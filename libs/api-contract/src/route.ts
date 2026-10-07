@@ -21,7 +21,7 @@ export const defineContract = <const T extends Contract>(contract: T): T =>
   contract;
 
 type Part<K extends string, S> = S extends z.ZodType
-  ? { [P in K]: z.input<S> }
+  ? Record<K, z.input<S>>
   : unknown;
 
 export type RouteInput<T extends RouteDef> = Part<'params', T['params']> &
