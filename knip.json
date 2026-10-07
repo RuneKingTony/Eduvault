@@ -38,6 +38,16 @@
       "entry": ["src/index.ts"],
       "project": ["src/**/*.{ts,tsx}"]
     },
+    "libs/ui": {
+      "entry": ["src/index.ts"],
+      "project": ["src/**/*.{ts,tsx}"],
+      "ignoreDependencies": [
+        "@fontsource-variable/inter",
+        "@fontsource-variable/roboto",
+        "tailwindcss",
+        "tw-animate-css"
+      ]
+    },
     "libs/testcontainers": {
       "entry": ["src/index.ts"],
       "project": ["src/**/*.ts"],

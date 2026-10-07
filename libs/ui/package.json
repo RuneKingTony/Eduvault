@@ -6,7 +6,15 @@
   "dependencies": {
     "react": "catalog:react",
     "react-dom": "catalog:react",
-    "better-auth": "catalog:auth"
+    "better-auth": "catalog:auth",
+    "@fontsource-variable/inter": "catalog:ui",
+    "@fontsource-variable/roboto": "catalog:ui",
+    "@radix-ui/react-slot": "catalog:ui",
+    "class-variance-authority": "catalog:ui",
+    "clsx": "catalog:ui",
+    "tailwind-merge": "catalog:ui",
+    "tailwindcss": "catalog:tailwind",
+    "tw-animate-css": "catalog:ui"
   },
   "devDependencies": {
     "@testing-library/dom": "catalog:testing",
