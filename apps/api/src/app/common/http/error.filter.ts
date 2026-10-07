@@ -22,7 +22,7 @@ const PG_FOREIGN_KEY_VIOLATION = '23503';
 
 const pgCode = (error: unknown): string | undefined =>
   typeof error === 'object' && error !== null && 'code' in error
-    ? String((error as { code: unknown }).code)
+    ? String(error.code)
     : undefined;
 
 /** Better Auth's server API throws APIError carrying an HTTP status. */

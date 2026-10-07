@@ -52,7 +52,7 @@ export class AuthContextService {
     const member = await this.authService.api
       .getActiveMember({ headers })
       .catch(() => null);
-    if (!member || member.organizationId !== organizationId) return undefined;
+    if (member?.organizationId !== organizationId) return undefined;
 
     const schoolWide = seesAllCampuses(member.role);
     const campuses = schoolWide

@@ -6,7 +6,7 @@ import {
   type ExecutionContext,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { can, type ActionOf, type Resource } from '@eduvault/policy';
+import { can } from '@eduvault/policy';
 import { AuthContextService } from '../auth-context.service';
 import type { AuthedRequest } from '../auth.types';
 import { PERMISSION_KEY, type RequiredPermission } from '../decorators/tokens';
@@ -32,14 +32,7 @@ export class OrganizationAuthGuard implements CanActivate {
       PERMISSION_KEY,
       context.getHandler()
     );
-    if (
-      required &&
-      !can(
-        org.role,
-        required.resource as Resource,
-        required.action as ActionOf<Resource>
-      )
-    ) {
+    if (required && !can(org.role, required.resource, required.action)) {
       throw new ForbiddenException(
         `Role "${org.role}" may not ${required.action} ${required.resource}`
       );

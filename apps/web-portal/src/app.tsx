@@ -36,7 +36,7 @@ export function App({ authClient }: { authClient: EduvaultAuthClient }) {
       {hasSchool ? (
         <RouterProvider router={router} />
       ) : (
-        <p className="text-slate-600">
+        <p className="text-muted-foreground">
           You have not been added to a school yet. Ask your school to invite
           you, then sign in again.
         </p>

@@ -1,6 +1,6 @@
-import type { FormEvent } from 'react';
+import type { SubmitEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Button, TextField } from '@eduvault/ui';
+import { Button, TextField, fieldValue } from '@eduvault/ui';
 import { useApi } from '../api';
 import { ErrorMessage } from '../components/error-message';
 
@@ -19,14 +19,14 @@ export function CampusesPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['campuses'] }),
   });
 
-  function submit(event: FormEvent<HTMLFormElement>) {
+  function submit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = event.currentTarget;
     const data = new FormData(form);
     create.mutate(
       {
-        name: String(data.get('name') ?? ''),
-        address: String(data.get('address') ?? ''),
+        name: fieldValue(data, 'name'),
+        address: fieldValue(data, 'address'),
       },
       { onSuccess: () => form.reset() }
     );
@@ -40,7 +40,9 @@ export function CampusesPage() {
         {campuses.data?.map((campus) => (
           <li key={campus.id} className="p-3">
             {campus.name}{' '}
-            <span className="text-sm text-slate-500">{campus.address}</span>
+            <span className="text-sm text-muted-foreground">
+              {campus.address}
+            </span>
           </li>
         ))}
       </ul>

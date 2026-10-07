@@ -19,7 +19,6 @@
     "@types/react": "catalog:react",
     "@types/react-dom": "catalog:react",
     "@vitejs/plugin-react": "catalog:vite-react",
-    "jsdom": "catalog:testing",
-    "tailwindcss": "catalog:tailwind"
+    "jsdom": "catalog:testing"
   }
 }

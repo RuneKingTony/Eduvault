@@ -21,26 +21,30 @@ export function ContextSwitchers({
   const schools = authClient.useListOrganizations();
   const activeSchoolId = session.data?.session.activeOrganizationId ?? null;
   const activeCampusId = session.data?.session.activeTeamId ?? null;
-  const [campuses, setCampuses] = useState<SwitcherOption[]>([]);
+  const [campuses, setCampuses] = useState<{
+    schoolId: string;
+    options: SwitcherOption[];
+  } | null>(null);
 
   useEffect(() => {
+    if (!activeSchoolId) return;
     let cancelled = false;
-    if (!activeSchoolId) {
-      setCampuses([]);
-      return;
-    }
     void authClient.organization.listUserTeams().then((result) => {
       if (cancelled) return;
-      setCampuses(
-        (result.data ?? [])
+      setCampuses({
+        schoolId: activeSchoolId,
+        options: (result.data ?? [])
           .filter((team) => team.organizationId === activeSchoolId)
-          .map((team) => ({ id: team.id, name: team.name }))
-      );
+          .map((team) => ({ id: team.id, name: team.name })),
+      });
     });
     return () => {
       cancelled = true;
     };
   }, [authClient, activeSchoolId]);
+
+  const schoolCampuses =
+    campuses?.schoolId === activeSchoolId ? campuses.options : [];
 
   return (
     <div className="flex items-center gap-4">
@@ -54,10 +58,10 @@ export function ContextSwitchers({
             .then(onChanged);
         }}
       />
-      {campuses.length > 1 ? (
+      {schoolCampuses.length > 1 ? (
         <ContextSwitcher
           label="Campus"
-          options={campuses}
+          options={schoolCampuses}
           value={activeCampusId}
           onChange={(teamId) => {
             void authClient.organization

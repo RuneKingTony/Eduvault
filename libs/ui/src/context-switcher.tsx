@@ -24,12 +24,12 @@ export function ContextSwitcher({
   const id = useId();
   return (
     <div className="flex items-center gap-2">
-      <label htmlFor={id} className="text-sm text-slate-600">
+      <label htmlFor={id} className="text-sm text-muted-foreground">
         {label}
       </label>
       <select
         id={id}
-        className="rounded-md border border-slate-300 px-2 py-1 text-sm"
+        className="rounded-md border border-input px-2 py-1 text-sm"
         value={value ?? ''}
         disabled={disabled}
         onChange={(event) => onChange(event.target.value)}

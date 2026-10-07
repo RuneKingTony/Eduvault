@@ -28,7 +28,9 @@ interface TestOrganization {
   owner: TestUser;
 }
 
-type AddMemberOptions = { campuses?: Array<Pick<Campus, 'id'>> };
+interface AddMemberOptions {
+  campuses?: Pick<Campus, 'id'>[];
+}
 
 const cookieFrom = (setCookie: string[] | string | undefined): string =>
   [setCookie ?? []]

@@ -1,6 +1,7 @@
-import { useState, type FormEvent } from 'react';
+import { useState, type SubmitEvent } from 'react';
 import type { EduvaultAuthClient } from './auth-client';
 import { Button } from './button';
+import { fieldValue } from './form-data';
 import { TextField } from './text-field';
 
 export function SignInForm({ authClient }: { authClient: EduvaultAuthClient }) {
@@ -8,11 +9,11 @@ export function SignInForm({ authClient }: { authClient: EduvaultAuthClient }) {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
+  async function submit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    const email = String(form.get('email') ?? '');
-    const password = String(form.get('password') ?? '');
+    const email = fieldValue(form, 'email');
+    const password = fieldValue(form, 'password');
     setPending(true);
     setError(null);
     const result =
@@ -21,7 +22,7 @@ export function SignInForm({ authClient }: { authClient: EduvaultAuthClient }) {
         : await authClient.signUp.email({
             email,
             password,
-            name: String(form.get('name') ?? '') || email,
+            name: fieldValue(form, 'name') || email,
           });
     setPending(false);
     if (result.error) setError(result.error.message ?? 'Something went wrong');
@@ -53,7 +54,7 @@ export function SignInForm({ authClient }: { authClient: EduvaultAuthClient }) {
       </Button>
       <button
         type="button"
-        className="text-sm text-slate-600 underline"
+        className="text-sm text-muted-foreground underline"
         onClick={() => setMode(mode === 'sign-in' ? 'sign-up' : 'sign-in')}
       >
         {mode === 'sign-in'

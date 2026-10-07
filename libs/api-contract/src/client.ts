@@ -1,4 +1,3 @@
-import type { z } from 'zod';
 import { errorSchema, type ApiErrorBody } from './schemas';
 import type { Contract, RouteDef, RouteInput, RouteOutput } from './route';
 
@@ -36,7 +35,13 @@ const fillPath = (path: string, params: Record<string, unknown> = {}) =>
 const toQuery = (query: Record<string, unknown> | undefined) => {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(query ?? {})) {
-    if (value !== undefined && value !== null) search.set(key, String(value));
+    if (
+      typeof value === 'string' ||
+      typeof value === 'number' ||
+      typeof value === 'boolean'
+    ) {
+      search.set(key, String(value));
+    }
   }
   const text = search.toString();
   return text ? `?${text}` : '';
@@ -70,7 +75,7 @@ async function call(
         : { code: 'UnknownError', message: response.statusText }
     );
   }
-  return route.response.parse(payload as z.input<typeof route.response>);
+  return route.response.parse(payload);
 }
 
 export function createApiClient<C extends Contract>(

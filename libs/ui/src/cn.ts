@@ -1,2 +1,4 @@
-export const cn = (...parts: Array<string | false | null | undefined>) =>
-  parts.filter(Boolean).join(' ');
+import { clsx, type ClassValue } from 'clsx';
+import { twMerge } from 'tailwind-merge';
+
+export const cn = (...inputs: ClassValue[]) => twMerge(clsx(inputs));

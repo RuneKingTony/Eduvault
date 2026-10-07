@@ -24,13 +24,15 @@ export function StudentsPage() {
         {students.data?.map((student) => (
           <li key={student.id} className="p-3">
             {student.fullName}{' '}
-            <span className="text-sm text-slate-500">
+            <span className="text-sm text-muted-foreground">
               {student.admissionNumber} · {campusName(student.campusId)}
             </span>
           </li>
         ))}
         {students.data?.length === 0 ? (
-          <li className="p-3 text-slate-500">No students on your campuses.</li>
+          <li className="p-3 text-muted-foreground">
+            No students on your campuses.
+          </li>
         ) : null}
       </ul>
     </section>

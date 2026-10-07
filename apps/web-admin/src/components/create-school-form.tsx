@@ -1,6 +1,11 @@
-import { useState, type FormEvent } from 'react';
+import { useState, type SubmitEvent } from 'react';
 import { slugify } from '@eduvault/shared';
-import { Button, TextField, type EduvaultAuthClient } from '@eduvault/ui';
+import {
+  Button,
+  TextField,
+  fieldValue,
+  type EduvaultAuthClient,
+} from '@eduvault/ui';
 
 export function CreateSchoolForm({
   authClient,
@@ -11,9 +16,9 @@ export function CreateSchoolForm({
 }) {
   const [error, setError] = useState<string | null>(null);
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
+  async function submit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
-    const name = String(new FormData(event.currentTarget).get('name') ?? '');
+    const name = fieldValue(new FormData(event.currentTarget), 'name');
     const slug = `${slugify(name)}-${Math.random().toString(36).slice(2, 6)}`;
     const result = await authClient.organization.create({ name, slug });
     if (result.error) {

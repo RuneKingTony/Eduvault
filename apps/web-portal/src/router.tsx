@@ -8,7 +8,7 @@ import {
 import { FeesPage } from './pages/fees-page';
 import { StudentsPage } from './pages/students-page';
 
-const navLinkClass = 'text-sm text-slate-600 hover:text-slate-900';
+const navLinkClass = 'text-sm text-muted-foreground hover:text-foreground';
 
 function Layout() {
   return (
