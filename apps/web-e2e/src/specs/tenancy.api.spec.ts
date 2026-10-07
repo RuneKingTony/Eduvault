@@ -55,7 +55,7 @@ test('an admin sees every campus of the school', async () => {
   const admin = await signedInAs(fixture.personas.admin);
   const res = await admin.get('/campuses');
   expect(res.status()).toBe(200);
-  const campuses = (await res.json()) as Array<{ id: string }>;
+  const campuses = (await res.json()) as { id: string }[];
   expect(campuses.map((c) => c.id)).toContain(fixture.annexCampusId);
   await admin.dispose();
 });

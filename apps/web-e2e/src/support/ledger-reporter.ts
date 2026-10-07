@@ -15,10 +15,10 @@ const resultPath = `${artifactDir}/result.txt`;
  * ledger after a run with no failure. A BLOCKED run exits non-zero: it is never a pass. A failed run keeps its records for inspection.
  */
 export default class LedgerReporter implements Reporter {
-  private passed: string[] = [];
-  private failed: string[] = [];
-  private blocked: string[] = [];
-  private errors: string[] = [];
+  private readonly passed: string[] = [];
+  private readonly failed: string[] = [];
+  private readonly blocked: string[] = [];
+  private readonly errors: string[] = [];
 
   onTestEnd(test: TestCase, result: TestResult): void {
     const title = `${test.parent.project()?.name ?? ''} ${test.title}`.trim();
