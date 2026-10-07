@@ -49,6 +49,7 @@ Unit tests (`nx run <project>:test`) never start Docker. Integration tests (`api
 - `@OrganizationAuth(resource, action)` goes on each handler, not the class, so the guard runs once.
 - The default team per organization is disabled; a campus is a team plus a `campus` row. Creating a campus enrols its creator, because Better Auth only activates a team the user belongs to.
 - Nest needs decorator metadata, so the API is built with SWC through Vite into `apps/api/dist/main.cjs` and run with `node` (not `tsx`). The output stays inside `apps/api` so pnpm's strict `node_modules` resolves.
+- UI components come from the shadcn CLI in `libs/ui`: `pnpm ui:add <name>`, then `pnpm ui:localize` (the apps need relative imports, not `@/`). Use theme tokens (`bg-primary`, `text-muted-foreground`), never raw colours. See `docs/development.md`.
 - Session cookies are host-scoped, not port-scoped: signing in on :4200 also signs in :4201.
 - Docker must be running for integration tests and `pnpm drift`.
 

@@ -3,7 +3,11 @@
   "compilerOptions": {
     "jsx": "react-jsx",
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
-    "types": ["vitest/globals", "@testing-library/jest-dom"]
+    "types": ["vitest/globals", "@testing-library/jest-dom"],
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+    "baseUrl": "."
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "vitest.config.mts"]
+  "include": ["src/**/*.ts", "src/**/*.tsx", "*.mts"]
 }
