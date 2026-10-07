@@ -2,7 +2,6 @@
   "compileOnSave": false,
   "compilerOptions": {
     "rootDir": ".",
-    "baseUrl": ".",
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "bundler",
@@ -21,12 +20,12 @@
     "sourceMap": true,
     "declaration": false,
     "paths": {
-      "@eduvault/shared": ["libs/shared/src/index.ts"],
-      "@eduvault/api-contract": ["libs/api-contract/src/index.ts"],
-      "@eduvault/policy": ["libs/policy/src/index.ts"],
-      "@eduvault/ui": ["libs/ui/src/index.ts"],
-      "@eduvault/auth-client": ["libs/auth-client/src/index.ts"],
-      "@eduvault/testcontainers": ["libs/testcontainers/src/index.ts"]
+      "@eduvault/shared": ["./libs/shared/src/index.ts"],
+      "@eduvault/api-contract": ["./libs/api-contract/src/index.ts"],
+      "@eduvault/policy": ["./libs/policy/src/index.ts"],
+      "@eduvault/ui": ["./libs/ui/src/index.ts"],
+      "@eduvault/auth-client": ["./libs/auth-client/src/index.ts"],
+      "@eduvault/testcontainers": ["./libs/testcontainers/src/index.ts"]
     }
   },
   "exclude": ["node_modules", "tmp", "dist"]
