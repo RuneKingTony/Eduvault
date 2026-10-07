@@ -1,17 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
 import { useApi } from '../api';
 import { ErrorMessage } from '../components/error-message';
+import { campusesQueryOptions, studentsQueryOptions } from '../queries';
 
 export function StudentsPage() {
   const api = useApi();
-  const students = useQuery({
-    queryKey: ['students'],
-    queryFn: () => api.students.list({ query: {} }),
-  });
-  const campuses = useQuery({
-    queryKey: ['campuses'],
-    queryFn: () => api.campuses.list({}),
-  });
+  const students = useQuery(studentsQueryOptions(api));
+  const campuses = useQuery(campusesQueryOptions(api));
 
   const campusName = (id: string) =>
     campuses.data?.find((campus) => campus.id === id)?.name ?? id;
