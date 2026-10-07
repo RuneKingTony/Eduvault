@@ -17,13 +17,13 @@ export function FeesPage() {
         {fees.data?.map((fee) => (
           <li key={fee.id} className="flex justify-between p-3">
             <span>{fee.name}</span>
-            <span className="text-slate-600">
+            <span className="text-muted-foreground">
               {(fee.amountMinor / 100).toLocaleString()} {fee.currency}
             </span>
           </li>
         ))}
         {fees.data?.length === 0 ? (
-          <li className="p-3 text-slate-500">No fee schedules.</li>
+          <li className="p-3 text-muted-foreground">No fee schedules.</li>
         ) : null}
       </ul>
     </section>
