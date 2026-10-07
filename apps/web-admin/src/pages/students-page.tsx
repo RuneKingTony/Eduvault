@@ -1,6 +1,6 @@
-import { useState, type FormEvent } from 'react';
+import { useState, type SubmitEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Button, TextField } from '@eduvault/ui';
+import { Button, TextField, fieldValue } from '@eduvault/ui';
 import { useApi } from '../api';
 import { ErrorMessage } from '../components/error-message';
 
@@ -31,14 +31,14 @@ export function StudentsPage() {
     onSuccess: refresh,
   });
 
-  function submit(event: FormEvent<HTMLFormElement>) {
+  function submit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = event.currentTarget;
     const data = new FormData(form);
     create.mutate(
       {
-        fullName: String(data.get('fullName') ?? ''),
-        admissionNumber: String(data.get('admissionNumber') ?? ''),
+        fullName: fieldValue(data, 'fullName'),
+        admissionNumber: fieldValue(data, 'admissionNumber'),
       },
       { onSuccess: () => form.reset() }
     );
@@ -59,11 +59,12 @@ export function StudentsPage() {
           >
             <span>
               {student.fullName}{' '}
-              <span className="text-sm text-slate-500">
+              <span className="text-sm text-muted-foreground">
                 {student.admissionNumber} · {campusName(student.campusId)}
               </span>
             </span>
             <button
+              type="button"
               className="text-sm text-red-600"
               onClick={() => remove.mutate(student.id)}
             >
@@ -72,7 +73,7 @@ export function StudentsPage() {
           </li>
         ))}
         {students.data?.length === 0 ? (
-          <li className="p-3 text-slate-500">No students yet.</li>
+          <li className="p-3 text-muted-foreground">No students yet.</li>
         ) : null}
       </ul>
       <form onSubmit={submit} className="flex flex-wrap items-end gap-3">
@@ -81,13 +82,13 @@ export function StudentsPage() {
         <div className="flex flex-col gap-1">
           <label
             htmlFor="student-campus"
-            className="text-sm font-medium text-slate-700"
+            className="text-sm font-medium text-foreground"
           >
             Campus
           </label>
           <select
             id="student-campus"
-            className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+            className="rounded-md border border-input px-3 py-2 text-sm"
             value={campusId}
             onChange={(event) => setCampusId(event.target.value)}
           >
