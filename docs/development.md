@@ -53,10 +53,15 @@ After any schema change run `pnpm drift:fix` and commit `schema.sql` and `db-typ
 
 ## UI components (shadcn)
 
-`libs/ui` is a shadcn project (`libs/ui/components.json`, preset `b1fy405VLO`: radix-nova, zinc, teal, Inter and Roboto). Tokens live in `libs/ui/src/styles/theme.css`; components in `libs/ui/src/components/ui/`, the `cn` helper in `libs/ui/src/lib/utils.ts`.
+`libs/ui` is a shadcn project (`libs/ui/components.json`, preset `b1fy405VLO`: radix-nova, zinc, teal, Inter and Roboto). Tokens live in `libs/ui/src/styles/theme.css`; helpers (`cn`, `fieldValue`) in `libs/ui/src/lib/`. Components are split by owner:
+
+- `src/components/ui/` and `src/hooks/`: shadcn CLI output only. Treat it as vendored: running `pnpm ui:add <name> --overwrite` must not lose anything. Change the look through tokens in `theme.css` or a CLI variant; change behaviour with an in-house wrapper.
+- `src/components/custom/`: in-house components (`TextField`, `ContextSwitcher`, ...), built from the `ui/` primitives. Names never reuse a shadcn name. Specs live here only.
+
+If a vendored file needs a real fix (an accessibility bug, say), edit it, add a one-line comment with the reason and list the file here so the next `--overwrite` re-applies it.
 
 - Add or update a component: `pnpm ui:add <component>`, then `pnpm ui:localize`. The apps consume `libs/ui` from source, so the CLI's `@/` imports cannot resolve; `ui:localize` rewrites them to relative paths, undoes the CLI swapping `cn` for the unrelated `cn` npm package, then runs install, Prettier and `eslint --fix`.
-- Export new components from `libs/ui/src/index.ts`; apps import only from `@eduvault/ui`.
+- Export new components from `libs/ui/src/index.ts`, in the shadcn or in-house block; apps import only from `@eduvault/ui`.
 - Re-apply the preset from `libs/ui`: `pnpm --filter @eduvault/ui exec shadcn apply --preset b1fy405VLO`, then `pnpm ui:localize`. The preset does not define `success` and `warning`; they are kept by hand in `theme.css`.
 - `libs/ui/vite.config.mts` is empty on purpose: the CLI only recognises a project that has a Vite config.
 

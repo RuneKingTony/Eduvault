@@ -115,7 +115,7 @@ Mapping: **organization = school**, **team = campus**, and **`member.role` = a r
 
 ### Endpoints
 
-All under `/api/auth/*`, mounted by `@thallesp/nestjs-better-auth`. SPAs reach them only through `createAuthClient` (`@eduvault/ui`, with `organizationClient({ teams: { enabled: true } })`); they never call these URLs by hand.
+All under `/api/auth/*`, mounted by `@thallesp/nestjs-better-auth`. SPAs reach them only through `createEduvaultAuthClient` (`@eduvault/auth-client`, with `organizationClient({ teams: { enabled: true } })`); they never call these URLs by hand.
 
 - **Core:** `sign-up/email`, `sign-in/email`, `sign-in/social`, `sign-out`, `get-session`, `update-user`, `change-email`, `change-password`, `request-password-reset`, `reset-password`, `send-verification-email`, `verify-email`, `list-sessions`, `revoke-session(s)`, `revoke-other-sessions`, `list-accounts`, `link-social`, `unlink-account`, `delete-user`, and related callbacks.
 - **Admin, `/admin/*`:** `list-users`, `get-user`, `create-user`, `update-user`, `set-role`, `set-user-password`, `ban-user`, `unban-user`, `remove-user`, `list-user-sessions`, `revoke-user-session(s)`, `impersonate-user`, `stop-impersonating`, `has-permission`.
