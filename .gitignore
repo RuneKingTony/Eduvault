@@ -15,3 +15,5 @@ vitest.config.*.timestamp*
 .claude/settings.local.json
 .claude/worktrees
 apps/*/src/routeTree.gen.ts
+.claude/opsx/
+.claude/soul/decisions.jsonl
