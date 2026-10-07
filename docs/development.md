@@ -51,6 +51,15 @@ After any schema change run `pnpm drift:fix` and commit `schema.sql` and `db-typ
 4. Add a module under `apps/api/src/app/modules/`; put `@OrganizationAuth(resource, action)` on each handler and filter every query by `ctx.organizationId` and, where campus aware, `inCampusScope`.
 5. Cover it in `apps/api/test/*.integration.spec.ts`, including a cross-school case.
 
+## UI components (shadcn)
+
+`libs/ui` is a shadcn project (`libs/ui/components.json`, preset `b1fy405VLO`: radix-nova, zinc, teal, Inter and Roboto). Tokens live in `libs/ui/src/styles/theme.css`; components in `libs/ui/src/components/ui/`, the `cn` helper in `libs/ui/src/lib/utils.ts`.
+
+- Add or update a component: `pnpm ui:add <component>`, then `pnpm ui:localize`. The apps consume `libs/ui` from source, so the CLI's `@/` imports cannot resolve; `ui:localize` rewrites them to relative paths, undoes the CLI swapping `cn` for the unrelated `cn` npm package, then runs install, Prettier and `eslint --fix`.
+- Export new components from `libs/ui/src/index.ts`; apps import only from `@eduvault/ui`.
+- Re-apply the preset from `libs/ui`: `pnpm --filter @eduvault/ui exec shadcn apply --preset b1fy405VLO`, then `pnpm ui:localize`. The preset does not define `success` and `warning`; they are kept by hand in `theme.css`.
+- `libs/ui/vite.config.mts` is empty on purpose: the CLI only recognises a project that has a Vite config.
+
 ## Integration tests
 
 `apps/api/test/support/base-test.ts` exposes the `baseTest` fixture: `signUp`, `signIn`, `createOrganization`, `createCampus`, `addMember`, `promoteToAdmin`, `setActiveOrganization`, `setActiveCampus` and an `api(user)` supertest helper. Each test starts from truncated tables; one Postgres container serves the whole run.

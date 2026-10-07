@@ -1,6 +1,6 @@
 import { useState, type SubmitEvent } from 'react';
 import type { EduvaultAuthClient } from './auth-client';
-import { Button } from './button';
+import { Button } from './components/ui/button';
 import { fieldValue } from './form-data';
 import { TextField } from './text-field';
 

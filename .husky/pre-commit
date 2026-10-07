@@ -1,4 +1,4 @@
-staged=$(git diff --cached --name-only --diff-filter=ACMR)
+staged=$(git diff --cached --name-only --diff-filter=ACMR | while IFS= read -r f; do [ -L "$f" ] || echo "$f"; done)
 if [ -n "$staged" ]; then
   echo "$staged" | xargs pnpm exec prettier --write --ignore-unknown --log-level=warn
   echo "$staged" | xargs git add

@@ -44,6 +44,7 @@
       "ignoreDependencies": [
         "@fontsource-variable/inter",
         "@fontsource-variable/roboto",
+        "shadcn",
         "tailwindcss",
         "tw-animate-css"
       ]
