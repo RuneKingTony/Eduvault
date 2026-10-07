@@ -14,13 +14,26 @@
       ]
     },
     "apps/api": {
-      "entry": ["auth.ts", "test/**/*.integration.spec.ts"],
+      "entry": [
+        "src/main.ts",
+        "auth.ts",
+        "scripts/seed.ts",
+        "test/**/*.integration.spec.ts",
+        "test/setup/global-setup.ts",
+        "vite.config.mts",
+        "vitest.config.mts",
+        "vitest.integration.config.mts"
+      ],
       "project": ["src/**/*.ts", "test/**/*.ts", "scripts/**/*.ts"],
       "ignore": ["src/db/db-types.ts"],
       "ignoreDependencies": ["auth", "kysely-codegen"]
     },
-    "apps/web-admin": {},
-    "apps/web-portal": {},
+    "apps/web-admin": {
+      "entry": ["src/main.tsx", "vite.config.mts", "vitest.config.mts"]
+    },
+    "apps/web-portal": {
+      "entry": ["src/main.tsx", "vite.config.mts", "vitest.config.mts"]
+    },
     "libs/*": {
       "entry": ["src/index.ts"],
       "project": ["src/**/*.{ts,tsx}"]
