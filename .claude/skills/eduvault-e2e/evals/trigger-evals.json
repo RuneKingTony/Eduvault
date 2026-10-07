@@ -1,0 +1,14 @@
+[
+  {
+    "query": "Run the e2e check against the local stack for my web-admin change",
+    "should_trigger": true
+  },
+  {
+    "query": "Does this diff need Playwright e2e? Run it if so",
+    "should_trigger": true
+  },
+  {
+    "query": "Run the API integration tests",
+    "should_trigger": false
+  }
+]

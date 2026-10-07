@@ -1,0 +1,14 @@
+[
+  {
+    "query": "/ship EDU-18",
+    "should_trigger": true
+  },
+  {
+    "query": "Take issue 18 all the way to a draft PR",
+    "should_trigger": true
+  },
+  {
+    "query": "Commit my staged changes",
+    "should_trigger": false
+  }
+]

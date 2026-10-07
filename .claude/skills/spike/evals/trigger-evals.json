@@ -1,0 +1,14 @@
+[
+  {
+    "query": "/spike EDU-5 --concurrency 3",
+    "should_trigger": true
+  },
+  {
+    "query": "Run every sub-issue of epic 5 in dependency order, three at a time",
+    "should_trigger": true
+  },
+  {
+    "query": "Ship a single issue EDU-7",
+    "should_trigger": false
+  }
+]

@@ -1,0 +1,14 @@
+[
+  {
+    "query": "Enrich EDU-12: what already exists in the code for this?",
+    "should_trigger": true
+  },
+  {
+    "query": "Reality-check issue 9 against the codebase before we start",
+    "should_trigger": true
+  },
+  {
+    "query": "Write a new migration for the student table",
+    "should_trigger": false
+  }
+]

@@ -1,0 +1,14 @@
+[
+  {
+    "query": "Fetch EDU-42 and list which issues block it",
+    "should_trigger": true
+  },
+  {
+    "query": "Move issue 17 to in-review and leave a comment saying the PR is up",
+    "should_trigger": true
+  },
+  {
+    "query": "Rename the GitHub Actions workflow file",
+    "should_trigger": false
+  }
+]

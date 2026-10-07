@@ -1,0 +1,14 @@
+[
+  {
+    "query": "Deep review of this branch before I open the PR",
+    "should_trigger": true
+  },
+  {
+    "query": "Check my diff for tenancy and money bugs across all dimensions",
+    "should_trigger": true
+  },
+  {
+    "query": "Run pnpm lint",
+    "should_trigger": false
+  }
+]

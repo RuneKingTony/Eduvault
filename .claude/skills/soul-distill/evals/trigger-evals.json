@@ -1,0 +1,14 @@
+[
+  {
+    "query": "Distill my recent decisions into the SOUL profile",
+    "should_trigger": true
+  },
+  {
+    "query": "The decision nudge fired; process decisions.jsonl",
+    "should_trigger": true
+  },
+  {
+    "query": "Summarise this conversation",
+    "should_trigger": false
+  }
+]

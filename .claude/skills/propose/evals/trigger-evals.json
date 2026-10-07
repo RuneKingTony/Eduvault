@@ -1,0 +1,14 @@
+[
+  {
+    "query": "Propose a design for EDU-31 before we implement it",
+    "should_trigger": true
+  },
+  {
+    "query": "Plan how to add per-campus fee schedules and write tasks.md",
+    "should_trigger": true
+  },
+  {
+    "query": "Fix the typo in the README",
+    "should_trigger": false
+  }
+]
