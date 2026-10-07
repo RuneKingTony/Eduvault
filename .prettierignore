@@ -1,0 +1,10 @@
+node_modules
+dist
+coverage
+.nx
+pnpm-lock.yaml
+apps/api/db/schema.sql
+apps/api/db/migrations
+apps/api/src/db/db-types.ts
+apps/*/src/routeTree.gen.ts
+GOAL.md
