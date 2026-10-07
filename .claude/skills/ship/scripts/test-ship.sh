@@ -14,6 +14,14 @@ has() { if grep -qF -- "$2" <<<"$3"; then echo "ok   $1"; else echo "FAIL $1 (mi
 rc() { "$@" >/dev/null 2>&1; echo $?; }
 S() { bash "$W/state.sh" "$@"; }
 
+echo "== herdr agent names"
+. "$W/lib.sh"
+for case in "EDU-1 implement 1" "EDU-1234 fix-blockers 1" "EDU-99999 fix-blockers 12"; do
+  set -- $case
+  n=$(worker_agent_name "$1" "$2" "$3")
+  ok "agent name '$n' is 1-32 chars of [a-z0-9_-] starting with a letter" 0 "$([ ${#n} -ge 1 ] && [ ${#n} -le 32 ] && printf '%s' "$n" | grep -qE '^[a-z][a-z0-9_-]*$'; echo $?)"
+done
+
 echo "== effort / stage table / README"
 TABLE=$(bash "$W/stage-table.sh")
 while read -r stage model effort; do

@@ -81,3 +81,9 @@ parent_spike() {  # <KEY>
     --slurpfile l <(cat "$OPSX/epic-$e/.spike-lock" 2>/dev/null || echo '{}') --argjson now "$(date +%s)" \
     '{epic: $e, source: $src, run_id: ($l[0].run_id // null), live: ($now - ($l[0].heartbeat_epoch // 0) < 600)}'
 }
+
+worker_agent_name() {
+  local base
+  base=$(printf 'ship-%s-%s-%s' "$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')" "$2" "$3" | tr -c 'a-z0-9_\n-' '-' | cut -c1-27)
+  printf '%s-%s' "$base" "$(date +%s | tail -c 4)"
+}

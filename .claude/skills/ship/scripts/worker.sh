@@ -135,7 +135,7 @@ dispatch)
   # inside the sandbox; EDU_ORCHESTRATED=1 makes gh-issues.sh refuse to close an issue.
   ENVLINE=" export $WORKER_ENV"
   herdr pane run "$PANE" "$ENVLINE" >/dev/null 2>&1 && sleep 1
-  NEW="ship-$(echo "$KEY" | tr '[:upper:]' '[:lower:]')-$STAGE-$ATTEMPTS-$(date +%s | tail -c 4)"
+  NEW=$(worker_agent_name "$KEY" "$STAGE" "$ATTEMPTS")
   start_worker() {
     for _ in 1 2 3; do       # the shell may need a moment after Claude exits
       herdr agent start "$NEW" --kind claude --pane "$PANE" --timeout 60000 \
