@@ -1,0 +1,76 @@
+{
+  "name": "api",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/api/src",
+  "projectType": "application",
+  "tags": ["scope:api"],
+  "targets": {
+    "typecheck": {},
+    "env-init": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "[ -f .env.local ] || cp .env.example .env.local",
+        "cwd": "apps/api"
+      }
+    },
+    "db-start": {
+      "executor": "nx:run-commands",
+      "description": "Start only Postgres (docker compose, host port 5434)",
+      "options": { "command": "docker compose up -d --wait postgres" }
+    },
+    "db-stop": {
+      "executor": "nx:run-commands",
+      "options": { "command": "docker compose down" }
+    },
+    "db-migrate-up": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["env-init"],
+      "options": {
+        "command": "pnpm exec dbmate --env-file .env.local --url \"$DATABASE_URL\" --migrations-dir db/migrations --no-dump-schema up",
+        "cwd": "apps/api"
+      }
+    },
+    "db-reset": {
+      "executor": "nx:run-commands",
+      "description": "Wipe the local Postgres volume, restart it and re-apply migrations",
+      "options": {
+        "commands": [
+          "docker compose down -v",
+          "docker compose up -d --wait postgres",
+          "nx run api:db-migrate-up"
+        ],
+        "parallel": false
+      }
+    },
+    "db-seed": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["env-init"],
+      "description": "Seed deterministic dev data through Better Auth (idempotent)",
+      "options": {
+        "command": "tsx --tsconfig tsconfig.json --env-file=.env.local scripts/seed.ts",
+        "cwd": "apps/api"
+      }
+    },
+    "auth-generate": {
+      "executor": "nx:run-commands",
+      "description": "Emit Better Auth schema changes as a new dbmate migration and refresh the snapshot",
+      "options": {
+        "command": "tsx --tsconfig scripts/tsconfig.json scripts/drift-check.ts --write --only=auth"
+      }
+    },
+    "db-codegen": {
+      "executor": "nx:run-commands",
+      "description": "Regenerate the committed Kysely types",
+      "options": {
+        "command": "tsx --tsconfig scripts/tsconfig.json scripts/drift-check.ts --write --only=types"
+      }
+    },
+    "db-dump": {
+      "executor": "nx:run-commands",
+      "description": "Regenerate the committed db/schema.sql",
+      "options": {
+        "command": "tsx --tsconfig scripts/tsconfig.json scripts/drift-check.ts --write --only=schema"
+      }
+    }
+  }
+}

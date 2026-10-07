@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 
 function findDbmate(from: string): string {
@@ -22,10 +23,13 @@ export function withoutSsl(uri: string): string {
 export function runMigrations(options: {
   url: string;
   migrationsDir: string;
-  cwd?: string;
 }): void {
+  const hasMigrations =
+    existsSync(options.migrationsDir) &&
+    readdirSync(options.migrationsDir).some((f) => f.endsWith('.sql'));
+  if (!hasMigrations) return;
   execFileSync(
-    findDbmate(options.cwd ?? process.cwd()),
+    findDbmate(dirname(fileURLToPath(import.meta.url))),
     [
       '--url',
       withoutSsl(options.url),

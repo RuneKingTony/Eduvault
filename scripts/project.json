@@ -1,0 +1,10 @@
+{
+  "name": "scripts",
+  "$schema": "../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "scripts",
+  "projectType": "library",
+  "tags": ["scope:api"],
+  "targets": {
+    "typecheck": {}
+  }
+}

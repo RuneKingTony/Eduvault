@@ -1,0 +1,21 @@
+name: eduvault
+
+services:
+  postgres:
+    image: postgres:17.6-alpine
+    environment:
+      POSTGRES_USER: eduvault
+      POSTGRES_PASSWORD: eduvault
+      POSTGRES_DB: eduvault
+    ports:
+      - '5434:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U eduvault -d eduvault']
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  pgdata:

@@ -21,9 +21,10 @@
     "typecheck": "nx run-many -t typecheck",
     "test": "echo 'Scope tests to a project: nx run <project>:test' && exit 1",
     "knip": "knip",
-    "drift": "tsx scripts/drift-check.ts",
+    "drift": "tsx --tsconfig scripts/tsconfig.json scripts/drift-check.ts",
     "validate:quick": "nx affected -t lint typecheck test",
-    "validate": "pnpm format:check && nx run-many -t lint && nx run-many -t typecheck && pnpm knip && pnpm drift && nx run-many -t test && nx run api:test-integration && nx run-many -t build"
+    "validate": "pnpm format:check && nx run-many -t lint && nx run-many -t typecheck && pnpm knip && pnpm drift && nx run-many -t test && nx run api:test-integration && nx run-many -t build",
+    "drift:fix": "tsx --tsconfig scripts/tsconfig.json scripts/drift-check.ts --write"
   },
   "devDependencies": {
     "@eslint/js": "catalog:",

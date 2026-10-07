@@ -1,0 +1,31 @@
+{
+  "name": "@eduvault/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@nestjs/common": "catalog:nestjs",
+    "@nestjs/core": "catalog:nestjs",
+    "@nestjs/platform-express": "catalog:nestjs",
+    "@thallesp/nestjs-better-auth": "catalog:server",
+    "better-auth": "catalog:auth",
+    "express": "catalog:server",
+    "kysely": "catalog:server",
+    "pg": "catalog:server",
+    "reflect-metadata": "catalog:server",
+    "rxjs": "catalog:server",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@nestjs/testing": "catalog:nestjs",
+    "@swc/core": "catalog:swc",
+    "@types/express": "catalog:server",
+    "@types/pg": "catalog:server",
+    "@types/supertest": "catalog:testing",
+    "auth": "catalog:auth",
+    "dbmate": "catalog:server",
+    "kysely-codegen": "catalog:server",
+    "supertest": "catalog:testing",
+    "unplugin-swc": "catalog:swc"
+  }
+}
