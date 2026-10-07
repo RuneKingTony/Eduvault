@@ -1,0 +1,71 @@
+import { useEffect, useState } from 'react';
+import type { EduvaultAuthClient } from './auth-client';
+import { ContextSwitcher, type SwitcherOption } from './context-switcher';
+
+export interface ContextSwitchersProps {
+  authClient: EduvaultAuthClient;
+  /** Called after the active school or campus changed, so data can refetch. */
+  onChanged: () => void;
+}
+
+/**
+ * School switcher always (a user may belong to several schools); campus
+ * switcher only when the active school has more than one campus the user
+ * works at, since Better Auth only activates campuses the user belongs to.
+ */
+export function ContextSwitchers({
+  authClient,
+  onChanged,
+}: ContextSwitchersProps) {
+  const session = authClient.useSession();
+  const schools = authClient.useListOrganizations();
+  const activeSchoolId = session.data?.session.activeOrganizationId ?? null;
+  const activeCampusId = session.data?.session.activeTeamId ?? null;
+  const [campuses, setCampuses] = useState<SwitcherOption[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!activeSchoolId) {
+      setCampuses([]);
+      return;
+    }
+    void authClient.organization.listUserTeams().then((result) => {
+      if (cancelled) return;
+      setCampuses(
+        (result.data ?? [])
+          .filter((team) => team.organizationId === activeSchoolId)
+          .map((team) => ({ id: team.id, name: team.name }))
+      );
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [authClient, activeSchoolId]);
+
+  return (
+    <div className="flex items-center gap-4">
+      <ContextSwitcher
+        label="School"
+        options={schools.data ?? []}
+        value={activeSchoolId}
+        onChange={(organizationId) => {
+          void authClient.organization
+            .setActive({ organizationId })
+            .then(onChanged);
+        }}
+      />
+      {campuses.length > 1 ? (
+        <ContextSwitcher
+          label="Campus"
+          options={campuses}
+          value={activeCampusId}
+          onChange={(teamId) => {
+            void authClient.organization
+              .setActiveTeam({ teamId })
+              .then(onChanged);
+          }}
+        />
+      ) : null}
+    </div>
+  );
+}

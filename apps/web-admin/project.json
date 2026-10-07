@@ -1,0 +1,8 @@
+{
+  "name": "web-admin",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/web-admin/src",
+  "projectType": "application",
+  "tags": ["scope:web-admin"],
+  "targets": { "typecheck": {} }
+}
