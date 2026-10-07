@@ -111,6 +111,18 @@ async function main() {
     riversideHeaders
   );
 
+  // createTeam does not enrol its creator; Better Auth only activates teams a user belongs to.
+  for (const teamId of [main, annex]) {
+    await auth.api.addTeamMember({
+      body: { teamId, userId: ids.greenfieldOwner },
+      headers: greenfieldHeaders,
+    });
+  }
+  await auth.api.addTeamMember({
+    body: { teamId: riversideMain, userId: ids.riversideOwner },
+    headers: riversideHeaders,
+  });
+
   await auth.api.addMember({
     body: {
       userId: ids.greenfieldTeacher,
@@ -127,10 +139,12 @@ async function main() {
   await auth.api.addMember({
     body: { userId: ids.multi, organizationId: greenfield.id, role: 'teacher' },
   });
-  await auth.api.addTeamMember({
-    body: { teamId: main, userId: ids.multi },
-    headers: greenfieldHeaders,
-  });
+  for (const teamId of [main, annex]) {
+    await auth.api.addTeamMember({
+      body: { teamId, userId: ids.multi },
+      headers: greenfieldHeaders,
+    });
+  }
   await auth.api.addMember({
     body: { userId: ids.multi, organizationId: riverside.id, role: 'admin' },
   });

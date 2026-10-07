@@ -23,12 +23,12 @@ pnpm db:seed    # idempotent; prints "Already seeded; nothing to do." on re-run
 
 Seed data (password for all: `password123`):
 
-| Email                     | Schools and roles                                      |
-| ------------------------- | ------------------------------------------------------ |
-| `owner@greenfield.test`   | Greenfield Academy owner (campuses Main Campus, Annex) |
-| `teacher@greenfield.test` | Greenfield teacher at Main Campus                      |
-| `owner@riverside.test`    | Riverside School owner (one campus)                    |
-| `multi@eduvault.test`     | Greenfield teacher (Main Campus) and Riverside admin   |
+| Email                     | Schools and roles                                            |
+| ------------------------- | ------------------------------------------------------------ |
+| `owner@greenfield.test`   | Greenfield Academy owner, member of Main Campus and Annex    |
+| `teacher@greenfield.test` | Greenfield teacher at Main Campus                            |
+| `owner@riverside.test`    | Riverside School owner (one campus)                          |
+| `multi@eduvault.test`     | Greenfield teacher at Main Campus and Annex, Riverside admin |
 
 ## 3. Serve all three apps
 

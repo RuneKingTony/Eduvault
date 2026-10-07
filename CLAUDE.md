@@ -50,6 +50,16 @@ Unit tests (`nx run <project>:test`) never start Docker. Integration tests (`api
 - Session cookies are host-scoped, not port-scoped: signing in on :4200 also signs in :4201.
 - Docker must be running for integration tests and `pnpm drift`.
 
+## Git
+
+- Conventional commits with a scope from the table in `.claude/commands/commit-conventional.md`. Never add a `Co-Authored-By` trailer.
+- Branches are `edu-<issue>-<slug>`, PRs are drafts titled `EDU-<n>: ...`. Diff against `origin/main`, never local `main`.
+- Never bypass hooks (`--no-verify`, `HUSKY=0`) and never background a command with `nohup` or `&`; the PreToolUse guard blocks both. Use `run_in_background: true`.
+
+## Agent skills
+
+Issues are in GitHub Issues via `gh` (`docs/agents/issue-tracker.md`). Domain vocabulary is in `CONTEXT.md`, decisions in `docs/adr/`.
+
 ## Comment hygiene
 
 Don't add code comments by default. Add one only for something a reader can't work out from the code: a non-obvious constraint, a workaround, or the reason for a surprising choice. One or two lines. Never restate what the code does, narrate the change, or reference a ticket or PR.
