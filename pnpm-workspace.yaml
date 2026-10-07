@@ -84,6 +84,7 @@ catalogs:
   tanstack:
     '@tanstack/react-query': ^5.85.0
     '@tanstack/react-router': ^1.132.0
+    '@tanstack/router-plugin': ^1.132.0
   testing:
     '@testcontainers/postgresql': ^11.5.1
     '@testing-library/dom': ^10.4.0

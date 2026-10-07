@@ -13,6 +13,7 @@
     "@eduvault/ui": "workspace:*"
   },
   "devDependencies": {
+    "@tanstack/router-plugin": "catalog:tanstack",
     "@tailwindcss/vite": "catalog:tailwind",
     "@testing-library/dom": "catalog:testing",
     "@testing-library/jest-dom": "catalog:testing",
