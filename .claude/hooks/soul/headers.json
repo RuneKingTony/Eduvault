@@ -1,0 +1,94 @@
+{
+  "_comment": "Canonical AskUserQuestion headers (12 characters or fewer). The capture hook maps a header, case-insensitively, onto its canonical name through aliases; an unknown header is still logged with header_known:false so distill can map it.",
+  "headers": [
+    {
+      "name": "Target app",
+      "use_for": "Which app or lib owns the change.",
+      "aliases": ["Target apps", "Placement", "Location", "Where"]
+    },
+    {
+      "name": "Scope",
+      "use_for": "What is in or out of this change; follow-ups.",
+      "aliases": ["Scope cut", "In scope", "Out of scope", "Follow-up", "Split"]
+    },
+    {
+      "name": "Plan",
+      "use_for": "Approving a proposed plan before implementing.",
+      "aliases": ["Plan approval", "Approve plan", "Proceed"]
+    },
+    {
+      "name": "Approach",
+      "use_for": "Choosing between implementation approaches.",
+      "aliases": ["Implementation", "Strategy", "Design choice", "Option"]
+    },
+    {
+      "name": "API contract",
+      "use_for": "Endpoint, schema or response shape in libs/api-contract.",
+      "aliases": ["Contract", "Endpoint", "Response shape", "API shape"]
+    },
+    {
+      "name": "Data model",
+      "use_for": "Tables, columns, constraints, migrations.",
+      "aliases": [
+        "Schema",
+        "Entity",
+        "Table design",
+        "Migration",
+        "Migrations",
+        "Backfill"
+      ]
+    },
+    {
+      "name": "Tenancy",
+      "use_for": "School and campus isolation, roles, guards, who may see or do what.",
+      "aliases": [
+        "Tenant scope",
+        "Permissions",
+        "RBAC",
+        "Access",
+        "Authz",
+        "Auth"
+      ]
+    },
+    {
+      "name": "Money",
+      "use_for": "Fees, payments, references, voids, balances.",
+      "aliases": ["Payments", "Fees", "Ledger"]
+    },
+    {
+      "name": "Error path",
+      "use_for": "Failure modes, fallbacks, error surfacing.",
+      "aliases": ["Errors", "Error handling", "Failure mode", "Fallback"]
+    },
+    {
+      "name": "Test layer",
+      "use_for": "Which tests to write: unit, integration, e2e.",
+      "aliases": ["Testing", "Tests", "Coverage", "E2E"]
+    },
+    {
+      "name": "UI/UX",
+      "use_for": "Layout, interaction, copy, visual design.",
+      "aliases": ["UI", "UX", "Design", "Layout", "Copy"]
+    },
+    {
+      "name": "Dependencies",
+      "use_for": "Adding a library versus reusing what exists.",
+      "aliases": ["Dependency", "Library", "Package"]
+    },
+    {
+      "name": "Performance",
+      "use_for": "Query cost, caching, bundle size, pagination.",
+      "aliases": ["Perf", "Caching"]
+    },
+    {
+      "name": "Root cause",
+      "use_for": "Diagnosing a bug; which explanation to act on.",
+      "aliases": ["Cause", "Diagnosis", "Debug"]
+    },
+    {
+      "name": "Commit/PR",
+      "use_for": "Commit grouping, PR split, branch, draft or ready.",
+      "aliases": ["Commit", "Commits", "PR", "PR split", "Branch"]
+    }
+  ]
+}

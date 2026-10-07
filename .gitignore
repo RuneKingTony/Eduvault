@@ -17,3 +17,11 @@ vitest.config.*.timestamp*
 apps/*/src/routeTree.gen.ts
 .claude/opsx/
 .claude/soul/decisions.jsonl
+.claude/soul/decisions.jsonl
+.claude/soul/.last-distill
+.claude/soul/.append.lock
+.claude/soul/.capture.*
+.claude/soul/config.json
+.claude/soul/proposals
+.claude/soul/notes
+.claude/soul/rejected.md
