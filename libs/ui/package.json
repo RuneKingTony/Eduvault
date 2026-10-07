@@ -1,0 +1,18 @@
+{
+  "name": "@eduvault/ui",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "react": "catalog:react",
+    "react-dom": "catalog:react"
+  },
+  "devDependencies": {
+    "@testing-library/dom": "catalog:testing",
+    "@testing-library/jest-dom": "catalog:testing",
+    "@testing-library/react": "catalog:testing",
+    "@types/react": "catalog:react",
+    "@types/react-dom": "catalog:react",
+    "jsdom": "catalog:testing"
+  }
+}

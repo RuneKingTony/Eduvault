@@ -1,0 +1,11 @@
+{
+  "name": "@eduvault/testcontainers",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@testcontainers/postgresql": "catalog:testing",
+    "dbmate": "catalog:server",
+    "testcontainers": "catalog:testing"
+  }
+}

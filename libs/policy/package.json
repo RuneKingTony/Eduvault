@@ -1,0 +1,9 @@
+{
+  "name": "@eduvault/policy",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "better-auth": "catalog:auth"
+  }
+}
