@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
-import type { EduvaultAuthClient } from '@eduvault/ui';
+import type { EduvaultAuthClient } from '@eduvault/auth-client';
 import { App } from './app';
 
 const clientWith = (session: {

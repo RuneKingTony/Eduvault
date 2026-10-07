@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { EduvaultAuthClient } from './auth-client';
-import { ContextSwitcher, type SwitcherOption } from './context-switcher';
+import { ContextSwitcher, type SwitcherOption } from '@eduvault/ui';
 
 export interface ContextSwitchersProps {
   authClient: EduvaultAuthClient;

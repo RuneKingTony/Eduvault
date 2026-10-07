@@ -6,13 +6,15 @@
   "dependencies": {
     "@fontsource-variable/inter": "catalog:ui",
     "@fontsource-variable/roboto": "catalog:ui",
-    "better-auth": "catalog:auth",
     "class-variance-authority": "catalog:ui",
     "clsx": "catalog:ui",
+    "lucide-react": "catalog:ui",
+    "next-themes": "catalog:ui",
     "radix-ui": "catalog:ui",
     "react": "catalog:react",
     "react-dom": "catalog:react",
     "shadcn": "catalog:ui",
+    "sonner": "catalog:ui",
     "tailwind-merge": "catalog:ui",
     "tailwindcss": "catalog:tailwind",
     "tw-animate-css": "catalog:ui"

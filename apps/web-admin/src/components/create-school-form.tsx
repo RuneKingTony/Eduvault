@@ -1,11 +1,7 @@
 import { useState, type SubmitEvent } from 'react';
 import { slugify } from '@eduvault/shared';
-import {
-  Button,
-  TextField,
-  fieldValue,
-  type EduvaultAuthClient,
-} from '@eduvault/ui';
+import type { EduvaultAuthClient } from '@eduvault/auth-client';
+import { Button, TextField, fieldValue } from '@eduvault/ui';
 
 export function CreateSchoolForm({
   authClient,

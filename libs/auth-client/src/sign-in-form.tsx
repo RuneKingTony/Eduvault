@@ -1,8 +1,6 @@
 import { useState, type SubmitEvent } from 'react';
 import type { EduvaultAuthClient } from './auth-client';
-import { Button } from './components/ui/button';
-import { fieldValue } from './form-data';
-import { TextField } from './text-field';
+import { Button, TextField, fieldValue } from '@eduvault/ui';
 
 export function SignInForm({ authClient }: { authClient: EduvaultAuthClient }) {
   const [mode, setMode] = useState<'sign-in' | 'sign-up'>('sign-in');

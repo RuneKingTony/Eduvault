@@ -9,6 +9,7 @@
     "react": "catalog:react",
     "react-dom": "catalog:react",
     "@eduvault/api-contract": "workspace:*",
+    "@eduvault/auth-client": "workspace:*",
     "@eduvault/shared": "workspace:*",
     "@eduvault/ui": "workspace:*"
   },

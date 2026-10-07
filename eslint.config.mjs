@@ -83,7 +83,8 @@ export const spaConfig = [
           patterns: [
             {
               group: ['better-auth', 'better-auth/*'],
-              message: 'Use createEduvaultAuthClient from @eduvault/ui.',
+              message:
+                'Use createEduvaultAuthClient from @eduvault/auth-client.',
             },
             {
               group: ['@nestjs/*', 'express', 'kysely', 'pg'],

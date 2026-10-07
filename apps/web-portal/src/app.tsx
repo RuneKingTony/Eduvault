@@ -1,11 +1,11 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { RouterProvider } from '@tanstack/react-router';
 import {
-  Button,
   ContextSwitchers,
   SignInForm,
   type EduvaultAuthClient,
-} from '@eduvault/ui';
+} from '@eduvault/auth-client';
+import { Button } from '@eduvault/ui';
 import { router } from './router';
 
 export function App({ authClient }: { authClient: EduvaultAuthClient }) {

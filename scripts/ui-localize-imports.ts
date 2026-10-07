@@ -21,6 +21,17 @@ function* walk(dir: string): Generator<string> {
   }
 }
 
+const utilsFile = join(srcRoot, 'lib/utils.ts');
+const utilsSource = `import { clsx, type ClassValue } from 'clsx';
+import { twMerge } from 'tailwind-merge';
+
+export const cn = (...inputs: ClassValue[]) => twMerge(clsx(inputs));
+`;
+if (readFileSync(utilsFile, 'utf8') !== utilsSource) {
+  writeFileSync(utilsFile, utilsSource);
+  console.log('restored lib/utils.ts');
+}
+
 for (const file of walk(srcRoot)) {
   const source = readFileSync(file, 'utf8');
   const rewritten = source
@@ -47,4 +58,22 @@ if ('cn' in manifest.dependencies) {
   Reflect.deleteProperty(manifest.dependencies, 'cn');
   writeFileSync(packageJson, `${JSON.stringify(manifest, null, 2)}\n`);
   console.log('removed the cn package from libs/ui/package.json');
+}
+
+const theme = join(srcRoot, 'styles/theme.css');
+const themeSource = readFileSync(theme, 'utf8');
+const seenImports = new Set<string>();
+const dedupedTheme = themeSource
+  .split('\n')
+  .filter((line) => {
+    if (!line.startsWith('@import')) return true;
+    const key = line.replaceAll('"', "'");
+    if (seenImports.has(key)) return false;
+    seenImports.add(key);
+    return true;
+  })
+  .join('\n');
+if (dedupedTheme !== themeSource) {
+  writeFileSync(theme, dedupedTheme);
+  console.log('removed duplicate @import lines from theme.css');
 }

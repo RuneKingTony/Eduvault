@@ -1,0 +1,8 @@
+{
+  "name": "auth-client",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/auth-client/src",
+  "projectType": "library",
+  "tags": ["scope:web-admin", "scope:web-portal"],
+  "targets": { "typecheck": {} }
+}
