@@ -1,5 +1,6 @@
 import type { BetterAuthOptions } from 'better-auth';
 import { admin, organization } from 'better-auth/plugins';
+import type { Pool } from 'pg';
 import { ac, roles } from '@eduvault/policy';
 
 // Shared by the Nest factory (better-auth.ts) and the CLI shim (apps/api/auth.ts).
@@ -24,6 +25,50 @@ export const getPlugins = () => [
     ac,
     roles,
     creatorRole: 'owner',
-    teams: { enabled: true },
+    // A campus is a team plus a domain row; an automatic team would have no row.
+    teams: {
+      enabled: true,
+      defaultTeam: { enabled: false },
+      allowRemovingAllTeams: true,
+    },
   }),
 ];
+
+/**
+ * Every new session starts in the user's first school and first campus there.
+ * Without it, sessions created outside the web flow (scripts, direct sign-in
+ * calls) have no active school and every school-scoped route is refused.
+ */
+export const getDatabaseHooks = (
+  pool: Pool
+): NonNullable<BetterAuthOptions['databaseHooks']> => ({
+  session: {
+    create: {
+      before: async (session) => {
+        if (session['activeOrganizationId']) return;
+        const school = await pool.query<{ organizationId: string }>(
+          `SELECT "organizationId" FROM member
+           WHERE "userId" = $1 ORDER BY "createdAt", id LIMIT 1`,
+          [session.userId]
+        );
+        const organizationId = school.rows[0]?.organizationId;
+        if (!organizationId) return;
+
+        const campus = await pool.query<{ teamId: string }>(
+          `SELECT tm."teamId" FROM "teamMember" tm
+           JOIN team t ON t.id = tm."teamId"
+           WHERE tm."userId" = $1 AND t."organizationId" = $2
+           ORDER BY tm."createdAt", tm.id LIMIT 1`,
+          [session.userId, organizationId]
+        );
+        return {
+          data: {
+            ...session,
+            activeOrganizationId: organizationId,
+            activeTeamId: campus.rows[0]?.teamId ?? null,
+          },
+        };
+      },
+    },
+  },
+});

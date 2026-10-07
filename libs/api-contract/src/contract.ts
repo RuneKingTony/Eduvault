@@ -69,12 +69,14 @@ export const contract = defineContract({
     path: '/health',
     response: healthSchema,
   }),
-  campuses: crud(
-    '/campuses',
-    campusSchema,
-    createCampusSchema,
-    updateCampusSchema
-  ),
+  campuses: {
+    ...crud('/campuses', campusSchema, createCampusSchema, updateCampusSchema),
+    list: defineRoute({
+      method: 'GET',
+      path: '/campuses',
+      response: z.array(campusSchema),
+    }),
+  },
   feeSchedules: crud(
     '/fee-schedules',
     feeScheduleSchema,

@@ -467,7 +467,7 @@ ALTER TABLE ONLY public.campus
 --
 
 ALTER TABLE ONLY public.fee_schedule
-    ADD CONSTRAINT fee_schedule_campus_id_organization_id_fkey FOREIGN KEY (campus_id, organization_id) REFERENCES public.campus(team_id, organization_id) ON DELETE CASCADE;
+    ADD CONSTRAINT fee_schedule_campus_id_organization_id_fkey FOREIGN KEY (campus_id, organization_id) REFERENCES public.campus(team_id, organization_id);
 
 --
 -- Name: fee_schedule fee_schedule_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -523,7 +523,7 @@ ALTER TABLE ONLY public.session
 --
 
 ALTER TABLE ONLY public.student
-    ADD CONSTRAINT student_campus_id_organization_id_fkey FOREIGN KEY (campus_id, organization_id) REFERENCES public.campus(team_id, organization_id) ON DELETE CASCADE;
+    ADD CONSTRAINT student_campus_id_organization_id_fkey FOREIGN KEY (campus_id, organization_id) REFERENCES public.campus(team_id, organization_id);
 
 --
 -- Name: student student_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -

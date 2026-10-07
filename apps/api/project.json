@@ -16,17 +16,21 @@
     "db-start": {
       "executor": "nx:run-commands",
       "description": "Start only Postgres (docker compose, host port 5434)",
-      "options": { "command": "docker compose up -d --wait postgres" }
+      "options": {
+        "command": "docker compose up -d --wait postgres"
+      }
     },
     "db-stop": {
       "executor": "nx:run-commands",
-      "options": { "command": "docker compose down" }
+      "options": {
+        "command": "docker compose down"
+      }
     },
     "db-migrate-up": {
       "executor": "nx:run-commands",
       "dependsOn": ["env-init"],
       "options": {
-        "command": "pnpm exec dbmate --env-file .env.local --url \"$DATABASE_URL\" --migrations-dir db/migrations --no-dump-schema up",
+        "command": "pnpm exec dbmate --env-file .env.local --migrations-dir db/migrations --no-dump-schema up",
         "cwd": "apps/api"
       }
     },
@@ -70,6 +74,38 @@
       "description": "Regenerate the committed db/schema.sql",
       "options": {
         "command": "tsx --tsconfig scripts/tsconfig.json scripts/drift-check.ts --write --only=schema"
+      }
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["production", "^production"],
+      "outputs": ["{projectRoot}/dist"],
+      "options": {
+        "command": "vite build",
+        "cwd": "apps/api"
+      }
+    },
+    "serve": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["build", "env-init"],
+      "continuous": true,
+      "description": "Build once, then rebuild on change and restart node on the new bundle (http://localhost:3000)",
+      "options": {
+        "cwd": "apps/api",
+        "parallel": true,
+        "commands": [
+          "vite build --watch --emptyOutDir=false",
+          "node --watch --env-file=.env.local dist/main.cjs"
+        ]
+      }
+    },
+    "test-integration": {
+      "executor": "nx:run-commands",
+      "description": "Integration tests against a real Postgres container (needs Docker)",
+      "options": {
+        "command": "vitest run --config vitest.integration.config.mts",
+        "cwd": "apps/api"
       }
     }
   }

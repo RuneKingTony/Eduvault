@@ -28,7 +28,7 @@ CREATE TABLE fee_schedule (
   currency CHAR(3) NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  FOREIGN KEY (campus_id, organization_id) REFERENCES campus (team_id, organization_id) ON DELETE CASCADE
+  FOREIGN KEY (campus_id, organization_id) REFERENCES campus (team_id, organization_id)
 );
 
 CREATE INDEX fee_schedule_organization_campus_idx ON fee_schedule (organization_id, campus_id);
@@ -42,7 +42,7 @@ CREATE TABLE student (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (organization_id, admission_number),
-  FOREIGN KEY (campus_id, organization_id) REFERENCES campus (team_id, organization_id) ON DELETE CASCADE
+  FOREIGN KEY (campus_id, organization_id) REFERENCES campus (team_id, organization_id)
 );
 
 CREATE INDEX student_organization_campus_idx ON student (organization_id, campus_id);
