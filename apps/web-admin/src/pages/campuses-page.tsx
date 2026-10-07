@@ -3,14 +3,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, TextField, fieldValue } from '@eduvault/ui';
 import { useApi } from '../api';
 import { ErrorMessage } from '../components/error-message';
+import { campusesQueryOptions } from '../queries';
 
 export function CampusesPage() {
   const api = useApi();
   const queryClient = useQueryClient();
-  const campuses = useQuery({
-    queryKey: ['campuses'],
-    queryFn: () => api.campuses.list({}),
-  });
+  const campuses = useQuery(campusesQueryOptions(api));
   const create = useMutation({
     mutationFn: (input: { name: string; address: string }) =>
       api.campuses.create({

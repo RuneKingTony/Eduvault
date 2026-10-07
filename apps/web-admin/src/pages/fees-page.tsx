@@ -1,13 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
 import { useApi } from '../api';
 import { ErrorMessage } from '../components/error-message';
+import { feeSchedulesQueryOptions } from '../queries';
 
 export function FeesPage() {
   const api = useApi();
-  const fees = useQuery({
-    queryKey: ['fee-schedules'],
-    queryFn: () => api.feeSchedules.list({ query: {} }),
-  });
+  const fees = useQuery(feeSchedulesQueryOptions(api));
 
   return (
     <section className="flex flex-col gap-4">

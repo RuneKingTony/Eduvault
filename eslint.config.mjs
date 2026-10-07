@@ -236,6 +236,10 @@ export default [
     },
   },
   {
+    files: ['**/src/routes/**/*.{ts,tsx}'],
+    rules: { 'check-file/filename-naming-convention': 'off' },
+  },
+  {
     files: ['**/*.spec.{ts,tsx}', '**/test/**/*.ts'],
     rules: {
       '@typescript-eslint/no-non-null-assertion': 'off',

@@ -1,65 +1,28 @@
-import {
-  Link,
-  Outlet,
-  createRootRoute,
-  createRoute,
-  createRouter,
-} from '@tanstack/react-router';
-import { CampusesPage } from './pages/campuses-page';
-import { FeesPage } from './pages/fees-page';
-import { StudentsPage } from './pages/students-page';
+import { createRouter, type ErrorComponentProps } from '@tanstack/react-router';
+import { defaultApi } from './api';
+import { ErrorMessage } from './components/error-message';
+import { queryClient } from './query-client';
+import { routeTree } from './routeTree.gen';
 
-const navLinkClass = 'text-sm text-muted-foreground hover:text-foreground';
-
-function Layout() {
-  return (
-    <div className="flex flex-col gap-6">
-      <Nav />
-      <Outlet />
-    </div>
-  );
+function RouteError({ error }: ErrorComponentProps) {
+  return <ErrorMessage error={error} />;
 }
 
-const rootRoute = createRootRoute({ component: Layout });
+function NotFound() {
+  return <p className="text-muted-foreground">Page not found.</p>;
+}
 
-const routeTree = rootRoute.addChildren([
-  createRoute({
-    getParentRoute: () => rootRoute,
-    path: '/',
-    component: StudentsPage,
-  }),
-  createRoute({
-    getParentRoute: () => rootRoute,
-    path: '/campuses',
-    component: CampusesPage,
-  }),
-  createRoute({
-    getParentRoute: () => rootRoute,
-    path: '/fees',
-    component: FeesPage,
-  }),
-]);
-
-export const router = createRouter({ routeTree });
+export const router = createRouter({
+  routeTree,
+  context: { queryClient, api: defaultApi },
+  defaultPreload: 'intent',
+  defaultPreloadStaleTime: 0,
+  defaultErrorComponent: RouteError,
+  defaultNotFoundComponent: NotFound,
+});
 
 declare module '@tanstack/react-router' {
   interface Register {
     router: typeof router;
   }
-}
-
-function Nav() {
-  return (
-    <nav className="flex gap-4">
-      <Link to="/" className={navLinkClass}>
-        Students
-      </Link>
-      <Link to="/campuses" className={navLinkClass}>
-        Campuses
-      </Link>
-      <Link to="/fees" className={navLinkClass}>
-        Fees
-      </Link>
-    </nav>
-  );
 }
