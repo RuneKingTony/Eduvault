@@ -11,12 +11,6 @@ set -u
 KEY=$1 TREE=$(st_get "$1" '.worktree_path') D=$(key_dir "$1")
 [ -d "$TREE" ] || { echo "no worktree for $KEY" >&2; exit 1; }
 
-INFRA_RE='^(\.github/|\.claude/|\.husky/|docs/)|\.md$'
-TEST_RE='\.(spec|test)\.[cm]?[jt]sx?$|/(__tests__|__mocks__|__fixtures__|fixtures)/|^apps/api/test/|^libs/testcontainers/'
-TOOL_RE='(^|/)(package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|project\.json|tsconfig[^/]*\.json|(vite|vitest)\.config\.[cm]?[jt]s|eslint\.config\.[cm]?js|\.prettierrc[^/]*|\.prettierignore|\.gitignore)$|^(nx\.json|scripts/)'
-WEB_RE='^apps/web-(admin|portal)/|^libs/(ui|api-contract|policy|shared)/'
-API_RE='^apps/api/'
-
 TOUCHED=$(cd "$TREE" && {
   git fetch -q origin main 2>/dev/null
   BASE=$(git merge-base origin/main HEAD 2>/dev/null) || BASE=origin/main
@@ -26,18 +20,15 @@ TOUCHED=$(cd "$TREE" && {
 
 [ -n "$TOUCHED" ] || { echo "e2e-gate: empty diff for $KEY" >&2; exit 1; }
 N=$(printf '%s\n' "$TOUCHED" | wc -l | tr -d ' ')
-APP=$(printf '%s\n' "$TOUCHED" | grep -vE "$INFRA_RE" || true)
-RUN=$(printf '%s\n' "$APP" | sed '/^$/d' | grep -vE "$TEST_RE" | grep -vE "$TOOL_RE" || true)
-WEB=$(printf '%s\n' "$RUN" | grep -E "$WEB_RE" || true)
-API=$(printf '%s\n' "$RUN" | grep -E "$API_RE" || true)
-
-if [ -z "$WEB" ] && [ -z "$API" ]; then
-  MODE=skip R="e2e-gate: none of the $N changed paths is served by the stack (docs, tests, tooling or CI only)"
-elif [ -n "$WEB" ]; then
-  MODE=browser R="e2e-gate: web app or a lib it imports changed"
-else
-  MODE=api R="e2e-gate: server-side paths only: verify through direct API calls"
-fi
+GATE="$(dirname "$0")/../../eduvault-e2e/scripts/e2e-gate.sh"
+MODE=$(printf '%s\n' "$TOUCHED" | bash "$GATE" --stdin 2>/dev/null) || { echo "e2e-gate: classifier failed" >&2; exit 1; }
+case "$MODE" in browser | api | skip) ;; *) echo "e2e-gate: unexpected verdict '$MODE'" >&2; exit 1 ;; esac
+RUN=$(printf '%s\n' "$TOUCHED" | grep -vE '^(\.github/|\.claude/|\.husky/|docs/)|\.md$' || true)
+case "$MODE" in
+  skip) R="e2e-gate: none of the $N changed paths is served by the stack (docs, tests, tooling or CI only)" ;;
+  browser) R="e2e-gate: web app or a lib it imports changed" ;;
+  api) R="e2e-gate: server-side paths only: verify through direct API calls" ;;
+esac
 
 X=$(jq -nc --arg m "$MODE" --arg r "$R" --arg a "$([ "$MODE" = skip ] || printf '%s' "$RUN")" \
   '{skip: ($m == "skip"), mode: $m, reason: $r, app_paths: ($a | split("\n") | map(select(. != "")))}')

@@ -33,6 +33,18 @@ Each test truncates Better Auth and domain tables first. A failing isolation tes
 - **Pre-commit (Husky):** Prettier on staged files, then `nx affected -t lint typecheck`.
 - **Claude Code:** a PostToolUse hook runs Prettier on each edited file; a Stop hook runs `nx affected -t lint typecheck` and refuses to finish while it fails.
 
+## Opt-in browser e2e
+
+Not a gate: it is outside `pnpm validate`, `validate:quick` and CI. Run it when a diff touches `apps/web-admin`, `apps/web-portal` or UI-visible API (`bash .claude/skills/eduvault-e2e/scripts/e2e-gate.sh` prints `skip`, `api` or `browser`).
+
+| Need                        | Command                                                                    |
+| --------------------------- | -------------------------------------------------------------------------- |
+| One-time browser install    | `pnpm --filter @eduvault/web-e2e exec playwright install chromium`         |
+| Run against the local stack | `pnpm dev` in one shell, then `nx run web-e2e:e2e`                         |
+| Reverse a failed run's data | `pnpm --filter @eduvault/web-e2e cleanup "$PWD/tmp/e2e/<run>/ledger.json"` |
+
+The run provisions owner, admin, teacher, student and foreign-school personas through the real API, writes screenshots to `tmp/e2e/<run>/`, and deletes the schools, campuses and students it created when every test passes (user accounts cannot be removed through the API and remain until `pnpm db:reset`). If the stack is down the run stops with `BLOCKED (environment)`, which is not a pass. The skill is `.claude/skills/eduvault-e2e/SKILL.md`.
+
 ## Not verified by any gate
 
-Browser behaviour. The SPAs' sign-in and school/campus switching are covered by component tests with fake clients; against the real API they are checked by hand with the `run-local` recipe.
+Browser behaviour in the default loop. The SPAs' sign-in and school/campus switching are covered by component tests with fake clients; against the real API they are covered only by the opt-in e2e run or by hand with the `run-local` recipe.

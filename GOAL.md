@@ -1,5 +1,5 @@
 ## Goal
-Scaffold a TypeScript **Nx monorepo** called **eduvault**: two React SPAs and one NestJS API, with Postgres (raw SQL migrations, no ORM) and Better Auth. The backend has integration tests. The whole repo is optimised so an AI agent can verify its own changes quickly and deterministically, using static checks plus integration tests. No browser e2e, and no deployment or infrastructure code (no production Dockerfiles, CI/CD, Terraform, or scanners). The only container is a local `docker-compose.yml` running Postgres.
+Scaffold a TypeScript **Nx monorepo** called **eduvault**: two React SPAs and one NestJS API, with Postgres (raw SQL migrations, no ORM) and Better Auth. The backend has integration tests. The whole repo is optimised so an AI agent can verify its own changes quickly and deterministically, using static checks plus integration tests. No browser e2e in the default loop, and no deployment or infrastructure code (no production Dockerfiles, Terraform, or scanners). See the note at the end for what was later allowed. The only container is a local `docker-compose.yml` running Postgres.
 
 ## Reference (read-only)
 Adapt conventions from `/Users/judeokafor/Documents/fogado`:
@@ -75,7 +75,7 @@ Vitest + Supertest against **real Postgres via Testcontainers**:
 - **`.claude/skills/run-local/SKILL.md`:** a verified recipe to start Postgres, migrate, seed a dev user, and serve all three apps.
 
 ## docs/
-- `docs/adr/`: `0000-template.md`, `0001` Nx + catalogs, `0002` Better Auth in NestJS, `0003` raw SQL (dbmate) + Kysely, `0004` verification policy (and no browser e2e), `0005` tenancy (organization = school, campus = team, out-of-scope cases). Keep them short and decision-focused.
+- `docs/adr/`: `0000-template.md`, `0001` Nx + catalogs, `0002` Better Auth in NestJS, `0003` raw SQL (dbmate) + Kysely, `0004` verification policy (no browser e2e in `pnpm validate`), `0005` tenancy (organization = school, campus = team, out-of-scope cases). Keep them short and decision-focused.
 - `docs/architecture.md`: Mermaid diagram, module boundaries, auth flow, tenancy model, and the required section below.
 - `docs/development.md` and `docs/verification.md` (every gate, what it catches, how to fix it).
 - A `README.md` of under one page, linking to `docs/`.
@@ -103,3 +103,9 @@ Document it from the real output of `api:auth-generate`, not from memory:
 - [ ] A contract change breaks `typecheck` in a consuming SPA.
 - [ ] A schema change without regenerating the Kysely types fails the drift gate.
 - [ ] `docs/` contains the ADRs and guides above, including "What Better Auth owns".
+
+## Superseded in part
+The original goal excluded browser e2e and CI/CD. Both are now allowed, with limits:
+- **CI** is allowed: `.github/workflows/validate-pr.yml` runs `pnpm validate`. Deployment and infrastructure code are still out of scope.
+- **Playwright e2e** is allowed as an opt-in project, `apps/web-e2e` (`nx run web-e2e:e2e`), driven by the `eduvault-e2e` skill. It is not part of `pnpm validate`, `validate:quick` or CI; nothing in the default loop starts a browser.
+- Decision record: ADR 0004.

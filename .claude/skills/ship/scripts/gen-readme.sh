@@ -44,4 +44,7 @@ HEAD
 `bash .claude/skills/ship/scripts/test-ship.sh` runs offline, with no Herdr, gh or network.
 TAIL
 } > "$OUT"
+HERE=$(cd "$(dirname "$0")" && pwd)
+TMP=$(mktemp)
+if (cd "$HERE" && pnpm -s prettier --stdin-filepath "$HERE/../README.md" < "$OUT" > "$TMP"); then mv "$TMP" "$OUT"; else rm -f "$TMP"; fi
 echo "$OUT"

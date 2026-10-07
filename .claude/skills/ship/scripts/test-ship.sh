@@ -33,7 +33,8 @@ pr haiku low
 ROWS
 ok "effort.sh unknown stage" 2 "$(rc bash "$W/effort.sh" EDU-1 nope)"
 bash "$W/gen-readme.sh" "$T/README.md" >/dev/null
-has "generated README holds the table" "$TABLE" "$(cat "$T/README.md")"
+norm() { sed -E 's/ +/ /g; s/-{2,}/---/g'; }
+has "generated README holds the table" "$(printf '%s\n' "$TABLE" | norm)" "$(norm < "$T/README.md")"
 ok "checked-in README is current" "$(cat "$T/README.md")" "$(cat "$W/../README.md" 2>/dev/null)"
 
 echo "== state.sh"

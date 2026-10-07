@@ -1,6 +1,6 @@
-# Verify with static checks and API integration tests; no browser e2e
+# Verify with static checks and API integration tests; no browser e2e in the default loop
 
-- Status: accepted
+- Status: accepted, superseded in part (see Superseded in part)
 - Date: 2026-10-07
 
 ## Context
@@ -13,15 +13,24 @@ Confidence comes from, in order: formatting, ESLint (typescript-eslint strict pl
 
 - Module boundaries: apps cannot import each other, web cannot import api, `shared` depends only on `shared`. Violations fail `nx lint`.
 - A change to `libs/api-contract` breaks `typecheck` in every consumer that uses the changed shape.
-- There is no browser e2e, and no deployment or infrastructure code. The only container is Postgres for local development.
+- There is no browser e2e in `pnpm validate`, and no deployment or infrastructure code. The only container is Postgres for local development.
 - The SPAs are covered by component tests with a fake API client and a fake auth client. Sign-in and school switching against the real API are verified by hand, with the `run-local` recipe.
 
 ## Alternatives considered
 
-- **Playwright e2e**: rejected for speed and flakiness.
+- **Playwright e2e in `pnpm validate`**: rejected for speed and flakiness. As an opt-in project it is allowed (see Superseded in part).
 - **Mocking Postgres in API tests**: rejected; tenancy rules live in SQL and foreign keys.
 
 ## Consequences
 
 - Whole-stack UI regressions are caught by a person, not a gate.
 - Docker is a prerequisite for `pnpm validate`.
+
+## Superseded in part
+
+Two parts of this decision were relaxed after it was written:
+
+- **CI is allowed.** `.github/workflows/validate-pr.yml` runs `pnpm validate` on pull requests. It adds no gate of its own; `pnpm validate` stays the single definition of "green".
+- **Opt-in Playwright e2e is allowed.** `apps/web-e2e` holds the specs and the `eduvault-e2e` skill drives them against the `run-local` stack, only when a diff touches `apps/web-admin`, `apps/web-portal` or UI-visible API. It is kept out of `pnpm validate`, `validate:quick` and CI, while its `lint` and `typecheck` run with the rest and need no running stack. The static-check-first order above is unchanged.
+
+Still true: no deployment or infrastructure code, and a gate that needs a browser never blocks the default loop.
