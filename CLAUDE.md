@@ -2,6 +2,8 @@
 
 Eduvault: a school-management monorepo (Nx + pnpm catalogs). Verification is static checks plus API integration tests; there is no browser e2e. Details in `docs/`.
 
+Coding conventions, and which gate enforces each: `docs/conventions.md`. Read it before writing code in `apps/` or `libs/`.
+
 ## Layout
 
 - `apps/api` — NestJS API (Better Auth, Kysely, dbmate). Modules in `src/app/modules/`, shared infra in `src/app/common/`. Integration tests in `test/`.
