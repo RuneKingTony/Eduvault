@@ -8,3 +8,5 @@ apps/api/db/migrations
 apps/api/src/db/db-types.ts
 apps/*/src/routeTree.gen.ts
 GOAL.md
+.agents
+skills-lock.json
