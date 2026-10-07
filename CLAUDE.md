@@ -8,7 +8,7 @@ Coding conventions, and which gate enforces each: `docs/conventions.md`. Read it
 
 - `apps/api` — NestJS API (Better Auth, Kysely, dbmate). Modules in `src/app/modules/`, shared infra in `src/app/common/`. Integration tests in `test/`.
 - `apps/web-admin` (:4200), `apps/web-portal` (:4201) — React SPAs (Vite, TanStack Router + Query, Tailwind 4).
-- `libs/` — `@eduvault/{api-contract,policy,shared,ui,testcontainers}`, resolved through `tsconfig.base.json` paths.
+- `libs/` — `@eduvault/{api-contract,policy,shared,ui,auth-client,testcontainers}` (`ui` is presentational only; Better Auth client code goes in `auth-client`), resolved through `tsconfig.base.json` paths.
 - `scripts/` — drift-gate tooling (`drift-check.ts`), run through `pnpm drift` / `pnpm drift:fix`.
 - Nx tags: `scope:api`, `scope:web-admin`, `scope:web-portal`, `scope:shared`. Apps cannot import each other; web cannot import api (`nx lint` fails).
 

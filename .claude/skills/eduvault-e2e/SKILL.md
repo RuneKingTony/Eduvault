@@ -36,7 +36,7 @@ bash .claude/skills/eduvault-e2e/scripts/preflight.sh api       # or: browser
 
 Exit 3 means the stack is down: **BLOCKED, cause environment**. Start it with the `run-local` recipe (`.claude/skills/run-local/SKILL.md`: `pnpm db:up`, then `pnpm dev` with `run_in_background: true`), then preflight again. If it still cannot start, stop and report BLOCKED; never report a pass for a run that did not happen. The browser needs a one-time `pnpm --filter @eduvault/web-e2e exec playwright install chromium`.
 
-Read the `e2e: env=local api=... admin=... portal=...` line: the run hits exactly those URLs. Override with `E2E_API_URL`, `E2E_ADMIN_URL`, `E2E_PORTAL_URL`. Local only; there is no staging or preview mode.
+Read the `e2e: env=local api=... admin=... portal=...` line: the run hits exactly those URLs. Override with `E2E_API_URL`, `E2E_ADMIN_URL`, `E2E_PORTAL_URL`, which are also read from `var/eduvault-dev.env` when a launcher writes it. Local only; there is no staging or preview mode.
 
 ## 3. Run
 

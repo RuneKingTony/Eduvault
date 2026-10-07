@@ -18,7 +18,7 @@ check "gate: api-contract is api" "$(is "$(gate libs/api-contract/src/schemas.ts
 check "gate: policy is api" "$(is "$(gate libs/policy/src/roles.ts)" api)"
 check "gate: web-admin is browser" "$(is "$(gate apps/web-admin/src/app.tsx)" browser)"
 check "gate: web-portal is browser" "$(is "$(gate apps/web-portal/src/app.tsx)" browser)"
-check "gate: shared ui is browser" "$(is "$(gate libs/ui/src/sign-in-form.tsx)" browser)"
+check "gate: shared ui is browser" "$(is "$(gate libs/ui/src/components/custom/text-field.tsx)" browser)"
 check "gate: an e2e spec is browser" "$(is "$(gate apps/web-e2e/src/specs/x.web.spec.ts)" browser)"
 check "gate: e2e support is browser" "$(is "$(gate apps/web-e2e/src/support/api.ts)" browser)"
 check "gate: browser beats api" "$(is "$(gate apps/api/src/main.ts apps/web-admin/src/app.tsx)" browser)"
