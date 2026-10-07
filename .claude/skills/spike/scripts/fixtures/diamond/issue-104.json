@@ -1,0 +1,10 @@
+{
+  "number": 104,
+  "title": "ticket 104",
+  "state": "open",
+  "labels": [],
+  "body": "",
+  "parent": 100,
+  "blocked_by": [102, 103],
+  "children": []
+}

@@ -1,0 +1,10 @@
+{
+  "number": 100,
+  "title": "epic",
+  "state": "open",
+  "labels": [],
+  "body": "",
+  "parent": null,
+  "blocked_by": [],
+  "children": [101, 102, 103]
+}
