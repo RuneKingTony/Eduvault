@@ -13,7 +13,7 @@ interface FeeInput {
   currency: string;
 }
 
-type Row = {
+interface Row {
   id: string;
   organization_id: string;
   campus_id: string | null;
@@ -21,7 +21,7 @@ type Row = {
   amount_minor: string | number | bigint;
   currency: string;
   created_at: Date | string;
-};
+}
 
 @Injectable()
 export class FeeScheduleService {

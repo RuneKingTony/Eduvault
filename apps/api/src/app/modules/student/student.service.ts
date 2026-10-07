@@ -17,14 +17,14 @@ interface StudentInput {
   admissionNumber: string;
 }
 
-type Row = {
+interface Row {
   id: string;
   organization_id: string;
   campus_id: string;
   full_name: string;
   admission_number: string;
   created_at: Date | string;
-};
+}
 
 @Injectable()
 export class StudentService {
