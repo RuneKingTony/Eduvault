@@ -17,7 +17,15 @@
       "Bash(gh pr list:*)",
       "Bash(gh pr checks:*)",
       "Bash(gh issue view:*)",
-      "Bash(gh issue list:*)"
+      "Bash(gh issue list:*)",
+      "Bash(bash .claude/skills/ship/scripts/*)",
+      "Bash(bash .claude/skills/spike/scripts/*)",
+      "Bash(bash .claude/skills/github-issues/scripts/gh-issues.sh:*)",
+      "Bash(gh pr create:*)",
+      "Bash(gh pr update-branch:*)",
+      "Bash(gh run view:*)",
+      "Bash(git push origin HEAD:*)",
+      "Bash(herdr:*)"
     ]
   },
   "hooks": {
@@ -28,6 +36,15 @@
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/pretool-guard.sh\""
+          }
+        ]
+      },
+      {
+        "matcher": "ScheduleWakeup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/ship-guard.sh\""
           }
         ]
       }
@@ -41,6 +58,15 @@
             "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/format-edited.sh\""
           }
         ]
+      },
+      {
+        "matcher": "AskUserQuestion",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/soul/capture-decision.sh\""
+          }
+        ]
       }
     ],
     "Stop": [
@@ -50,6 +76,21 @@
             "type": "command",
             "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/stop-verify.sh\"",
             "timeout": 600
+          },
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/soul/distill-nudge.sh\""
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/soul/session-context.sh\""
           }
         ]
       }
