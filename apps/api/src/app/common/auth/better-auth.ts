@@ -8,7 +8,7 @@ import {
   getPlugins,
 } from './better-auth-base';
 
-export const getTrustedOrigins = (env: Env): string[] =>
+const getTrustedOrigins = (env: Env): string[] =>
   env.NODE_ENV === 'test' ? ['*'] : [env.WEB_ADMIN_URL, env.WEB_PORTAL_URL];
 
 export function createAuth(pool: Pool, env: Env) {

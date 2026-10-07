@@ -9,7 +9,7 @@ import { CampusesPage } from './pages/campuses-page';
 import { FeesPage } from './pages/fees-page';
 import { StudentsPage } from './pages/students-page';
 
-export const navLinkClass = 'text-sm text-slate-600 hover:text-slate-900';
+const navLinkClass = 'text-sm text-slate-600 hover:text-slate-900';
 
 function Layout() {
   return (
@@ -48,7 +48,7 @@ declare module '@tanstack/react-router' {
   }
 }
 
-export function Nav() {
+function Nav() {
   return (
     <nav className="flex gap-4">
       <Link to="/" className={navLinkClass}>

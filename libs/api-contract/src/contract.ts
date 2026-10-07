@@ -10,6 +10,7 @@ import {
   feeScheduleSchema,
   healthSchema,
   idParamsSchema,
+  meSchema,
   schoolAccountSchema,
   studentSchema,
   updateCampusSchema,
@@ -69,6 +70,7 @@ export const contract = defineContract({
     path: '/health',
     response: healthSchema,
   }),
+  me: defineRoute({ method: 'GET', path: '/me', response: meSchema }),
   campuses: {
     ...crud('/campuses', campusSchema, createCampusSchema, updateCampusSchema),
     list: defineRoute({

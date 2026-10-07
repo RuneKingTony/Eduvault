@@ -14,7 +14,9 @@
     "pg": "catalog:server",
     "reflect-metadata": "catalog:server",
     "rxjs": "catalog:server",
-    "zod": "catalog:"
+    "zod": "catalog:",
+    "@eduvault/api-contract": "workspace:*",
+    "@eduvault/policy": "workspace:*"
   },
   "devDependencies": {
     "@nestjs/testing": "catalog:nestjs",
@@ -26,6 +28,7 @@
     "dbmate": "catalog:server",
     "kysely-codegen": "catalog:server",
     "supertest": "catalog:testing",
-    "unplugin-swc": "catalog:swc"
+    "unplugin-swc": "catalog:swc",
+    "@eduvault/testcontainers": "workspace:*"
   }
 }

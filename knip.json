@@ -1,0 +1,34 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "workspaces": {
+    ".": {
+      "entry": ["scripts/*.ts"],
+      "project": ["scripts/**/*.ts"],
+      "ignoreDependencies": [
+        "@nx/devkit",
+        "@nx/js",
+        "@nx/nest",
+        "@nx/node",
+        "@nx/react",
+        "@eslint/js"
+      ]
+    },
+    "apps/api": {
+      "entry": ["auth.ts", "test/**/*.integration.spec.ts"],
+      "project": ["src/**/*.ts", "test/**/*.ts", "scripts/**/*.ts"],
+      "ignore": ["src/db/db-types.ts"],
+      "ignoreDependencies": ["auth", "kysely-codegen"]
+    },
+    "apps/web-admin": {},
+    "apps/web-portal": {},
+    "libs/*": {
+      "entry": ["src/index.ts"],
+      "project": ["src/**/*.{ts,tsx}"]
+    },
+    "libs/testcontainers": {
+      "entry": ["src/index.ts"],
+      "project": ["src/**/*.ts"],
+      "ignoreDependencies": ["dbmate"]
+    }
+  }
+}

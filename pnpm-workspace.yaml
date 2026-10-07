@@ -19,7 +19,6 @@ onlyBuiltDependencies:
 catalog:
   '@eslint/js': ^9.39.0
   '@types/node': ^24.0.0
-  dotenv: ^17.0.0
   eslint: ^9.39.0
   jiti: ^2.4.2
   prettier: ~3.9.0
@@ -35,7 +34,6 @@ catalogs:
     better-auth: ~1.7.7
   eslint:
     eslint-config-prettier: ^10.1.0
-    eslint-plugin-react-hooks: ^5.2.0
     eslint-plugin-unused-imports: ^4.4.1
     typescript-eslint: ^8.40.0
   git-hooks:
@@ -81,7 +79,6 @@ catalogs:
   tanstack:
     '@tanstack/react-query': ^5.85.0
     '@tanstack/react-router': ^1.132.0
-    '@tanstack/router-plugin': ^1.132.0
   testing:
     '@testcontainers/postgresql': ^11.5.1
     '@testing-library/dom': ^10.4.0
@@ -90,7 +87,6 @@ catalogs:
     '@types/supertest': ^6.0.0
     jsdom: ^26.0.0
     supertest: ^7.0.0
-    testcontainers: ^11.5.1
   vite-react:
     '@vitejs/plugin-react': ^5.0.0
   vitest:

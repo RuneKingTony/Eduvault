@@ -27,6 +27,7 @@
     "drift:fix": "tsx --tsconfig scripts/tsconfig.json scripts/drift-check.ts --write"
   },
   "devDependencies": {
+    "@eduvault/testcontainers": "workspace:*",
     "@eslint/js": "catalog:",
     "@nx/devkit": "catalog:nx",
     "@nx/eslint": "catalog:nx",

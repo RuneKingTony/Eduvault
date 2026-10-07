@@ -17,6 +17,12 @@ export type ApiErrorBody = z.infer<typeof errorSchema>;
 
 export const healthSchema = z.object({ status: z.literal('ok') });
 
+export const meSchema = z.object({
+  user: z.object({ id: z.string(), email: z.string(), name: z.string() }),
+  activeOrganizationId: z.string().nullable(),
+  activeCampusId: z.string().nullable(),
+});
+
 export const campusSchema = z.object({
   id: idSchema,
   organizationId: idSchema,

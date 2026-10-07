@@ -14,14 +14,14 @@ import { configureApp } from '../../src/app/configure-app';
 const ORIGIN = 'http://localhost:4200';
 export const PASSWORD = 'correct-horse-battery';
 
-export interface TestUser {
+interface TestUser {
   id: string;
   email: string;
   password: string;
   cookie: string;
 }
 
-export interface TestOrganization {
+interface TestOrganization {
   id: string;
   name: string;
   slug: string;

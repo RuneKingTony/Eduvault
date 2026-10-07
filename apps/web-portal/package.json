@@ -7,7 +7,9 @@
     "@tanstack/react-query": "catalog:tanstack",
     "@tanstack/react-router": "catalog:tanstack",
     "react": "catalog:react",
-    "react-dom": "catalog:react"
+    "react-dom": "catalog:react",
+    "@eduvault/api-contract": "workspace:*",
+    "@eduvault/ui": "workspace:*"
   },
   "devDependencies": {
     "@tailwindcss/vite": "catalog:tailwind",

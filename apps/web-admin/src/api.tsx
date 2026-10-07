@@ -9,7 +9,7 @@ import { API_URL } from './env';
 
 export type Api = ApiClient<AppContract>;
 
-export const defaultApi: Api = createApiClient(contract, { baseUrl: API_URL });
+const defaultApi: Api = createApiClient(contract, { baseUrl: API_URL });
 
 const ApiContext = createContext<Api>(defaultApi);
 

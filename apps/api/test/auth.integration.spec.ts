@@ -60,6 +60,25 @@ test.describe('authentication', () => {
     }
   });
 
+  test('/me needs a session but not a school', async ({
+    api,
+    signUp,
+    createOrganization,
+  }) => {
+    await api().get('/me').expect(401);
+
+    const user = await signUp();
+    const bare = await api(user).get('/me').expect(200);
+    expect(bare.body).toMatchObject({
+      user: { id: user.id, email: user.email },
+      activeOrganizationId: null,
+    });
+
+    const org = await createOrganization(user);
+    const withSchool = await api(user).get('/me').expect(200);
+    expect(withSchool.body.activeOrganizationId).toBe(org.id);
+  });
+
   test('a signed-in user with no school gets 403, not data', async ({
     api,
     signUp,
