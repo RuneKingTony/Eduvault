@@ -1,0 +1,21 @@
+Read and follow {{ROOT}}/.claude/skills/eduvault-e2e/SKILL.md to verify {{KEY}} on its local stack.
+
+- Before anything else, read {{D}}/e2e-gate.json (one JSON line; may be missing, then treat mode as browser).
+  mode "browser": verify in the browser (API calls allowed too). mode "api": the change has no web surface: verify through direct API calls as the personas, no browser; evidence is [] and report.md lists each call, its status and what it proves.
+- The stack is already up from {{WORKTREE}} on api :3000, web-admin :4200, web-portal :4201, against the shared eduvault Postgres on :5434. Never start or stop it, and never run db:reset or db:seed:reset against it.
+- Cover the acceptance criteria in {{D}}/ticket.json, the flows {{D}}/design.md changes and the bullets under "## E2E checks" in {{D}}/tasks.md (if any). Its "## Human checks" are for a person: not yours.
+- Personas and seeding follow the eduvault-e2e skill (owner, admin, teacher, student and a foreign-org user); create fixture data through the API as the persona that would create it, ledger every record so teardown reverses it, never insert rows with SQL.
+- Visual evidence (mode browser): for every acceptance criterion, take a screenshot of the state that proves it, named step-NN-<what-it-shows>.png in this run's own dir. List only this run's files.
+- A path you cannot exercise locally: exercise everything else, then write verdict PASS with a "partial" entry naming each unverified path and why. If the unverified path IS the ticket's core change, write BLOCKED with "cause": "environment". Any other BLOCKED carries "cause": "app".
+- Nobody is watching to approve a permission prompt: put any multi-step shell sequence in a script file in this run's dir (Write tool) and run it as one plain call.
+- Keep command output short (| tail -30). Never print, cat or grep any .env file, cookie file or secret.
+- Never spawn agents or subagents. Run long commands in the background and wait for them; never end your turn while any background command or browser step of yours is still running.
+- Write report.md, then {{D}}/e2e.json last:
+  {"verdict": "PASS|FAIL|BLOCKED", "report": "<abs path to report.md>", "reason": "<=200 chars", "cause": "environment|app (BLOCKED only)",
+   "evidence": [{"path": "<abs path to a .png>", "caption": "<=80 chars", "ac": "<the acceptance criterion it proves>"}],
+   "partial": [{"path": "<the flow or AC not exercised>", "reason": "<=120 chars"}]}
+- report.md's first line is "# {{KEY}} e2e: PASS" (or FAIL / BLOCKED). On a PASS the words FAIL, FAILED and BLOCKED must not appear in its first 15 lines (verify.sh rejects the report): write unverified paths as "not exercised locally", in a section after line 15.
+- Always write e2e.json before you finish, whatever happened.
+- Never call AskUserQuestion. If you need a decision, write {{D}}/e2e.question.json {"question", "options": [{"label", "description"}], "recommended"} and stop.
+
+Reply with one line only.

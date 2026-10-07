@@ -1,0 +1,6 @@
+Use the code-review skill on this branch's changes since the merge-base with origin/main (committed or not; see Base below).
+- Spec axis: the spec is {{D}}/ticket.json (acceptance criteria and title), {{D}}/design.md and {{D}}/tasks.md. Never skip it: every acceptance criterion is met, or its gap is a finding.
+- Standards axis: CLAUDE.md (gotchas, tenancy, comment hygiene) and CONTEXT.md. A new table or route without a tenant-isolation test, and any added comment the comment rule below doesn't allow, are findings. At most 3 code-smell findings, none above minor.
+Write the findings to {{D}}/review.md, classifying each as blocker, major or minor. Then write {{D}}/review.json last: {"result": "pass", "blockers": <int>, "summary": "<=200 chars"}. Blockers are findings, not a failure: set "failure_reason" only if you couldn't complete the review.
+
+{{RULES}}

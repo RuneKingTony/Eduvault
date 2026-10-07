@@ -1,0 +1,5 @@
+Security-review the changes in {{WORKTREE}} since the merge-base with origin/main (B=$(git -C {{WORKTREE}} merge-base HEAD origin/main); git -C {{WORKTREE}} diff $B, plus untracked files: git -C {{WORKTREE}} ls-files --others --exclude-standard) using the security-review skill. Never diff against local main (stale). Read-only: never edit the worktree. Weigh tenancy (organization and campus scope), authorization policy, money and PII.
+Write {{D}}/security.md (each finding blocker, major or minor), then {{D}}/security.json last: {"result": "pass", "blockers": <int>, "summary": "<=200 chars", "files_reviewed": ["<every changed path you read>"]}. files_reviewed must be non-empty: a handoff without it doesn't count. Set "failure_reason" only if you couldn't complete the review.
+Keep command output short (| head -200 on diffs of generated files). Reply with one line only.
+
+{{RULES}}

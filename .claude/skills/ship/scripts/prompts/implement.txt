@@ -1,0 +1,1 @@
+{{GOAL_LINE}}; throughout, follow the rules in {{RULES_FILE}}

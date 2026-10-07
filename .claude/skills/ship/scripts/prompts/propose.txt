@@ -1,0 +1,12 @@
+Invoke the propose skill with: {{KEY}} --auto-decide
+It writes {{D}}/design.md, {{D}}/tasks.md and the goal_line in {{D}}/status.json. Never call AskUserQuestion: --auto-decide takes the recommended option for every decision.
+Also, before you finish:
+- Coverage: every acceptance criterion in {{D}}/ticket.json and the issue title map to at least one task in tasks.md. Anything you leave out goes under "## Descoped" in design.md, one line each with the reason; never drop an item silently.
+- Not a descope: an acceptance criterion that can only be checked after a deploy, or by an operator (a console, a data load) goes under "## Human checks" at the end of tasks.md, and never also under "## Descoped". "## Descoped" is only for work this change doesn't do.
+- Items in {{D}}/status.json .descopes_accepted were accepted by the engineer: keep each under "## Descoped" ("accepted:" in its reason) and don't plan it.
+- Every "- [ ]" task is implementation work the sandboxed worker can finish and check: code, specs, typecheck, lint, unit tests. No task may need a browser, a running stack or anything else a worker hook blocks. Behaviour to confirm in a browser or by API call goes under "## E2E checks" (ship's e2e stage runs it), anything for an operator under "## Human checks", both at the end of tasks.md as plain "- " bullets, never "- [ ]" checkboxes.
+- Record ordering stated in the issue text ("after EDU-12", "blocked by #12", "before #12") under "## Soft dependencies" in design.md, or "None". It is a real dependency: ship and spike gate on it until the other issue is closed or merged.
+- Not shippable: if the issue isn't a code change, or its acceptance criteria depend on an out-of-scope prerequisite that isn't in origin/main, don't write a partial plan. Write design.md with the reason, skip tasks.md and the goal_line, and merge into {{D}}/status.json atomically (jq ... > status.json.tmp && mv): {"propose_verdict": "not-shippable", "propose_reason": "<=200 chars"}. Otherwise merge {"propose_verdict": "shippable"}.
+- Follow {{ROOT}}/CONTEXT.md vocabulary and the decisions in {{ROOT}}/docs/adr/.
+- Foreground only: never run_in_background, &, nohup, ScheduleWakeup, Monitor or /loop. Never cat, grep or print .env files or secrets; test for a key with grep -q.
+Reply with one line only: the number of tasks and the design's one-line summary (or "not shippable: <reason>").

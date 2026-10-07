@@ -1,0 +1,9 @@
+Create the worktree for {{KEY}}.
+1. bash {{W}}/mutex.sh acquire git-ops {{KEY}} {{RUN_ID}}
+2. Run the /start-branch command with: {{BRANCH}}
+   Skip its Step 2 fetch: origin/main was fetched moments ago by the orchestrator. Everything else it does is local or pnpm.
+   If it fails on a git lock (index.lock, packed-refs, cannot lock ref) or a pnpm store error, retry up to 3 times, 15 s apart.
+3. Always: bash {{W}}/mutex.sh release git-ops {{KEY}} {{RUN_ID}}
+4. Write {{D}}/branch.json: {"result": "pass|fail", "branch": "{{BRANCH}}", "worktree_path": "{{WORKTREE}}", "failure_reason": "<if fail>"}
+Foreground only: never run_in_background, &, nohup, ScheduleWakeup, Monitor or /loop. Never bypass git hooks. Never cat, grep or print .env files or secrets; test for a key with grep -q.
+Reply with one line only.

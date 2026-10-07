@@ -1,0 +1,5 @@
+Use the simplify skill on this branch's changes since the merge-base with origin/main (committed or not; see Base below). Remove code comments the change added that the comment rule below doesn't allow. Then run typecheck, lint and unit tests for the touched projects (pnpm validate:quick).
+Write {{D}}/simplify.json last: {"result": "pass|fail", "summary": "<=200 chars", "failure_reason": "<if fail>", "unrun_specs": [<only if any>]}.
+Keep command output short (| tail -40); never paste whole logs.
+
+{{RULES}}

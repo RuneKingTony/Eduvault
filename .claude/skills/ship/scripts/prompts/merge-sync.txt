@@ -1,0 +1,7 @@
+Bring {{BRANCH}} up to date with main:
+1. git pull --ff-only origin {{BRANCH}} (an earlier update-branch may have added a commit), then git fetch origin main && git merge origin/main.
+2. Resolve every conflict keeping both sides' intent. Never hand-merge apps/api/db/schema.sql, apps/api/src/db/db-types.ts or apps/api/db/auth-schema.snapshot.sql: take either side, then run pnpm drift:fix (Docker-bound: list pnpm drift in unrun_specs if Docker is unreachable). pnpm-lock.yaml: take main's, then pnpm install --lockfile-only.
+3. pnpm validate:quick; commit; git push.
+Write {{D}}/merge-sync.json last: {"result": "pass|fail", "head": "<sha>", "app_conflicts": <true if any conflict was in application code, not only generated files and the lockfile>, "failure_reason": "<if fail>", "unrun_specs": [<only if any>]}.
+
+{{RULES}}
