@@ -4,6 +4,8 @@ Eduvault: a school-management monorepo (Nx + pnpm catalogs). Verification is sta
 
 Coding conventions, and which gate enforces each: `docs/conventions.md`. Read it before writing code in `apps/` or `libs/`.
 
+Before implementing a roadmap slice, read `docs/technical-reference.md` (shared rules and the decision log) and the slice's PRD in `docs/prd/`. Log any new decision there in the same change.
+
 ## Layout
 
 - `apps/api` — NestJS API (Better Auth, Kysely, dbmate). Modules in `src/app/modules/`, shared infra in `src/app/common/`. Integration tests in `test/`.
