@@ -1,6 +1,6 @@
 ---
 name: eduvault-e2e
-description: Required end-to-end check of Eduvault against the local run-local stack, part of the definition of done for every change to product code. Decides from the diff whether the run is needed (e2e-gate.sh prints skip or browser), then drives the browser with the playwright-cli skill and the API with curl. Personas owner, admin, teacher, student and a foreign-school user are created through the real API by scripts/provision.sh with a created-record ledger that scripts/cleanup.sh reverses after a pass; screenshots go to tmp/e2e/<run>/step-NN-*.png; the run ends in a PASS, FAIL or BLOCKED report. Use when asked to verify, e2e-test or manually test a change in the running app, to check a role or school/campus isolation boundary over HTTP, or after a diff touches apps/web-admin, apps/web-portal, libs/ui or UI-visible API. Not for unit or integration tests (those are validate and api:test-integration), and not part of pnpm validate.
+description: Required end-to-end check of Eduvault against the local run-local stack, part of the definition of done for every change to product code. Decides from the diff whether the run is needed (e2e-gate.sh prints skip or browser), then drives the browser with the playwright-cli skill and the API with curl. Personas superadmin, owner and a foreign-school user are created through the real API by scripts/provision.sh (the super admin makes each school and its owner; staff, student and guardian personas are recorded as blocked) with a created-record ledger that scripts/cleanup.sh reverses after a pass; screenshots go to tmp/e2e/<run>/step-NN-*.png; the run ends in a PASS, FAIL or BLOCKED report. Use when asked to verify, e2e-test or manually test a change in the running app, to check a role or school/campus isolation boundary over HTTP, or after a diff touches apps/web-admin, apps/web-portal, libs/ui or UI-visible API. Not for unit or integration tests (those are validate and api:test-integration), and not part of pnpm validate.
 argument-hint: <prose goal> | gate | preflight | cleanup <ledger.json>
 allowed-tools: Bash(bash .claude/skills/eduvault-e2e/scripts/*), Bash(playwright-cli:*), Bash(curl:*), Bash(jq:*), Read, Grep, Write, Edit
 ---
@@ -45,7 +45,7 @@ Read the `e2e: env=local api=... admin=... portal=... stack=...` line: the run h
 RUN_DIR=$(bash .claude/skills/eduvault-e2e/scripts/provision.sh)   # tmp/e2e/<run>, holds personas.json and ledger.json
 ```
 
-Provisioning goes through the real API (never SQL) and appends each school, campus and student to `$RUN_DIR/ledger.json` as it is created. Then run the flows in [flows](references/flows.md):
+Provisioning goes through the real API (never SQL): it signs in as the stack's super admin (`E2E_SUPERADMIN_EMAIL`, `E2E_SUPERADMIN_PASSWORD`; a worktree stack bootstraps it, the shared stack needs `nx run api:bootstrap-admin` once), creates each school and its owner with `POST /platform/schools`, and appends each school, campus and student to `$RUN_DIR/ledger.json` as it is created. Then run the flows in [flows](references/flows.md):
 
 - **API checks:** `curl` with a persona's cookie jar (`$RUN_DIR/<key>.jar`) and an `origin` header; assert the exact status.
 - **Browser steps:** the `playwright-cli` skill, one named session per persona (`-s="$(bash .claude/skills/eduvault-e2e/scripts/session-name.sh "$RUN_DIR" owner)"`, e.g. `ev-ow-x73o41`), signing in through the real form; take a screenshot after each state worth looking at into `$RUN_DIR/<project>/step-NN-<name>.png`.
@@ -76,7 +76,7 @@ bash $S/stack-worktree.sh down <worktree>        # stops its processes and drops
 
 `down` also sweeps any API bundle or `vite --strictPort` process of that worktree that `state.json` lost track of, and fails (naming the pids) if one survives; `up` sweeps first, and names the owner of a taken port. `up` exits 3 when no free port triple is left. The database is `eduvault_e2e_<worktree>` inside the shared Postgres container (:5434), migrated with the worktree's own migrations, so the shared `eduvault` database is never touched. Ports are the first free triple from api :3710, admin :4720, portal :4721. The worktree needs `pnpm install` first. Run `cleanup.sh` **before** `down` and in a shell where the `eval` ran, or it signs in on the wrong stack.
 
-- **Shared on purpose:** cookies are host-scoped, so two stacks on `localhost` share cookies within one browser; separate playwright-cli sessions are separate browsers, so keep one session per persona and never reuse one across runs. Sign-up and sign-in on one API are not rate-limited locally, so concurrent runs on one stack are fine.
+- **Shared on purpose:** cookies are host-scoped, so two stacks on `localhost` share cookies within one browser; separate playwright-cli sessions are separate browsers, so keep one session per persona and never reuse one across runs. Sign-in is not rate-limited locally (`AUTH_RATE_LIMIT` is off), so concurrent runs on one stack are fine.
 
 ## 4. Write the report
 
@@ -96,7 +96,7 @@ Screenshots are `tmp/e2e/<run>/<project>/step-NN-<name>.png`, numbered in the or
 | `FAIL`    | an assertion failed, or the run broke for a reason in the product or the spec              | Name the failing step and the expected and actual status or text.                     |
 | `BLOCKED` | the run could not test what it was asked to: stack down, or a persona could not be created | Give `cause: environment\|persona\|product`. Never rounded up to PASS, never to FAIL. |
 
-A test skipped because its persona is blocked is BLOCKED, not "skipped, so fine". Staff personas join by invite-and-accept, which needs `E2E_TRUST_INVITEES=true` on the API (a worktree stack sets it), and student, guardian and superadmin cannot be created over HTTP (see [personas](references/personas.md)), so any run that needs a persona recorded as blocked in `personas.json` is BLOCKED until that is fixed; say so plainly and report the tests that did pass separately. Plan each run around the personas the code under test can already create (the roadmap's M1.2, M1.3 and M2.4 slices add them); a flow that needs a persona that cannot exist yet belongs to the slice that adds it.
+A test skipped because its persona is blocked is BLOCKED, not "skipped, so fine". Staff personas wait for M1.3 (`POST /members`) and student and guardian personas for M2.4 and M2.8 (see [personas](references/personas.md)), so any run that needs a persona recorded as blocked in `personas.json` is BLOCKED until that slice lands; say so plainly and report the tests that did pass separately. Plan each run around the personas the code under test can already create (the roadmap's M1.3 and M2.4 slices add them); a flow that needs a persona that cannot exist yet belongs to the slice that adds it.
 
 ## Assertions
 
@@ -109,7 +109,7 @@ A test skipped because its persona is blocked is BLOCKED, not "skipped, so fine"
 ## Ground rules
 
 - **Never seed or reset a database from a run.** No `db:seed`, `db:seed:reset`, `db:reset` or `api:db-reset`, on the shared stack or any other: personas and fixtures come from `provision.sh` and the API, and a worktree stack's database starts with migrations only.
-- **Real API only.** Sign-up, school, campus and student creation go through Better Auth and the Nest routes. No SQL, no direct database writes, no test-only endpoints.
+- **Real API only.** School, owner, campus and student creation go through the Nest routes (`POST /platform/schools` as the super admin, then `POST /me/password` for the owner); sign-up is off. No SQL, no direct database writes, no test-only endpoints.
 - **Ledger everything a run creates.** Records created outside `provision.sh` must be appended to the ledger so cleanup can reverse them ([flows](references/flows.md)).
 - **Business rules stay true.** Eduvault never deletes money, results or students in the product. The e2e ledger deletes only rows this run created, in a throwaway local database, through the same API.
 - **Never write to seed data.** A read-only tour may sign in as a seeded persona such as `funmi@greenfield.test`; every write goes to the run's own school.

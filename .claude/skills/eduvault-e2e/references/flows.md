@@ -22,7 +22,7 @@ Open a named session, go to the SPA, sign in through the real form (`Email`, `Pa
 
 ## Creating records
 
-Create through the API as a persona, and append to the ledger straight away so cleanup reverses it:
+Create through the API as a persona (schools as the super admin through `POST /platform/schools`), and append to the ledger straight away so cleanup reverses it:
 
 ```sh
 ID=$(curl -sS -b "$J" -H "origin: $E2E_ADMIN_URL" -H 'content-type: application/json' \
@@ -53,3 +53,15 @@ Run as the staff persona in `personas.json`, or as the seeded persona of the sam
 5. **403 names the permission.** `curl` as `newhire`: `GET /students` answers 403 `Missing permission student:read`. `GET /me/permissions` without an active school answers 403 `NoSchool`.
 6. **Foreign and campus 404.** `foreign` on an `owner` student answers 404; `bursar2` (Ikeja) on a Lekki student answers 404, and `GET /students?campusId=<Lekki>` answers 404 `Campus not found`.
 7. **No student delete.** `DELETE /students/<id>` as `owner` answers 404.
+
+## M1.2 flow: sign-in, set-up and create school
+
+The provisioned `owner` has already changed its temporary password, so this flow makes its own school and signs in as that school's new owner. Sign-up is off; accounts come from the server.
+
+1. **Super admin lands in the console.** Sign in on web-admin as `superadmin`. Expect `/platform/schools` with the head "Eduvault platform", "Super admin console" and the nav group Platform with Schools. Screenshot it.
+2. **Create a school.** Open "Create school", type a name: the slug and the admission prefix are suggested. Submit with the slug of an existing school (for example the run's `greenfield-<run>`): expect the toast "That slug is taken." with the sheet still open. Then submit a fresh slug, the owner's name and a new email: the sheet closes, the dialog "{name} created" shows the temporary password once, "Copy" works, "Done" closes it, and the list shows the school. Record the owner's email and the password, and append the school to `$RUN_DIR/ledger.json` (kind `school`, the owner as actor once they have chosen a password).
+3. **The new owner chooses a password.** Sign out, sign in as that owner with the temporary password. Expect "Choose your own password" and nothing else. Nine characters shows "Use at least 10 characters."; two different passwords show "The passwords don’t match."; a valid pair reaches the Dashboard.
+4. **Sign-in screen.** Signed out, the staff screen has no sign-up or forgot link and shows "Forgot your password? Ask your school owner to reset it." A wrong password and an unknown email both show "That email and password don’t match."
+5. **Owner and the console.** As the new owner type `/platform/schools`: the app lands on `/`.
+6. **Portal.** Sign in on web-portal as `superadmin` (no school there): "You’re not linked to a school yet" with "Sign out". The web-admin "You’re not in a school yet" screen needs a user with no membership, which no HTTP route makes before M1.3; its copy is proved by the `NoSchoolScreen` and `app.spec.tsx` unit specs.
+7. **curl.** `POST /api/auth/sign-up/email` answers 400; as `superadmin` `GET /students` answers 403 `NoSchool`; as the new owner before the change `GET /students` answers 403 `MustChangePassword`; `GET /platform/schools` answers 401 without a session, 403 as `owner` and 200 as `superadmin`.
