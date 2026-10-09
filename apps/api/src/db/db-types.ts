@@ -78,6 +78,19 @@ export interface Organization {
   slug: string;
 }
 
+export interface OrganizationRole {
+  createdAt: Generated<Timestamp>;
+  description: string | null;
+  editedAt: Timestamp | null;
+  id: Generated<string>;
+  label: string | null;
+  organizationId: string;
+  permission: string;
+  role: string;
+  source: string | null;
+  updatedAt: Timestamp | null;
+}
+
 export interface SchoolAccount {
   created_at: Generated<Timestamp>;
   currency: string;
@@ -158,6 +171,7 @@ export interface DB {
   invitation: Invitation;
   member: Member;
   organization: Organization;
+  organizationRole: OrganizationRole;
   school_account: SchoolAccount;
   session: Session;
   student: Student;

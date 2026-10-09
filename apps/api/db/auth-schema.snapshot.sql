@@ -8,6 +8,8 @@ create table "verification" ("id" text not null primary key, "identifier" text n
 
 create table "organization" ("id" text not null primary key, "name" text not null, "slug" text not null unique, "logo" text, "createdAt" timestamptz not null, "metadata" text);
 
+create table "organizationRole" ("id" text not null primary key, "organizationId" text not null references "organization" ("id") on delete cascade, "role" text not null, "permission" text not null, "createdAt" timestamptz default CURRENT_TIMESTAMP not null, "updatedAt" timestamptz, "label" text, "description" text, "source" text, "editedAt" timestamptz);
+
 create table "team" ("id" text not null primary key, "name" text not null, "memberCount" integer not null, "organizationId" text not null references "organization" ("id") on delete cascade, "createdAt" timestamptz not null, "updatedAt" timestamptz);
 
 create table "teamMember" ("id" text not null primary key, "teamId" text not null references "team" ("id") on delete cascade, "userId" text not null references "user" ("id") on delete cascade, "membershipKey" text unique, "createdAt" timestamptz);
@@ -21,6 +23,10 @@ create index "session_userId_idx" on "session" ("userId");
 create index "account_userId_idx" on "account" ("userId");
 
 create index "verification_identifier_idx" on "verification" ("identifier");
+
+create index "organizationRole_organizationId_idx" on "organizationRole" ("organizationId");
+
+create index "organizationRole_role_idx" on "organizationRole" ("role");
 
 create index "team_organizationId_idx" on "team" ("organizationId");
 
