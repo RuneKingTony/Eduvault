@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { naira } from '@eduvault/shared';
+import { money } from '@eduvault/shared';
 import { useApi } from '../api';
 import { ErrorMessage } from '../components/error-message';
 import { feeSchedulesQueryOptions } from '../queries';
@@ -17,7 +17,9 @@ export function FeesPage() {
           <li key={fee.id} className="flex justify-between p-3">
             <span>{fee.name}</span>
             <span className="text-muted-foreground">
-              {naira(fee.amountMinor)}
+              {Number.isSafeInteger(fee.amountMinor)
+                ? money(fee.amountMinor, fee.currency)
+                : '—'}
             </span>
           </li>
         ))}

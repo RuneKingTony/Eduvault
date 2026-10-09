@@ -6,7 +6,14 @@ import {
   createRoute,
   createRouter,
 } from '@tanstack/react-router';
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import {
   AuthClientProvider,
   type EduvaultAuthClient,
@@ -26,7 +33,10 @@ const authClient = {
     },
   }),
   useListOrganizations: () => ({
-    data: [{ id: 'o1', name: 'Greenfield College' }],
+    data: [
+      { id: 'o1', name: 'Greenfield College' },
+      { id: 'o2', name: 'Lakeside Academy' },
+    ],
   }),
   useActiveMember: () => ({ data: { role: 'owner,member' } }),
   organization: {
@@ -44,7 +54,7 @@ function Broken(): never {
   throw new Error('Page exploded');
 }
 
-async function renderAt(path: string) {
+async function renderAt(path: string, queryClient = new QueryClient()) {
   const root = createRootRoute({ component: AppShell });
   const child = (to: string, component: () => React.ReactNode) =>
     createRoute({ getParentRoute: () => root, path: to, component });
@@ -61,7 +71,7 @@ async function renderAt(path: string) {
     defaultErrorComponent: ({ error }) => <ErrorMessage error={error} />,
   });
   render(
-    <QueryClientProvider client={new QueryClient()}>
+    <QueryClientProvider client={queryClient}>
       <AuthClientProvider authClient={authClient}>
         <RouterProvider router={router} />
       </AuthClientProvider>
@@ -215,6 +225,26 @@ describe('AppShell', () => {
     expect(
       within(sidebarNav()).getByRole('link', { name: 'Students' })
     ).toBeInTheDocument();
+  });
+
+  it('drops the previous school data from the cache when the school is switched', async () => {
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(['students'], [{ fullName: 'Ada Obi' }]);
+    await renderAt('/students', queryClient);
+    fireEvent.keyDown(
+      within(sidebarNav()).getByRole('button', { name: /Greenfield College/ }),
+      { key: 'Enter' }
+    );
+    fireEvent.click(
+      await screen.findByRole('menuitem', { name: 'Lakeside Academy' })
+    );
+    await waitFor(() => {
+      expect(queryClient.getQueryData(['students'])).toBeUndefined();
+    });
+    expect(authClient.organization.setActive).toHaveBeenCalledWith({
+      organizationId: 'o2',
+    });
+    expect(await screen.findByText('Dashboard page')).toBeInTheDocument();
   });
 
   it('signs out from the user menu', async () => {

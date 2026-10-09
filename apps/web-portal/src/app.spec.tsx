@@ -36,5 +36,8 @@ describe('App', () => {
       })
     );
     expect(screen.getByText(/not been added to a school/)).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Sign out' })
+    ).toBeInTheDocument();
   });
 });

@@ -1,4 +1,16 @@
-import { naira, parseNaira } from './naira';
+import { money, naira, parseNaira } from './naira';
+
+describe('money', () => {
+  it('uses the naira sign for NGN and the code for any other currency', () => {
+    expect(money(1_250_000, 'NGN')).toBe('₦12,500');
+    expect(money(1_250_050, 'USD')).toBe('USD 12,500.50');
+    expect(money(-500_000, 'GBP', { paren: true })).toBe('(GBP 5,000)');
+  });
+
+  it('refuses fractional minor units', () => {
+    expect(() => money(12.5, 'USD')).toThrow(RangeError);
+  });
+});
 
 describe('naira', () => {
   it.each([

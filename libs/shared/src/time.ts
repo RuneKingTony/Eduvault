@@ -13,7 +13,8 @@ export function lagosDateOf(timestamp: string | Date): string {
   if (Number.isNaN(instant.getTime())) {
     throw new RangeError(`Invalid timestamp: ${String(timestamp)}`);
   }
+  const parts = lagosParts.formatToParts(instant);
   const part = (type: Intl.DateTimeFormatPartTypes) =>
-    lagosParts.formatToParts(instant).find((p) => p.type === type)?.value ?? '';
+    parts.find((p) => p.type === type)?.value ?? '';
   return `${part('year')}-${part('month')}-${part('day')}`;
 }

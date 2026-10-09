@@ -3,6 +3,7 @@ import { RouterProvider } from '@tanstack/react-router';
 import {
   AuthClientProvider,
   SignInForm,
+  SignOutButton,
   type EduvaultAuthClient,
 } from '@eduvault/auth-client';
 import { Toaster, useThemeChoice } from '@eduvault/ui';
@@ -26,11 +27,17 @@ function Gate({ authClient }: { authClient: EduvaultAuthClient }) {
   }
   if (!hasSchool) {
     return (
-      <div className="mx-auto max-w-4xl p-6">
+      <div className="mx-auto flex max-w-4xl flex-col items-start gap-6 p-6">
         <CreateSchoolForm
           authClient={authClient}
           onCreated={() => {
             void queryClient.invalidateQueries();
+          }}
+        />
+        <SignOutButton
+          authClient={authClient}
+          onSignedOut={() => {
+            queryClient.clear();
           }}
         />
       </div>

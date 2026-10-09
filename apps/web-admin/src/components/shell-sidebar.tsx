@@ -42,7 +42,7 @@ function SidebarHead() {
               <SchoolCrest name={name} initials={initials(name)} />
             )}
             onSwitched={() => {
-              void queryClient.invalidateQueries();
+              queryClient.removeQueries();
               void navigate({ to: '/' });
             }}
           />
