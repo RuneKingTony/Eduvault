@@ -4,6 +4,9 @@ packages:
 
 autoInstallPeers: true
 
+overrides:
+  '@types/node': 'catalog:'
+
 onlyBuiltDependencies:
   - '@swc/core'
   - esbuild
@@ -34,11 +37,18 @@ catalogs:
     better-auth: ~1.7.7
   eslint:
     '@tanstack/eslint-plugin-query': ^5.100.0
+    '@vitest/eslint-plugin': ^1.6.27
     eslint-config-prettier: ^10.1.0
+    eslint-import-resolver-typescript: ^4.4.5
+    eslint-plugin-better-tailwindcss: ^4.9.0
     eslint-plugin-check-file: ^3.3.0
+    eslint-plugin-import-x: ^4.17.1
     eslint-plugin-jsx-a11y: ^6.10.0
     eslint-plugin-react: ^7.37.0
     eslint-plugin-react-hooks: ^7.1.0
+    eslint-plugin-regexp: ^3.3.1
+    eslint-plugin-sonarjs: ^4.2.2
+    eslint-plugin-unicorn: ^64.0.0
     eslint-plugin-unused-imports: ^4.4.1
     typescript-eslint: ^8.40.0
   git-hooks:

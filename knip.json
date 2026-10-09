@@ -10,7 +10,8 @@
         "@nx/nest",
         "@nx/node",
         "@nx/react",
-        "@eslint/js"
+        "@eslint/js",
+        "tailwindcss"
       ]
     },
     "apps/api": {
