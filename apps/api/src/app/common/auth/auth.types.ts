@@ -8,8 +8,12 @@ export interface AuthenticatedUser {
   name: string;
 }
 
+export type PlatformRole = 'superadmin';
+
 export interface SessionContext {
   user: AuthenticatedUser;
+  mustChangePassword: boolean;
+  platformRole: PlatformRole | null;
   activeOrganizationId: string | null;
   activeTeamId: string | null;
   headers: Headers;

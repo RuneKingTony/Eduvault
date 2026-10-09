@@ -16,13 +16,13 @@ import { twoSchools, type TwoSchools } from './support/two-schools';
 
 const test = baseTest.extend<{ schools: TwoSchools }>({
   schools: async (
-    { app, signUp, createOrganization, createCampus, addMember },
+    { app, createUser, createOrganization, createCampus, addMember },
     use
   ) => {
     await use(
       await twoSchools({
         app,
-        signUp,
+        createUser,
         createOrganization,
         createCampus,
         addMember,
@@ -137,7 +137,7 @@ test.describe('guard order', () => {
     await api(owner).post('/fee-schedules').send(FEE).expect(201);
     await api(owner)
       .post('/school-account')
-      .send({ name: 'Fees', currency: 'NGN' })
+      .send({ name: 'Fees', currency: 'NGN', admissionPrefix: 'FEE' })
       .expect(201);
     await api(owner).get('/school-account').expect(200);
 
@@ -156,7 +156,7 @@ test.describe('guard order', () => {
 test.describe('role union', () => {
   test('permissions from two custom roles are combined', async ({
     api,
-    signUp,
+    createUser,
     addMember,
     createRole,
     schools: { orgA, lekki },
@@ -166,7 +166,7 @@ test.describe('role union', () => {
       slug: 'enroller',
       permissions: ['student:create'],
     });
-    const reader = await addMember(orgA, await signUp(), {
+    const reader = await addMember(orgA, await createUser(), {
       roles: ['reader'],
       campuses: [lekki],
     });
@@ -175,7 +175,7 @@ test.describe('role union', () => {
       .send(student(lekki.id, 'U'))
       .expect(403);
 
-    const both = await addMember(orgA, await signUp(), {
+    const both = await addMember(orgA, await createUser(), {
       roles: ['reader', 'enroller'],
       campuses: [lekki],
     });
@@ -302,11 +302,11 @@ test.describe('campus scope', () => {
 test.describe('/me/permissions', () => {
   test('lists the union for a member with two roles', async ({
     api,
-    signUp,
+    createUser,
     addMember,
     schools: { orgA, lekki },
   }) => {
-    const grace = await addMember(orgA, await signUp(), {
+    const grace = await addMember(orgA, await createUser(), {
       roles: ['teacher', 'principal'],
       campuses: [lekki],
     });
@@ -351,10 +351,10 @@ test.describe('/me/permissions', () => {
 
   test('401 without a session and 403 NoSchool without a school', async ({
     api,
-    signUp,
+    createUser,
   }) => {
     await api().get('/me/permissions').expect(401);
-    const user = await signUp();
+    const user = await createUser();
     const res = await api(user).get('/me/permissions').expect(403);
     expect(res.body).toEqual({
       code: 'NoSchool',
@@ -379,11 +379,11 @@ test.describe('isolation', () => {
   test('a same-slug role edited in one school leaves the other school unchanged', async ({
     api,
     pool,
-    signUp,
+    createUser,
     addMember,
     schools: { orgA, orgB, campusB, lekkiOnly },
   }) => {
-    const bursarB = await addMember(orgB, await signUp(), {
+    const bursarB = await addMember(orgB, await createUser(), {
       roles: ['bursar'],
       campuses: [campusB],
     });

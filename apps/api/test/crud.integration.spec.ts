@@ -3,11 +3,11 @@ import { baseTest as test, expect } from './support/base-test';
 test.describe('campuses', () => {
   test('full CRUD, with details in the domain table and the name in the team', async ({
     api,
-    signUp,
+    createUser,
     createOrganization,
     pool,
   }) => {
-    const owner = await signUp();
+    const owner = await createUser();
     const org = await createOrganization(owner);
 
     const created = await api(owner)
@@ -43,11 +43,11 @@ test.describe('campuses', () => {
 
   test('refuses to delete a campus that still has students', async ({
     api,
-    signUp,
+    createUser,
     createOrganization,
     createCampus,
   }) => {
-    const owner = await signUp();
+    const owner = await createUser();
     const org = await createOrganization(owner);
     const campus = await createCampus(org);
     await api(owner)
@@ -61,19 +61,19 @@ test.describe('campuses', () => {
 
   test('only roles with the team permission can create or edit campuses', async ({
     api,
-    signUp,
+    createUser,
     createOrganization,
     createCampus,
     addMember,
   }) => {
-    const owner = await signUp();
+    const owner = await createUser();
     const org = await createOrganization(owner);
     const campus = await createCampus(org);
-    const teacher = await addMember(org, await signUp(), {
+    const teacher = await addMember(org, await createUser(), {
       roles: ['teacher'],
       campuses: [campus],
     });
-    const administrator = await addMember(org, await signUp(), {
+    const administrator = await addMember(org, await createUser(), {
       roles: ['administrator'],
     });
 
@@ -93,22 +93,32 @@ test.describe('campuses', () => {
 test.describe('school account', () => {
   test('full CRUD, one account per school', async ({
     api,
-    signUp,
+    createUser,
     createOrganization,
   }) => {
-    const owner = await signUp();
+    const owner = await createUser();
     await createOrganization(owner);
 
     await api(owner).get('/school-account').expect(404);
     const created = await api(owner)
       .post('/school-account')
-      .send({ name: 'Fees', currency: 'ngn' })
+      .send({
+        name: 'Fees',
+        currency: 'ngn',
+        admissionPrefix: 'FEE',
+        city: 'Lagos',
+      })
       .expect(201);
-    expect(created.body).toMatchObject({ name: 'Fees', currency: 'NGN' });
+    expect(created.body).toMatchObject({
+      name: 'Fees',
+      currency: 'NGN',
+      admissionPrefix: 'FEE',
+      city: 'Lagos',
+    });
 
     await api(owner)
       .post('/school-account')
-      .send({ name: 'Second', currency: 'NGN' })
+      .send({ name: 'Second', currency: 'NGN', admissionPrefix: 'SEC' })
       .expect(409);
 
     const updated = await api(owner)
@@ -128,11 +138,11 @@ test.describe('school account', () => {
 test.describe('fee schedules', () => {
   test('full CRUD; a null campus applies to the whole school', async ({
     api,
-    signUp,
+    createUser,
     createOrganization,
     createCampus,
   }) => {
-    const owner = await signUp();
+    const owner = await createUser();
     const org = await createOrganization(owner);
     const campus = await createCampus(org);
 
@@ -173,12 +183,12 @@ test.describe('fee schedules', () => {
 
   test('rejects a campus from another school', async ({
     api,
-    signUp,
+    createUser,
     createOrganization,
     createCampus,
   }) => {
-    const ownerA = await signUp();
-    const ownerB = await signUp();
+    const ownerA = await createUser();
+    const ownerB = await createUser();
     await createOrganization(ownerA);
     const orgB = await createOrganization(ownerB);
     const campusB = await createCampus(orgB);
@@ -198,12 +208,12 @@ test.describe('fee schedules', () => {
 test.describe('students', () => {
   test('full CRUD; the active campus is the default for new students', async ({
     api,
-    signUp,
+    createUser,
     createOrganization,
     createCampus,
     setActiveCampus,
   }) => {
-    const owner = await signUp();
+    const owner = await createUser();
     const org = await createOrganization(owner);
     const campus = await createCampus(org);
     const other = await createCampus(org, 'Annex');

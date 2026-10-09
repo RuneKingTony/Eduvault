@@ -3,7 +3,7 @@ import { KYSELY_TOKEN, type Database } from '../../src/app/common/db/tokens';
 import { CampusService } from '../../src/app/modules/campus/campus.service';
 import { StudentService } from '../../src/app/modules/student/student.service';
 import { orgContextFor } from './actors';
-import { emailOf } from './members';
+import { emailOf, SUPER_ADMIN_EMAIL } from './members';
 import { schools } from './schools';
 import { students } from './students';
 
@@ -18,17 +18,80 @@ export const visibleStudents: Record<string, number> = {
   kola: 0,
 };
 
+type Check = (
+  label: string,
+  actual: number | string,
+  expected: number | string
+) => void;
+
+async function checkSuperAdmin(db: Database, check: Check) {
+  const expected = (
+    process.env['BOOTSTRAP_ADMIN_EMAIL'] ?? SUPER_ADMIN_EMAIL
+  ).toLowerCase();
+  const superAdmin = await db
+    .selectFrom('user')
+    .select('email')
+    .where('role', '=', 'superadmin')
+    .where('email', '=', expected)
+    .executeTakeFirst();
+  check('super admin', superAdmin?.email ?? 'missing', expected);
+}
+
+async function checkSchool(
+  db: Database,
+  check: Check,
+  school: (typeof schools)[number]
+) {
+  const account = await db
+    .selectFrom('school_account')
+    .innerJoin(
+      'organization',
+      'organization.id',
+      'school_account.organization_id'
+    )
+    .select(['school_account.admission_prefix', 'organization.id'])
+    .where('organization.slug', '=', school.slug)
+    .executeTakeFirst();
+  check(
+    `${school.slug} admission prefix`,
+    account?.admission_prefix ?? 'missing',
+    school.admissionPrefix
+  );
+  const levels = await db
+    .selectFrom('class_level')
+    .select(['code', 'next_level_id'])
+    .where('organization_id', '=', account?.id ?? '')
+    .orderBy('sequence')
+    .execute();
+  check(`${school.slug} levels`, levels.length, 12);
+  check(
+    `${school.slug} final level`,
+    levels.filter((level) => level.next_level_id === null).length === 1
+      ? (levels.at(-1)?.code ?? 'none')
+      : 'several',
+    'SS3'
+  );
+}
+
+async function checkPlatform(db: Database, check: Check) {
+  await checkSuperAdmin(db, check);
+  for (const school of schools) {
+    await checkSchool(db, check, school);
+  }
+}
+
 export async function runSeedCheck(
   app: INestApplicationContext
 ): Promise<string[]> {
   const failures: string[] = [];
-  const check = (label: string, actual: number, expected: number) => {
+  const check: Check = (label, actual, expected) => {
     if (actual !== expected) {
       failures.push(`${label}: expected ${expected}, got ${actual}`);
     }
   };
 
   const db = app.get<Database>(KYSELY_TOKEN, { strict: false });
+  await checkPlatform(db, check);
   const organizations = await db
     .selectFrom('organization')
     .select('slug')

@@ -1,4 +1,5 @@
 import {
+  ForbiddenException,
   Injectable,
   UnauthorizedException,
   type CanActivate,
@@ -10,7 +11,7 @@ import type { AuthedRequest } from '../auth.types';
 import { assertPasswordSettled } from './password-rule';
 
 @Injectable()
-export class SessionAuthGuard implements CanActivate {
+export class PlatformAuthGuard implements CanActivate {
   constructor(
     private readonly context: AuthContextService,
     private readonly reflector: Reflector
@@ -23,6 +24,9 @@ export class SessionAuthGuard implements CanActivate {
       throw new UnauthorizedException('Authentication is required');
     }
     assertPasswordSettled(this.reflector, context, session);
+    if (session.platformRole !== 'superadmin') {
+      throw new ForbiddenException('Super admins only');
+    }
     request.authSession = session;
     return true;
   }

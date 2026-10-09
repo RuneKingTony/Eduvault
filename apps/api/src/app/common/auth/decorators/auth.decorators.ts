@@ -9,11 +9,27 @@ import {
 import type { ActionOf, Resource } from '@eduvault/policy';
 import type { AuthedRequest, OrgContext, SessionContext } from '../auth.types';
 import { OrganizationAuthGuard } from '../guards/organization-auth.guard';
+import { PlatformAuthGuard } from '../guards/platform-auth.guard';
 import { SessionAuthGuard } from '../guards/session-auth.guard';
-import { PERMISSION_KEY, type RequiredPermission } from './tokens';
+import {
+  ALLOW_TEMPORARY_PASSWORD_KEY,
+  PERMISSION_KEY,
+  type RequiredPermission,
+} from './tokens';
 
-/** Requires a signed-in, non-banned user. */
-export const SessionAuth = () => UseGuards(SessionAuthGuard);
+interface SessionAuthOptions {
+  allowTemporaryPassword?: boolean;
+}
+
+export const SessionAuth = ({
+  allowTemporaryPassword = false,
+}: SessionAuthOptions = {}) =>
+  applyDecorators(
+    SetMetadata(ALLOW_TEMPORARY_PASSWORD_KEY, allowTemporaryPassword),
+    UseGuards(SessionAuthGuard)
+  );
+
+export const PlatformAuth = () => UseGuards(PlatformAuthGuard);
 
 /**
  * Requires a signed-in user acting in a school, and — when given — that their

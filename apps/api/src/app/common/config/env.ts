@@ -12,6 +12,10 @@ const envSchema = z
     WEB_ADMIN_URL: z.url(),
     WEB_PORTAL_URL: z.url(),
     SEED_TODAY: z.iso.date().optional(),
+    AUTH_RATE_LIMIT: z
+      .enum(['true', 'false'])
+      .default('false')
+      .transform((value) => value === 'true'),
     E2E_TRUST_INVITEES: z
       .enum(['true', 'false'])
       .default('false')

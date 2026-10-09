@@ -5,10 +5,14 @@ import { AuthService } from '@thallesp/nestjs-better-auth';
 import { Pool } from 'pg';
 import request from 'supertest';
 import { test as vitestTest } from 'vitest';
-import type { Campus } from '@eduvault/api-contract';
+import type {
+  Campus,
+  CreateSchoolInput,
+  CreateSchoolResult,
+} from '@eduvault/api-contract';
 import { toPermissionMap, type Permission } from '@eduvault/policy';
 import { AppModule } from '../../src/app/app.module';
-import type { AppAuth } from '../../src/app/common/auth';
+import { AccountService, type AppAuth } from '../../src/app/common/auth';
 import { castToBetterAuthRoles } from '../../src/app/common/auth/better-auth-roles';
 import { loadEnv } from '../../src/app/common/config/env';
 import { configureApp } from '../../src/app/configure-app';
@@ -51,6 +55,12 @@ const cookieFrom = (setCookie: string[] | string | undefined): string =>
     .map((cookie) => cookie.split(';')[0])
     .join('; ');
 
+let nextHost = 0;
+const nextAddress = () => {
+  nextHost = (nextHost + 1) % 250;
+  return `203.0.113.${nextHost}`;
+};
+
 const headersFor = (cookie: string) => new Headers({ cookie, origin: ORIGIN });
 
 export interface Fixtures {
@@ -64,8 +74,11 @@ export interface Fixtures {
     patch: (path: string) => request.Test;
     delete: (path: string) => request.Test;
   };
-  /** Registers through the real endpoint; autoSignIn yields the cookie. */
-  signUp: (input?: { email?: string; name?: string }) => Promise<TestUser>;
+  createUser: (input?: {
+    email?: string;
+    name?: string;
+    mustChangePassword?: boolean;
+  }) => Promise<TestUser>;
   /** Fresh session for the user; the default-school hook applies on creation. */
   signIn: (user: TestUser) => Promise<TestUser>;
   setActiveOrganization: (
@@ -95,8 +108,11 @@ export interface Fixtures {
     permissions: readonly Permission[],
     input?: CampusScopeInput
   ) => Promise<TestUser>;
-  /** Makes the user a platform admin (admin plugin `user.role = 'admin'`). */
-  promoteToAdmin: (user: TestUser) => Promise<TestUser>;
+  makeSuperAdmin: (user: TestUser) => Promise<TestUser>;
+  createSchoolViaPlatform: (
+    superAdmin: TestUser,
+    body: Partial<CreateSchoolInput> & Pick<CreateSchoolInput, 'ownerEmail'>
+  ) => Promise<CreateSchoolResult>;
 }
 
 export const baseTest = vitestTest.extend<Fixtures>({
@@ -151,19 +167,17 @@ export const baseTest = vitestTest.extend<Fixtures>({
     });
   },
 
-  signUp: async ({ api }, use) => {
+  createUser: async ({ app, signIn }, use) => {
+    const accounts = app.get(AccountService);
     await use(async (input = {}) => {
       const email = input.email ?? `user-${randomUUID()}@example.test`;
-      const res = await api()
-        .post('/api/auth/sign-up/email')
-        .send({ name: input.name ?? 'Test User', email, password: PASSWORD })
-        .expect(200);
-      return {
-        id: (res.body as { user: { id: string } }).user.id,
+      const { user } = await accounts.createAccount({
+        name: input.name ?? 'Test User',
         email,
         password: PASSWORD,
-        cookie: cookieFrom(res.headers['set-cookie']),
-      };
+        mustChangePassword: input.mustChangePassword ?? false,
+      });
+      return signIn({ id: user.id, email, password: PASSWORD, cookie: '' });
     });
   },
 
@@ -171,6 +185,7 @@ export const baseTest = vitestTest.extend<Fixtures>({
     await use(async (user) => {
       const res = await api()
         .post('/api/auth/sign-in/email')
+        .set('x-forwarded-for', nextAddress())
         .send({ email: user.email, password: user.password })
         .expect(200);
       user.cookie = cookieFrom(res.headers['set-cookie']);
@@ -253,20 +268,37 @@ export const baseTest = vitestTest.extend<Fixtures>({
     });
   },
 
-  withPermissions: async ({ signUp, createRole, addMember }, use) => {
+  withPermissions: async ({ createUser, createRole, addMember }, use) => {
     await use(async (org, permissions, { campuses = [] } = {}) => {
       const slug = `role-${randomUUID().slice(0, 8)}`;
       await createRole(org, { slug, permissions });
-      return addMember(org, await signUp(), { roles: [slug], campuses });
+      return addMember(org, await createUser(), { roles: [slug], campuses });
     });
   },
 
-  promoteToAdmin: async ({ pool, signIn }, use) => {
+  makeSuperAdmin: async ({ pool, signIn }, use) => {
     await use(async (user) => {
-      await pool.query(`UPDATE "user" SET role = 'admin' WHERE id = $1`, [
+      await pool.query(`UPDATE "user" SET role = 'superadmin' WHERE id = $1`, [
         user.id,
       ]);
       return signIn(user);
+    });
+  },
+
+  createSchoolViaPlatform: async ({ api }, use) => {
+    await use(async (superAdmin, body) => {
+      const suffix = randomUUID().slice(0, 6);
+      const res = await api(superAdmin)
+        .post('/platform/schools')
+        .send({
+          name: `School ${suffix}`,
+          slug: `school-${suffix}`,
+          admissionPrefix: 'SCH',
+          ownerName: 'Owner',
+          ...body,
+        })
+        .expect(201);
+      return res.body as CreateSchoolResult;
     });
   },
 });

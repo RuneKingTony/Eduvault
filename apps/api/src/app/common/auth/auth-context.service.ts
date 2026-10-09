@@ -5,6 +5,7 @@ import { getOrgAdapter } from 'better-auth/plugins';
 import {
   OWNER_ROLE,
   can,
+  isSuperAdmin,
   parsePermissionMap,
   resolvePermissions,
   splitRoles,
@@ -24,7 +25,11 @@ import type {
 // The admin and organization plugins add these fields at runtime, but
 // getSession's declared type omits them when plugins come from a shared factory.
 interface PluginSession {
-  user: AuthenticatedUser & { banned?: boolean | null };
+  user: AuthenticatedUser & {
+    banned?: boolean | null;
+    role?: string | null;
+    mustChangePassword?: boolean | null;
+  };
   session: {
     activeOrganizationId?: string | null;
     activeTeamId?: string | null;
@@ -53,6 +58,8 @@ export class AuthContextService {
         email: result.user.email,
         name: result.user.name,
       },
+      mustChangePassword: result.user.mustChangePassword === true,
+      platformRole: isSuperAdmin(result.user.role) ? 'superadmin' : null,
       activeOrganizationId: result.session.activeOrganizationId ?? null,
       activeTeamId: result.session.activeTeamId ?? null,
       headers,

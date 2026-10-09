@@ -13,6 +13,8 @@ interface Row {
   organization_id: string;
   name: string;
   currency: string;
+  admission_prefix: string;
+  city: string | null;
   created_at: Date | string;
 }
 
@@ -21,6 +23,8 @@ const toAccount = (row: Row): SchoolAccount => ({
   organizationId: row.organization_id,
   name: row.name,
   currency: row.currency,
+  admissionPrefix: row.admission_prefix,
+  city: row.city,
   createdAt: iso(row.created_at),
 });
 
@@ -45,7 +49,13 @@ export class KyselySchoolAccountRepository extends SchoolAccountRepository {
   ): Promise<SchoolAccount> {
     const row = await this.db
       .insertInto('school_account')
-      .values({ ...input, organization_id: organizationId })
+      .values({
+        organization_id: organizationId,
+        name: input.name,
+        currency: input.currency,
+        admission_prefix: input.admissionPrefix,
+        city: input.city ?? null,
+      })
       .returningAll()
       .executeTakeFirstOrThrow();
     return toAccount(row);
@@ -57,7 +67,15 @@ export class KyselySchoolAccountRepository extends SchoolAccountRepository {
   ): Promise<SchoolAccount | undefined> {
     const row = await this.db
       .updateTable('school_account')
-      .set({ ...patch, updated_at: new Date() })
+      .set({
+        ...(patch.name === undefined ? {} : { name: patch.name }),
+        ...(patch.currency === undefined ? {} : { currency: patch.currency }),
+        ...(patch.admissionPrefix === undefined
+          ? {}
+          : { admission_prefix: patch.admissionPrefix }),
+        ...(patch.city === undefined ? {} : { city: patch.city }),
+        updated_at: new Date(),
+      })
       .where('organization_id', '=', organizationId)
       .returningAll()
       .executeTakeFirst();

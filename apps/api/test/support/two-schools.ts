@@ -3,29 +3,29 @@ import { createStudent } from './factories/students';
 
 type SchoolFixtures = Pick<
   Fixtures,
-  'app' | 'signUp' | 'createOrganization' | 'createCampus' | 'addMember'
+  'app' | 'createUser' | 'createOrganization' | 'createCampus' | 'addMember'
 >;
 
 export async function twoSchools({
   app,
-  signUp,
+  createUser,
   createOrganization,
   createCampus,
   addMember,
 }: SchoolFixtures) {
-  const owner = await signUp();
-  const ownerB = await signUp();
+  const owner = await createUser();
+  const ownerB = await createUser();
   const orgA = await createOrganization(owner, 'School A');
   const orgB = await createOrganization(ownerB, 'School B');
   const lekki = await createCampus(orgA, 'Lekki');
   const ikeja = await createCampus(orgA, 'Ikeja');
   const campusB = await createCampus(orgB, 'Main');
 
-  const lekkiOnly = await addMember(orgA, await signUp(), {
+  const lekkiOnly = await addMember(orgA, await createUser(), {
     roles: ['bursar'],
     campuses: [lekki],
   });
-  const noPermission = await addMember(orgA, await signUp(), {
+  const noPermission = await addMember(orgA, await createUser(), {
     roles: ['member'],
   });
 

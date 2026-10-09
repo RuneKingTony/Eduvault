@@ -1,5 +1,5 @@
-import { Controller, Get } from '@nestjs/common';
-import type { RouteOutput, contract } from '@eduvault/api-contract';
+import { Body, Controller, Get, HttpCode, Post } from '@nestjs/common';
+import { contract, type RouteOutput } from '@eduvault/api-contract';
 import {
   CurrentSession,
   Org,
@@ -8,27 +8,27 @@ import {
   type OrgContext,
   type SessionContext,
 } from '../../common/auth';
+import { zod } from '../../common/http/zod.pipe';
+import { MeService } from './me.service';
+
+const routes = contract.me;
 
 @Controller('me')
 export class MeController {
+  constructor(private readonly me: MeService) {}
+
   /** Needs a session only, so it answers before a school is chosen. */
   @Get()
-  @SessionAuth()
+  @SessionAuth({ allowTemporaryPassword: true })
   get(
     @CurrentSession() session: SessionContext
-  ): RouteOutput<typeof contract.me.get> {
-    return {
-      user: session.user,
-      activeOrganizationId: session.activeOrganizationId,
-      activeCampusId: session.activeTeamId,
-    };
+  ): Promise<RouteOutput<typeof routes.get>> {
+    return this.me.get(session);
   }
 
   @Get('permissions')
   @OrganizationAuth()
-  permissions(
-    @Org() org: OrgContext
-  ): RouteOutput<typeof contract.me.permissions> {
+  permissions(@Org() org: OrgContext): RouteOutput<typeof routes.permissions> {
     return {
       organizationId: org.organizationId,
       roles: org.roles,
@@ -37,5 +37,16 @@ export class MeController {
       classScope: org.classScope,
       acting: org.acting,
     };
+  }
+
+  @Post('password')
+  @HttpCode(204)
+  @SessionAuth({ allowTemporaryPassword: true })
+  setPassword(
+    @CurrentSession() session: SessionContext,
+    @Body(zod(routes.setPassword.body))
+    body: { newPassword: string }
+  ): Promise<RouteOutput<typeof routes.setPassword>> {
+    return this.me.setPassword(session, body.newPassword);
   }
 }

@@ -6,6 +6,7 @@ import {
   advancedBaseConfig,
   emailAndPasswordBaseConfig,
   getPlugins,
+  userBaseConfig,
 } from './src/app/common/auth/better-auth-base';
 
 const pool = new Pool({
@@ -18,6 +19,7 @@ export default betterAuth({
   appName: 'Eduvault',
   database: pool,
   emailAndPassword: emailAndPasswordBaseConfig,
+  user: userBaseConfig,
   advanced: advancedBaseConfig,
   plugins: getPlugins(pool),
 });

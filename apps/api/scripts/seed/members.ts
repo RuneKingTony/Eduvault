@@ -1,4 +1,9 @@
-export const SEED_PASSWORD = 'password123';
+export {
+  DEV_BOOTSTRAP_EMAIL as SUPER_ADMIN_EMAIL,
+  DEV_BOOTSTRAP_PASSWORD as SEED_PASSWORD,
+} from '../../src/app/common/auth/bootstrap-admin';
+
+export const FORCED_CHANGE_PERSONA = 'kemi';
 
 interface Persona {
   key: string;

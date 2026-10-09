@@ -6,10 +6,14 @@ import {
   emailAndPasswordBaseConfig,
   getDatabaseHooks,
   getPlugins,
+  userBaseConfig,
 } from './better-auth-base';
 
 const getTrustedOrigins = (env: Env): string[] =>
   env.NODE_ENV === 'test' ? ['*'] : [env.WEB_ADMIN_URL, env.WEB_PORTAL_URL];
+
+export const isSignInLimited = (env: Env): boolean =>
+  env.NODE_ENV === 'production' || env.AUTH_RATE_LIMIT;
 
 export function createAuth(pool: Pool, env: Env) {
   return betterAuth({
@@ -19,8 +23,12 @@ export function createAuth(pool: Pool, env: Env) {
     secret: env.BETTER_AUTH_SECRET,
     trustedOrigins: getTrustedOrigins(env),
     emailAndPassword: emailAndPasswordBaseConfig,
+    user: userBaseConfig,
     databaseHooks: getDatabaseHooks(pool),
-    rateLimit: { enabled: env.NODE_ENV === 'production' },
+    rateLimit: {
+      enabled: isSignInLimited(env),
+      customRules: { '/sign-in/*': { window: 60, max: 5 } },
+    },
     advanced: {
       ...advancedBaseConfig,
       defaultCookieAttributes: {

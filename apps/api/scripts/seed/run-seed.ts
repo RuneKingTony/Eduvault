@@ -1,15 +1,28 @@
 import type { INestApplicationContext } from '@nestjs/common';
 import { AuthService } from '@thallesp/nestjs-better-auth';
-import type { AppAuth, OrgContext } from '../../src/app/common/auth';
+import {
+  AccountService,
+  bootstrapSuperAdmin,
+  parseBootstrapEnv,
+  type AppAuth,
+  type OrgContext,
+} from '../../src/app/common/auth';
 import { castToBetterAuthRoles } from '../../src/app/common/auth/better-auth-roles';
 import { ENV_TOKEN, type Env } from '../../src/app/common/config/env';
 import { KYSELY_TOKEN, type Database } from '../../src/app/common/db/tokens';
 import { CampusService } from '../../src/app/modules/campus/campus.service';
-import { SchoolAccountService } from '../../src/app/modules/school-account/school-account.service';
+import { PlatformService } from '../../src/app/modules/platform/platform.service';
 import { StudentService } from '../../src/app/modules/student/student.service';
 import { orgContextFor } from './actors';
 import { PROTOTYPE_TODAY, seedOffsetDays, shiftDate } from './date-shift';
-import { emailOf, memberships, personas, SEED_PASSWORD } from './members';
+import {
+  emailOf,
+  memberships,
+  personas,
+  SEED_PASSWORD,
+  SUPER_ADMIN_EMAIL,
+  FORCED_CHANGE_PERSONA,
+} from './members';
 import { GREENFIELD_SLUG, schools } from './schools';
 import { runSeedCheck } from './seed-check';
 import { students } from './students';
@@ -24,6 +37,14 @@ interface SeedResult {
   failures: string[];
 }
 
+const lookupPersona = (key: string) => {
+  const persona = personas.find((candidate) => candidate.key === key);
+  if (persona === undefined) {
+    throw new Error(`Unknown persona ${key}`);
+  }
+  return persona;
+};
+
 const lookup = (map: Map<string, string>, key: string, what: string) => {
   const value = map.get(key);
   if (value === undefined) {
@@ -33,14 +54,17 @@ const lookup = (map: Map<string, string>, key: string, what: string) => {
 };
 
 async function createSchools(app: INestApplicationContext) {
-  const { api } = app.get(AuthService<AppAuth>, { strict: false });
   const campusService = app.get(CampusService, { strict: false });
-  const accounts = app.get(SchoolAccountService, { strict: false });
+  const accounts = app.get(AccountService, { strict: false });
+  const platform = app.get(PlatformService, { strict: false });
 
   const userIds = new Map<string, string>();
   for (const { key, name, email } of personas) {
-    const { user } = await api.signUpEmail({
-      body: { name, email, password: SEED_PASSWORD },
+    const { user } = await accounts.createAccount({
+      name,
+      email,
+      password: SEED_PASSWORD,
+      mustChangePassword: key === FORCED_CHANGE_PERSONA,
     });
     userIds.set(key, user.id);
   }
@@ -49,25 +73,23 @@ async function createSchools(app: INestApplicationContext) {
   const campusIds = new Map<string, string>();
   const owners = new Map<string, OrgContext>();
   for (const school of schools) {
-    const organization = await api.createOrganization({
-      body: {
-        name: school.name,
-        slug: school.slug,
-        userId: lookup(userIds, school.owner, 'persona'),
-      },
+    const ownerPersona = lookupPersona(school.owner);
+    const created = await platform.createSchool({
+      name: school.name,
+      slug: school.slug,
+      admissionPrefix: school.admissionPrefix,
+      city: school.city,
+      ownerName: ownerPersona.name,
+      ownerEmail: ownerPersona.email,
     });
-    organizationIds.set(school.slug, organization.id);
+    organizationIds.set(school.slug, created.school.id);
 
-    const owner = await orgContextFor(app, emailOf(school.owner));
+    const owner = await orgContextFor(app, ownerPersona.email);
     owners.set(school.slug, owner);
     for (const campus of school.campuses) {
-      const created = await campusService.create(owner, campus);
-      campusIds.set(`${school.slug}/${campus.name}`, created.id);
+      const campusRow = await campusService.create(owner, campus);
+      campusIds.set(`${school.slug}/${campus.name}`, campusRow.id);
     }
-    await accounts.create(owner, {
-      name: school.name,
-      currency: school.currency,
-    });
   }
   return { userIds, organizationIds, campusIds, owners };
 }
@@ -120,10 +142,30 @@ async function createStudents(
   }
 }
 
+async function ensureSuperAdmin(
+  app: INestApplicationContext,
+  log: (line: string) => void
+) {
+  const auth = app.get(AuthService<AppAuth>, { strict: false }).instance;
+  const credentials = parseBootstrapEnv({
+    ...process.env,
+    BOOTSTRAP_ADMIN_EMAIL:
+      process.env['BOOTSTRAP_ADMIN_EMAIL'] ?? SUPER_ADMIN_EMAIL,
+    BOOTSTRAP_ADMIN_PASSWORD:
+      process.env['BOOTSTRAP_ADMIN_PASSWORD'] ?? SEED_PASSWORD,
+  });
+  const outcome = await bootstrapSuperAdmin(auth, credentials);
+  if (outcome === 'created') {
+    log(`Created the super admin ${credentials.email}.`);
+  }
+  return credentials.email;
+}
+
 export async function runSeed(
   app: INestApplicationContext,
   { log = console.log, now }: SeedOptions = {}
 ): Promise<SeedResult> {
+  const superAdminEmail = await ensureSuperAdmin(app, log);
   const db = app.get<Database>(KYSELY_TOKEN, { strict: false });
   const marker = await db
     .selectFrom('organization')
@@ -156,6 +198,7 @@ export async function runSeed(
     `Seeded ${schools.length} schools, ${personas.length} users and ${students.length} students; seed check passed.`
   );
   log(`Sign in with any of these (password: ${SEED_PASSWORD}):`);
+  log(`  ${superAdminEmail}  Super admin (staff app, no school)`);
   for (const { name, email } of personas) {
     log(`  ${email}  ${name}`);
   }
