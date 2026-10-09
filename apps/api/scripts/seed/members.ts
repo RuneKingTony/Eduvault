@@ -21,6 +21,7 @@ export const personas: Persona[] = [
   { key: 'uche', name: 'Uche Nweke', email: 'uche.nweke@greenfield.test' },
   { key: 'claire', name: 'Claire Ade', email: 'claire.ade@greenfield.test' },
   { key: 'mo', name: 'Mo Multi', email: 'multi@eduvault.test' },
+  { key: 'kemi', name: 'Kemi Balogun', email: 'kemi.balogun@greenfield.test' },
   { key: 'kola', name: 'Kola Ajayi', email: 'kola@hilltop.test' },
   {
     key: 'mary',
@@ -32,7 +33,7 @@ export const personas: Persona[] = [
 interface Membership {
   persona: string;
   school: string;
-  role: 'admin' | 'teacher';
+  roles: string[];
   campuses: string[];
 }
 
@@ -49,39 +50,70 @@ const BOTH = ['Lekki', 'Ikeja'];
 // Owners are not listed: creating the school makes them owner, and creating
 // its campuses enrols them.
 export const memberships: Membership[] = [
-  { persona: 'tunde', school: 'greenfield', role: 'admin', campuses: BOTH },
-  { persona: 'grace', school: 'greenfield', role: 'admin', campuses: BOTH },
+  {
+    persona: 'tunde',
+    school: 'greenfield',
+    roles: ['administrator'],
+    campuses: BOTH,
+  },
+  {
+    persona: 'grace',
+    school: 'greenfield',
+    roles: ['teacher', 'principal'],
+    campuses: BOTH,
+  },
   {
     persona: 'chika',
     school: 'greenfield',
-    role: 'teacher',
+    roles: ['bursar'],
     campuses: ['Lekki'],
   },
   {
     persona: 'yemi',
     school: 'greenfield',
-    role: 'teacher',
+    roles: ['bursar'],
     campuses: ['Ikeja'],
   },
   {
     persona: 'emeka',
     school: 'greenfield',
-    role: 'teacher',
+    roles: ['teacher'],
     campuses: ['Lekki'],
   },
   {
     persona: 'ayo',
     school: 'greenfield',
-    role: 'teacher',
+    roles: ['teacher'],
     campuses: ['Lekki'],
   },
   {
     persona: 'uche',
     school: 'greenfield',
-    role: 'teacher',
+    roles: ['teacher'],
     campuses: ['Lekki'],
   },
-  { persona: 'claire', school: 'greenfield', role: 'teacher', campuses: BOTH },
-  { persona: 'mo', school: 'greenfield', role: 'teacher', campuses: ['Lekki'] },
-  { persona: 'mo', school: 'hilltop', role: 'admin', campuses: ['Main'] },
+  {
+    persona: 'claire',
+    school: 'greenfield',
+    roles: ['teacher'],
+    campuses: BOTH,
+  },
+  {
+    persona: 'mo',
+    school: 'greenfield',
+    roles: ['teacher'],
+    campuses: ['Lekki'],
+  },
+  {
+    persona: 'mo',
+    school: 'hilltop',
+    roles: ['administrator'],
+    campuses: ['Main'],
+  },
+  {
+    persona: 'kemi',
+    school: 'greenfield',
+    roles: ['member'],
+    campuses: ['Lekki'],
+  },
 ];

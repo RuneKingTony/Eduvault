@@ -3,6 +3,7 @@ import {
   Logger,
   type ArgumentsHost,
   NotFoundException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import { ErrorFilter } from './error.filter';
 
@@ -29,9 +30,47 @@ describe('ErrorFilter', () => {
     expect(run(new ForbiddenException('nope')).body.code).toBe('Forbidden');
   });
 
+  it('keeps a listed code from the exception and falls back to the status for any other', () => {
+    expect(
+      run(new ForbiddenException({ code: 'NoSchool', message: 'No school' }))
+        .body.code
+    ).toBe('NoSchool');
+    expect(
+      run(new ForbiddenException({ code: 'Made up', message: 'x' })).body.code
+    ).toBe('Forbidden');
+    expect(run(new UnprocessableEntityException('x')).body.code).toBe(
+      'BadRequest'
+    );
+  });
+
   it('maps Postgres violations to 409', () => {
     expect(run({ code: '23505' }).status).toBe(409);
     expect(run({ code: '23503' }).status).toBe(409);
+  });
+
+  it('maps a self-approval check violation to SelfApproval', () => {
+    expect(
+      run({ code: '23514', constraint: 'payment_void_approved_by_not_self' })
+    ).toEqual({
+      status: 409,
+      body: {
+        code: 'SelfApproval',
+        message: 'You created this. Someone else must approve it.',
+      },
+    });
+  });
+
+  it('maps any other check violation to Conflict', () => {
+    expect(
+      run({ code: '23514', constraint: 'fee_amount_nonnegative' })
+    ).toEqual({
+      status: 409,
+      body: {
+        code: 'Conflict',
+        message: 'The change breaks a rule on this record',
+      },
+    });
+    expect(run({ code: '23514' }).body.code).toBe('Conflict');
   });
 
   it('maps Better Auth 4xx errors to their status', () => {

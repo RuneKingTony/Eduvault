@@ -22,11 +22,10 @@ export class FeeScheduleService {
   }
 
   async list(ctx: OrgContext, campusId?: string): Promise<FeeSchedule[]> {
-    if (campusId !== undefined && !canSeeCampus(ctx.campusScope, campusId)) {
-      throw new NotFoundException('Campus not found');
+    if (campusId !== undefined) {
+      await this.campuses.assertInScope(ctx, campusId);
     }
-    const fees = await this.fees.list(ctx.organizationId, campusId);
-    return fees.filter((fee) => this.visible(ctx, fee));
+    return this.fees.list(ctx.organizationId, ctx.campusScope, campusId);
   }
 
   async get(ctx: OrgContext, id: string): Promise<FeeSchedule> {
@@ -39,7 +38,7 @@ export class FeeScheduleService {
 
   async create(ctx: OrgContext, input: NewFeeSchedule): Promise<FeeSchedule> {
     if (typeof input.campusId === 'string') {
-      await this.campuses.assertInSchool(ctx, input.campusId);
+      await this.campuses.assertInScope(ctx, input.campusId);
     }
     return this.fees.create(ctx.organizationId, input);
   }
@@ -51,7 +50,7 @@ export class FeeScheduleService {
   ): Promise<FeeSchedule> {
     await this.get(ctx, id);
     if (typeof input.campusId === 'string') {
-      await this.campuses.assertInSchool(ctx, input.campusId);
+      await this.campuses.assertInScope(ctx, input.campusId);
     }
     const fee = await this.fees.update(ctx.organizationId, id, input);
     if (!fee) {

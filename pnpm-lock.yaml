@@ -485,6 +485,9 @@ importers:
       '@eduvault/auth-client':
         specifier: workspace:*
         version: link:../../libs/auth-client
+      '@eduvault/policy':
+        specifier: workspace:*
+        version: link:../../libs/policy
       '@eduvault/shared':
         specifier: workspace:*
         version: link:../../libs/shared
@@ -595,12 +598,21 @@ importers:
 
   libs/api-contract:
     dependencies:
+      '@eduvault/policy':
+        specifier: workspace:*
+        version: link:../policy
       zod:
         specifier: 'catalog:'
         version: 4.6.5
 
   libs/auth-client:
     dependencies:
+      '@eduvault/api-contract':
+        specifier: workspace:*
+        version: link:../api-contract
+      '@eduvault/policy':
+        specifier: workspace:*
+        version: link:../policy
       '@eduvault/shared':
         specifier: workspace:*
         version: link:../shared

@@ -1,4 +1,8 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import {
+  QueryClient,
+  QueryClientProvider,
+  focusManager,
+} from '@tanstack/react-query';
 import {
   RouterProvider,
   createMemoryHistory,
@@ -18,7 +22,14 @@ import {
   AuthClientProvider,
   type EduvaultAuthClient,
 } from '@eduvault/auth-client';
+import { ApiError, type MePermissions } from '@eduvault/api-contract';
 import { stubMatchMedia } from '@eduvault/ui/testing';
+import { requireGate } from '../access';
+import { ApiProvider, type Api } from '../api';
+import { DashboardPage } from '../pages/dashboard-page';
+import { mePermissionsQueryOptions } from '../queries';
+import { createQueryClient } from '../query-client';
+import { fakeAccess, ownerAccess, starterAccess } from '../test-utils';
 import { ErrorMessage } from './error-message';
 import { AppShell } from './app-shell';
 import { NotFoundPage } from './page-fallbacks';
@@ -54,13 +65,42 @@ function Broken(): never {
   throw new Error('Page exploded');
 }
 
-async function renderAt(path: string, queryClient = new QueryClient()) {
-  const root = createRootRoute({ component: AppShell });
+interface RenderOptions {
+  queryClient?: QueryClient;
+  access?: MePermissions;
+  realDashboard?: boolean;
+}
+
+async function renderAt(
+  path: string,
+  {
+    queryClient = new QueryClient(),
+    access = ownerAccess(),
+    realDashboard = false,
+  }: RenderOptions = {}
+) {
+  let current = access;
+  const permissions = vi.fn(() => Promise.resolve(current));
+  const api = { me: { permissions } } as unknown as Api;
+  const root = createRootRoute({
+    component: AppShell,
+    beforeLoad: async () => ({
+      access: await queryClient.query(mePermissionsQueryOptions(api)),
+    }),
+  });
   const child = (to: string, component: () => React.ReactNode) =>
-    createRoute({ getParentRoute: () => root, path: to, component });
+    createRoute({
+      getParentRoute: () => root,
+      path: to,
+      component,
+      beforeLoad: ({ context }) => {
+        requireGate(context.access, to);
+      },
+    });
   const router = createRouter({
     routeTree: root.addChildren([
-      child('/', page('Dashboard page')),
+      child('/', realDashboard ? DashboardPage : page('Dashboard page')),
+      child('/approvals', page('Approvals page')),
       child('/students', page('Students page')),
       child('/fees', page('Fees page')),
       child('/campuses', page('Campuses page')),
@@ -72,12 +112,20 @@ async function renderAt(path: string, queryClient = new QueryClient()) {
   });
   render(
     <QueryClientProvider client={queryClient}>
-      <AuthClientProvider authClient={authClient}>
-        <RouterProvider router={router} />
-      </AuthClientProvider>
+      <ApiProvider api={api}>
+        <AuthClientProvider authClient={authClient}>
+          <RouterProvider router={router} />
+        </AuthClientProvider>
+      </ApiProvider>
     </QueryClientProvider>
   );
   await screen.findByRole('navigation', { name: 'Breadcrumb' });
+  return {
+    permissions,
+    changeAccessTo: (next: MePermissions) => {
+      current = next;
+    },
+  };
 }
 
 const sidebarNav = () =>
@@ -112,7 +160,7 @@ describe('AppShell', () => {
       'aria-current'
     );
     expect(
-      nav.queryByRole('link', { name: 'Approvals' })
+      nav.queryByRole('link', { name: 'Announcements' })
     ).not.toBeInTheDocument();
     const links = nav.getAllByRole('link').map((link) => link.textContent);
     expect(links.at(-1)).toBe('Settings');
@@ -230,7 +278,7 @@ describe('AppShell', () => {
   it('drops the previous school data from the cache when the school is switched', async () => {
     const queryClient = new QueryClient();
     queryClient.setQueryData(['students'], [{ fullName: 'Ada Obi' }]);
-    await renderAt('/students', queryClient);
+    await renderAt('/students', { queryClient });
     fireEvent.keyDown(
       within(sidebarNav()).getByRole('button', { name: /Greenfield College/ }),
       { key: 'Enter' }
@@ -255,6 +303,172 @@ describe('AppShell', () => {
     );
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Sign out' }));
     expect(signOut).toHaveBeenCalledOnce();
+  });
+});
+
+const linkNames = () =>
+  within(sidebarNav())
+    .getAllByRole('link')
+    .map((link) => link.textContent);
+
+describe('AppShell access', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    stubMatchMedia({ '(max-width: 820px)': false });
+  });
+
+  afterEach(() => {
+    focusManager.setFocused();
+    vi.unstubAllGlobals();
+  });
+
+  it('sends the open page to the Dashboard when the window regains focus after access was revoked', async () => {
+    const { changeAccessTo } = await renderAt('/students');
+    changeAccessTo(fakeAccess());
+    act(() => {
+      focusManager.setFocused(false);
+      focusManager.setFocused(true);
+    });
+    expect(await screen.findByText('Dashboard page')).toBeInTheDocument();
+    expect(linkNames()).toEqual(['Dashboard', 'Approvals']);
+  });
+
+  it('refetches the access after a 403 and sends the open page to the Dashboard', async () => {
+    const queryClient = createQueryClient();
+    const { changeAccessTo } = await renderAt('/students', { queryClient });
+    changeAccessTo(fakeAccess());
+    await queryClient
+      .query({
+        queryKey: ['students'],
+        queryFn: () =>
+          Promise.reject(
+            new ApiError(403, {
+              code: 'Forbidden',
+              message: 'Missing permission student:read',
+            })
+          ),
+      })
+      .catch(() => undefined);
+    expect(await screen.findByText('Dashboard page')).toBeInTheDocument();
+    expect(linkNames()).toEqual(['Dashboard', 'Approvals']);
+  });
+
+  it('reads the access of the school that was switched to, not the previous one', async () => {
+    const { changeAccessTo, permissions } = await renderAt('/students');
+    expect(linkNames()).toContain('Fees');
+    changeAccessTo(starterAccess('bursar'));
+    fireEvent.keyDown(
+      within(sidebarNav()).getByRole('button', { name: /Greenfield College/ }),
+      { key: 'Enter' }
+    );
+    fireEvent.click(
+      await screen.findByRole('menuitem', { name: 'Lakeside Academy' })
+    );
+    await waitFor(() => {
+      expect(linkNames()).toEqual(['Dashboard', 'Approvals', 'Students']);
+    });
+    expect(permissions).toHaveBeenCalledTimes(2);
+  });
+
+  it('shows an owner Students, Fees and a Settings entry that opens Campuses', async () => {
+    await renderAt('/');
+    expect(linkNames()).toEqual([
+      'Dashboard',
+      'Approvals',
+      'Students',
+      'Fees',
+      'Settings',
+    ]);
+    expect(
+      within(sidebarNav()).getByRole('link', { name: 'Settings' })
+    ).toHaveAttribute('href', '/campuses');
+  });
+
+  it('shows a bursar Students but no Fees or Settings', async () => {
+    await renderAt('/', { access: starterAccess('bursar') });
+    expect(linkNames()).toEqual(['Dashboard', 'Approvals', 'Students']);
+  });
+
+  it('shows a member with no roles only Dashboard and Approvals', async () => {
+    await renderAt('/', { access: fakeAccess() });
+    expect(linkNames()).toEqual(['Dashboard', 'Approvals']);
+    expect(
+      within(sidebarNav()).queryByRole('link', { name: 'Settings' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('sends a teacher who types /fees to the Dashboard with no message', async () => {
+    await renderAt('/fees', { access: starterAccess('teacher') });
+    expect(await screen.findByText('Dashboard page')).toBeInTheDocument();
+    expect(screen.queryByText('Fees page')).not.toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(linkNames()).toEqual(['Dashboard', 'Approvals', 'Students']);
+  });
+
+  it('keeps the command menu to what the member can open', async () => {
+    await renderAt('/', { access: starterAccess('bursar') });
+    fireEvent.keyDown(globalThis as unknown as Window, {
+      key: 'k',
+      ctrlKey: true,
+    });
+    const input = await screen.findByPlaceholderText(
+      'Search pages and actions…'
+    );
+    fireEvent.change(input, { target: { value: 'fees' } });
+    expect(
+      screen.queryByRole('option', { name: /Fees/ })
+    ).not.toBeInTheDocument();
+    fireEvent.change(input, { target: { value: 'students' } });
+    expect(
+      screen.getByRole('option', { name: /Students/ })
+    ).toBeInTheDocument();
+  });
+
+  it('shows the no-roles Dashboard and opens My access from it', async () => {
+    await renderAt('/', { access: fakeAccess(), realDashboard: true });
+    expect(
+      await screen.findByRole('heading', { name: 'Welcome, Funmi' })
+    ).toBeInTheDocument();
+    expect(screen.getByText('No access yet')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'See my access' }));
+    expect(
+      await screen.findByText('Nothing yet. Ask the owner to give you a role.')
+    ).toBeInTheDocument();
+  });
+
+  it('tells a member whose role grants nothing that the role is the limit', async () => {
+    await renderAt('/', {
+      access: fakeAccess({ roles: ['student'] }),
+      realDashboard: true,
+    });
+    expect(await screen.findByText('No access yet')).toBeInTheDocument();
+    expect(
+      screen.getByText(/Your role doesn’t give you anything to see yet/)
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/until the owner gives you a role/)).toBeNull();
+  });
+
+  it('opens My access from the user menu', async () => {
+    await renderAt('/', { access: starterAccess('administrator') });
+    fireEvent.keyDown(
+      within(sidebarNav()).getByRole('button', { name: /Funmi Adeyemi/ }),
+      { key: 'Enter' }
+    );
+    expect(screen.queryByText('Member, no roles')).not.toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'My access' }));
+    expect(
+      await screen.findByText('What you can do in Greenfield College, and why.')
+    ).toBeInTheDocument();
+    expect(screen.getByText('Every campus')).toBeInTheDocument();
+  });
+
+  it('reads the user menu role label from the permissions', async () => {
+    await renderAt('/', { access: fakeAccess() });
+    expect(
+      within(sidebarNav()).getByRole('button', {
+        name: /Funmi Adeyemi.*Member, no roles/,
+      })
+    ).toBeInTheDocument();
   });
 });
 

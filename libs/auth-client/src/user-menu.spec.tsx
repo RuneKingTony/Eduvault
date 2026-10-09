@@ -1,12 +1,15 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { PermissionsProvider } from './permissions';
+import { accessOfStarter, fakeAccess } from './access-test-utils';
 import { UserMenu } from './user-menu';
 import { fakeClient, openMenu, renderInSidebar } from './menu-test-utils';
 
 function setup(
   options: {
     role?: string;
+    access?: ReturnType<typeof fakeAccess> | null;
     onOpenCommandMenu?: () => void;
-    showMyAccess?: boolean;
+    onOpenMyAccess?: () => void;
     signOutResult?: { error: unknown };
   } = {}
 ) {
@@ -27,11 +30,11 @@ function setup(
     useActiveMember: () => ({ data: { role: options.role ?? 'owner,member' } }),
     signOut,
   });
-  renderInSidebar(
+  const menu = (
     <UserMenu
       authClient={authClient}
       onOpenCommandMenu={options.onOpenCommandMenu}
-      showMyAccess={options.showMyAccess}
+      onOpenMyAccess={options.onOpenMyAccess}
       onSignedOut={onSignedOut}
       renderTrigger={(user) => (
         <button type="button">
@@ -39,6 +42,17 @@ function setup(
         </button>
       )}
     />
+  );
+  const access =
+    options.access === undefined
+      ? accessOfStarter('administrator')
+      : options.access;
+  renderInSidebar(
+    access === null ? (
+      menu
+    ) : (
+      <PermissionsProvider value={access}>{menu}</PermissionsProvider>
+    )
   );
   return { signOut, onSignedOut };
 }
@@ -58,10 +72,24 @@ describe('UserMenu', () => {
     localStorage.clear();
   });
 
-  it('gives the trigger the name and the membership role labels', () => {
-    setup();
+  it('gives the trigger the name and the role labels from the permissions', () => {
+    setup({ access: fakeAccess({ roles: ['owner', 'member', 'bursar'] }) });
     expect(
-      screen.getByRole('button', { name: 'Funmi Adeyemi Owner' })
+      screen.getByRole('button', { name: 'Funmi Adeyemi Owner, Bursar' })
+    ).toBeInTheDocument();
+  });
+
+  it('says "Member, no roles" for a member holding only member', () => {
+    setup({ access: fakeAccess() });
+    expect(
+      screen.getByRole('button', { name: 'Funmi Adeyemi Member, no roles' })
+    ).toBeInTheDocument();
+  });
+
+  it('falls back to the active member outside a permissions provider', () => {
+    setup({ access: null, role: 'student,member' });
+    expect(
+      screen.getByRole('button', { name: 'Funmi Adeyemi Student' })
     ).toBeInTheDocument();
   });
 
@@ -80,13 +108,20 @@ describe('UserMenu', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('shows a disabled My access item for staff', () => {
-    setup({ showMyAccess: true });
+  it('opens My access when the shell has one', () => {
+    const onOpenMyAccess = vi.fn();
+    setup({ onOpenMyAccess });
     openMenu(/Funmi Adeyemi/);
-    expect(screen.getByRole('menuitem', { name: 'My access' })).toHaveAttribute(
-      'aria-disabled',
-      'true'
-    );
+    fireEvent.click(screen.getByRole('menuitem', { name: 'My access' }));
+    expect(onOpenMyAccess).toHaveBeenCalledOnce();
+  });
+
+  it('hides My access when the shell has none', () => {
+    setup();
+    openMenu(/Funmi Adeyemi/);
+    expect(
+      screen.queryByRole('menuitem', { name: 'My access' })
+    ).not.toBeInTheDocument();
   });
 
   it('opens the command menu when the shell has one', () => {

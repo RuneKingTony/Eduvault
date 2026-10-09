@@ -1,7 +1,6 @@
 import {
   Body,
   Controller,
-  Delete,
   Get,
   Param,
   Patch,
@@ -56,14 +55,5 @@ export class StudentController {
     body: Parameters<StudentService['update']>[2]
   ): Promise<RouteOutput<typeof routes.update>> {
     return this.students.update(org, params.id, body);
-  }
-
-  @Delete(':id')
-  @OrganizationAuth('student', 'delete')
-  remove(
-    @Org() org: OrgContext,
-    @Param(zod(routes.remove.params)) params: { id: string }
-  ): Promise<RouteOutput<typeof routes.remove>> {
-    return this.students.remove(org, params.id);
   }
 }

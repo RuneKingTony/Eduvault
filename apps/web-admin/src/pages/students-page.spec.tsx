@@ -1,5 +1,5 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
-import { renderWithApi, student } from '../test-utils';
+import { renderWithApi, starterAccess, student } from '../test-utils';
 import { StudentsPage } from './students-page';
 
 const campus = {
@@ -54,5 +54,41 @@ describe('StudentsPage', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'No active school'
     );
+  });
+
+  it('has no create form and no remove button without student:create', async () => {
+    renderWithApi(
+      <StudentsPage />,
+      {
+        students: { list: vi.fn().mockResolvedValue([student()]) },
+        campuses: { list: vi.fn().mockResolvedValue([campus]) },
+      },
+      starterAccess('teacher')
+    );
+
+    expect(await screen.findByText('Ada Obi')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Full name')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Add student' })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Remove' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows the create form with student:create and never a remove button', async () => {
+    renderWithApi(
+      <StudentsPage />,
+      {
+        students: { list: vi.fn().mockResolvedValue([student()]) },
+        campuses: { list: vi.fn().mockResolvedValue([campus]) },
+      },
+      starterAccess('administrator')
+    );
+
+    expect(await screen.findByLabelText('Full name')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Remove' })
+    ).not.toBeInTheDocument();
   });
 });

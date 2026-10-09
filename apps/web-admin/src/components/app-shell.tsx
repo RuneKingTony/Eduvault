@@ -1,5 +1,19 @@
-import { useCallback, useState, type ReactNode } from 'react';
-import { Outlet, useRouter, useRouterState } from '@tanstack/react-router';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
+import { useQuery } from '@tanstack/react-query';
+import {
+  Outlet,
+  useRouteContext,
+  useRouter,
+  useRouterState,
+} from '@tanstack/react-router';
+import type { MePermissions } from '@eduvault/api-contract';
+import { PermissionsProvider } from '@eduvault/auth-client';
 import {
   Sheet,
   SheetContent,
@@ -12,6 +26,8 @@ import {
   cn,
   useIsCompact,
 } from '@eduvault/ui';
+import { useApi } from '../api';
+import { mePermissionsQueryOptions } from '../queries';
 import {
   EXTRA_PAGE_TITLES,
   NAV_GROUPS,
@@ -22,6 +38,7 @@ import {
   type NavGroup,
 } from '../nav';
 import { CommandMenu, type CommandEntry } from './command-menu';
+import { MyAccessProvider, useMyAccess } from './my-access';
 import { ShellSidebar } from './shell-sidebar';
 import { useRailOpen } from './shell-state';
 import { ShellTopbar } from './shell-topbar';
@@ -42,17 +59,36 @@ function commandEntries(groups: readonly NavGroup[]): CommandEntry[] {
     );
 }
 
-function useShellModel() {
+function useAccess(): MePermissions {
+  const router = useRouter();
+  const api = useApi();
+  const { access } = useRouteContext({ from: '__root__' });
+  const { data } = useQuery({
+    ...mePermissionsQueryOptions(api),
+    initialData: access,
+  });
+  const previous = useRef(data);
+  useEffect(() => {
+    if (previous.current !== data) {
+      previous.current = data;
+      void router.invalidate();
+    }
+  }, [data, router]);
+  return data;
+}
+
+function useShellModel(access: MePermissions) {
   const router = useRouter();
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
   });
   const builtRoutes = new Set(Object.keys(router.routesByPath));
-  const groups = visibleNav(NAV_GROUPS, builtRoutes);
+  const groups = visibleNav(NAV_GROUPS, builtRoutes, access.permissions);
   const current = findCurrent(groups, pathname);
   const settings: CommandEntry[] = visibleSettings(
     SETTINGS_SECTIONS,
-    builtRoutes
+    builtRoutes,
+    access.permissions
   ).map((section) => ({
     id: section.id,
     label: section.label,
@@ -139,6 +175,7 @@ function ShellNavigation({
   onNavOpenChange: (open: boolean) => void;
   onOpenCommandMenu: () => void;
 }) {
+  const { openMyAccess } = useMyAccess();
   const sidebar = (
     <ShellSidebar
       groups={model.groups}
@@ -146,6 +183,10 @@ function ShellNavigation({
       rail={!compact && !railOpen}
       onNavigate={() => {
         onNavOpenChange(false);
+      }}
+      onOpenMyAccess={() => {
+        onNavOpenChange(false);
+        openMyAccess();
       }}
       onOpenCommandMenu={() => {
         onNavOpenChange(false);
@@ -163,11 +204,22 @@ function ShellNavigation({
 }
 
 export function AppShell() {
+  const access = useAccess();
+  return (
+    <PermissionsProvider value={access}>
+      <MyAccessProvider>
+        <ShellFrame access={access} />
+      </MyAccessProvider>
+    </PermissionsProvider>
+  );
+}
+
+function ShellFrame({ access }: { access: MePermissions }) {
   const compact = useIsCompact();
   const [railOpen, setRailOpen] = useRailOpen();
   const [navOpen, setNavOpen] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
-  const model = useShellModel();
+  const model = useShellModel(access);
   const toggleCommand = useCallback(() => {
     setCommandOpen((open) => !open);
   }, []);

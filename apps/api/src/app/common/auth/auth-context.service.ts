@@ -1,9 +1,20 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { AuthService } from '@thallesp/nestjs-better-auth';
 import { fromNodeHeaders } from 'better-auth/node';
-import { seesAllCampuses } from '@eduvault/policy';
+import { getOrgAdapter } from 'better-auth/plugins';
+import {
+  OWNER_ROLE,
+  can,
+  parsePermissionMap,
+  resolvePermissions,
+  splitRoles,
+  type PermissionMap,
+} from '@eduvault/policy';
 import type { Request } from 'express';
+import type { Pool } from 'pg';
+import { DB_TOKEN } from '../db/tokens';
 import type { AppAuth } from './better-auth';
+import { getOrganizationOptions } from './better-auth-base';
 import type {
   AuthenticatedUser,
   OrgContext,
@@ -22,7 +33,10 @@ interface PluginSession {
 
 @Injectable()
 export class AuthContextService {
-  constructor(private readonly authService: AuthService<AppAuth>) {}
+  constructor(
+    private readonly authService: AuthService<AppAuth>,
+    @Inject(DB_TOKEN) private readonly pool: Pool
+  ) {}
 
   /** Banned users count as unauthenticated. */
   async resolveSession(req: Request): Promise<SessionContext | undefined> {
@@ -60,7 +74,9 @@ export class AuthContextService {
       return undefined;
     }
 
-    const schoolWide = seesAllCampuses(member.role);
+    const roles = splitRoles(member.role);
+    const permissions = await this.loadPermissions(organizationId, roles);
+    const schoolWide = can(permissions, 'campus', 'readAll');
     const campuses = schoolWide
       ? await this.authService.api.listOrganizationTeams({
           query: { organizationId },
@@ -73,14 +89,47 @@ export class AuthContextService {
     return {
       user: session.user,
       organizationId,
-      role: member.role,
+      roles,
+      permissions,
+      isOwner: roles.includes(OWNER_ROLE),
       activeCampusId:
         activeTeamId !== null && campusIds.includes(activeTeamId)
           ? activeTeamId
           : null,
       campusScope: schoolWide ? 'all' : campusIds,
+      classScope: 'all',
+      acting: null,
       headers,
     };
+  }
+
+  /**
+   * addTeamMember demands `member:update`, which no starter role holds; the
+   * route guard has already checked `team:create`.
+   */
+  async enrolInCampus(teamId: string, userId: string): Promise<void> {
+    const context = (await this.authService.instance
+      .$context) as unknown as Parameters<typeof getOrgAdapter>[0];
+    await getOrgAdapter(
+      context,
+      getOrganizationOptions(this.pool)
+    ).findOrCreateTeamMember({ teamId, userId });
+  }
+
+  private async loadPermissions(
+    organizationId: string,
+    roles: string[]
+  ): Promise<PermissionMap> {
+    const rows = await this.pool.query<{ role: string; permission: string }>(
+      `SELECT role, permission FROM "organizationRole"
+       WHERE "organizationId" = $1 AND role = ANY($2)`,
+      [organizationId, roles]
+    );
+    const custom: Record<string, PermissionMap> = {};
+    for (const row of rows.rows) {
+      custom[row.role] = parsePermissionMap(row.permission);
+    }
+    return resolvePermissions(roles, custom);
   }
 
   private async listUserCampuses(headers: Headers, organizationId: string) {

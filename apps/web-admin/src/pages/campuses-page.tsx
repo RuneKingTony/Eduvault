@@ -1,5 +1,6 @@
 import type { SubmitEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Can } from '@eduvault/auth-client';
 import { Button, TextField, fieldValue } from '@eduvault/ui';
 import { useApi } from '../api';
 import { ErrorMessage } from '../components/error-message';
@@ -44,13 +45,15 @@ export function CampusesPage() {
           </li>
         ))}
       </ul>
-      <form onSubmit={submit} className="flex flex-wrap items-end gap-3">
-        <TextField label="Name" name="name" required />
-        <TextField label="Address" name="address" />
-        <Button type="submit" disabled={create.isPending}>
-          Add campus
-        </Button>
-      </form>
+      <Can permission="team:create">
+        <form onSubmit={submit} className="flex flex-wrap items-end gap-3">
+          <TextField label="Name" name="name" required />
+          <TextField label="Address" name="address" />
+          <Button type="submit" disabled={create.isPending}>
+            Add campus
+          </Button>
+        </form>
+      </Can>
     </section>
   );
 }

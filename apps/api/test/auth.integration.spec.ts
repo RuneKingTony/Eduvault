@@ -85,7 +85,38 @@ test.describe('authentication', () => {
   }) => {
     const user = await signUp();
     const res = await api(user).get('/students').expect(403);
-    expect(res.body).toMatchObject({ code: 'Forbidden' });
+    expect(res.body).toMatchObject({
+      code: 'NoSchool',
+      message: 'No active school for this session',
+    });
+  });
+
+  test('an invitee with an unverified email cannot accept by default', async ({
+    api,
+    signUp,
+    createOrganization,
+    createCampus,
+  }) => {
+    const owner = await signUp();
+    const org = await createOrganization(owner);
+    const campus = await createCampus(org, 'Lekki');
+    const hire = await signUp();
+    const invitation = await api(owner)
+      .post('/api/auth/organization/invite-member')
+      .send({
+        email: hire.email,
+        role: ['bursar'],
+        organizationId: org.id,
+        teamId: [campus.id],
+      })
+      .expect(200);
+    const res = await api(hire)
+      .post('/api/auth/organization/accept-invitation')
+      .send({ invitationId: (invitation.body as { id: string }).id })
+      .expect(403);
+    expect(res.body.code).toBe(
+      'EMAIL_VERIFICATION_REQUIRED_BEFORE_ACCEPTING_OR_REJECTING_INVITATION'
+    );
   });
 
   test('banned users are unauthenticated and cannot sign in', async ({

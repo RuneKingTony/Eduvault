@@ -29,6 +29,4 @@ export abstract class StudentRepository {
     id: string,
     patch: StudentPatch
   ): Promise<Student | undefined>;
-
-  abstract remove(organizationId: string, id: string): Promise<void>;
 }

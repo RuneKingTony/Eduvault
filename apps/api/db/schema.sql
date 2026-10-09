@@ -108,6 +108,23 @@ CREATE TABLE public.organization (
 );
 
 --
+-- Name: organizationRole; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public."organizationRole" (
+    id text DEFAULT (gen_random_uuid())::text NOT NULL,
+    "organizationId" text NOT NULL,
+    role text NOT NULL,
+    permission text NOT NULL,
+    "createdAt" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    "updatedAt" timestamp with time zone,
+    label text,
+    description text,
+    source text,
+    "editedAt" timestamp with time zone
+);
+
+--
 -- Name: schema_migrations; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -259,6 +276,13 @@ ALTER TABLE ONLY public.member
     ADD CONSTRAINT member_pkey PRIMARY KEY (id);
 
 --
+-- Name: organizationRole organizationRole_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public."organizationRole"
+    ADD CONSTRAINT "organizationRole_pkey" PRIMARY KEY (id);
+
+--
 -- Name: organization organization_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -406,6 +430,24 @@ CREATE INDEX "member_organizationId_idx" ON public.member USING btree ("organiza
 CREATE INDEX "member_userId_idx" ON public.member USING btree ("userId");
 
 --
+-- Name: organizationRole_organizationId_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX "organizationRole_organizationId_idx" ON public."organizationRole" USING btree ("organizationId");
+
+--
+-- Name: organizationRole_organizationId_role_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX "organizationRole_organizationId_role_key" ON public."organizationRole" USING btree ("organizationId", role);
+
+--
+-- Name: organizationRole_role_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX "organizationRole_role_idx" ON public."organizationRole" USING btree (role);
+
+--
 -- Name: session_userId_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -505,6 +547,13 @@ ALTER TABLE ONLY public.member
     ADD CONSTRAINT "member_userId_fkey" FOREIGN KEY ("userId") REFERENCES public."user"(id) ON DELETE CASCADE;
 
 --
+-- Name: organizationRole organizationRole_organizationId_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public."organizationRole"
+    ADD CONSTRAINT "organizationRole_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES public.organization(id) ON DELETE CASCADE;
+
+--
 -- Name: school_account school_account_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -563,4 +612,6 @@ ALTER TABLE ONLY public.team
 
 INSERT INTO public.schema_migrations (version) VALUES
     ('20261007112254'),
-    ('20261007112300');
+    ('20261007112300'),
+    ('20261009155210'),
+    ('20261009190000');

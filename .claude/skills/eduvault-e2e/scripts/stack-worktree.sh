@@ -121,7 +121,7 @@ mkdir -p "$DIR"; : >"$DIR/api.log"; : >"$DIR/admin.log"; : >"$DIR/portal.log"
 (cd "$TREE/apps/api" && pnpm exec vite build >"$DIR/api-build.log" 2>&1) && [[ -f "$TREE/apps/api/dist/main.cjs" ]] || { tail -15 "$DIR/api-build.log" >&2; drop_db; die "API build failed"; }
 
 ADMIN_URL="http://localhost:$ADMIN_PORT"; PORTAL_URL="http://localhost:$PORTAL_PORT"
-(cd "$TREE/apps/api" && exec env NODE_ENV=development PORT="$API_PORT" DATABASE_URL="$DB_URL" BETTER_AUTH_SECRET="$SECRET" \
+(cd "$TREE/apps/api" && exec env NODE_ENV=development PORT="$API_PORT" DATABASE_URL="$DB_URL" BETTER_AUTH_SECRET="$SECRET" E2E_TRUST_INVITEES=true \
    BETTER_AUTH_URL="http://localhost:$API_PORT" WEB_ADMIN_URL="$ADMIN_URL" WEB_PORTAL_URL="$PORTAL_URL" \
    node --enable-source-maps "$TREE/apps/api/dist/main.cjs") >"$DIR/api.log" 2>&1 &
 API_PID=$!

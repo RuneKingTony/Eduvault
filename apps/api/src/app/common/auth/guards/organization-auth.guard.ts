@@ -6,6 +6,7 @@ import {
   type ExecutionContext,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import type { ApiErrorCode } from '@eduvault/api-contract';
 import { can } from '@eduvault/policy';
 import { AuthContextService } from '../auth-context.service';
 import type { AuthedRequest } from '../auth.types';
@@ -27,16 +28,19 @@ export class OrganizationAuthGuard implements CanActivate {
 
     const org = await this.context.resolveOrganization(session);
     if (!org) {
-      throw new ForbiddenException('No active school for this session');
+      throw new ForbiddenException({
+        code: 'NoSchool' satisfies ApiErrorCode,
+        message: 'No active school for this session',
+      });
     }
 
     const required = this.reflector.get<RequiredPermission | undefined>(
       PERMISSION_KEY,
       context.getHandler()
     );
-    if (required && !can(org.role, required.resource, required.action)) {
+    if (required && !can(org.permissions, required.resource, required.action)) {
       throw new ForbiddenException(
-        `Role "${org.role}" may not ${required.action} ${required.resource}`
+        `Missing permission ${required.resource}:${required.action}`
       );
     }
 

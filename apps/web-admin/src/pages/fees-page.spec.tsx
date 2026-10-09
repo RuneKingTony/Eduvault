@@ -1,6 +1,6 @@
 import { screen } from '@testing-library/react';
 import type { FeeSchedule } from '@eduvault/api-contract';
-import { renderWithApi } from '../test-utils';
+import { renderWithApi, starterAccess } from '../test-utils';
 import { FeesPage } from './fees-page';
 
 const fee = (overrides: Partial<FeeSchedule> = {}): FeeSchedule => ({
@@ -39,5 +39,19 @@ describe('FeesPage', () => {
     expect(await screen.findByText('Broken')).toBeInTheDocument();
     expect(screen.getByText('—')).toBeInTheDocument();
     expect(screen.getByText('₦12,500')).toBeInTheDocument();
+  });
+
+  it('lists the schedules for a member holding only feeSchedule:read', async () => {
+    const reader = {
+      ...starterAccess('teacher'),
+      permissions: { feeSchedule: ['read' as const] },
+    };
+    renderWithApi(
+      <FeesPage />,
+      { feeSchedules: { list: vi.fn().mockResolvedValue([fee()]) } },
+      reader
+    );
+    expect(await screen.findByText('₦12,500')).toBeInTheDocument();
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 });

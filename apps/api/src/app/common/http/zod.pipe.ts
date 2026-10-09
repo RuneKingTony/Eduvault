@@ -1,4 +1,5 @@
 import { BadRequestException, type PipeTransform } from '@nestjs/common';
+import type { ApiErrorCode } from '@eduvault/api-contract';
 import type { z } from 'zod';
 
 class ZodPipe<S extends z.ZodType> implements PipeTransform {
@@ -10,7 +11,7 @@ class ZodPipe<S extends z.ZodType> implements PipeTransform {
       return parsed.data;
     }
     throw new BadRequestException({
-      code: 'ValidationError',
+      code: 'ValidationError' satisfies ApiErrorCode,
       message: 'Request validation failed',
       issues: parsed.error.issues.map((issue) => ({
         path: issue.path.join('.'),

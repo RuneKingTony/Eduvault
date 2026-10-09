@@ -5,7 +5,6 @@ import {
 } from '@nestjs/common';
 import type { Student } from '@eduvault/api-contract';
 import type { OrgContext } from '../../common/auth';
-import { canSeeCampus } from '../../common/campus-scope';
 import { CampusService } from '../campus/campus.service';
 import { StudentRepository } from './student.repository';
 
@@ -24,10 +23,7 @@ export class StudentService {
 
   async list(ctx: OrgContext, campusId?: string): Promise<Student[]> {
     if (campusId !== undefined) {
-      if (!canSeeCampus(ctx.campusScope, campusId)) {
-        throw new NotFoundException('Campus not found');
-      }
-      await this.campuses.assertInSchool(ctx, campusId);
+      await this.campuses.assertInScope(ctx, campusId);
     }
     return this.students.list(ctx.organizationId, ctx.campusScope, campusId);
   }
@@ -51,7 +47,7 @@ export class StudentService {
         'campusId is required when the session has no active campus'
       );
     }
-    await this.campuses.assertInSchool(ctx, campusId);
+    await this.campuses.assertInScope(ctx, campusId);
     return this.students.create(ctx.organizationId, {
       campusId,
       fullName: input.fullName,
@@ -66,18 +62,12 @@ export class StudentService {
   ): Promise<Student> {
     await this.get(ctx, id);
     if (input.campusId !== undefined) {
-      await this.campuses.assertInSchool(ctx, input.campusId);
+      await this.campuses.assertInScope(ctx, input.campusId);
     }
     const student = await this.students.update(ctx.organizationId, id, input);
     if (!student) {
       throw new NotFoundException('Student not found');
     }
     return student;
-  }
-
-  async remove(ctx: OrgContext, id: string): Promise<{ id: string }> {
-    await this.get(ctx, id);
-    await this.students.remove(ctx.organizationId, id);
-    return { id };
   }
 }

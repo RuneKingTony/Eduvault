@@ -6,10 +6,14 @@ import {
   type ArgumentsHost,
   type ExceptionFilter,
 } from '@nestjs/common';
-import type { ApiErrorBody } from '@eduvault/api-contract';
+import {
+  apiErrorCodeSchema,
+  type ApiErrorBody,
+  type ApiErrorCode,
+} from '@eduvault/api-contract';
 import type { Response } from 'express';
 
-const CODES: Record<number, string> = {
+const CODES: Partial<Record<number, ApiErrorCode>> = {
   400: 'BadRequest',
   401: 'Unauthorized',
   403: 'Forbidden',
@@ -17,8 +21,17 @@ const CODES: Record<number, string> = {
   409: 'Conflict',
 };
 
+const codeFor = (status: number): ApiErrorCode =>
+  CODES[status] ?? (status >= 500 ? 'InternalError' : 'BadRequest');
+
 const PG_UNIQUE_VIOLATION = '23505';
 const PG_FOREIGN_KEY_VIOLATION = '23503';
+const PG_CHECK_VIOLATION = '23514';
+
+const pgConstraint = (error: unknown): string =>
+  typeof error === 'object' && error !== null && 'constraint' in error
+    ? String(error.constraint)
+    : '';
 
 const pgCode = (error: unknown): string | undefined =>
   typeof error === 'object' && error !== null && 'code' in error
@@ -56,13 +69,11 @@ export class ErrorFilter implements ExceptionFilter {
     const raw = exception.getResponse();
     const payload =
       typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+    const named = apiErrorCodeSchema.safeParse(payload['code']);
     return {
       status,
       body: {
-        code:
-          typeof payload['code'] === 'string'
-            ? payload['code']
-            : (CODES[status] ?? 'Error'),
+        code: named.success ? named.data : codeFor(status),
         message:
           typeof payload['message'] === 'string'
             ? payload['message']
@@ -87,7 +98,7 @@ export class ErrorFilter implements ExceptionFilter {
       return {
         status: upstream.status,
         body: {
-          code: CODES[upstream.status] ?? 'Error',
+          code: codeFor(upstream.status),
           message: upstream.message,
         },
       };
@@ -108,6 +119,25 @@ export class ErrorFilter implements ExceptionFilter {
           message: 'Resource is referenced by, or references, other records',
         },
       };
+    }
+
+    if (code === PG_CHECK_VIOLATION) {
+      // Convention: a self-approval CHECK is named `<table>_<action>_not_self`.
+      return pgConstraint(exception).includes('not_self')
+        ? {
+            status: HttpStatus.CONFLICT,
+            body: {
+              code: 'SelfApproval',
+              message: 'You created this. Someone else must approve it.',
+            },
+          }
+        : {
+            status: HttpStatus.CONFLICT,
+            body: {
+              code: 'Conflict',
+              message: 'The change breaks a rule on this record',
+            },
+          };
     }
 
     this.logger.error(

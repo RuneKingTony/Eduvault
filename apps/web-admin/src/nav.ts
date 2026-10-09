@@ -1,3 +1,4 @@
+import { canAny, type Gate, type PermissionMap } from '@eduvault/policy';
 import { routeMatchLength } from '@eduvault/shared';
 import type { NavIconName } from '@eduvault/ui';
 import { isDev } from './env';
@@ -9,6 +10,7 @@ export interface NavItem {
   route: string;
   icon: NavIconName;
   alsoActiveFor?: readonly string[];
+  gate?: Gate;
 }
 
 export interface NavGroup {
@@ -21,7 +23,10 @@ interface SettingsSection {
   id: string;
   label: string;
   route: string;
+  gate?: Gate;
 }
+
+const SETTINGS_ITEM_ID = 'settings';
 
 export const NAV_GROUPS: readonly NavGroup[] = [
   {
@@ -61,6 +66,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         pageTitle: 'Students',
         route: '/students',
         icon: 'graduation-cap',
+        gate: ['student:read'],
       },
       {
         id: 'members',
@@ -101,6 +107,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         pageTitle: 'Fees',
         route: '/fees',
         icon: 'wallet',
+        gate: ['feeSchedule:read'],
       },
       {
         id: 'payments',
@@ -130,7 +137,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
     label: null,
     items: [
       {
-        id: 'settings',
+        id: SETTINGS_ITEM_ID,
         label: 'Settings',
         pageTitle: 'Settings',
         route: '/campuses',
@@ -146,26 +153,69 @@ export const EXTRA_PAGE_TITLES: Readonly<Record<string, string>> = isDev
   : {};
 
 export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
-  { id: 'campuses', label: 'Campuses', route: '/campuses' },
+  {
+    id: 'campuses',
+    label: 'Campuses',
+    route: '/campuses',
+    gate: ['team:read'],
+  },
 ];
+
+const ROUTE_GATES = new Map<string, Gate>(
+  [...NAV_GROUPS.flatMap((group) => group.items), ...SETTINGS_SECTIONS].flatMap(
+    (entry): [string, Gate][] =>
+      entry.gate === undefined ? [] : [[entry.route, entry.gate]]
+  )
+);
+
+export const routeGate = (route: string): Gate | undefined =>
+  ROUTE_GATES.get(route);
+
+const passes = (permissions: PermissionMap, gate: Gate | undefined) =>
+  gate === undefined || canAny(permissions, gate);
+
+export function visibleSettings(
+  sections: readonly SettingsSection[],
+  builtRoutes: ReadonlySet<string>,
+  permissions: PermissionMap
+): SettingsSection[] {
+  return sections.filter(
+    (section) =>
+      builtRoutes.has(section.route) && passes(permissions, section.gate)
+  );
+}
+
+function settingsItem(
+  item: NavItem,
+  builtRoutes: ReadonlySet<string>,
+  permissions: PermissionMap
+): NavItem | undefined {
+  const [first] = visibleSettings(SETTINGS_SECTIONS, builtRoutes, permissions);
+  return first === undefined ? undefined : { ...item, route: first.route };
+}
 
 export function visibleNav(
   groups: readonly NavGroup[],
-  builtRoutes: ReadonlySet<string>
+  builtRoutes: ReadonlySet<string>,
+  permissions: PermissionMap
 ): NavGroup[] {
   return groups
     .map((group) => ({
       ...group,
-      items: group.items.filter((item) => builtRoutes.has(item.route)),
+      items: group.items
+        .map((item) =>
+          item.id === SETTINGS_ITEM_ID
+            ? settingsItem(item, builtRoutes, permissions)
+            : item
+        )
+        .filter(
+          (item): item is NavItem =>
+            item !== undefined &&
+            builtRoutes.has(item.route) &&
+            passes(permissions, item.gate)
+        ),
     }))
     .filter((group) => group.items.length > 0);
-}
-
-export function visibleSettings(
-  sections: readonly SettingsSection[],
-  builtRoutes: ReadonlySet<string>
-): SettingsSection[] {
-  return sections.filter((section) => builtRoutes.has(section.route));
 }
 
 function matchLength(item: NavItem, pathname: string): number {

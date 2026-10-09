@@ -1,4 +1,6 @@
 import type { Request } from 'express';
+import type { MePermissions, Scope } from '@eduvault/api-contract';
+import type { PermissionMap } from '@eduvault/policy';
 
 export interface AuthenticatedUser {
   id: string;
@@ -17,12 +19,14 @@ export interface OrgContext {
   user: AuthenticatedUser;
   /** The school (Better Auth organization) the session is acting in. */
   organizationId: string;
-  /** The user's role in that school. */
-  role: string;
+  roles: string[];
+  permissions: PermissionMap;
+  isOwner: boolean;
   /** The campus (Better Auth team) the session is acting in, if valid. */
   activeCampusId: string | null;
-  /** 'all' for school-wide roles; otherwise the campuses the user works at. */
-  campusScope: 'all' | string[];
+  campusScope: Scope;
+  classScope: Scope;
+  acting: MePermissions['acting'];
   headers: Headers;
 }
 

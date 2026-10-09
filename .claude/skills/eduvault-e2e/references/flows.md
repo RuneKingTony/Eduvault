@@ -41,3 +41,15 @@ Each slice adds one flow here, named for the slice. Run it as the persona who do
 3. **404** for `foreign`, and, where the route is campus aware, for `bursar2` on a Lekki record.
 
 A step that needs a blocked persona is listed as blocked, not skipped silently ([personas](personas.md)).
+
+## M1.1 flows: permissions, guard and gating
+
+Run as the staff persona in `personas.json`, or as the seeded persona of the same role when it is blocked (read-only steps only; never write to seed data).
+
+1. **Teacher types a gated URL.** Sign in as `teacher` (seeded: `emeka.obi@greenfield.test`), open `/fees` directly. Expect the Dashboard with no message, and a nav of Dashboard, Approvals and Students only.
+2. **No-roles member.** Sign in as `newhire` (seeded: `kemi.balogun@greenfield.test`). Expect only Dashboard and Approvals in the nav, "No access yet" on the Dashboard, "Member, no roles" in the user menu. "See my access" and the user menu's "My access" open the sheet that reads "Nothing yet. Ask the owner to give you a role."
+3. **Owner and bursar nav.** `owner` sees Students, Fees and a Settings entry that opens Campuses. `bursar` sees Students but no Fees and no Settings.
+4. **Role change on focus.** Change a persona's role row through the owner's session, switch the browser tab away and back: the open app picks up the new access on window focus. A 403 on any call also refetches it.
+5. **403 names the permission.** `curl` as `newhire`: `GET /students` answers 403 `Missing permission student:read`. `GET /me/permissions` without an active school answers 403 `NoSchool`.
+6. **Foreign and campus 404.** `foreign` on an `owner` student answers 404; `bursar2` (Ikeja) on a Lekki student answers 404, and `GET /students?campusId=<Lekki>` answers 404 `Campus not found`.
+7. **No student delete.** `DELETE /students/<id>` as `owner` answers 404.

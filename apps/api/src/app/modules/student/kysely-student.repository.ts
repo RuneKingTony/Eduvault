@@ -43,7 +43,7 @@ export class KyselyStudentRepository extends StudentRepository {
       .selectFrom('student')
       .selectAll()
       .where('organization_id', '=', organizationId)
-      .where((eb) => inCampusScope(eb, 'student.campus_id', scope));
+      .where((eb) => inCampusScope(eb, 'student.campus_id', { scope }));
     if (campusId !== undefined) {
       query = query.where('campus_id', '=', campusId);
     }
@@ -61,7 +61,7 @@ export class KyselyStudentRepository extends StudentRepository {
       .selectAll()
       .where('id', '=', id)
       .where('organization_id', '=', organizationId)
-      .where((eb) => inCampusScope(eb, 'student.campus_id', scope))
+      .where((eb) => inCampusScope(eb, 'student.campus_id', { scope }))
       .executeTakeFirst();
     return row && toStudent(row);
   }
@@ -100,13 +100,5 @@ export class KyselyStudentRepository extends StudentRepository {
       .returningAll()
       .executeTakeFirst();
     return row && toStudent(row);
-  }
-
-  async remove(organizationId: string, id: string): Promise<void> {
-    await this.db
-      .deleteFrom('student')
-      .where('id', '=', id)
-      .where('organization_id', '=', organizationId)
-      .execute();
   }
 }

@@ -1,6 +1,7 @@
 import type { INestApplicationContext } from '@nestjs/common';
 import { AuthService } from '@thallesp/nestjs-better-auth';
 import type { AppAuth, OrgContext } from '../../src/app/common/auth';
+import { castToBetterAuthRoles } from '../../src/app/common/auth/better-auth-roles';
 import { ENV_TOKEN, type Env } from '../../src/app/common/config/env';
 import { KYSELY_TOKEN, type Database } from '../../src/app/common/db/tokens';
 import { CampusService } from '../../src/app/modules/campus/campus.service';
@@ -78,13 +79,13 @@ async function addMembers(
   { userIds, organizationIds, campusIds, owners }: Created
 ) {
   const { api } = app.get(AuthService<AppAuth>, { strict: false });
-  for (const { persona, school, role, campuses } of memberships) {
+  for (const { persona, school, roles, campuses } of memberships) {
     const userId = lookup(userIds, persona, 'persona');
     await api.addMember({
       body: {
         userId,
         organizationId: lookup(organizationIds, school, 'school'),
-        role,
+        role: castToBetterAuthRoles(roles),
       },
     });
     const owner = owners.get(school);

@@ -6,7 +6,6 @@ type SchoolFixtures = Pick<
   'app' | 'signUp' | 'createOrganization' | 'createCampus' | 'addMember'
 >;
 
-/** `noPermission` holds the student role, which has no `student` permission. */
 export async function twoSchools({
   app,
   signUp,
@@ -23,11 +22,11 @@ export async function twoSchools({
   const campusB = await createCampus(orgB, 'Main');
 
   const lekkiOnly = await addMember(orgA, await signUp(), {
-    role: 'teacher',
+    roles: ['bursar'],
     campuses: [lekki],
   });
   const noPermission = await addMember(orgA, await signUp(), {
-    role: 'student',
+    roles: ['member'],
   });
 
   const studentLekki = await createStudent(app, owner, {

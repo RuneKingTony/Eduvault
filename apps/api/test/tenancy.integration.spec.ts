@@ -1,9 +1,6 @@
 import { baseTest, expect } from './support/base-test';
 import { twoSchools, type TwoSchools } from './support/two-schools';
 
-// No campus-scoped role can write yet, so a lekkiOnly write answers 403 for
-// the missing permission.
-
 const test = baseTest.extend<{ schools: TwoSchools }>({
   schools: async (
     { app, signUp, createOrganization, createCampus, addMember },
@@ -32,7 +29,7 @@ const ids = (rows: { id: string }[]) =>
 
 test.describe('students', () => {
   test.describe('isolation', () => {
-    test('1: another school reads, updates and deletes by id as 404', async ({
+    test('1: another school reads and updates by id as 404', async ({
       api,
       schools: { ownerB, studentLekki },
     }) => {
@@ -41,7 +38,6 @@ test.describe('students', () => {
         .patch(`/students/${studentLekki.id}`)
         .send({ fullName: 'x' })
         .expect(404);
-      await api(ownerB).delete(`/students/${studentLekki.id}`).expect(404);
     });
 
     test('2: lists hold no other school; a foreign campus filter is 404', async ({
@@ -69,7 +65,6 @@ test.describe('students', () => {
         .patch(`/students/${studentLekki.id}`)
         .send({ fullName: 'x' })
         .expect(403);
-      await api(lekkiOnly).delete(`/students/${studentLekki.id}`).expect(403);
     });
 
     test('4: a Lekki-only member lists only Lekki students', async ({
@@ -94,9 +89,6 @@ test.describe('students', () => {
         .patch(`/students/${studentLekki.id}`)
         .send({ fullName: 'x' })
         .expect(403);
-      await api(noPermission)
-        .delete(`/students/${studentLekki.id}`)
-        .expect(403);
     });
 
     test('6: no session answers 401', async ({
@@ -110,7 +102,6 @@ test.describe('students', () => {
         .patch(`/students/${studentLekki.id}`)
         .send({ fullName: 'x' })
         .expect(401);
-      await api().delete(`/students/${studentLekki.id}`).expect(401);
     });
 
     test('7: a cross-school campus answers 404 and the composite foreign key refuses a bypass', async ({
@@ -168,8 +159,10 @@ test.describe('students', () => {
         .expect(201)
     ).body;
 
-    let both = await addMember(orgA, await signUp(), { role: 'admin' });
-    both = await addMember(orgB, both, { role: 'admin' });
+    let both = await addMember(orgA, await signUp(), {
+      roles: ['administrator'],
+    });
+    both = await addMember(orgB, both, { roles: ['administrator'] });
     await setActiveOrganization(both, orgA.id);
 
     const list = (await api(both).get('/students').expect(200)).body;
@@ -189,7 +182,7 @@ test.describe('students', () => {
 
 test.describe('campuses', () => {
   test.describe('isolation', () => {
-    test('1: another school reads, updates and deletes by id as 404', async ({
+    test('1: another school reads, updates and deletes by id as 404, and lists hold none of it', async ({
       api,
       schools: { ownerB, lekki },
     }) => {
@@ -199,6 +192,8 @@ test.describe('campuses', () => {
         .send({ name: 'x' })
         .expect(404);
       await api(ownerB).delete(`/campuses/${lekki.id}`).expect(404);
+      const listB = (await api(ownerB).get('/campuses').expect(200)).body;
+      expect(listB.map((c: { id: string }) => c.id)).not.toContain(lekki.id);
     });
 
     test('2: lists hold no other school', async ({
@@ -258,7 +253,7 @@ test.describe('campuses', () => {
     signUp,
     createOrganization,
     createCampus,
-    addMember,
+    withPermissions,
   }) => {
     const owner = await signUp();
     const org = await createOrganization(owner);
@@ -279,16 +274,60 @@ test.describe('campuses', () => {
       currency: 'NGN',
       campusId: campus2.id,
     });
-    const teacher = await addMember(org, await signUp(), {
-      role: 'teacher',
+    const reader = await withPermissions(org, ['feeSchedule:read'], {
       campuses: [campus1],
     });
 
-    const seen = (await api(teacher).get('/fee-schedules').expect(200)).body;
+    const seen = (await api(reader).get('/fee-schedules').expect(200)).body;
     expect(seen.map((f: { name: string }) => f.name)).toEqual([
       'Everyone',
       'Only 1',
     ]);
+  });
+});
+
+test.describe('fee schedules', () => {
+  test.describe('isolation', () => {
+    test('1 and 2: another school reads and updates by id as 404 and lists hold none of it', async ({
+      api,
+      schools: { owner, ownerB },
+    }) => {
+      const fee = (
+        await api(owner)
+          .post('/fee-schedules')
+          .send({ name: 'Tuition', amountMinor: 1, currency: 'NGN' })
+          .expect(201)
+      ).body;
+      await api(ownerB).get(`/fee-schedules/${fee.id}`).expect(404);
+      await api(ownerB)
+        .patch(`/fee-schedules/${fee.id}`)
+        .send({ name: 'x' })
+        .expect(404);
+      await api(ownerB).delete(`/fee-schedules/${fee.id}`).expect(404);
+      expect(
+        (await api(ownerB).get('/fee-schedules').expect(200)).body
+      ).toEqual([]);
+    });
+
+    test('2: a campus filter naming another school answers 404', async ({
+      api,
+      schools: { owner, campusB },
+    }) => {
+      await api(owner).get(`/fee-schedules?campusId=${campusB.id}`).expect(404);
+    });
+
+    test('5: members without the feeSchedule permission get 403', async ({
+      api,
+      schools: { noPermission, lekkiOnly },
+    }) => {
+      for (const user of [noPermission, lekkiOnly]) {
+        await api(user).get('/fee-schedules').expect(403);
+      }
+    });
+
+    test('6: no session answers 401', async ({ api }) => {
+      await api().get('/fee-schedules').expect(401);
+    });
   });
 });
 
@@ -343,7 +382,7 @@ test.describe('school account', () => {
 });
 
 test.describe('role per school', () => {
-  test('the same user is a teacher in A and an admin in B', async ({
+  test('the same user is a teacher in A and an administrator in B', async ({
     api,
     signUp,
     createOrganization,
@@ -367,10 +406,10 @@ test.describe('role per school', () => {
       .expect(201);
 
     let user = await addMember(orgA, await signUp(), {
-      role: 'teacher',
+      roles: ['teacher'],
       campuses: [campusA],
     });
-    user = await addMember(orgB, user, { role: 'admin' });
+    user = await addMember(orgB, user, { roles: ['administrator'] });
 
     await setActiveOrganization(user, orgA.id);
     await api(user).get('/students').expect(200);
@@ -394,7 +433,7 @@ test.describe('role per school', () => {
       .expect(403);
   });
 
-  test('the student role reads fee schedules but nothing about students', async ({
+  test('the student role holds no staff permission', async ({
     api,
     signUp,
     createOrganization,
@@ -402,8 +441,10 @@ test.describe('role per school', () => {
   }) => {
     const owner = await signUp();
     const org = await createOrganization(owner);
-    const learner = await addMember(org, await signUp(), { role: 'student' });
-    await api(learner).get('/fee-schedules').expect(200);
+    const learner = await addMember(org, await signUp(), {
+      roles: ['student'],
+    });
+    await api(learner).get('/fee-schedules').expect(403);
     await api(learner).get('/students').expect(403);
     await api(learner).get('/school-account').expect(403);
   });
@@ -429,8 +470,8 @@ test.describe('active school and campus', () => {
     const before = await api(user).get('/api/auth/get-session').expect(200);
     expect(before.body.session.activeOrganizationId ?? null).toBeNull();
 
-    await addMember(orgA, user, { role: 'teacher', campuses: [campusA] });
-    await addMember(orgB, user, { role: 'teacher', campuses: [campusB] });
+    await addMember(orgA, user, { roles: ['teacher'], campuses: [campusA] });
+    await addMember(orgB, user, { roles: ['teacher'], campuses: [campusB] });
     await signIn(user);
 
     const after = await api(user).get('/api/auth/get-session').expect(200);
@@ -456,10 +497,10 @@ test.describe('active school and campus', () => {
     await createCampus(orgB, 'B1');
 
     let user = await addMember(orgA, await signUp(), {
-      role: 'teacher',
+      roles: ['teacher'],
       campuses: [a1, a2],
     });
-    user = await addMember(orgB, user, { role: 'teacher' });
+    user = await addMember(orgB, user, { roles: ['teacher'] });
 
     expect((await api(user).get('/campuses').expect(200)).body).toHaveLength(2);
 

@@ -46,6 +46,22 @@ test.describe('dev seed', () => {
       expect(list.body, key).toHaveLength(expected);
     }
 
+    const kemi = await api()
+      .post('/api/auth/sign-in/email')
+      .send({ email: emailOf('kemi'), password: SEED_PASSWORD })
+      .expect(200);
+    const kemiCookie = (kemi.headers['set-cookie'] as unknown as string[])
+      .map((c) => c.split(';')[0])
+      .join('; ');
+    const kemiAccess = await api({ cookie: kemiCookie })
+      .get('/me/permissions')
+      .expect(200);
+    expect(kemiAccess.body).toMatchObject({
+      roles: ['member'],
+      permissions: {},
+    });
+    await api({ cookie: kemiCookie }).get('/students').expect(403);
+
     const before = await counts();
     lines.length = 0;
     const second = await runSeed(app, { log });

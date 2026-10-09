@@ -1,6 +1,7 @@
 import { useState, type SubmitEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Campus, Student } from '@eduvault/api-contract';
+import { Can } from '@eduvault/auth-client';
 import { Button, TextField, fieldValue } from '@eduvault/ui';
 import { useApi } from '../api';
 import { ErrorMessage } from '../components/error-message';
@@ -20,10 +21,6 @@ export function StudentsPage() {
       api.students.create({
         body: { ...input, ...(campusId ? { campusId } : {}) },
       }),
-    onSuccess: refresh,
-  });
-  const remove = useMutation({
-    mutationFn: (id: string) => api.students.remove({ params: { id } }),
     onSuccess: refresh,
   });
 
@@ -46,19 +43,17 @@ export function StudentsPage() {
   return (
     <section className="flex flex-col gap-4">
       <h1>Students</h1>
-      <ErrorMessage error={students.error ?? create.error ?? remove.error} />
-      <StudentList
-        students={students.data}
-        campusName={campusName}
-        onRemove={(id) => remove.mutate(id)}
-      />
-      <StudentForm
-        campuses={campuses.data}
-        campusId={campusId}
-        onCampusChange={setCampusId}
-        pending={create.isPending}
-        onSubmit={submit}
-      />
+      <ErrorMessage error={students.error ?? create.error} />
+      <StudentList students={students.data} campusName={campusName} />
+      <Can permission="student:create">
+        <StudentForm
+          campuses={campuses.data}
+          campusId={campusId}
+          onCampusChange={setCampusId}
+          pending={create.isPending}
+          onSubmit={submit}
+        />
+      </Can>
     </section>
   );
 }
@@ -66,11 +61,9 @@ export function StudentsPage() {
 function StudentList({
   students,
   campusName,
-  onRemove,
 }: {
   students: Student[] | undefined;
   campusName: (id: string) => string;
-  onRemove: (id: string) => void;
 }) {
   return (
     <ul className="divide-y rounded-md border">
@@ -82,13 +75,6 @@ function StudentList({
               {student.admissionNumber} · {campusName(student.campusId)}
             </span>
           </span>
-          <button
-            type="button"
-            className="text-sm text-destructive"
-            onClick={() => onRemove(student.id)}
-          >
-            Remove
-          </button>
         </li>
       ))}
       {students?.length === 0 ? (
