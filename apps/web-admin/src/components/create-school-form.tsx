@@ -15,7 +15,7 @@ export function CreateSchoolForm({
   async function submit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     const name = fieldValue(new FormData(event.currentTarget), 'name');
-    const slug = `${slugify(name)}-${crypto.randomUUID().slice(0, 4)}`;
+    const slug = `${slugify(name)}-${crypto.randomUUID().slice(0, 8)}`;
     const result = await authClient.organization.create({ name, slug });
     if (result.error) {
       setError(result.error.message ?? 'Could not create the school');

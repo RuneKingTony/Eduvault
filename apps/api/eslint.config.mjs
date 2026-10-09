@@ -125,18 +125,26 @@ export default [
     },
   },
   {
-    // The health probe is the one deliberately public route.
-    files: [
-      'src/app/common/config/env.ts',
-      'src/app/modules/health/health.controller.ts',
-      '**/*.spec.ts',
-    ],
+    files: ['src/app/common/config/env.ts', '**/*.spec.ts'],
     rules: {
       'no-restricted-syntax': [
         'error',
         noEnum,
         noDefaultExport,
         classLevelAuth,
+      ],
+    },
+  },
+  {
+    // The health probe is the one deliberately public route.
+    files: ['src/app/modules/health/health.controller.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        noEnum,
+        noDefaultExport,
+        classLevelAuth,
+        processEnv,
       ],
     },
   },
