@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
 # Creates the e2e personas through the real API and records every school, campus and student in a ledger.
 # Usage: provision.sh   prints the run directory (tmp/e2e/<run>) on stdout; personas.json and ledger.json are inside.
-# Staff personas join through Better Auth's invite-and-accept with starter role slugs and a teamId; when accepting is
-# refused (it needs a verified email and Eduvault has no mail transport until M1.3), the persona is recorded blocked with
-# the reason. superadmin, student and guardian are blocked until their slices land (see references/personas.md).
 set -eu
 ROOT="$(git rev-parse --show-toplevel)"
 . "$(dirname "$0")/stack-env.sh"
@@ -57,9 +54,7 @@ block_persona() { # key slice [reason]
   jq --arg k "$1" --arg e "$(email "$1")" --arg p "$PASSWORD" --arg b "$2" --arg r "${3:-no HTTP endpoint provisions this persona yet}" \
     '. + {($k):{email:$e,password:$p,userId:"",schoolId:"",campusId:"",blocked:$r,unblocked_by:$b}}' "$PERSONAS" >"$PERSONAS.tmp" && mv "$PERSONAS.tmp" "$PERSONAS"
 }
-# staff_in <key> <school> <campusIds, comma separated> <role slugs, comma separated>
-# Signs the persona up, invites them as the owner, accepts as them; records the persona or blocks it with the API's answer.
-staff_in() {
+staff_in() { # key school campusIds(comma separated) roleSlugs(comma separated)
   local key="$1" school="$2" campuses="$3" roles="$4" uid inv why
   uid=$(sign_up "$DIR/$key.jar" "$key") || { block_persona "$key" 'M1.2' 'sign-up failed'; return 0; }
   inv=$(call "$OJAR" POST /api/auth/organization/invite-member "$(jq -nc --arg e "$(email "$key")" --arg o "$school" --arg c "$campuses" --arg r "$roles" \

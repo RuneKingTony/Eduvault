@@ -21,6 +21,7 @@ Run `git status` and `git diff --cached --name-only`. Nothing staged: say so and
 | `apps/web-portal/`                                      | `web-portal`     |
 | `libs/api-contract/`                                    | `api-contract`   |
 | `libs/policy/`                                          | `policy`         |
+| `libs/auth-client/`                                     | `auth-client`    |
 | `libs/shared/`                                          | `shared`         |
 | `libs/ui/`                                              | `ui`             |
 | `libs/testcontainers/`                                  | `testcontainers` |

@@ -46,7 +46,7 @@ Unit tests (`nx run <project>:test`) never start Docker. Integration tests (`api
 
 ## Gotchas
 
-- **Never hand-edit** `apps/api/db/schema.sql`, `apps/api/src/db/db-types.ts` or `apps/api/db/auth-schema.snapshot.sql`; `pnpm drift:fix` regenerates them. Better Auth tables come from `api:auth-generate`, never from hand-written SQL.
+- **Never hand-edit** `apps/api/db/schema.sql`, `apps/api/src/db/db-types.ts` or `apps/api/db/auth-schema.snapshot.sql`; `pnpm drift:fix` regenerates them. Better Auth tables come from `api:auth-generate`, never from hand-written SQL (the one exception is the D-067 unique index on `organizationRole`).
 - Better Auth tables use camelCase columns and text ids (`DEFAULT gen_random_uuid()::text`, because `generateId: false`). Domain tables are snake_case. Kysely has no `CamelCasePlugin` on purpose.
 - Tenancy: organization = school, team = campus. Every school-scoped table carries `organization_id`, and every query filters by `ctx.organizationId` and the campus scope. Out-of-scope rows answer 404, not 403.
 - `@OrganizationAuth(resource, action)` goes on each handler, not the class, so the guard runs once.
