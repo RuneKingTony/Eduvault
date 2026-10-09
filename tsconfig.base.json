@@ -24,6 +24,7 @@
       "@eduvault/api-contract": ["./libs/api-contract/src/index.ts"],
       "@eduvault/policy": ["./libs/policy/src/index.ts"],
       "@eduvault/ui": ["./libs/ui/src/index.ts"],
+      "@eduvault/ui/testing": ["./libs/ui/src/testing/index.ts"],
       "@eduvault/auth-client": ["./libs/auth-client/src/index.ts"],
       "@eduvault/testcontainers": ["./libs/testcontainers/src/index.ts"]
     }

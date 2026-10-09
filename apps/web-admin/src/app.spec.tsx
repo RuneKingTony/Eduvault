@@ -38,5 +38,8 @@ describe('App', () => {
     expect(
       screen.getByRole('heading', { name: 'Create your school' })
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Sign out' })
+    ).toBeInTheDocument();
   });
 });

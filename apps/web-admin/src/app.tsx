@@ -1,21 +1,23 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { RouterProvider } from '@tanstack/react-router';
 import {
-  ContextSwitchers,
+  AuthClientProvider,
   SignInForm,
+  SignOutButton,
   type EduvaultAuthClient,
 } from '@eduvault/auth-client';
-import { Button } from '@eduvault/ui';
+import { Toaster, useThemeChoice } from '@eduvault/ui';
 import { CreateSchoolForm } from './components/create-school-form';
 import { router } from './router';
 
-export function App({ authClient }: { authClient: EduvaultAuthClient }) {
+function Gate({ authClient }: { authClient: EduvaultAuthClient }) {
   const session = authClient.useSession();
   const queryClient = useQueryClient();
 
   if (session.isPending) {
     return <p className="p-6">Loading…</p>;
   }
+  const hasSchool = Boolean(session.data?.session.activeOrganizationId);
   if (!session.data) {
     return (
       <main className="p-6">
@@ -23,24 +25,37 @@ export function App({ authClient }: { authClient: EduvaultAuthClient }) {
       </main>
     );
   }
-
-  const refresh = () => {
-    void queryClient.invalidateQueries();
-  };
-  const hasSchool = Boolean(session.data.session.activeOrganizationId);
-
+  if (!hasSchool) {
+    return (
+      <div className="mx-auto flex max-w-4xl flex-col items-start gap-6 p-6">
+        <CreateSchoolForm
+          authClient={authClient}
+          onCreated={() => {
+            void queryClient.invalidateQueries();
+          }}
+        />
+        <SignOutButton
+          authClient={authClient}
+          onSignedOut={() => {
+            queryClient.clear();
+          }}
+        />
+      </div>
+    );
+  }
   return (
-    <div className="mx-auto flex max-w-4xl flex-col gap-6 p-6">
-      <header className="flex flex-wrap items-center justify-between gap-4">
-        <span className="font-semibold">Eduvault Admin</span>
-        <ContextSwitchers authClient={authClient} onChanged={refresh} />
-        <Button onClick={() => void authClient.signOut()}>Sign out</Button>
-      </header>
-      {hasSchool ? (
-        <RouterProvider router={router} />
-      ) : (
-        <CreateSchoolForm authClient={authClient} onCreated={refresh} />
-      )}
-    </div>
+    <AuthClientProvider authClient={authClient}>
+      <RouterProvider router={router} />
+    </AuthClientProvider>
+  );
+}
+
+export function App({ authClient }: { authClient: EduvaultAuthClient }) {
+  const { resolved } = useThemeChoice();
+  return (
+    <>
+      <Gate authClient={authClient} />
+      <Toaster theme={resolved} />
+    </>
   );
 }

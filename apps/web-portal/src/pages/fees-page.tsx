@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { money } from '@eduvault/shared';
 import { useApi } from '../api';
 import { ErrorMessage } from '../components/error-message';
 import { feeSchedulesQueryOptions } from '../queries';
@@ -9,14 +10,16 @@ export function FeesPage() {
 
   return (
     <section className="flex flex-col gap-4">
-      <h2 className="text-lg font-semibold">Fee schedules</h2>
+      <h1>Fee schedules</h1>
       <ErrorMessage error={fees.error} />
       <ul className="divide-y rounded-md border">
         {fees.data?.map((fee) => (
           <li key={fee.id} className="flex justify-between p-3">
             <span>{fee.name}</span>
             <span className="text-muted-foreground">
-              {(fee.amountMinor / 100).toLocaleString()} {fee.currency}
+              {Number.isSafeInteger(fee.amountMinor)
+                ? money(fee.amountMinor, fee.currency)
+                : '—'}
             </span>
           </li>
         ))}

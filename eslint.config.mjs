@@ -69,6 +69,21 @@ export const noEnum = {
   message: 'Use a const object with `as const`, or a string-literal union.',
 };
 
+const colourMessage =
+  'Use a semantic theme token such as bg-primary; colour literals live in libs/ui/src/styles/theme.css only.';
+
+export const noColourLiterals = [
+  String.raw`#[0-9a-fA-F]{3}(?:[0-9a-fA-F]{3}(?:[0-9a-fA-F]{2})?)?\b`,
+  String.raw`\b(?:rgba?|hsla?|oklch)\(`,
+  String.raw`(?:^|[\s:"'])-?(?:bg|text|border|ring|fill|stroke|from|via|to|outline|divide|decoration|accent|caret|shadow|placeholder)-\[(?:#|(?:rgba?|hsla?|oklch|oklab|lab|lch|hwb)\(|color:)`,
+].flatMap((pattern) => [
+  { selector: `Literal[value=/${pattern}/]`, message: colourMessage },
+  {
+    selector: `TemplateElement[value.raw=/${pattern}/]`,
+    message: colourMessage,
+  },
+]);
+
 export const noDefaultExport = {
   selector: 'ExportDefaultDeclaration',
   message: 'Use a named export so imports stay greppable and renames safe.',
@@ -144,12 +159,32 @@ export const spaConfig = [
           ],
         },
       ],
-      'no-restricted-syntax': ['error', noEnum, noDefaultExport, importMetaEnv],
+      'no-restricted-syntax': [
+        'error',
+        noEnum,
+        noDefaultExport,
+        importMetaEnv,
+        ...noColourLiterals,
+      ],
     },
   },
   {
     files: ['src/env.ts'],
-    rules: { 'no-restricted-syntax': ['error', noEnum, noDefaultExport] },
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        noEnum,
+        noDefaultExport,
+        ...noColourLiterals,
+      ],
+    },
+  },
+  {
+    // Specs assert token values, so they may spell colours out.
+    files: ['src/**/*.spec.{ts,tsx}'],
+    rules: {
+      'no-restricted-syntax': ['error', noEnum, noDefaultExport, importMetaEnv],
+    },
   },
 ];
 
@@ -292,7 +327,7 @@ export default [
       'unicorn/prevent-abbreviations': 'off',
       'sonarjs/no-unused-vars': 'off',
       'sonarjs/prefer-read-only-props': 'off',
-      'no-restricted-syntax': ['error', noEnum],
+      'no-restricted-syntax': ['error', noEnum, ...noColourLiterals],
       '@typescript-eslint/consistent-type-definitions': ['error', 'interface'],
       '@typescript-eslint/consistent-type-exports': 'error',
       '@typescript-eslint/dot-notation': [
@@ -330,7 +365,14 @@ export default [
   },
   {
     files: ['**/src/**/*.{ts,tsx}'],
-    rules: { 'no-restricted-syntax': ['error', noEnum, noDefaultExport] },
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        noEnum,
+        noDefaultExport,
+        ...noColourLiterals,
+      ],
+    },
   },
   {
     files: ['**/src/**/*.{ts,tsx}', '**/test/**/*.ts'],
@@ -352,6 +394,11 @@ export default [
     rules: { 'check-file/filename-naming-convention': 'off' },
   },
   {
+    // Specs assert token values, so they may spell colours out.
+    files: ['**/src/**/*.spec.{ts,tsx}'],
+    rules: { 'no-restricted-syntax': ['error', noEnum, noDefaultExport] },
+  },
+  {
     ...asErrors(vitest.configs.recommended),
     files: ['**/*.spec.{ts,tsx}', '**/test/**/*.ts'],
   },
@@ -370,6 +417,9 @@ export default [
       '@typescript-eslint/no-unsafe-return': 'off',
       '@typescript-eslint/unbound-method': 'off',
     },
+  },
+  {
+    linterOptions: { reportUnusedDisableDirectives: 'error' },
   },
   eslintConfigPrettier,
   {

@@ -228,7 +228,10 @@ catalogs:
     '@fontsource-variable/inter':
       specifier: ^5.2.0
       version: 5.3.0
-    '@fontsource-variable/roboto':
+    '@fontsource-variable/roboto-mono':
+      specifier: ^5.2.0
+      version: 5.3.0
+    '@fontsource/playfair-display':
       specifier: ^5.2.0
       version: 5.3.0
     class-variance-authority:
@@ -237,6 +240,9 @@ catalogs:
     clsx:
       specifier: ^2.1.1
       version: 2.1.1
+    cmdk:
+      specifier: ^1.1.1
+      version: 1.1.1
     lucide-react:
       specifier: ^1.52.0
       version: 1.52.0
@@ -491,6 +497,9 @@ importers:
       '@tanstack/react-router':
         specifier: catalog:tanstack
         version: 1.170.41(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      lucide-react:
+        specifier: catalog:ui
+        version: 1.52.0(@types/react@19.3.0)(react@19.3.0)
       react:
         specifier: catalog:react
         version: 19.3.0
@@ -534,6 +543,9 @@ importers:
       '@eduvault/auth-client':
         specifier: workspace:*
         version: link:../../libs/auth-client
+      '@eduvault/shared':
+        specifier: workspace:*
+        version: link:../../libs/shared
       '@eduvault/ui':
         specifier: workspace:*
         version: link:../../libs/ui
@@ -543,6 +555,9 @@ importers:
       '@tanstack/react-router':
         specifier: catalog:tanstack
         version: 1.170.41(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      lucide-react:
+        specifier: catalog:ui
+        version: 1.52.0(@types/react@19.3.0)(react@19.3.0)
       react:
         specifier: catalog:react
         version: 19.3.0
@@ -586,19 +601,40 @@ importers:
 
   libs/auth-client:
     dependencies:
+      '@eduvault/shared':
+        specifier: workspace:*
+        version: link:../shared
       '@eduvault/ui':
         specifier: workspace:*
         version: link:../ui
       better-auth:
         specifier: catalog:auth
         version: 1.7.7(pg@8.23.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@4.1.11(@types/node@24.19.1)(jsdom@26.1.0)(vite@7.3.7(@types/node@24.19.1)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1)))
+      lucide-react:
+        specifier: catalog:ui
+        version: 1.52.0(@types/react@19.3.0)(react@19.3.0)
       react:
         specifier: catalog:react
         version: 19.3.0
     devDependencies:
+      '@testing-library/dom':
+        specifier: catalog:testing
+        version: 10.4.2
+      '@testing-library/jest-dom':
+        specifier: catalog:testing
+        version: 6.9.1
+      '@testing-library/react':
+        specifier: catalog:testing
+        version: 16.3.3(@testing-library/dom@10.4.2)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@types/react':
         specifier: catalog:react
         version: 19.3.0
+      '@vitejs/plugin-react':
+        specifier: catalog:vite-react
+        version: 5.2.0(vite@7.3.7(@types/node@24.19.1)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
+      jsdom:
+        specifier: catalog:testing
+        version: 26.1.0
 
   libs/policy:
     dependencies:
@@ -622,7 +658,10 @@ importers:
       '@fontsource-variable/inter':
         specifier: catalog:ui
         version: 5.3.0
-      '@fontsource-variable/roboto':
+      '@fontsource-variable/roboto-mono':
+        specifier: catalog:ui
+        version: 5.3.0
+      '@fontsource/playfair-display':
         specifier: catalog:ui
         version: 5.3.0
       class-variance-authority:
@@ -631,6 +670,9 @@ importers:
       clsx:
         specifier: catalog:ui
         version: 2.1.1
+      cmdk:
+        specifier: catalog:ui
+        version: 1.1.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       lucide-react:
         specifier: catalog:ui
         version: 1.52.0(@types/react@19.3.0)(react@19.3.0)
@@ -1799,8 +1841,11 @@ packages:
   '@fontsource-variable/inter@5.3.0':
     resolution: {integrity: sha512-OupL48va4JNofb97w6NYeF9S7W/kHNKM0Er8Dem5nqi4jeOLrVJDoE8tZEpnMJmtkvNbB1EIPPwHcdkF6b1oUA==}
 
-  '@fontsource-variable/roboto@5.3.0':
-    resolution: {integrity: sha512-BoaaZiQf8fgtxv07KXkTwx1bKz/EoqIlTXq2OOKKXINxp6qXWdnlChqV+hSaDANS49yyUASFl3OVBMMDTCIHFA==}
+  '@fontsource-variable/roboto-mono@5.3.0':
+    resolution: {integrity: sha512-h5r+KY/6qy8JEOj33JgcrFO81YAnvrc1EAwMpl/EPJLb2OIvOy0/jmB5M7qs7x/uXk5JUP5Ux4LrkeOK7faHkQ==}
+
+  '@fontsource/playfair-display@5.3.0':
+    resolution: {integrity: sha512-uJSABalvdWc10fEPppQjQocamT21LEyRfzzWfRfqbkPz+sRv+kKpYDKyluBUskvJREkJTos9epj1WjQROGu99Q==}
 
   '@grpc/grpc-js@1.14.5':
     resolution: {integrity: sha512-7VZM+SVdEcUUqSQeNI3zM8Qs/BhQKZndPo2h5VkYkAM8Iz0wJIa8mKV5ekQGqG8UUsnkQ0NMxIxwkIHYvj0qOw==}
@@ -4971,6 +5016,12 @@ packages:
   clsx@2.1.1:
     resolution: {integrity: sha512-eYm0QWBtUrBWZWG0d386OGAw16Z995PiOVo2B7bjWSbHedGl5e0ZWaq65kOGgUSNesEIDkB9ISbTg/JK9dhCZA==}
     engines: {node: '>=6'}
+
+  cmdk@1.1.1:
+    resolution: {integrity: sha512-Vsv7kFaXm+ptHDMZ7izaRsP70GgrW9NBNGswt9OZaVBLlE0SNpDq8eu/VGXyF9r7M0azK3Wy7OlYXsuyYLFzHg==}
+    peerDependencies:
+      react: ^18 || ^19 || ^19.0.0-rc
+      react-dom: ^18 || ^19 || ^19.0.0-rc
 
   cn@0.2.6:
     resolution: {integrity: sha512-+i4L0zUGgRcEnhsxueVrP7iBGxBx5iD0WOTYg1MwFEu2ZyCmH5Ov2V1cul2Ht5UchRQQgftCf4be/RxspuW6QQ==}
@@ -10086,7 +10137,9 @@ snapshots:
 
   '@fontsource-variable/inter@5.3.0': {}
 
-  '@fontsource-variable/roboto@5.3.0': {}
+  '@fontsource-variable/roboto-mono@5.3.0': {}
+
+  '@fontsource/playfair-display@5.3.0': {}
 
   '@grpc/grpc-js@1.14.5':
     dependencies:
@@ -13770,6 +13823,18 @@ snapshots:
   clone@1.0.4: {}
 
   clsx@2.1.1: {}
+
+  cmdk@1.1.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0):
+    dependencies:
+      '@radix-ui/react-compose-refs': 1.1.5(@types/react@19.3.0)(react@19.3.0)
+      '@radix-ui/react-dialog': 1.2.0(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      '@radix-ui/react-id': 1.1.4(@types/react@19.3.0)(react@19.3.0)
+      '@radix-ui/react-primitive': 2.1.11(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      react: 19.3.0
+      react-dom: 19.3.0(react@19.3.0)
+    transitivePeerDependencies:
+      - '@types/react'
+      - '@types/react-dom'
 
   cn@0.2.6: {}
 

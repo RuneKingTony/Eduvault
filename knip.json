@@ -43,9 +43,11 @@
     "libs/ui": {
       "entry": ["src/index.ts"],
       "project": ["src/**/*.{ts,tsx}"],
+      "ignore": ["src/lib/colour-literal.fixture.ts"],
       "ignoreDependencies": [
         "@fontsource-variable/inter",
-        "@fontsource-variable/roboto",
+        "@fontsource-variable/roboto-mono",
+        "@fontsource/playfair-display",
         "shadcn",
         "tailwindcss",
         "tw-animate-css"
