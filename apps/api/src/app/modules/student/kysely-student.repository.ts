@@ -44,9 +44,11 @@ export class KyselyStudentRepository extends StudentRepository {
       .selectAll()
       .where('organization_id', '=', organizationId)
       .where((eb) => inCampusScope(eb, 'student.campus_id', scope));
-    if (campusId) query = query.where('campus_id', '=', campusId);
+    if (campusId !== undefined) {
+      query = query.where('campus_id', '=', campusId);
+    }
     const rows = await query.orderBy('full_name').orderBy('id').execute();
-    return rows.map(toStudent);
+    return rows.map((row) => toStudent(row));
   }
 
   async findById(

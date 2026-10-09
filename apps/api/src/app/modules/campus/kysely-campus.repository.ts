@@ -48,7 +48,7 @@ export class KyselyCampusRepository extends CampusRepository {
       .orderBy('team.name')
       .orderBy('campus.team_id')
       .execute();
-    return rows.map(toCampus);
+    return rows.map((row) => toCampus(row));
   }
 
   async findById(

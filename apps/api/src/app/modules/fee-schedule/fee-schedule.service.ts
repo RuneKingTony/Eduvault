@@ -22,7 +22,7 @@ export class FeeScheduleService {
   }
 
   async list(ctx: OrgContext, campusId?: string): Promise<FeeSchedule[]> {
-    if (campusId && !canSeeCampus(ctx.campusScope, campusId)) {
+    if (campusId !== undefined && !canSeeCampus(ctx.campusScope, campusId)) {
       throw new NotFoundException('Campus not found');
     }
     const fees = await this.fees.list(ctx.organizationId, campusId);
@@ -38,7 +38,7 @@ export class FeeScheduleService {
   }
 
   async create(ctx: OrgContext, input: NewFeeSchedule): Promise<FeeSchedule> {
-    if (input.campusId) {
+    if (typeof input.campusId === 'string') {
       await this.campuses.assertInSchool(ctx, input.campusId);
     }
     return this.fees.create(ctx.organizationId, input);
@@ -50,11 +50,13 @@ export class FeeScheduleService {
     input: FeeSchedulePatch
   ): Promise<FeeSchedule> {
     await this.get(ctx, id);
-    if (input.campusId) {
+    if (typeof input.campusId === 'string') {
       await this.campuses.assertInSchool(ctx, input.campusId);
     }
     const fee = await this.fees.update(ctx.organizationId, id, input);
-    if (!fee) throw new NotFoundException('Fee schedule not found');
+    if (!fee) {
+      throw new NotFoundException('Fee schedule not found');
+    }
     return fee;
   }
 
