@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Decides how much e2e a diff needs. Prints one word on stdout: skip | api | browser.
-#   browser  the diff touches apps/web-admin, apps/web-portal, libs/ui, libs/shared or apps/web-e2e (specs included)
+#   browser  the diff touches apps/web-admin, apps/web-portal, libs/ui, libs/shared
 #   api      it touches UI-visible API: apps/api source, migrations or seed, libs/api-contract, libs/policy
 #   skip     anything else (docs, tests, tooling, .claude)
-# Unit and integration specs and apps/api/test never count; apps/web-e2e always does. The reason goes to stderr.
+# Unit and integration specs and apps/api/test never count. The reason goes to stderr.
 # Usage: e2e-gate.sh [--stdin | path ...]   no arguments: diff against origin/main plus untracked files.
 set -u
 
@@ -24,7 +24,6 @@ WHY="no UI-visible change"
 while IFS= read -r p; do
   [ -n "$p" ] || continue
   case "$p" in
-    apps/web-e2e/*) VERDICT=browser; WHY="$p"; break ;;
     *.spec.ts | *.spec.tsx | *.test.ts | *.test.tsx | apps/api/test/*) continue ;;
     apps/web-admin/* | apps/web-portal/* | libs/ui/* | libs/shared/*)
       VERDICT=browser; WHY="$p"; break ;;

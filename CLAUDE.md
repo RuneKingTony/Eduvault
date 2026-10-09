@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Eduvault: a school-management monorepo (Nx + pnpm catalogs). Verification is static checks plus API integration tests; browser e2e is opt-in (`nx run web-e2e:e2e`, never part of `pnpm validate`). Details in `docs/`.
+Eduvault: a school-management monorepo (Nx + pnpm catalogs). Verification is static checks plus API integration tests; browser e2e is opt-in (the `eduvault-e2e` skill, never part of `pnpm validate`). Details in `docs/`.
 
 Coding conventions, and which gate enforces each: `docs/conventions.md`. Read it before writing code in `apps/` or `libs/`.
 

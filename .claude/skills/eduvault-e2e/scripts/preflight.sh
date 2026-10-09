@@ -2,14 +2,7 @@
 # Checks the local stack is reachable before an e2e run. Never launches a browser.
 # Prints an "e2e: env=local ..." line, then exits 0 (ready) or 3 (BLOCKED, cause environment).
 set -u
-# A launcher that runs the stack off the default ports records its URLs here (main checkout's var/,
-# found through the git common dir so worktrees see it). Variables already set win.
-STACK_ENV="$(git -C "$(dirname "$0")" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)/../var/eduvault-dev.env"
-if [ -f "$STACK_ENV" ]; then
-  while IFS='=' read -r k v; do
-    case "$k" in E2E_API_URL | E2E_ADMIN_URL | E2E_PORTAL_URL) [ -n "${!k:-}" ] || export "$k=$v" ;; esac
-  done <"$STACK_ENV"
-fi
+. "$(dirname "$0")/stack-env.sh"
 API="${E2E_API_URL:-http://localhost:3000}"
 ADMIN="${E2E_ADMIN_URL:-http://localhost:4200}"
 PORTAL="${E2E_PORTAL_URL:-http://localhost:4201}"
