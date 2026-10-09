@@ -1,6 +1,6 @@
 # Run Better Auth inside NestJS and keep its options Nest-free
 
-- Status: accepted
+- Status: accepted; superseded in part by [0006](0006-per-request-permissions.md)
 - Date: 2026-10-07
 
 ## Context
@@ -13,15 +13,19 @@ Authentication, sessions, organizations and campuses (teams) come from Better Au
 - Options live in `better-auth-base.ts` with no Nest imports. The Nest factory (`better-auth.ts`) and the CLI shim (`apps/api/auth.ts`) both build from it.
 - `advanced.database.generateId: false`: the database mints ids. Better Auth's generated SQL has no default for that, so `api:auth-generate` adds `DEFAULT gen_random_uuid()::text` to every primary key when it writes the migration.
 - Cookies are `httpOnly` and `sameSite: lax`. `trustedOrigins` is the two SPA URLs; `*` only when `NODE_ENV=test`. CORS is ours, restricted to the same two origins.
-- Our guards (`SessionAuthGuard`, `OrganizationAuthGuard`) call `AuthService.api` for the session, active member and teams. Banned users count as unauthenticated. Permission checks use `can()` from `libs/policy`, the same roles Better Auth is configured with.
+- Our guards (`SessionAuthGuard`, `OrganizationAuthGuard`) call `AuthService.api` for the session, active member and teams. Banned users count as unauthenticated. Permission checks use `can()` from `libs/policy` over the permissions resolved for the request (see ADR 0006).
 - A `databaseHooks.session.create.before` hook gives every new session the user's first school and first campus in it.
 
 ## Alternatives considered
 
 - **The library's global auth guard**: it cannot express "needs an active school and this permission", so every route would re-check by hand.
-- **Calling `auth.api.hasPermission` per request**: an extra round trip for a decision the pure role map already makes.
+- **Calling `auth.api.hasPermission` per request**: an extra round trip for a decision the pure role map already makes. Superseded in part: ADR 0006 reads the member's roles from the database on every request so a role change applies at once.
 
 ## Consequences
 
 - Changing an auth option means regenerating and reviewing the schema (`api:auth-generate`), then the Kysely types.
 - Better Auth's declared types omit plugin fields when plugins come from a shared factory, so `AuthContextService` narrows the session with a local `PluginSession` type.
+
+## Superseded in part
+
+Fixed role names and "the same roles Better Auth is configured with" are replaced by ADR 0006: permissions are a code list, roles are slugs in `member.role` (code `owner` and `member`, starter and custom rows in `organizationRole`), and they are resolved on each request. Everything else here stands.
