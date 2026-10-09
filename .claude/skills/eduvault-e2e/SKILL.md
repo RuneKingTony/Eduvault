@@ -102,7 +102,7 @@ A test skipped because its persona is blocked is BLOCKED, not "skipped, so fine"
 - **Real API only.** Sign-up, school, campus and student creation go through Better Auth and the Nest routes. No SQL, no direct database writes, no test-only endpoints.
 - **Ledger everything a run creates.** Records created outside `provision.sh` must be appended to the ledger so cleanup can reverse them ([flows](references/flows.md)).
 - **Business rules stay true.** Eduvault never deletes money, results or students in the product. The e2e ledger deletes only rows this run created, in a throwaway local database, through the same API.
-- **Never touch seed data.** Do not sign in as `owner@greenfield.test` and mutate its school; the e2e personas are separate.
+- **Never write to seed data.** A read-only tour may sign in as a seeded persona such as `funmi@greenfield.test`; every write goes to the run's own school.
 - **Browser driving is `playwright-cli`.** Use the `playwright-cli` skill against the admin and portal URLs from preflight with a persona from `personas.json`. Do not add a spec project or vendor third-party skills.
 - **Do not weaken an assertion to make a failure pass.** A flaky step is a FAIL with a note, or a wait on the real condition.
 - Never commit, and never report a run you did not make.

@@ -27,4 +27,14 @@ describe('loadEnv', () => {
     const { WEB_PORTAL_URL: _omitted, ...rest } = valid;
     expect(() => loadEnv(rest)).toThrow(/WEB_PORTAL_URL/);
   });
+
+  it('accepts an ISO SEED_TODAY and leaves it unset by default', () => {
+    expect(loadEnv(valid).SEED_TODAY).toBeUndefined();
+    expect(loadEnv({ ...valid, SEED_TODAY: '2026-10-07' }).SEED_TODAY).toBe(
+      '2026-10-07'
+    );
+    expect(() => loadEnv({ ...valid, SEED_TODAY: 'yesterday' })).toThrow(
+      /SEED_TODAY/
+    );
+  });
 });

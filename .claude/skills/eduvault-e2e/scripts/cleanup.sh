@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Reverses a run's ledger through the API: students first, then schools (a campus goes with its school).
+# Reverses what a run's ledger can still reverse through the API: campuses with nothing in them.
 # Usage: cleanup.sh <absolute path to ledger.json>
-# User accounts cannot be removed through the API and stay until `pnpm db:reset`.
+# Students and money are never deleted (the product keeps them), so a run's schools, students and users stay until
+# `pnpm db:reset`. It then closes the run's browser sessions.
 set -u
 LEDGER="${1:?usage: cleanup.sh <absolute path to ledger.json>}"
 . "$(dirname "$0")/stack-env.sh"
@@ -9,21 +10,18 @@ API="${E2E_API_URL:-http://localhost:3000}"
 ORIGIN="${E2E_ADMIN_URL:-http://localhost:4200}"
 JAR="$(mktemp)"; trap 'rm -f "$JAR"' EXIT
 req() { curl -sS -m 20 -X "$1" -H "origin: $ORIGIN" -H 'content-type: application/json' -b "$JAR" -c "$JAR" -o /dev/null -w '%{http_code}' ${3:+--data "$3"} "$API$2"; }
-SCHOOLS=$(jq -r '[.[]|select(.kind=="school")|.id]|join(" ")' "$LEDGER")
-FAILED=0
-for kind in student school campus; do
-  jq -c --arg k "$kind" '.[]|select(.kind==$k)' "$LEDGER" | while read -r e; do
-    id=$(jq -r .id <<<"$e"); sid=$(jq -r .schoolId <<<"$e")
-    if [ "$kind" = campus ] && [[ " $SCHOOLS " == *" $sid "* ]]; then echo "campus $id: removed with its school"; continue; fi
-    : >"$JAR"
-    code=$(req POST /api/auth/sign-in/email "$(jq -c .actor <<<"$e")")
-    [ "$code" = 200 ] || { echo "skip $kind $id: sign-in $code"; continue; }
-    req POST /api/auth/organization/set-active "$(jq -nc --arg o "$sid" '{organizationId:$o}')" >/dev/null
-    case "$kind" in
-      school) code=$(req POST /api/auth/organization/delete "$(jq -nc --arg o "$id" '{organizationId:$o}')") ;;
-      student) code=$(req DELETE "/students/$id") ;;
-      campus) code=$(req DELETE "/campuses/$id") ;;
-    esac
-    case "$code" in 2*) echo "deleted $kind $id" ;; *) echo "FAILED $code $kind $id" ;; esac
-  done
+jq -c '.[]|select(.kind=="campus")' "$LEDGER" | while read -r e; do
+  id=$(jq -r .id <<<"$e"); sid=$(jq -r .schoolId <<<"$e")
+  : >"$JAR"
+  code=$(req POST /api/auth/sign-in/email "$(jq -c .actor <<<"$e")")
+  [ "$code" = 200 ] || { echo "skip campus $id: sign-in $code"; continue; }
+  req POST /api/auth/organization/set-active "$(jq -nc --arg o "$sid" '{organizationId:$o}')" >/dev/null
+  code=$(req DELETE "/campuses/$id")
+  case "$code" in
+    2*) echo "deleted campus $id" ;;
+    409) echo "kept campus $id: it still has students or fee schedules" ;;
+    *) echo "FAILED $code campus $id" ;;
+  esac
 done
+jq -r '[.[]|select(.kind=="student")]|length as $n|"kept \($n) student(s) and every school: students and money are never deleted"' "$LEDGER"
+bash "$(dirname "$0")/close-sessions.sh" --run="$(dirname "$LEDGER")"

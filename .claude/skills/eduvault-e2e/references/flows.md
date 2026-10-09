@@ -30,4 +30,14 @@ ID=$(curl -sS -b "$J" -H "origin: $E2E_ADMIN_URL" -H 'content-type: application/
 jq --arg i "$ID" --arg s "$SCHOOL" --arg e "$OWNER_EMAIL" '. + [{kind:"student",id:$i,schoolId:$s,actor:{email:$e,password:"e2e-password-123"}}]' "$RUN_DIR/ledger.json" > "$RUN_DIR/l.tmp" && mv "$RUN_DIR/l.tmp" "$RUN_DIR/ledger.json"
 ```
 
-Ledger kinds are `student`, `campus` and `school`. A campus is removed together with its school (deleting one alone answered 403 in testing), so a new kind of record needs a reversal in `cleanup.sh` first. Use unique admission numbers and names (`E2E-<label>-<runId>`); admission numbers are unique across schools.
+Ledger kinds are `student`, `campus` and `school`. Cleanup reverses only campuses with nothing in them: students and money are never deleted, so a run's records stay in its own run-named schools until `pnpm db:reset`. Use unique names and admission numbers (`E2E-<label>-<runId>`); admission numbers are unique within a school, not across schools.
+
+## Per-slice flow template
+
+Each slice adds one flow here, named for the slice. Run it as the persona who does the work and keep the three checks:
+
+1. **Happy path** in the browser as the persona who does it, with a screenshot after each state.
+2. **403** for one persona without the permission, by API (`curl` with that persona's jar).
+3. **404** for `foreign`, and, where the route is campus aware, for `bursar2` on a Lekki record.
+
+A step that needs a blocked persona is listed as blocked, not skipped silently ([personas](personas.md)).

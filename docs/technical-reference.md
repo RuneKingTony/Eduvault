@@ -102,6 +102,7 @@ Each is decided elsewhere; the link is the authority.
 
 | D-049 | 2026-10-09 | Expenses and suppliers (F1b) ship after the store as M5, not between finance and the store: the prototype has no expense screens, so they wait for a design | Advisor (roadmap) | prd/README.md | Active |
 | D-050 | 2026-10-09 | Recording a student's leaving or graduation removes the student's own school membership, closing their portal login; undoing it restores it. Guardians keep seeing the child. Revisit when F3 report cards need graduates to sign in | Agent default (consolidating 40, 72) | prd/40, prd/72 | Active |
+| D-052 | 2026-10-09 | Until M1.1 the seed maps bursars to `teacher` and the principal to `admin` (the only campus-scoped fixed role that can read students), and defers the no-role member, the super admin and portal logins. The seed is bundled by Vite and SWC to `dist/seed.cjs` and run with `node`, because `tsx` drops the decorator metadata Nest needs | Agent default (parent spec M0.2) | prd/04, D-047 | Active |
 
 ## Open questions
 
