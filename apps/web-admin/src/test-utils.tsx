@@ -2,12 +2,12 @@ import type { ReactElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render } from '@testing-library/react';
 import type { MePermissions, Student } from '@eduvault/api-contract';
-import { PermissionsProvider } from '@eduvault/auth-client';
 import {
-  ALL_PERMISSIONS,
-  STARTER_ROLES,
-  toPermissionMap,
-} from '@eduvault/policy';
+  PermissionsProvider,
+  accessOfStarter,
+  fakeAccess,
+} from '@eduvault/auth-client';
+import { ALL_PERMISSIONS, toPermissionMap } from '@eduvault/policy';
 import { ApiProvider, type Api } from './api';
 
 export const student = (overrides: Partial<Student> = {}): Student => ({
@@ -20,18 +20,6 @@ export const student = (overrides: Partial<Student> = {}): Student => ({
   ...overrides,
 });
 
-export const fakeAccess = (
-  overrides: Partial<MePermissions> = {}
-): MePermissions => ({
-  organizationId: 'org-1',
-  roles: ['member'],
-  permissions: {},
-  campusScope: [],
-  classScope: 'all',
-  acting: null,
-  ...overrides,
-});
-
 export const ownerAccess = (): MePermissions =>
   fakeAccess({
     roles: ['owner'],
@@ -39,15 +27,8 @@ export const ownerAccess = (): MePermissions =>
     campusScope: 'all',
   });
 
-/** The access of a member holding one starter role. */
-export function starterAccess(slug: string): MePermissions {
-  const role = STARTER_ROLES.find((candidate) => candidate.slug === slug);
-  return fakeAccess({
-    roles: [slug],
-    permissions: toPermissionMap(role?.permissions ?? []),
-    campusScope: slug === 'administrator' ? 'all' : ['c1'],
-  });
-}
+export const starterAccess = (slug: string): MePermissions =>
+  accessOfStarter(slug, slug === 'administrator' ? 'all' : ['c1']);
 
 export function renderWithApi(
   ui: ReactElement,
@@ -65,3 +46,5 @@ export function renderWithApi(
     </QueryClientProvider>
   );
 }
+
+export { fakeAccess } from '@eduvault/auth-client';

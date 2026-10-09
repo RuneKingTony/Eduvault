@@ -10,7 +10,6 @@ export interface NavItem {
   route: string;
   icon: NavIconName;
   alsoActiveFor?: readonly string[];
-  /** Any one permission shows the item and opens the route; none means everyone. */
   gate?: Gate;
 }
 
@@ -169,7 +168,6 @@ const ROUTE_GATES = new Map<string, Gate>(
   )
 );
 
-/** The one declaration of who may open a route; the nav and the route both read it. */
 export const routeGate = (route: string): Gate | undefined =>
   ROUTE_GATES.get(route);
 
@@ -187,7 +185,6 @@ export function visibleSettings(
   );
 }
 
-/** Settings is shown when any section passes, and opens the first one. */
 function settingsItem(
   item: NavItem,
   builtRoutes: ReadonlySet<string>,

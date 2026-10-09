@@ -59,10 +59,6 @@ function commandEntries(groups: readonly NavGroup[]): CommandEntry[] {
     );
 }
 
-/**
- * The access loaded by the root route, kept fresh by the query: when a refetch
- * changes it, the router re-runs the route gates.
- */
 function useAccess(): MePermissions {
   const router = useRouter();
   const api = useApi();

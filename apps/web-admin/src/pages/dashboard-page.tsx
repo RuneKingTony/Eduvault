@@ -1,4 +1,5 @@
 import { useAuthClient, usePermissions } from '@eduvault/auth-client';
+import { MEMBER_ROLE } from '@eduvault/policy';
 import {
   Button,
   Empty,
@@ -10,7 +11,7 @@ import {
 import { useMyAccess } from '../components/my-access';
 import { useSchool } from '../use-school';
 
-function NoAccessDashboard() {
+function NoAccessDashboard({ hasRole }: { hasRole: boolean }) {
   const { schoolName, user } = useSchool(useAuthClient());
   const { openMyAccess } = useMyAccess();
   const [firstName = user.name] = user.name.split(' ');
@@ -24,8 +25,9 @@ function NoAccessDashboard() {
         <EmptyHeader>
           <EmptyTitle>No access yet</EmptyTitle>
           <EmptyDescription>
-            You’re on the staff list, but you can’t see anything until the owner
-            gives you a role. This page fills in once they do.
+            {hasRole
+              ? 'Your role doesn’t give you anything to see yet. This page fills in once the owner changes it.'
+              : 'You’re on the staff list, but you can’t see anything until the owner gives you a role. This page fills in once they do.'}
           </EmptyDescription>
         </EmptyHeader>
         <EmptyContent>
@@ -39,9 +41,11 @@ function NoAccessDashboard() {
 }
 
 export function DashboardPage() {
-  const { permissions } = usePermissions();
+  const { permissions, roles } = usePermissions();
   if (Object.keys(permissions).length === 0) {
-    return <NoAccessDashboard />;
+    return (
+      <NoAccessDashboard hasRole={roles.some((role) => role !== MEMBER_ROLE)} />
+    );
   }
   return (
     <section className="flex flex-col gap-4">

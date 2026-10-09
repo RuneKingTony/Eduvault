@@ -8,7 +8,6 @@ const personOf = (
   image: user?.image ?? null,
 });
 
-/** The signed-in person and the active school, as the auth client reports them. */
 export function useSchool(authClient: EduvaultAuthClient) {
   const session = authClient.useSession();
   const schools = authClient.useListOrganizations();

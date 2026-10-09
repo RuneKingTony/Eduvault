@@ -1,4 +1,8 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import {
+  QueryClient,
+  QueryClientProvider,
+  focusManager,
+} from '@tanstack/react-query';
 import {
   RouterProvider,
   createMemoryHistory,
@@ -18,10 +22,13 @@ import {
   AuthClientProvider,
   type EduvaultAuthClient,
 } from '@eduvault/auth-client';
-import type { MePermissions } from '@eduvault/api-contract';
+import { ApiError, type MePermissions } from '@eduvault/api-contract';
 import { stubMatchMedia } from '@eduvault/ui/testing';
 import { requireGate } from '../access';
+import { ApiProvider, type Api } from '../api';
 import { DashboardPage } from '../pages/dashboard-page';
+import { mePermissionsQueryOptions } from '../queries';
+import { createQueryClient } from '../query-client';
 import { fakeAccess, ownerAccess, starterAccess } from '../test-utils';
 import { ErrorMessage } from './error-message';
 import { AppShell } from './app-shell';
@@ -72,17 +79,22 @@ async function renderAt(
     realDashboard = false,
   }: RenderOptions = {}
 ) {
+  let current = access;
+  const permissions = vi.fn(() => Promise.resolve(current));
+  const api = { me: { permissions } } as unknown as Api;
   const root = createRootRoute({
     component: AppShell,
-    beforeLoad: () => ({ access }),
+    beforeLoad: async () => ({
+      access: await queryClient.query(mePermissionsQueryOptions(api)),
+    }),
   });
   const child = (to: string, component: () => React.ReactNode) =>
     createRoute({
       getParentRoute: () => root,
       path: to,
       component,
-      beforeLoad: () => {
-        requireGate(access, to);
+      beforeLoad: ({ context }) => {
+        requireGate(context.access, to);
       },
     });
   const router = createRouter({
@@ -100,12 +112,20 @@ async function renderAt(
   });
   render(
     <QueryClientProvider client={queryClient}>
-      <AuthClientProvider authClient={authClient}>
-        <RouterProvider router={router} />
-      </AuthClientProvider>
+      <ApiProvider api={api}>
+        <AuthClientProvider authClient={authClient}>
+          <RouterProvider router={router} />
+        </AuthClientProvider>
+      </ApiProvider>
     </QueryClientProvider>
   );
   await screen.findByRole('navigation', { name: 'Breadcrumb' });
+  return {
+    permissions,
+    changeAccessTo: (next: MePermissions) => {
+      current = next;
+    },
+  };
 }
 
 const sidebarNav = () =>
@@ -298,7 +318,56 @@ describe('AppShell access', () => {
   });
 
   afterEach(() => {
+    focusManager.setFocused();
     vi.unstubAllGlobals();
+  });
+
+  it('sends the open page to the Dashboard when the window regains focus after access was revoked', async () => {
+    const { changeAccessTo } = await renderAt('/students');
+    changeAccessTo(fakeAccess());
+    act(() => {
+      focusManager.setFocused(false);
+      focusManager.setFocused(true);
+    });
+    expect(await screen.findByText('Dashboard page')).toBeInTheDocument();
+    expect(linkNames()).toEqual(['Dashboard', 'Approvals']);
+  });
+
+  it('refetches the access after a 403 and sends the open page to the Dashboard', async () => {
+    const queryClient = createQueryClient();
+    const { changeAccessTo } = await renderAt('/students', { queryClient });
+    changeAccessTo(fakeAccess());
+    await queryClient
+      .query({
+        queryKey: ['students'],
+        queryFn: () =>
+          Promise.reject(
+            new ApiError(403, {
+              code: 'Forbidden',
+              message: 'Missing permission student:read',
+            })
+          ),
+      })
+      .catch(() => undefined);
+    expect(await screen.findByText('Dashboard page')).toBeInTheDocument();
+    expect(linkNames()).toEqual(['Dashboard', 'Approvals']);
+  });
+
+  it('reads the access of the school that was switched to, not the previous one', async () => {
+    const { changeAccessTo, permissions } = await renderAt('/students');
+    expect(linkNames()).toContain('Fees');
+    changeAccessTo(starterAccess('bursar'));
+    fireEvent.keyDown(
+      within(sidebarNav()).getByRole('button', { name: /Greenfield College/ }),
+      { key: 'Enter' }
+    );
+    fireEvent.click(
+      await screen.findByRole('menuitem', { name: 'Lakeside Academy' })
+    );
+    await waitFor(() => {
+      expect(linkNames()).toEqual(['Dashboard', 'Approvals', 'Students']);
+    });
+    expect(permissions).toHaveBeenCalledTimes(2);
   });
 
   it('shows an owner Students, Fees and a Settings entry that opens Campuses', async () => {
@@ -365,6 +434,18 @@ describe('AppShell access', () => {
     expect(
       await screen.findByText('Nothing yet. Ask the owner to give you a role.')
     ).toBeInTheDocument();
+  });
+
+  it('tells a member whose role grants nothing that the role is the limit', async () => {
+    await renderAt('/', {
+      access: fakeAccess({ roles: ['student'] }),
+      realDashboard: true,
+    });
+    expect(await screen.findByText('No access yet')).toBeInTheDocument();
+    expect(
+      screen.getByText(/Your role doesn’t give you anything to see yet/)
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/until the owner gives you a role/)).toBeNull();
   });
 
   it('opens My access from the user menu', async () => {

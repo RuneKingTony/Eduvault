@@ -60,7 +60,6 @@ function ShellAccessSheet({
   );
 }
 
-/** One sheet, opened from the user menu or the Dashboard. */
 export function MyAccessProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const control = useMemo(
