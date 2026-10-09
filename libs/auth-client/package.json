@@ -8,6 +8,7 @@
     "@eduvault/policy": "workspace:*",
     "@eduvault/shared": "workspace:*",
     "@eduvault/ui": "workspace:*",
+    "@tanstack/react-query": "catalog:tanstack",
     "better-auth": "catalog:auth",
     "lucide-react": "catalog:ui",
     "react": "catalog:react"
