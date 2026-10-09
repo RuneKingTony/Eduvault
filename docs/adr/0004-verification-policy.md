@@ -31,6 +31,6 @@ Confidence comes from, in order: formatting, ESLint (typescript-eslint strict pl
 Two parts of this decision were relaxed after it was written:
 
 - **CI is allowed.** `.github/workflows/validate-pr.yml` runs `pnpm validate` on pull requests. It adds no gate of its own; `pnpm validate` stays the single definition of "green".
-- **Opt-in Playwright e2e is allowed.** `apps/web-e2e` holds the specs and the `eduvault-e2e` skill drives them against the `run-local` stack, only when a diff touches `apps/web-admin`, `apps/web-portal` or UI-visible API. It is kept out of `pnpm validate`, `validate:quick` and CI, while its `lint` and `typecheck` run with the rest and need no running stack. The static-check-first order above is unchanged.
+- **Opt-in browser e2e is allowed.** The `eduvault-e2e` skill drives the `run-local` stack with `playwright-cli` and `curl`, only when a diff touches `apps/web-admin`, `apps/web-portal` or UI-visible API. It has no project in the workspace, so it is kept out of `pnpm validate`, `validate:quick` and CI. The static-check-first order above is unchanged.
 
 Still true: no deployment or infrastructure code, and a gate that needs a browser never blocks the default loop.

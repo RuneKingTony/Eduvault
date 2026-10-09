@@ -37,13 +37,13 @@ Each test truncates Better Auth and domain tables first. A failing isolation tes
 
 Not a gate: it is outside `pnpm validate`, `validate:quick` and CI. Run it when a diff touches `apps/web-admin`, `apps/web-portal` or UI-visible API (`bash .claude/skills/eduvault-e2e/scripts/e2e-gate.sh` prints `skip`, `api` or `browser`).
 
-| Need                        | Command                                                                    |
-| --------------------------- | -------------------------------------------------------------------------- |
-| One-time browser install    | `pnpm --filter @eduvault/web-e2e exec playwright install chromium`         |
-| Run against the local stack | `pnpm dev` in one shell, then `nx run web-e2e:e2e`                         |
-| Reverse a failed run's data | `pnpm --filter @eduvault/web-e2e cleanup "$PWD/tmp/e2e/<run>/ledger.json"` |
+| Need                        | Command                                                                                |
+| --------------------------- | -------------------------------------------------------------------------------------- |
+| Run against the local stack | `pnpm dev` in one shell, then follow `.claude/skills/eduvault-e2e/SKILL.md`            |
+| Create personas             | `bash .claude/skills/eduvault-e2e/scripts/provision.sh`                                |
+| Reverse a run's data        | `bash .claude/skills/eduvault-e2e/scripts/cleanup.sh "$PWD/tmp/e2e/<run>/ledger.json"` |
 
-The run provisions owner, admin, teacher, student and foreign-school personas through the real API, writes screenshots to `tmp/e2e/<run>/`, and deletes the schools, campuses and students it created when every test passes (user accounts cannot be removed through the API and remain until `pnpm db:reset`). If the stack is down the run stops with `BLOCKED (environment)`, which is not a pass. The skill is `.claude/skills/eduvault-e2e/SKILL.md`.
+The browser is driven through the `playwright-cli` skill and the API through `curl`; there is no Playwright project in the workspace. Personas are provisioned through the real API, screenshots go to `tmp/e2e/<run>/`, and the schools, campuses and students a run created are deleted when every step passes (user accounts cannot be removed through the API and remain until `pnpm db:reset`). If the stack is down the run stops with `BLOCKED (environment)`, which is not a pass.
 
 ## Not verified by any gate
 
