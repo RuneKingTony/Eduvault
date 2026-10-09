@@ -17,6 +17,7 @@ const me = (overrides: Partial<Me> = {}): Me => ({
   mustChangePassword: false,
   platformRole: null,
   schoolCount: 1,
+  suspendedSchool: null,
   ...overrides,
 });
 
@@ -129,5 +130,40 @@ describe('App', () => {
       screen.getByRole('heading', { name: /Welcome back|Sign in/ })
     ).toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('shows the paused screen for a suspended school, with sign out', async () => {
+    const signOut = vi.fn().mockResolvedValue({ data: {}, error: null });
+    const { api } = apiWith(
+      me({ suspendedSchool: { id: 'o1', name: 'Greenfield College' } })
+    );
+    renderApp(clientWith(signedIn, signOut), api);
+    expect(
+      await screen.findByText('Greenfield College is paused on Eduvault')
+    ).toBeInTheDocument();
+    expect(screen.getByText('Contact the school for details.')).toBeVisible();
+    expect(screen.queryByText('The router is showing')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /Greenfield|School/ })
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+    await waitFor(() => {
+      expect(signOut).toHaveBeenCalledOnce();
+    });
+  });
+
+  it('offers the school switcher when the person belongs to other schools', async () => {
+    const { api } = apiWith(
+      me({
+        schoolCount: 2,
+        suspendedSchool: { id: 'o1', name: 'Greenfield College' },
+      })
+    );
+    renderApp(clientWith(signedIn), api);
+    await screen.findByText('Greenfield College is paused on Eduvault');
+    expect(
+      screen.getAllByRole('button').map((button) => button.textContent)
+    ).toEqual(expect.arrayContaining(['Sign out', 'Check again']));
+    expect(screen.getAllByRole('button')).toHaveLength(3);
   });
 });
