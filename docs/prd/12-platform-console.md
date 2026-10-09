@@ -47,7 +47,7 @@ The console uses the `web-admin` shell with the platform head ("Eduvault platfor
   | Status   | "Active" or "Suspended" status badge                     |
   | Created  | date ("12 Aug 2026")                                     |
 
-  Clicking a row opens the school. The prototype has no filters or search.
+  Choosing a school's name (a button, so the keyboard reaches it) opens the school. The prototype has no filters or search.
 
 - Empty (no schools yet): "Nothing here yet" (the table default; see Prototype gaps).
 
@@ -113,14 +113,14 @@ The console uses the `web-admin` shell with the platform head ("Eduvault platfor
 - Header: title "Audit log"; description "Every request a super admin makes while acting inside a school, and every platform action."; info tip "Reads are logged too. Rows are kept until a retention period is agreed."
 - Table (newest first, cursor-paged, 10 per page):
 
-  | Column  | Content                                                                                  |
-  | ------- | ---------------------------------------------------------------------------------------- |
-  | Time    | `YYYY-MM-DD HH:mm`, mono                                                                 |
-  | Actor   | avatar and name, for example "Jude (super admin)"                                        |
-  | School  | school name                                                                              |
-  | Request | method badge (GET and HEAD neutral, others highlighted) and path with query string, mono |
-  | Status  | the HTTP status as a badge: green below 300, red otherwise                               |
-  | Reason  | the reason in code style, or "—"                                                         |
+  | Column  | Content                                                                         |
+  | ------- | ------------------------------------------------------------------------------- |
+  | Time    | `YYYY-MM-DD HH:mm`, mono                                                        |
+  | Actor   | avatar and name, for example "Jude (super admin)"                               |
+  | School  | school name                                                                     |
+  | Request | method badge (GET, HEAD and OPTIONS neutral, others highlighted) and path, mono |
+  | Status  | the HTTP status as a badge: green below 300, red otherwise                      |
+  | Reason  | the reason in code style, or "—"                                                |
 
 - Empty: "No acting requests yet".
 - Filters (not in the prototype): a school select ("All schools" by default) and a "Writes only" switch, because every read is logged and the table grows fast.
@@ -140,14 +140,14 @@ The console uses the `web-admin` shell with the platform head ("Eduvault platfor
 4. The starter roles are `administrator`, `teacher`, `bursar`, `principal`, `student`, `guardian` (six; Principal is ready-made, [D-010](../technical-reference.md#decision-log)). Each holds the permissions that have landed in the permission list when the school is created; each later slice's migration backfills starter roles the school hasn't edited ([21](21-roles-and-permissions.md), RP-11). `student` and `guardian` gain the portal permissions from M2.8.
 5. The slug is Better Auth's `organization.slug`: unique across Eduvault, lowercase letters, digits and hyphens, 3–40 characters. It can't be changed from the console (student usernames are built from it).
 6. If the owner email already belongs to a user (an owner of another school, or a guardian), that user becomes the owner and no temporary password is created: one account works across schools.
-7. Suspending sets `school_account.suspended_at` and `suspended_by` ([D-037](../technical-reference.md#decision-log)). While suspended, every school route for that school answers 403 `SchoolSuspended` for its members, and both apps show a screen: "{school} is paused on Eduvault. Contact the school for details." with "Sign out", and a school switcher when the person belongs to other schools. Sign-in itself still works, because a user may belong to other schools.
+7. Suspending sets `school_account.suspended_at` and `suspended_by` ([D-037](../technical-reference.md#decision-log)). While suspended, every school route for that school answers 403 `SchoolSuspended` for its members, and both apps show a screen: "{school} is paused on Eduvault. Contact the school for details." with "Check again" (refetches who the person is), "Sign out", and a school switcher when the person belongs to other schools. Sign-in itself still works, because a user may belong to other schools.
 8. Reactivating clears `suspended_at` and takes effect on the next request.
 9. Replacing an owner adds the new owner first, then removes the `owner` role from the old one, in one transaction. The school always has at least one owner. The new owner loses `administrator` and `principal` if they held them (one-senior-role rule, D-006).
 10. Acting is requested with the header `X-Eduvault-Acting-Org: {organizationId}`. It is honoured only for `superadmin` and silently ignored for anyone else. An unknown school answers 404.
 11. Acting without a reason grants every `read` and `readAll` action in the permission list, `campusScope: 'all'` and `classScope: 'all'`. `readOwn` actions are not granted.
-12. A write (`POST`, `PUT`, `PATCH`, `DELETE`) while acting needs `X-Eduvault-Acting-Reason` (1–200 characters). Without it the API answers 403 `ActingReadOnly`. With it, the request runs with every permission.
+12. A write (`POST`, `PUT`, `PATCH`, `DELETE`) while acting needs `X-Eduvault-Acting-Reason` (1–200 characters, sent percent-encoded because header values are Latin-1 only; the length counts the decoded text, and malformed encoding answers 400). Without it the API answers 403 `ActingReadOnly`. With it, the request runs with every permission.
 13. Self-approval still applies while acting: the acting super admin is the `approved_by` and must differ from `created_by`.
-14. **Every** acting request, reads and refused writes included, writes one `audit_log` row after the response: actor, school, method, path with query string, response status, reason (null when absent), time. The row is written even when the handler throws.
+14. **Every** acting request, reads and refused writes included, writes one `audit_log` row after the response: actor, school, method, path without its query string, response status, reason (null when absent), time. The row is written even when the handler throws.
 15. Platform actions also write `audit_log` rows with kind `platform` and an `action` ([D-037](../technical-reference.md#decision-log)): create school, suspend, reactivate, replace owner. This is how "The audit log records who suspended it" holds.
 16. Audit rows are never updated or deleted by the application. They are kept indefinitely until a retention period is agreed with the first school contract.
 17. A suspended school can still be acted in (support during an incident).
@@ -170,7 +170,7 @@ The console uses the `web-admin` shell with the platform head ("Eduvault platfor
   | `organization_id` | TEXT → `organization`, nullable      | **nullable is new**: a failed create-school has no school; FK `ON DELETE RESTRICT`                         |
   | `method`          | TEXT, nullable                       | HTTP method for `acting` rows; null for `platform` rows                                                    |
   | `action`          | TEXT, nullable                       | **new**: `school.create`, `school.suspend`, `school.reactivate`, `school.replaceOwner`; platform rows only |
-  | `path`            | TEXT                                 | includes the query string                                                                                  |
+  | `path`            | TEXT                                 | the path only, never the query string                                                                      |
   | `status`          | SMALLINT                             |                                                                                                            |
   | `reason`          | TEXT, nullable                       |                                                                                                            |
   | `created_at`      | TIMESTAMPTZ                          | index `(organization_id, created_at DESC)` and `(created_at DESC)`                                         |
@@ -184,6 +184,8 @@ The console uses the `web-admin` shell with the platform head ("Eduvault platfor
 | ------ | --------------------------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
 | GET    | `/platform/schools`                           | `superadmin`                       | `?q&cursor`                                                                          | `{ items: PlatformSchool[], totals: { schools, active, students, actingRequests }, nextCursor }`; `PlatformSchool = { id, name, slug, admissionPrefix, city, owners: {id,name,email}[], students, campuses, status, createdAt }` | 401; 403                                                                  |
 | POST   | `/platform/schools`                           | `superadmin`                       | `{ name, slug, admissionPrefix, city?, ownerName, ownerEmail }`                      | `{ school: PlatformSchool, owner: { id, email }, temporaryPassword: string \| null }`                                                                                                                                            | 400 validation (`issues`); 401; 403; 409 slug taken                       |
+| GET    | `/platform/schools/options`                   | `superadmin`                       | –                                                                                    | `{ items: { id, name }[] }`, every school A–Z, no paging (the audit log's school select)                                                                                                                                         | 401; 403                                                                  |
+| GET    | `/platform/schools/:id/members`               | `superadmin`                       | –                                                                                    | `{ items: { memberId, userId, name, email, roles }[] }` (the replace-owner picker)                                                                                                                                               | 401; 403; 404                                                             |
 | GET    | `/platform/schools/:id`                       | `superadmin`                       | –                                                                                    | `PlatformSchool`                                                                                                                                                                                                                 | 401; 403; 404                                                             |
 | POST   | `/platform/schools/:id/suspend`               | `superadmin`                       | –                                                                                    | `PlatformSchool`                                                                                                                                                                                                                 | 401; 403; 404; 409 already suspended                                      |
 | POST   | `/platform/schools/:id/reactivate`            | `superadmin`                       | –                                                                                    | `PlatformSchool`                                                                                                                                                                                                                 | 401; 403; 404; 409 not suspended                                          |

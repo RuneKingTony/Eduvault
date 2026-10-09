@@ -14,6 +14,12 @@ Terms the code and the people using it share. Adapted from the earlier school-ma
 
 **Super admin** — an Eduvault operator with the platform role `superadmin` (`user.role`). Creates schools and their owners in the platform console and belongs to no school; the first one comes from `nx run api:bootstrap-admin`, never from a screen.
 
+**Acting** — a super admin working inside one school without belonging to it, started from the school's page in the platform console. Read-only until they give a reason (a ticket number, up to 200 characters); with one they hold owner-level permissions, with every request still audited. The SPA keeps the acted school and reason in `sessionStorage`, so a new tab or a sign-out ends it, and sends them as `X-Eduvault-Acting-Org` and `X-Eduvault-Acting-Reason`. Only a super admin's headers are read; anyone else's are ignored.
+
+**Suspended school** — a school whose `school_account.suspended_at` is set. Its members get 403 `SchoolSuspended` on every school route and both apps show "{school} is paused on Eduvault"; sign-in still works and no data changes. A super admin can still act in it. Reactivating clears it on the next request.
+
+**Audit log** — the append-only `audit_log` table: one `acting` row for every request a super admin makes while acting (method, path, status, reason, kept even when the request is refused or fails) and one `platform` row for each create school, suspend, reactivate and replace owner. Only the platform console reads it; no school route does, and the database refuses an update or delete.
+
 **Temporary password** — the one-time password generated on the server when someone's account is created (a school owner today, staff and guardians later). It is shown once to whoever creates the account, never stored in clear, and the account is held on "Choose your own password" until its owner replaces it.
 
 ## Calendar and classes
