@@ -15,12 +15,14 @@ export const apiErrorCodeSchema = z.enum([
   'NotFound',
   'Conflict',
   'SelfApproval',
+  'ValidationError',
   'InternalError',
+  'UnknownError',
 ]);
 export type ApiErrorCode = z.infer<typeof apiErrorCodeSchema>;
 
 export const errorSchema = z.object({
-  code: z.string(),
+  code: apiErrorCodeSchema,
   message: z.string(),
   issues: z
     .array(z.object({ path: z.string(), message: z.string() }))
