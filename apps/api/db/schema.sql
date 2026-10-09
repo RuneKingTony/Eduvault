@@ -436,6 +436,12 @@ CREATE INDEX "member_userId_idx" ON public.member USING btree ("userId");
 CREATE INDEX "organizationRole_organizationId_idx" ON public."organizationRole" USING btree ("organizationId");
 
 --
+-- Name: organizationRole_organizationId_role_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX "organizationRole_organizationId_role_key" ON public."organizationRole" USING btree ("organizationId", role);
+
+--
 -- Name: organizationRole_role_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -607,4 +613,5 @@ ALTER TABLE ONLY public.team
 INSERT INTO public.schema_migrations (version) VALUES
     ('20261007112254'),
     ('20261007112300'),
-    ('20261009155210');
+    ('20261009155210'),
+    ('20261009190000');

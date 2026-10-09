@@ -1,6 +1,7 @@
 import type { INestApplicationContext } from '@nestjs/common';
 import { AuthService } from '@thallesp/nestjs-better-auth';
 import type { AppAuth, OrgContext } from '../../src/app/common/auth';
+import { castToBetterAuthRoles } from '../../src/app/common/auth/better-auth-roles';
 import { ENV_TOKEN, type Env } from '../../src/app/common/config/env';
 import { KYSELY_TOKEN, type Database } from '../../src/app/common/db/tokens';
 import { CampusService } from '../../src/app/modules/campus/campus.service';
@@ -84,8 +85,7 @@ async function addMembers(
       body: {
         userId,
         organizationId: lookup(organizationIds, school, 'school'),
-        // Starter role slugs live in organizationRole, so the typed list lacks them.
-        role: roles as ('owner' | 'member')[],
+        role: castToBetterAuthRoles(roles),
       },
     });
     const owner = owners.get(school);
