@@ -52,7 +52,8 @@ sequenceDiagram
   participant SPA
   participant BA as Better Auth (/api/auth/*)
   participant G as OrganizationAuthGuard
-  participant S as Service (Kysely)
+  participant S as Service
+  participant R as Repository (Kysely)
   participant DB as Postgres
 
   SPA->>BA: sign-in/email (createAuthClient)
@@ -63,11 +64,12 @@ sequenceDiagram
   G->>BA: AuthService.api getSession, getActiveMember, listUserTeams
   G->>G: 401 no session or banned, 403 no school or role lacks permission
   G->>S: handler gets OrgContext (school, role, campus scope)
-  S->>DB: WHERE organization_id = :school AND campus_id IN :scope
+  S->>R: school and campus scope from OrgContext
+  R->>DB: WHERE organization_id = :school AND campus_id IN :scope
   DB-->>SPA: rows (out-of-scope ids answer 404)
 ```
 
-`OrgContext` carries the active school, the member's role, the active campus, and the campus scope: `'all'` for owner/admin, otherwise the campuses the user belongs to. Services never read the session themselves.
+`OrgContext` carries the active school, the member's role, the active campus, and the campus scope: `'all'` for owner/admin, otherwise the campuses the user belongs to. Services never read the session themselves, and only repositories talk to the database, so the ORM can be replaced without touching services.
 
 ## Tenancy model
 
