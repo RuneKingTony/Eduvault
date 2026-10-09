@@ -48,3 +48,5 @@ export * from './components/custom/portal-nav';
 export * from './components/custom/portal-bottom-nav';
 export * from './components/custom/page-states';
 export * from './lib/storage';
+export * from './components/custom/error-message';
+export * from './components/custom/field-error';
