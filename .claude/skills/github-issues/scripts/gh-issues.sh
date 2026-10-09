@@ -233,9 +233,16 @@ case "$VERB" in
     need_num "${1:-}"; n="$1"
     [ "${EDU_ORCHESTRATED:-}" != "1" ] || die "close-issue is human-only: refused while EDU_ORCHESTRATED=1" 3
     if is_dry; then
-      jq -nc --argjson n "$n" '{dry_run:true,verb:"close-issue",issue:$n,hint:"human-only; pass --yes to close"}'
+      jq -nc --argjson n "$n" --argjson r "$(printf '%s\n' "${STATES[@]}" | jq -R . | jq -sc .)" \
+        '{dry_run:true,verb:"close-issue",issue:$n,remove_labels:$r,hint:"human-only; pass --yes to close"}'
     else
       gh issue close "$n" >/dev/null || die "gh close failed"
+      # A closed issue is done, so none of the in-flight status labels may stay on it.
+      args=(issue edit "$n")
+      while IFS= read -r l; do
+        printf '%s\n' "${STATES[@]}" | grep -qx -- "$l" && args+=(--remove-label "$l")
+      done < <(gh issue view "$n" --json labels --jq '.labels[].name')
+      [ "${#args[@]}" -eq 3 ] || gh "${args[@]}" >/dev/null || die "gh label cleanup failed"
       jq -nc --argjson n "$n" '{ok:true,verb:"close-issue",issue:$n}'
     fi
     ;;

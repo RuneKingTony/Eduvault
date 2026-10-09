@@ -11,7 +11,7 @@ Needs a GitHub remote named `origin`. If `git remote get-url origin` fails, stop
 
 ## 1. Branch and issue
 
-`git branch --show-current`. Extract the issue number from `edu-<n>-<slug>`; the PR references `#<n>`. On `main`, stop.
+`git branch --show-current`. Extract the issue number from `edu-<n>-<slug>`; the PR must link `#<n>`. On `main`, stop. If the branch has no issue number, stop and ask for one (or to create the issue); never open an unlinked PR.
 
 ## 2. Local checks (mirror `.github/workflows/validate-pr.yml`)
 
@@ -34,9 +34,9 @@ Resolve conflicts, then `git rebase --continue`. Never push to `main`.
 
 ## 4. Title and body
 
-- Title: `EDU-<n>: <concise subject>`, at most 65 characters. Without an issue number, the subject alone.
+- Title: `EDU-<n>: <concise subject>`, at most 65 characters.
 - Body: fill `.github/PULL_REQUEST_TEMPLATE.md`. Derive it from `git log origin/main..HEAD` and `git diff --stat origin/main...HEAD`. Say why, not just what, and list what was not verified.
-- Reference the issue with `Refs #<n>`. Use `Closes` only when the human asked for it.
+- Link the issue in the body with `Refs #<n>`, always. Use `Closes #<n>` instead only when the human asked for it.
 
 ## 5. Open
 
@@ -47,4 +47,4 @@ EOF
 )"
 ```
 
-Always `--draft`, no reviewers. The human marks it ready. Print the PR URL. Do not wait on CI unless asked; if asked, use `gh pr checks <url> --watch`.
+Always `--draft`, no reviewers. The human marks it ready. Then confirm the link: `gh pr view <url> --json body --jq .body | grep -E '(Refs|Closes) #<n>'` must match, otherwise `gh pr edit` the body until it does. Print the PR URL. Do not wait on CI unless asked; if asked, use `gh pr checks <url> --watch`.

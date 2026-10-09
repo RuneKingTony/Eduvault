@@ -52,6 +52,9 @@ done
 out="$("$S" transition 2 bogus)"; rc=$?
 [ $rc -ne 0 ] && ok "transition rejects unknown state" || bad "transition rejects unknown state"
 
+out="$("$S" close-issue 2)"
+check "close dry-run lists the status labels it clears" '.remove_labels==["in-progress","in-review","hold-merge"]' "$out"
+
 out="$(EDU_ORCHESTRATED=1 "$S" close-issue 2 --yes)"; rc=$?
 [ $rc -ne 0 ] && check "close refused when orchestrated" '.error|test("human-only")' "$out" || bad "close must refuse when orchestrated"
 out="$(EDU_ORCHESTRATED=1 "$S" close-issue 2)"; rc=$?
