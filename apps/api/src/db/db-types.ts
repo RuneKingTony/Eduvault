@@ -30,6 +30,19 @@ export interface Account {
   userId: string;
 }
 
+export interface AuditLog {
+  action: string | null;
+  actor_user_id: string;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  kind: string;
+  method: string | null;
+  organization_id: string | null;
+  path: string;
+  reason: string | null;
+  status: number;
+}
+
 export interface Campus {
   address: string | null;
   created_at: Generated<Timestamp>;
@@ -110,6 +123,8 @@ export interface SchoolAccount {
   id: Generated<string>;
   name: string;
   organization_id: string;
+  suspended_at: Timestamp | null;
+  suspended_by: string | null;
   updated_at: Generated<Timestamp>;
 }
 
@@ -180,6 +195,7 @@ export interface Verification {
 
 export interface DB {
   account: Account;
+  audit_log: AuditLog;
   campus: Campus;
   class_level: ClassLevel;
   fee_schedule: FeeSchedule;
