@@ -16,6 +16,7 @@ replaced_pane}` (dispatch marks the stage `running`; never do it yourself first)
    25 step 1; 30 halt, leave it `running`.
 3. `bash $W/verify.sh <KEY> <stage>`: see "Handoffs" in SKILL.md.
 
-One worker process on the worktree at a time. `simplify` beside the read-only `security` subagent is the
-only overlap: security may see simplify's edits half-done, its findings still stand, and `review` runs
-after simplify on the final tree.
+One worker process on the worktree at a time. `review` beside the read-only `security` subagent is the only
+overlap, and both read the tree simplify has already left, so neither sees half-done edits. To rerun a stage
+with extra instructions: `bash $W/worker.sh dispatch <KEY> <stage> --note "<text>"` (kept until the stage
+passes). A stage that had passed and runs again marks its dependents `stale`.

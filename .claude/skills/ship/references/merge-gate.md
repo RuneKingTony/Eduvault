@@ -13,5 +13,6 @@ moves; relay the latest when asked):
 | 23   | halt: held, `hold-merge` is on the issue or the PR. Recorded `held`, so a resume reruns the gate. The PR stays open; nothing merges it to get past this                                                                                                                                                                                                                                            |
 | 30   | halt: timed out waiting for checks                                                                                                                                                                                                                                                                                                                                                                 |
 
-Never `gh pr merge`, never `--admin`, never `gh pr ready`. After exit 0 the final report says CI is green and
-the PR is ready for a human to mark ready and merge.
+Never `gh pr merge`, never `--admin`, never `gh pr ready` from here. After exit 0 the final report says CI is
+green and the PR is ready for a human to mark ready and merge, or to run `/ship <KEY> --finish`, which does
+both and closes the issue through `finish.sh` (`$R/stages.md`, finish).

@@ -48,6 +48,10 @@ setup; put apps/api/src/app/common/auth/guards/organization-auth.guard.ts 2; g a
 setup; put apps/api/src/app/modules/school-account/service.ts 2; check "money path (school-account)" 10
 setup; put apps/api/src/app/modules/student/student.service.ts 2; check "unrelated small source diff" 0
 setup; put apps/api/src/app/common/campus-scope.ts 2; check "campus scope" 10
+setup; put apps/web-admin/src/pages/fees-page.tsx 40; check "web fees page is not money code" 0
+setup; put libs/ui/src/components/payment-badge.tsx 5; check "ui payment component is not money code" 0
+setup; put apps/api/src/app/modules/fee/fee.service.ts 2; check "api fee module" 10
+setup; put apps/api/src/app/modules/payment/payment.controller.ts 2; check "api payment module" 10
 setup; put apps/api/src/feature.ts 601; g add -A; g commit -qm c; git -C "$TMP/repo" branch -f main HEAD; check "local main moved to HEAD is ignored" 10
 setup; put apps/api/src/feature.ts 601; SECURITY_GATE_BASE=origin/main check "env base" 10
 setup; check "no diff" 0

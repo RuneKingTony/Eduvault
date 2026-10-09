@@ -10,13 +10,15 @@ NEED="${1:-browser}"
 
 up() { curl -fsS -m 3 -o /dev/null "$1" 2>/dev/null; }
 MISSING=()
-up "$API/health" || MISSING+=("api $API/health")
+if ! up "$API/health"; then MISSING+=("api $API/health")
+elif ! is_eduvault_api "$API"; then MISSING+=("api $API answers /health but is not Eduvault's API (/me is not the session guard's 401): another project may own that port")
+fi
 if [ "$NEED" = "browser" ]; then
   up "$ADMIN" || MISSING+=("web-admin $ADMIN")
   up "$PORTAL" || MISSING+=("web-portal $PORTAL")
 fi
 
-echo "e2e: env=local api=$API admin=$ADMIN portal=$PORTAL need=$NEED" >&2
+echo "e2e: env=local api=$API admin=$ADMIN portal=$PORTAL stack=${E2E_STACK:-shared} need=$NEED" >&2
 if [ ${#MISSING[@]} -gt 0 ]; then
   echo "BLOCKED (environment): not answering: ${MISSING[*]}. Start the stack with .claude/skills/run-local/SKILL.md" >&2
   exit 3

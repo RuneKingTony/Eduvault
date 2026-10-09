@@ -15,14 +15,15 @@ of every stage come from `scripts/effort.sh`.
 
 ```
 fetch -> branch (haiku) + propose (opus/high)
-      -> implement -> security-gate -> simplify, with security (gated) beside it
-      -> review -> fix-blockers (only on blockers)
-      -> e2e (opt-in) -> push -> pr (draft)
+      -> implement -> security-gate -> simplify
+      -> review, with security (gated) beside it -> fix-blockers (blockers, majors or unmet criteria)
+      -> e2e (required) -> push -> pr (draft)
       -> merge-gate (waits for CI) -> HUMAN merges -> cleanup
 ```
 
 Merge and closing the issue stay human. The merge gate only waits for CI through `gh pr checks`; it
-never merges and never uses `--admin`. Workers run with `EDU_ORCHESTRATED=1`, so `gh-issues.sh
+never merges and never uses `--admin`. `/ship <KEY> --finish` is the person's request to mark the green PR
+ready, merge it and close the issue, through `scripts/finish.sh` only. Workers run with `EDU_ORCHESTRATED=1`, so `gh-issues.sh
 close-issue` refuses.
 
 ## Stages

@@ -1,6 +1,6 @@
 Commit and push {{BRANCH}}. Do not open the PR (the next stage does). CI is the orchestrator's: never watch it.
 1. Commit any uncommitted work with the /commit-conventional command (stage first). Never --no-verify: fix what a failing hook reports, then commit again. Nothing to commit is fine.
-2. Checks: {{TESTED}} pnpm format:check and pnpm validate:quick; if apps/api, libs/policy, libs/api-contract or a migration changed, nx run api:test-integration is Docker-bound: list it in unrun_specs if you can't run it.
+2. Checks: {{TESTED}} pnpm format:check and pnpm validate:quick; if apps/api, libs/policy, libs/api-contract or a migration changed, run nx run api:test-integration (and pnpm drift when the schema or Better Auth options changed): Docker is reachable here, so list one in unrun_specs only when you tried it and it could not start.
 3. git fetch -q origin main; if the branch is behind, git rebase origin/main and resolve conflicts; then git push --force-with-lease -u origin HEAD. Never push to main.
 Write {{D}}/push.json last: {"result": "pass|fail", "head": "<git rev-parse HEAD>", "failure_reason": "<if fail>", "unrun_specs": [<only if any>]}. Your turn is not over until push.json exists.
 

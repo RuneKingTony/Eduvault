@@ -7,31 +7,32 @@ of every stage come from `scripts/effort.sh`.
 
 ```
 fetch -> branch (haiku) + propose (opus/high)
-      -> implement -> security-gate -> simplify, with security (gated) beside it
-      -> review -> fix-blockers (only on blockers)
-      -> e2e (opt-in) -> push -> pr (draft)
+      -> implement -> security-gate -> simplify
+      -> review, with security (gated) beside it -> fix-blockers (blockers, majors or unmet criteria)
+      -> e2e (required) -> push -> pr (draft)
       -> merge-gate (waits for CI) -> HUMAN merges -> cleanup
 ```
 
 Merge and closing the issue stay human. The merge gate only waits for CI through `gh pr checks`; it
-never merges and never uses `--admin`. Workers run with `EDU_ORCHESTRATED=1`, so `gh-issues.sh
+never merges and never uses `--admin`. `/ship <KEY> --finish` is the person's request to mark the green PR
+ready, merge it and close the issue, through `scripts/finish.sh` only. Workers run with `EDU_ORCHESTRATED=1`, so `gh-issues.sh
 close-issue` refuses.
 
 ## Stages
 
-| stage        | model  | effort | runs in                                  | gated | why                                                                           |
-| ------------ | ------ | ------ | ---------------------------------------- | ----- | ----------------------------------------------------------------------------- |
-| propose      | opus   | high   | session, or subagent under --auto-decide | no    | design and task plan; the decisions everything else rests on                  |
-| branch       | haiku  | low    | background subagent                      | no    | mechanical worktree creation through /start-branch                            |
-| implement    | sonnet | high   | worker pane                              | no    | the code change itself                                                        |
-| simplify     | sonnet | medium | worker pane                              | no    | cleanup that must not change behaviour                                        |
-| security     | opus   | medium | background subagent                      | yes   | read-only review, only when security-gate.sh triggers                         |
-| review       | sonnet | high   | worker pane                              | no    | the last quality check before a human looks                                   |
-| fix-blockers | sonnet | high   | worker pane                              | no    | blocker fixes feed straight into the PR                                       |
-| e2e          | sonnet | medium | subagent                                 | no    | opt-in browser or API check on the local stack                                |
-| push         | sonnet | low    | worker pane                              | no    | commit, local checks, git push                                                |
-| pr           | haiku  | low    | worker pane                              | no    | open the draft PR from the finished branch                                    |
-| merge-sync   | sonnet | low    | worker pane                              | no    | conflict resolution onto origin/main, only when merge-gate reports a conflict |
+| stage        | model  | effort | runs in                                  | gated | why                                                                               |
+| ------------ | ------ | ------ | ---------------------------------------- | ----- | --------------------------------------------------------------------------------- |
+| propose      | opus   | high   | session, or subagent under --auto-decide | no    | design and task plan; the decisions everything else rests on                      |
+| branch       | haiku  | low    | background subagent                      | no    | mechanical worktree creation through /start-branch                                |
+| implement    | sonnet | high   | worker pane                              | no    | the code change itself                                                            |
+| simplify     | sonnet | medium | worker pane                              | no    | cleanup that must not change behaviour                                            |
+| security     | opus   | medium | background subagent                      | yes   | read-only review of the tree simplify leaves, only when security-gate.sh triggers |
+| review       | sonnet | high   | worker pane                              | no    | the last quality check before a human looks                                       |
+| fix-blockers | sonnet | high   | worker pane                              | no    | blocker fixes feed straight into the PR                                           |
+| e2e          | sonnet | medium | subagent                                 | no    | required browser check (with API calls) on the local stack                        |
+| push         | sonnet | low    | worker pane                              | no    | commit, local checks, git push                                                    |
+| pr           | haiku  | low    | worker pane                              | no    | open the draft PR from the finished branch                                        |
+| merge-sync   | sonnet | low    | worker pane                              | no    | conflict resolution onto origin/main, only when merge-gate reports a conflict     |
 
 ## Before the first run (Phase 0)
 

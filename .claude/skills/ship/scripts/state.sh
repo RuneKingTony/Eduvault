@@ -3,14 +3,29 @@
 # and worktree adoption. Every subcommand prints at most one JSON line.
 #
 # usage:
-#   state.sh next <KEY>      reconcile the PR and print {next, result, incomplete, halt, pr_state, awaiting_merge,
+#   state.sh next <KEY>      reconcile the PR and print {next, run, result, incomplete, stale, halt, pr_state, awaiting_merge,
 #                            issue_pending, parent_spike, ticket_refetched, deps_unmet, descopes_accepted};
+#                            `run` = the stages to start now: branch also carries propose only while propose
+#                            isn't done, and review carries security while the fired gate's security isn't;
 #                            before the plan (next = branch|propose) it refetches a ticket.json older than
 #                            SHIP_TICKET_MAX_AGE s (default 300) and re-checks `deps`
-#   state.sh stage <KEY> <stage> running|pass|skipped [extra-json]
+#   state.sh stage <KEY> <stage> running|pass|skipped|fail [extra-json]
 #                            running: records started_at/started_epoch/run_id, attempts+1 (exit 11 if > 3);
-#                            already running under this run's live lock = same attempt, no bump
-#                            pass/skipped: records result + at, keeping started_* and attempts
+#                            already running under this run's live lock = same attempt, no bump; a stage that
+#                            had finished (pass|fail) marks its dependents `stale` first (stale-after)
+#                            pass/skipped/fail: records result + at, keeping started_* and attempts; pass also
+#                            drops this stage's `note`
+#   state.sh stale-after <KEY> <stage>   mark every finished dependent of <stage> `stale` (attempts reset to 0):
+#                            implement -> security-gate simplify review security fix-blockers e2e;
+#                            simplify -> review security fix-blockers e2e; review|security -> fix-blockers;
+#                            fix-blockers -> review e2e. A `skipped` security or e2e only resets when the
+#                            upstream is implement. Prints {stale: [...]}
+#   state.sh halt <KEY> <stage> "<reason>"   record the halt: the stage `fail` with its reason, and
+#                            status.json .halt = {stage, reason, at}; never leave a halted stage `running`
+#   state.sh note <KEY> <stage> "<text>"     extra instructions for the stage's next dispatch (prompt.sh
+#                            appends them; a pass removes them)
+#   state.sh ran <KEY> <spec>...             record that the orchestrator ran these specs on the tree in
+#                            tree.pass (verify.sh stops requiring them until the tree changes)
 #   state.sh set <KEY> <jq filter> [jq args]   atomic update
 #   state.sh get <KEY> <jq filter>             raw value, empty when unset
 #   state.sh guard <KEY>     open PRs for the key on a branch other than this run's: prints them, exit 1;
@@ -22,14 +37,18 @@
 #                            {deps: [{key, kind, status, merged_pr, satisfied}], unmet}; exit 1 any unmet, 2 no ticket.json
 #   state.sh dep-status <DEP>   satisfied = the issue is closed, or its PR merged -> {key, status, done, merged_pr}
 #   state.sh accept-descope <KEY> "<item>"   record a descope the engineer accepted
-#   state.sh descopes <KEY>  design.md's ## Descoped bullets -> {descoped: [{item, accepted}], unaccepted}; exit 1 when any isn't
+#   state.sh followup <KEY> "<item>"         open a follow-up issue for a real gap (gh-issues.sh create-issue) and
+#                            record the descope as accepted with its issue number; exit 1 when the issue wasn't created
+#   state.sh descopes <KEY>  design.md's ## Descoped bullets -> {descoped: [{item, accepted, via?}], unaccepted, gaps};
+#                            an item that restates the ticket's own exclusion text counts as accepted (via "ticket");
+#                            `gaps` = the unaccepted ones; exit 1 when any isn't accepted
 #   state.sh skip-e2e <KEY> "<reason>"   record e2e skipped; refused (exit 1) once e2e passed
 #   state.sh goal <KEY>      the goal_line /propose pins, read from the propose skill
 set -u
 . "$(dirname "$0")/lib.sh"
 
 CMD=${1:-} KEY=${2:-}
-[ -n "$KEY" ] || { sed -n '2,29p' "$0"; exit 2; }
+[ -n "$KEY" ] || { sed -n '2,46p' "$0"; exit 2; }
 D=$(key_dir "$KEY")
 
 goal_expected() {
@@ -52,6 +71,27 @@ dep_status() {  # <DEP> -> one JSON line; rc 0 when satisfied
   $done || [ -n "$pr" ]
 }
 
+dependents() {  # <stage> -> the stages that rest on its output
+  case "$1" in
+    implement) echo security-gate simplify review security fix-blockers e2e ;;
+    simplify) echo review security fix-blockers e2e ;;
+    review|security) echo fix-blockers ;;
+    fix-blockers) echo review e2e ;;
+  esac
+}
+stale_after() {  # <stage> -> {stale: [...]}; only stages that already have a result move
+  local s=$1 d r out=()
+  for d in $(dependents "$s"); do
+    r=$(st_get "$KEY" ".stages[\"$d\"].result")
+    [ -n "$r" ] && [ "$r" != stale ] || continue
+    [ "$r" = skipped ] && [ "$s" != implement ] && case "$d" in security|e2e) continue ;; esac
+    st_set "$KEY" ".stages[\"$d\"] = ((.stages[\"$d\"] // {}) + {result: \"stale\", stale_by: \$s, stale_at: \$t, attempts: 0})" \
+      --arg s "$s" --arg t "$(now_iso)"
+    out+=("$d")
+  done
+  jq -nc --argjson o "$(printf '%s\n' "${out[@]+"${out[@]}"}" | jq -R . | jq -sc 'map(select(. != ""))')" '{stale: $o}'
+}
+
 case "$CMD" in
 get) st_get "$KEY" "$3" ;;
 goal) goal_expected ;;
@@ -71,14 +111,35 @@ stage)
       echo "{\"attempts\": $n, \"same_run\": true}"; exit 0
     fi
     case "$S" in merge-gate|cleanup) ;; *) [ "$n" -gt 3 ] && { echo "$S failed to complete in 3 attempts"; exit 11; } ;; esac
+    case "$(st_get "$KEY" ".stages[\"$S\"].result")" in pass|fail) stale_after "$S" >/dev/null ;; esac
     st_set "$KEY" ".stages[\"$S\"] = ({result: \"running\", started_at: \$t, started_epoch: \$e, attempts: \$n}
-        + (if \$r == \"\" then {} else {run_id: \$r} end) + \$x)" \
-      --arg t "$(now_iso)" --argjson e "$(date +%s)" --argjson n "$n" --argjson x "$X" --arg r "$(lock_run "$KEY")"
+        + (if \$r == \"\" then {} else {run_id: \$r} end) + \$x)
+        | if (.halt.stage // \"\") == \$s then del(.halt) else . end" \
+      --arg t "$(now_iso)" --argjson e "$(date +%s)" --argjson n "$n" --argjson x "$X" --arg r "$(lock_run "$KEY")" --arg s "$S"
     echo "{\"attempts\": $n}"
   else
-    st_set "$KEY" ".stages[\"$S\"] = ((.stages[\"$S\"] // {}) + {result: \$r, at: \$t} + \$x)" \
-      --arg r "$R" --arg t "$(now_iso)" --argjson x "$X"
+    st_set "$KEY" ".stages[\"$S\"] = ((.stages[\"$S\"] // {}) + {result: \$r, at: \$t} + \$x)
+        | if \$r == \"pass\" and (.halt.stage // \"\") == \$s then del(.halt) else . end" \
+      --arg r "$R" --arg t "$(now_iso)" --argjson x "$X" --arg s "$S"
+    if [ "$R" = pass ]; then rm -f "$D/note.$S.txt"; fi
   fi ;;
+stale-after) [ -n "${3:-}" ] || { sed -n '2,46p' "$0"; exit 2; }; stale_after "$3" ;;
+halt)
+  S=${3:-} WHY=${4:-}; [ -n "$S" ] && [ -n "$WHY" ] || { echo 'usage: state.sh halt <KEY> <stage> "<reason>"'; exit 2; }
+  st_set "$KEY" ".stages[\"$S\"] = ((.stages[\"$S\"] // {}) + {result: \"fail\", at: \$t, reason: \$r})
+      | .halt = {stage: \$s, reason: \$r, at: \$t}" --arg s "$S" --arg r "$WHY" --arg t "$(now_iso)"
+  jq -nc --arg s "$S" --arg r "$WHY" '{halted: $s, reason: $r}' ;;
+note)
+  S=${3:-} T=${4:-}; [ -n "$S" ] && [ -n "$T" ] || { echo 'usage: state.sh note <KEY> <stage> "<text>"'; exit 2; }
+  mkdir -p "$D"; printf '%s\n' "$T" > "$D/note.$S.txt"; echo "{\"note\": \"$S\"}" ;;
+ran)
+  shift 2; [ $# -gt 0 ] || { echo 'usage: state.sh ran <KEY> <spec>...'; exit 2; }
+  read -r _ TREE _ < "$D/tree.pass" 2>/dev/null
+  [ -n "${TREE:-}" ] || { echo "no tree.pass for $KEY: nothing to tie the run to"; exit 1; }
+  OLD=$(cat "$D/ran.json" 2>/dev/null); jq -e 'type == "object"' >/dev/null 2>&1 <<<"$OLD" || OLD='{}'
+  printf '%s\n' "$@" | jq -R . | jq -sc --argjson o "$OLD" --arg t "$TREE" 'reduce .[] as $s ($o; .[$s] = $t)' > "$D/ran.json.tmp.$$" &&
+    mv "$D/ran.json.tmp.$$" "$D/ran.json"
+  jq -c . "$D/ran.json" ;;
 
 guard)
   own=$(st_get "$KEY" '.branch')
@@ -131,6 +192,13 @@ next)
   AWAIT=false
   [ "$NEXT" = cleanup ] && [ "$PRS" != MERGED ] && AWAIT=true
 
+  finished() { case "$(st_get "$KEY" ".stages[\"$1\"].result")" in pass|skipped) return 0 ;; *) return 1 ;; esac; }
+  RUN=("$NEXT")
+  [ "$NEXT" = branch ] && ! finished propose && RUN+=(propose)
+  [ "$NEXT" = review ] && ! finished security && [ "$(st_get "$KEY" '.stages["security-gate"].fires')" = true ] && RUN+=(security)
+  STALE=()
+  for s in "${STAGES[@]}"; do [ "$(st_get "$KEY" ".stages[\"$s\"].result")" = stale ] && STALE+=("$s"); done
+
   REF=null UNMET='[]'
   if [[ "$KEY" =~ ^EDU-[0-9]+$ ]] && { [ "$NEXT" = branch ] || [ "$NEXT" = propose ]; } && [ -f "$D/ticket.json" ]; then
     fa=$(jq -r '(.fetched_at // "") as $f | if $f == "" then 0 else ($f | fromdateiso8601? // 0) end' "$D/ticket.json" 2>/dev/null)
@@ -144,10 +212,12 @@ next)
   [ "$(st_get "$KEY" '.stages.fetch.result')" = pass ] && [ -z "$(st_get "$KEY" '.issue.in_progress')" ] && J+=(assign+in_progress)
   [ "$(st_get "$KEY" '.stages.pr.result')" = pass ] && [ -z "$(st_get "$KEY" '.issue.in_review')" ] && J+=(in_review)
   jq -nc --arg n "$NEXT" --arg r "$RES" --arg h "$HALT" --arg p "$PRS" --argjson aw "$AWAIT" --argjson ps "$(parent_spike "$KEY")" \
+    --argjson run "$(printf '%s\n' "${RUN[@]}" | jq -R . | jq -sc 'map(select(. != ""))')" \
+    --argjson st "$(printf '%s\n' "${STALE[@]+"${STALE[@]}"}" | jq -R . | jq -sc 'map(select(. != ""))')" \
     --argjson i "$(printf '%s\n' "${INC[@]+"${INC[@]}"}" | jq -R . | jq -sc 'map(select(. != ""))')" \
     --argjson j "$(printf '%s\n' "${J[@]+"${J[@]}"}" | jq -R . | jq -sc 'map(select(. != ""))')" \
     --argjson rf "$REF" --argjson u "$UNMET" --argjson da "$(st_get "$KEY" '[.descopes_accepted[]?.item]' -c)" \
-    '{next: $n, result: ($r | select(. != "") // null), incomplete: $i, halt: ($h | select(. != "") // null),
+    '{next: $n, run: $run, result: ($r | select(. != "") // null), incomplete: $i, stale: $st, halt: ($h | select(. != "") // null),
       pr_state: ($p | select(. != "") // null), awaiting_merge: $aw, issue_pending: $j, parent_spike: $ps,
       ticket_refetched: $rf, deps_unmet: $u, descopes_accepted: $da}' ;;
 dep-status) shift; dep_status "$@" ;;
@@ -167,10 +237,23 @@ accept-descope)
   st_set "$KEY" '.descopes_accepted = ((.descopes_accepted // []) + [{item: $i, at: $t}] | unique_by(.item))' --arg i "$I" --arg t "$(now_iso)"
   jq -c '{descopes_accepted: (.descopes_accepted | length)}' "$D/status.json" ;;
 descopes)
-  python3 - "$D/design.md" "$(st_get "$KEY" '[.descopes_accepted[]?.item]' -c)" <<'PY'
+  python3 - "$D/design.md" "$(st_get "$KEY" '[.descopes_accepted[]?.item]' -c)" "$D/ticket.json" <<'PY'
 import json, re, sys
 path, acc = sys.argv[1], json.loads(sys.argv[2] or "[]")
 norm = lambda s: " ".join(re.sub(r"[^a-z0-9]+", " ", s.lower()).split())
+try: ticket = json.load(open(sys.argv[3]))
+except (OSError, ValueError): ticket = {}
+EXCL = re.compile(r"out of (this )?(slice|scope|issue)|deliberately out|not in (this|scope)|\bskipped\b|later slice|unblocking slice", re.I)
+texts = [ticket.get("description") or ""] + [t for t in ticket.get("acceptance_criteria") or [] if isinstance(t, str)]
+sents = [x for t in texts for x in re.split(r"(?<=[.!?])\s+|\n+", t)]
+excl = [norm(x) for x in sents + [c for x in sents for c in re.split(r"[,;]|\band\b", x)] if EXCL.search(x)]
+def stems(n): return {w[:5] for w in n.split() if len(w) >= 5}
+def restated(item):
+    ws = stems(norm(item))
+    for e in excl:
+        es = stems(e)
+        if len(es) >= 3 and len(es & ws) / len(es) >= 0.6: return True
+    return False
 def accepted(item):
     n = norm(item)
     for a in map(norm, acc):
@@ -187,12 +270,27 @@ for line in lines:
     m = on and re.match(r"^\s*[-*]\s+(.*\S)", line)
     if m and not re.fullmatch(r"\**none\.?\**", m.group(1).strip(), re.I):
         items.append(m.group(1)[:200])
-out = [{"item": i, "accepted": accepted(i)} for i in items]
-bad = sum(not o["accepted"] for o in out)
-print(json.dumps({"descoped": out, "unaccepted": bad}, ensure_ascii=False, separators=(",", ":")))
+out = []
+for i in items:
+    if accepted(i): out.append({"item": i, "accepted": True})
+    elif restated(i): out.append({"item": i, "accepted": True, "via": "ticket"})
+    else: out.append({"item": i, "accepted": False})
+gaps = [o["item"] for o in out if not o["accepted"]]
+bad = len(gaps)
+print(json.dumps({"descoped": out, "unaccepted": bad, "gaps": gaps}, ensure_ascii=False, separators=(",", ":")))
 sys.exit(1 if bad else 0)
 PY
   ;;
+followup)
+  I=${3:-}; [ -n "$I" ] || { echo 'usage: state.sh followup <KEY> "<item>"'; exit 2; }
+  BF=$(mktemp); trap 'rm -f "$BF"' EXIT
+  printf 'Descoped from %s (#%s) because it falls outside that issue:\n\n%s\n\nScope it before work starts. Opened by /ship so the gap is not lost.\n' "$KEY" "$(issue_num "$KEY")" "$I" > "$BF"
+  OUT=$(bash "$GHI" create-issue --title "Follow-up from $KEY: ${I:0:80}" --body-file "$BF" --yes 2>&1) &&
+    jq -e '.ok or .dry_run' >/dev/null 2>&1 <<<"$OUT" || { echo "follow-up issue not created: $(tail -c 300 <<<"$OUT" | tr '\n' ' ')"; exit 1; }
+  F=$(jq -r 'if .dry_run then "dry-run" else (.issue | tostring) end' <<<"$OUT")
+  st_set "$KEY" '.descopes_accepted = ((.descopes_accepted // []) + [{item: $i, at: $t, followup: $f}] | unique_by(.item))' \
+    --arg i "$I" --arg t "$(now_iso)" --arg f "$F"
+  jq -nc --arg f "$F" '{followup: $f}' ;;
 skip-e2e)
   R=${3:-}; [ -n "$R" ] || { echo 'usage: state.sh skip-e2e <KEY> "<reason>"'; exit 2; }
   [ "$(st_get "$KEY" '.stages.e2e.result')" = pass ] && { echo "e2e already passed for $KEY: nothing to skip"; exit 1; }
@@ -207,5 +305,5 @@ fetch-ticket)
     mv "$D/ticket.json.tmp.$$" "$D/ticket.json" || { rm -f "$D/ticket.json.tmp.$$"; echo "ticket.json build failed"; exit 1; }
   bash "$0" stage "$KEY" fetch pass
   jq -c '{key, summary, ac: (.acceptance_criteria | length), links: (.links | length), soft_deps, labels}' "$D/ticket.json" ;;
-*) sed -n '2,29p' "$0"; exit 2 ;;
+*) sed -n '2,46p' "$0"; exit 2 ;;
 esac
