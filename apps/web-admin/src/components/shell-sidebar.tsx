@@ -26,6 +26,7 @@ interface ShellSidebarProps {
   rail: boolean;
   onNavigate: () => void;
   onOpenCommandMenu: () => void;
+  onOpenMyAccess: () => void;
 }
 
 function SidebarHead() {
@@ -53,7 +54,13 @@ function SidebarHead() {
   );
 }
 
-function SidebarFoot({ onOpenCommandMenu }: { onOpenCommandMenu: () => void }) {
+function SidebarFoot({
+  onOpenCommandMenu,
+  onOpenMyAccess,
+}: {
+  onOpenCommandMenu: () => void;
+  onOpenMyAccess: () => void;
+}) {
   const authClient = useAuthClient();
   const queryClient = useQueryClient();
   return (
@@ -63,7 +70,7 @@ function SidebarFoot({ onOpenCommandMenu }: { onOpenCommandMenu: () => void }) {
           <UserMenu
             authClient={authClient}
             side="top"
-            showMyAccess
+            onOpenMyAccess={onOpenMyAccess}
             onOpenCommandMenu={onOpenCommandMenu}
             onSignedOut={() => {
               queryClient.clear();
@@ -93,6 +100,7 @@ export function ShellSidebar({
   rail,
   onNavigate,
   onOpenCommandMenu,
+  onOpenMyAccess,
 }: ShellSidebarProps) {
   return (
     <>
@@ -105,7 +113,10 @@ export function ShellSidebar({
           onNavigate={onNavigate}
         />
       </SidebarContent>
-      <SidebarFoot onOpenCommandMenu={onOpenCommandMenu} />
+      <SidebarFoot
+        onOpenCommandMenu={onOpenCommandMenu}
+        onOpenMyAccess={onOpenMyAccess}
+      />
     </>
   );
 }

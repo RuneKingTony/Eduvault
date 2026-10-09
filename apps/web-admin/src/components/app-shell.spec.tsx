@@ -18,7 +18,11 @@ import {
   AuthClientProvider,
   type EduvaultAuthClient,
 } from '@eduvault/auth-client';
+import type { MePermissions } from '@eduvault/api-contract';
 import { stubMatchMedia } from '@eduvault/ui/testing';
+import { requireGate } from '../access';
+import { DashboardPage } from '../pages/dashboard-page';
+import { fakeAccess, ownerAccess, starterAccess } from '../test-utils';
 import { ErrorMessage } from './error-message';
 import { AppShell } from './app-shell';
 import { NotFoundPage } from './page-fallbacks';
@@ -54,13 +58,37 @@ function Broken(): never {
   throw new Error('Page exploded');
 }
 
-async function renderAt(path: string, queryClient = new QueryClient()) {
-  const root = createRootRoute({ component: AppShell });
+interface RenderOptions {
+  queryClient?: QueryClient;
+  access?: MePermissions;
+  realDashboard?: boolean;
+}
+
+async function renderAt(
+  path: string,
+  {
+    queryClient = new QueryClient(),
+    access = ownerAccess(),
+    realDashboard = false,
+  }: RenderOptions = {}
+) {
+  const root = createRootRoute({
+    component: AppShell,
+    beforeLoad: () => ({ access }),
+  });
   const child = (to: string, component: () => React.ReactNode) =>
-    createRoute({ getParentRoute: () => root, path: to, component });
+    createRoute({
+      getParentRoute: () => root,
+      path: to,
+      component,
+      beforeLoad: () => {
+        requireGate(access, to);
+      },
+    });
   const router = createRouter({
     routeTree: root.addChildren([
-      child('/', page('Dashboard page')),
+      child('/', realDashboard ? DashboardPage : page('Dashboard page')),
+      child('/approvals', page('Approvals page')),
       child('/students', page('Students page')),
       child('/fees', page('Fees page')),
       child('/campuses', page('Campuses page')),
@@ -112,7 +140,7 @@ describe('AppShell', () => {
       'aria-current'
     );
     expect(
-      nav.queryByRole('link', { name: 'Approvals' })
+      nav.queryByRole('link', { name: 'Announcements' })
     ).not.toBeInTheDocument();
     const links = nav.getAllByRole('link').map((link) => link.textContent);
     expect(links.at(-1)).toBe('Settings');
@@ -230,7 +258,7 @@ describe('AppShell', () => {
   it('drops the previous school data from the cache when the school is switched', async () => {
     const queryClient = new QueryClient();
     queryClient.setQueryData(['students'], [{ fullName: 'Ada Obi' }]);
-    await renderAt('/students', queryClient);
+    await renderAt('/students', { queryClient });
     fireEvent.keyDown(
       within(sidebarNav()).getByRole('button', { name: /Greenfield College/ }),
       { key: 'Enter' }
@@ -255,6 +283,111 @@ describe('AppShell', () => {
     );
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Sign out' }));
     expect(signOut).toHaveBeenCalledOnce();
+  });
+});
+
+const linkNames = () =>
+  within(sidebarNav())
+    .getAllByRole('link')
+    .map((link) => link.textContent);
+
+describe('AppShell access', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    stubMatchMedia({ '(max-width: 820px)': false });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('shows an owner Students, Fees and a Settings entry that opens Campuses', async () => {
+    await renderAt('/');
+    expect(linkNames()).toEqual([
+      'Dashboard',
+      'Approvals',
+      'Students',
+      'Fees',
+      'Settings',
+    ]);
+    expect(
+      within(sidebarNav()).getByRole('link', { name: 'Settings' })
+    ).toHaveAttribute('href', '/campuses');
+  });
+
+  it('shows a bursar Students but no Fees or Settings', async () => {
+    await renderAt('/', { access: starterAccess('bursar') });
+    expect(linkNames()).toEqual(['Dashboard', 'Approvals', 'Students']);
+  });
+
+  it('shows a member with no roles only Dashboard and Approvals', async () => {
+    await renderAt('/', { access: fakeAccess() });
+    expect(linkNames()).toEqual(['Dashboard', 'Approvals']);
+    expect(
+      within(sidebarNav()).queryByRole('link', { name: 'Settings' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('sends a teacher who types /fees to the Dashboard with no message', async () => {
+    await renderAt('/fees', { access: starterAccess('teacher') });
+    expect(await screen.findByText('Dashboard page')).toBeInTheDocument();
+    expect(screen.queryByText('Fees page')).not.toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(linkNames()).toEqual(['Dashboard', 'Approvals', 'Students']);
+  });
+
+  it('keeps the command menu to what the member can open', async () => {
+    await renderAt('/', { access: starterAccess('bursar') });
+    fireEvent.keyDown(globalThis as unknown as Window, {
+      key: 'k',
+      ctrlKey: true,
+    });
+    const input = await screen.findByPlaceholderText(
+      'Search pages and actions…'
+    );
+    fireEvent.change(input, { target: { value: 'fees' } });
+    expect(
+      screen.queryByRole('option', { name: /Fees/ })
+    ).not.toBeInTheDocument();
+    fireEvent.change(input, { target: { value: 'students' } });
+    expect(
+      screen.getByRole('option', { name: /Students/ })
+    ).toBeInTheDocument();
+  });
+
+  it('shows the no-roles Dashboard and opens My access from it', async () => {
+    await renderAt('/', { access: fakeAccess(), realDashboard: true });
+    expect(
+      await screen.findByRole('heading', { name: 'Welcome, Funmi' })
+    ).toBeInTheDocument();
+    expect(screen.getByText('No access yet')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'See my access' }));
+    expect(
+      await screen.findByText('Nothing yet. Ask the owner to give you a role.')
+    ).toBeInTheDocument();
+  });
+
+  it('opens My access from the user menu', async () => {
+    await renderAt('/', { access: starterAccess('administrator') });
+    fireEvent.keyDown(
+      within(sidebarNav()).getByRole('button', { name: /Funmi Adeyemi/ }),
+      { key: 'Enter' }
+    );
+    expect(screen.queryByText('Member, no roles')).not.toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'My access' }));
+    expect(
+      await screen.findByText('What you can do in Greenfield College, and why.')
+    ).toBeInTheDocument();
+    expect(screen.getByText('Every campus')).toBeInTheDocument();
+  });
+
+  it('reads the user menu role label from the permissions', async () => {
+    await renderAt('/', { access: fakeAccess() });
+    expect(
+      within(sidebarNav()).getByRole('button', {
+        name: /Funmi Adeyemi.*Member, no roles/,
+      })
+    ).toBeInTheDocument();
   });
 });
 

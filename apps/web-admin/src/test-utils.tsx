@@ -1,7 +1,13 @@
 import type { ReactElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render } from '@testing-library/react';
-import type { Student } from '@eduvault/api-contract';
+import type { MePermissions, Student } from '@eduvault/api-contract';
+import { PermissionsProvider } from '@eduvault/auth-client';
+import {
+  ALL_PERMISSIONS,
+  STARTER_ROLES,
+  toPermissionMap,
+} from '@eduvault/policy';
 import { ApiProvider, type Api } from './api';
 
 export const student = (overrides: Partial<Student> = {}): Student => ({
@@ -14,16 +20,48 @@ export const student = (overrides: Partial<Student> = {}): Student => ({
   ...overrides,
 });
 
+export const fakeAccess = (
+  overrides: Partial<MePermissions> = {}
+): MePermissions => ({
+  organizationId: 'org-1',
+  roles: ['member'],
+  permissions: {},
+  campusScope: [],
+  classScope: 'all',
+  acting: null,
+  ...overrides,
+});
+
+export const ownerAccess = (): MePermissions =>
+  fakeAccess({
+    roles: ['owner'],
+    permissions: toPermissionMap(ALL_PERMISSIONS),
+    campusScope: 'all',
+  });
+
+/** The access of a member holding one starter role. */
+export function starterAccess(slug: string): MePermissions {
+  const role = STARTER_ROLES.find((candidate) => candidate.slug === slug);
+  return fakeAccess({
+    roles: [slug],
+    permissions: toPermissionMap(role?.permissions ?? []),
+    campusScope: slug === 'administrator' ? 'all' : ['c1'],
+  });
+}
+
 export function renderWithApi(
   ui: ReactElement,
-  api: Partial<Record<keyof Api, unknown>>
+  api: Partial<Record<keyof Api, unknown>>,
+  access: MePermissions = ownerAccess()
 ) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
   return render(
     <QueryClientProvider client={queryClient}>
-      <ApiProvider api={api as unknown as Api}>{ui}</ApiProvider>
+      <ApiProvider api={api as unknown as Api}>
+        <PermissionsProvider value={access}>{ui}</PermissionsProvider>
+      </ApiProvider>
     </QueryClientProvider>
   );
 }
