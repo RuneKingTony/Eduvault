@@ -6,6 +6,7 @@ W=$ROOT/.claude/skills/ship/scripts            # ship's own scripts — reused, 
 GH=${SPIKE_GH_ISSUES:-$ROOT/.claude/skills/github-issues/scripts/gh-issues.sh}   # SPIKE_GH_ISSUES: tests only
 OPSX=${SPIKE_OPSX:-$ROOT/.claude/opsx}   # SPIKE_OPSX: tests only
 STALE=600                                       # same staleness as ship's lock.sh / slot.sh
+DEAD_FAST=180                                   # a heartbeat this old with no heartbeat process is a dead run, not a slow one
 
 # The epic's state dir. Its lock is `.spike-lock`, NOT `.lock`: ship's slot.sh counts every
 # $OPSX/*/.lock as a live /ship run, so a `.lock` here would eat one of the parallel slots.
@@ -69,6 +70,18 @@ pane_text() {
   printf '%s\n' "$t" | pane_clean
 }
 OPT_RE='^[[:space:]]*(❯[[:space:]]*)?[0-9]+\.[[:space:]]'
+# last_block < cleaned text → the last ⏺ block that is Claude talking, not a tool call or a background-task
+# notice ("That's just the heartbeat ending normally"); the last block of any kind when every one is chatter
+CHATTER_RE='heartbeat|task-notification|background (task|command)|exited with code|^⏺ *(ran|bash[(])'
+last_block() {
+  awk -v re="$CHATTER_RE" '
+    function close_block() { if (!f) return; last = b; if (tolower(first) !~ re) keep = b }
+    /^⏺/ { close_block(); b = ""; first = $0; f = 1 }
+    f { b = b $0 "\n" }
+    END { close_block(); printf "%s", (keep != "" ? keep : last) }'
+}
+# asks_question < cleaned text → 0 when Claude's last real message asks something
+asks_question() { last_block | grep -q '?'; }
 # question_of <dialog|text|halt> < cleaned text → one line: a dialog's question (the line above its first
 # option); else from the last thing Claude said (its last ⏺ block), the last line asking something (text) or
 # its first line
@@ -78,7 +91,7 @@ question_of() {
     q=$(head -n $(( first - 1 )) <<<"$t" | grep -v -E '^[[:space:]]*[☐☒✔]' | tail -1)
   fi
   if [ -z "$q" ]; then
-    b=$(awk '/^⏺/ { b = ""; f = 1 } f { b = b $0 "\n" } END { printf "%s", b }' <<<"$t")
+    b=$(last_block <<<"$t")
     [ "$1" = text ] && q=$(grep '?' <<<"$b" | tail -1)
     [ -z "$q" ] && q=$(head -1 <<<"$b")
   fi
@@ -90,7 +103,7 @@ question_of() {
 loop_live() {
   local f hb; f=$(epic_dir "$1")/.spike-lock; [ -f "$f" ] || return 1
   hb=$(jq -r '.heartbeat_epoch // 0' "$f" 2>/dev/null)
-  [ $(( $(date +%s) - ${hb:-0} )) -lt $STALE ]
+  [ $(( $(date +%s) - ${hb:-0} )) -lt $STALE ] && ! lock_dead "$f"
 }
 loop_line() {
   if loop_live "$1"; then echo "spike loop: live"
@@ -102,6 +115,18 @@ loop_line() {
 live_tab() {
   local t; t=$(es_get "$1" '.spike_tab'); [ -n "$t" ] || return 1
   herdr tab get "$t" 2>/dev/null | jq -e --arg p "spike · $1" '.result.tab.label | . == $p or startswith($p + " ")' >/dev/null && echo "$t"
+}
+# agent_gone <agent> → 0 only when Herdr answers that the agent doesn't exist
+agent_gone() { [ -n "${1:-}" ] && herdr agent get "$1" 2>&1 | grep -q '"agent_not_found"'; }
+# lock_dead <lock_file> [agent] → 0 when the run behind the lock is gone before STALE says so: the heartbeat is
+# over DEAD_FAST old and either no heartbeat process holds the lock (lock.sh status) or Herdr lost the agent
+lock_dead() {
+  local f=$1 hb age
+  [ -f "$f" ] || return 1
+  hb=$(jq -r '.heartbeat_epoch // 0' "$f" 2>/dev/null); age=$(( $(date +%s) - ${hb:-0} ))
+  [ "$age" -gt "$DEAD_FAST" ] || return 1
+  [ "$(bash "$W/lock.sh" status "$f" 2>/dev/null | jq -r '.heartbeats | length')" = 0 ] && return 0
+  agent_gone "${2:-}"
 }
 # pane_gone <pane> → 0 only when Herdr answers that the pane doesn't exist; Herdr itself being down is not "gone"
 pane_gone() { [ -n "${1:-}" ] && herdr pane get "$1" 2>&1 >/dev/null | grep -q '"pane_not_found"'; }

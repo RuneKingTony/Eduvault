@@ -13,10 +13,10 @@ propose|opus|high|session, or subagent under --auto-decide|no|design and task pl
 branch|haiku|low|background subagent|no|mechanical worktree creation through /start-branch
 implement|sonnet|high|worker pane|no|the code change itself
 simplify|sonnet|medium|worker pane|no|cleanup that must not change behaviour
-security|opus|medium|background subagent|yes|read-only review, only when security-gate.sh triggers
+security|opus|medium|background subagent|yes|read-only review of the tree simplify leaves, only when security-gate.sh triggers
 review|sonnet|high|worker pane|no|the last quality check before a human looks
 fix-blockers|sonnet|high|worker pane|no|blocker fixes feed straight into the PR
-e2e|sonnet|medium|subagent|no|opt-in browser or API check on the local stack
+e2e|sonnet|medium|subagent|no|required browser check (with API calls) on the local stack
 push|sonnet|low|worker pane|no|commit, local checks, git push
 pr|haiku|low|worker pane|no|open the draft PR from the finished branch
 merge-sync|sonnet|low|worker pane|no|conflict resolution onto origin/main, only when merge-gate reports a conflict

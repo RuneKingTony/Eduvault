@@ -5,7 +5,9 @@
 #   stack-worktree.sh up <worktree> [--api-port=N --admin-port=N --portal-port=N]
 #   stack-worktree.sh env <worktree>      # prints exports; eval "$(stack-worktree.sh env X)"
 #   stack-worktree.sh status [<worktree>]
-#   stack-worktree.sh down <worktree>     # stops only what `up` started and drops its database
+#   stack-worktree.sh down <worktree>     # stops what `up` started, sweeps any stack process of this worktree
+#                                         # that state.json lost, fails if one survives, drops its database
+# exit: 0 ok   2 failed (message says why)   3 no free port triple
 #
 # <worktree> is a name under .claude/worktrees/ or a path. Ports default to the first free triple
 # api 3700+n, admin 4700+2n, portal 4701+2n (n = 10, 11, ...), so :3000/:4200/:4201 and a launcher's
@@ -17,6 +19,9 @@
 # Browser note: session cookies are host-scoped, so two stacks on localhost share cookies inside ONE
 # browser. Concurrent runs are safe because each opens its own playwright-cli session (see close-sessions.sh).
 set -uo pipefail
+# vite configs load @nx/vite plugins; a dying nx daemon took the dev server down with it.
+export NX_DAEMON=false
+. "$(dirname "${BASH_SOURCE[0]}")/stack-sweep.sh"
 COMMON="$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --path-format=absolute --git-common-dir)"
 REPO_ROOT="$(cd "$COMMON/.." && pwd -P)"
 STACKS="$REPO_ROOT/var/e2e/stacks"
@@ -39,6 +44,9 @@ done
 port_free() { ! lsof -iTCP:"$1" -sTCP:LISTEN -t >/dev/null 2>&1; }
 alive() { [[ -n "${1:-}" ]] && kill -0 "$1" 2>/dev/null; }
 kill_tree() { local c; for c in $(pgrep -P "$1" 2>/dev/null); do kill_tree "$c"; done; kill "$1" 2>/dev/null; }
+port_owner() { lsof -nP -iTCP:"$1" -sTCP:LISTEN 2>/dev/null | awk 'NR==2 {print $1" pid "$2}'; }
+stack_pids() { ps -axo pid=,command= | sweep_match "$TREE"; }
+sweep() { local p; for p in $(stack_pids); do kill_tree "$p"; done; sleep 1; for p in $(stack_pids); do kill -9 "$p" 2>/dev/null; done; }
 sget() { jq -r --arg k "$2" '.[$k] // empty' "$1" 2>/dev/null; }
 psql_admin() { (cd "$REPO_ROOT" && docker compose exec -T postgres psql -U eduvault -d postgres -v ON_ERROR_STOP=1 -Atqc "$1"); }
 
@@ -82,12 +90,16 @@ down)
     sleep 1
     for k in portal_pid admin_pid api_pid; do p="$(sget "$STATE" "$k")"; alive "$p" && { kill -9 "$p" 2>/dev/null; echo "killed $k ($p)"; }; done
   fi
+  sweep
+  left="$(stack_pids | tr '\n' ' ')"
+  [[ -z "${left// }" ]] || die "$NAME: still running after down: pids $left"
   psql_admin "DROP DATABASE IF EXISTS \"$DB\" WITH (FORCE)" >/dev/null 2>&1 || echo "warning: could not drop $DB; down retries it"
   rm -f "$STATE"; echo "$NAME down (logs kept in $DIR)"; exit 0 ;;
 esac
 
 # ---- up
 if [[ -f "$STATE" ]] && alive "$(sget "$STATE" api_pid)"; then echo "$NAME already up — eval \"\$(bash $0 env $NAME)\""; exit 0; fi
+sweep
 [[ -d "$TREE/node_modules" ]] || die "$TREE has no node_modules — run pnpm install there first"
 psql_admin 'select 1' >/dev/null 2>&1 || die "Postgres is not reachable: run pnpm db:up in the main checkout"
 
@@ -96,9 +108,9 @@ if [[ -z "$API_PORT" ]]; then
     a=$((3700 + n)); d=$((4700 + 2 * n)); p=$((4701 + 2 * n))
     if port_free "$a" && port_free "$d" && port_free "$p"; then API_PORT=$a; ADMIN_PORT=$d; PORTAL_PORT=$p; break; fi
   done
-  [[ -n "$API_PORT" ]] || die "no free port triple found"
+  [[ -n "$API_PORT" ]] || { echo "stack-worktree.sh: no free port triple found" >&2; exit 3; }
 fi
-for p in "$API_PORT" "$ADMIN_PORT" "$PORTAL_PORT"; do port_free "$p" || die "port $p is taken"; done
+for p in "$API_PORT" "$ADMIN_PORT" "$PORTAL_PORT"; do port_free "$p" || die "port $p is taken by $(port_owner "$p")"; done
 
 psql_admin "DROP DATABASE IF EXISTS \"$DB\" WITH (FORCE)" >/dev/null && psql_admin "CREATE DATABASE \"$DB\"" >/dev/null || die "cannot create $DB"
 DB_URL="postgres://eduvault:eduvault@localhost:5434/$DB?sslmode=disable"
@@ -111,7 +123,7 @@ mkdir -p "$DIR"; : >"$DIR/api.log"; : >"$DIR/admin.log"; : >"$DIR/portal.log"
 ADMIN_URL="http://localhost:$ADMIN_PORT"; PORTAL_URL="http://localhost:$PORTAL_PORT"
 (cd "$TREE/apps/api" && exec env NODE_ENV=development PORT="$API_PORT" DATABASE_URL="$DB_URL" BETTER_AUTH_SECRET="$SECRET" \
    BETTER_AUTH_URL="http://localhost:$API_PORT" WEB_ADMIN_URL="$ADMIN_URL" WEB_PORTAL_URL="$PORTAL_URL" \
-   node --enable-source-maps dist/main.cjs) >"$DIR/api.log" 2>&1 &
+   node --enable-source-maps "$TREE/apps/api/dist/main.cjs") >"$DIR/api.log" 2>&1 &
 API_PID=$!
 for app in admin portal; do
   port=$ADMIN_PORT; [[ $app == portal ]] && port=$PORTAL_PORT

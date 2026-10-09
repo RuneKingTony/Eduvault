@@ -1,19 +1,22 @@
 Read and follow {{ROOT}}/.claude/skills/eduvault-e2e/SKILL.md to verify {{KEY}} on its local stack.
 
-- Before anything else, read {{D}}/e2e-gate.json (one JSON line; may be missing, then treat mode as browser).
-  mode "browser": verify in the browser (API calls allowed too). mode "api": the change has no web surface: verify through direct API calls as the personas, no browser; evidence is [] and report.md lists each call, its status and what it proves.
-- The stack is already up from {{WORKTREE}} on api :3000, web-admin :4200, web-portal :4201, against the shared eduvault Postgres on :5434. Never start or stop it, and never run db:reset or db:seed:reset against it.
+- Before anything else, read {{D}}/e2e-gate.json (one JSON line; may be missing). The run is always a browser run, with the curl checks too: a server-only change is checked through the screens that read it.
+- The stack is already up from {{WORKTREE}}: api {{API}}, web-admin {{ADMIN}}, web-portal {{PORTAL}}, on its own database eduvault_e2e_<worktree name> (migrations only, no seed data). Never start or stop it.
+  Before any step run eval "$(bash {{ROOT}}/.claude/skills/eduvault-e2e/scripts/stack-worktree.sh env {{WORKTREE}})" and then bash {{ROOT}}/.claude/skills/eduvault-e2e/scripts/preflight.sh browser: its `e2e:` line must name {{API}}, {{ADMIN}}, {{PORTAL}} and stack=<this worktree's name>, never :3000, :4200, :4201 or the launcher's :3700, :4700, :4701. If it names anything else, or preflight fails, write BLOCKED with "cause": "environment" and stop; never switch to another stack.
+- Never run db:seed, db:seed:reset, db:reset or api:db-reset, and never touch any database but through the API: personas and fixture data come from provision.sh and the API as the persona that would create them.
+- Right after provision.sh prints the run directory, write that absolute path to {{D}}/e2e.run: the orchestrator reads it to see whether one of your browser sessions is still open.
 - Cover the acceptance criteria in {{D}}/ticket.json, the flows {{D}}/design.md changes and the bullets under "## E2E checks" in {{D}}/tasks.md (if any). Its "## Human checks" are for a person: not yours.
 - Personas and seeding follow the eduvault-e2e skill (owner, admin, teacher, student and a foreign-org user); create fixture data through the API as the persona that would create it, ledger every record so teardown reverses it, never insert rows with SQL.
-- Visual evidence (mode browser): for every acceptance criterion, take a screenshot of the state that proves it, named step-NN-<what-it-shows>.png in this run's own dir. List only this run's files.
+- Visual evidence: for every acceptance criterion, take a screenshot of the state that proves it, named step-NN-<what-it-shows>.png in this run's own dir. List only this run's files.
 - A path you cannot exercise locally: exercise everything else, then write verdict PASS with a "partial" entry naming each unverified path and why. If the unverified path IS the ticket's core change, write BLOCKED with "cause": "environment". Any other BLOCKED carries "cause": "app".
-- Nobody is watching to approve a permission prompt: put any multi-step shell sequence in a script file in this run's dir (Write tool) and run it as one plain call.
+- Nobody is watching to approve a permission prompt: put any multi-step shell sequence in a script file in this run's dir (Write tool), starting with the eval line above, and run it as one plain call.
 - Keep command output short (| tail -30). Never print, cat or grep any .env file, cookie file or secret.
 - Never spawn agents or subagents. Run long commands in the background and wait for them; never end your turn while any background command or browser step of yours is still running.
 - Write report.md, then {{D}}/e2e.json last:
   {"verdict": "PASS|FAIL|BLOCKED", "report": "<abs path to report.md>", "reason": "<=200 chars", "cause": "environment|app (BLOCKED only)",
    "evidence": [{"path": "<abs path to a .png>", "caption": "<=80 chars", "ac": "<the acceptance criterion it proves>"}],
    "partial": [{"path": "<the flow or AC not exercised>", "reason": "<=120 chars"}]}
+- report.md quotes preflight's `e2e:` line verbatim (after line 15) and names every "partial" entry's path in its "not exercised locally" section (verify.sh rejects a PASS report that omits either).
 - report.md's first line is "# {{KEY}} e2e: PASS" (or FAIL / BLOCKED). On a PASS the words FAIL, FAILED and BLOCKED must not appear in its first 15 lines (verify.sh rejects the report): write unverified paths as "not exercised locally", in a section after line 15.
 - Always write e2e.json before you finish, whatever happened.
 - Never call AskUserQuestion. If you need a decision, write {{D}}/e2e.question.json {"question", "options": [{"label", "description"}], "recommended"} and stop.

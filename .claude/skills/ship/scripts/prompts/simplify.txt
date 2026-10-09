@@ -1,5 +1,6 @@
-Use the simplify skill on this branch's changes since the merge-base with origin/main (committed or not; see Base below). Remove code comments the change added that the comment rule below doesn't allow. Then run typecheck, lint and unit tests for the touched projects (pnpm validate:quick).
-Write {{D}}/simplify.json last: {"result": "pass|fail", "summary": "<=200 chars", "failure_reason": "<if fail>", "unrun_specs": [<only if any>]}.
+Use the simplify skill on this branch's changes since the merge-base with origin/main (committed or not; see Base below). Remove code comments the change added that the comment rule below doesn't allow. Fix duplication the change introduced even when it spans apps: move the shared code to the lib that fits (libs/ui, libs/shared, libs/auth-client) instead of leaving two copies. Then run typecheck, lint and unit tests for the touched projects (pnpm validate:quick).
+Defer a cleanup only for a concrete blocker, never because it is "too large" or "a bigger refactor": list it as {"item": "<what>", "reason": "<the blocker>"} under "deferred" in the handoff. A deferral that only says it is too large sends this stage back once. What stays deferred goes into the PR body.
+Write {{D}}/simplify.json last: {"result": "pass|fail", "summary": "<=200 chars", "failure_reason": "<if fail>", "unrun_specs": [<only if any>], "deferred": [<only if any>]}.
 Keep command output short (| tail -40); never paste whole logs.
 
 {{RULES}}

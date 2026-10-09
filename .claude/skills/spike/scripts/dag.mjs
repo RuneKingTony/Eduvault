@@ -165,7 +165,7 @@ function walk(g, obs, st) {
   );
 
   // effective cap: dispatch.sh hands each ticket pane SHIP_MAX_PARALLEL=<concurrency>, so ship's
-  // slot.sh admits the same number; the hard ceiling is stack.sh's 10 e2e port sets
+  // slot.sh admits the same number; the ceiling of 10 keeps the number of concurrent e2e stacks sane (stack-worktree.sh has room for 81 port sets)
   const conc = Math.max(1, Math.min(Number(st.concurrency ?? 3), 10));
   // only this run's dispatches spend --max-tickets (init.sh stamps run_started on each invocation)
   const dispatchedCount = Object.values(st.dispatched ?? {}).filter(

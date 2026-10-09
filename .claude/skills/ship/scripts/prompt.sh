@@ -5,6 +5,7 @@
 #   "Read and follow <this file>."
 #
 # usage: prompt.sh <KEY> <stage> [NAME=value ...]    e.g. prompt.sh EDU-1 branch RUN_ID=<id>
+# A note left by `state.sh note <KEY> <stage> "<text>"` (worker.sh dispatch --note) is appended to the rendering.
 # {{RULES}} is the shared worker rules inline; {{RULES_FILE}} their copy in $D/worker-rules.md, for the
 # one-line /goal prompts.
 set -u
@@ -19,9 +20,17 @@ if [ -n "${TESTED_TREE:-}" ]; then
   TESTED="$TESTED_STAGE ran typecheck, lint and unit tests and passed on tree $TESTED_TREE. If git status --porcelain prints nothing and git rev-parse 'HEAD^{tree}' prints exactly that tree, skip the checks except pnpm format:check: it was verified on this exact tree. Otherwise run"
 else TESTED="no tested tree is recorded, so run"; fi
 E2E_REASON=$(st_get "$KEY" 'select(.stages.e2e.result == "skipped") | .stages.e2e.reason // "no reason recorded"')
+mkdir -p "$D"; NOT_VERIFIED_FILE=$D/not-verified.txt
+{
+  jq -r '(.partial // [])[] | "- \(.path): \(.reason)"' "$D/e2e.json" 2>/dev/null
+  jq -r '(.unrun_specs // [])[] | "- \(.) (not run locally)"' "$D/push.json" 2>/dev/null
+} > "$NOT_VERIFIED_FILE"
+[ -s "$NOT_VERIFIED_FILE" ] || echo "Nothing: every check ran locally." > "$NOT_VERIFIED_FILE"
+E2E_VERDICT=$(jq -r '.verdict // empty' "$D/e2e.json" 2>/dev/null)
 if [ -n "$E2E_REASON" ]; then E2E_NOTE="e2e skipped: $E2E_REASON"
-elif [ "$(jq -r '.mode // empty' "$D/e2e-gate.json" 2>/dev/null)" = api ]; then E2E_NOTE="verified via API calls (no browser surface)"
-else E2E_NOTE="verified in the browser by /ship's e2e stage"; fi
+elif [ "$E2E_VERDICT" != PASS ]; then E2E_NOTE="e2e verdict: ${E2E_VERDICT:-not recorded}; nothing is claimed as verified in the browser"
+elif [ "$(jq -r '(.partial // []) | length' "$D/e2e.json" 2>/dev/null)" != 0 ]; then E2E_NOTE="e2e PASS on part of the change: the browser run covered what is not listed under Not verified locally"
+else E2E_NOTE="verified in the browser by /ship's e2e stage (PASS)"; fi
 mkdir -p "$D"; RULES_FILE=$D/worker-rules.md
 cat > "$RULES_FILE" <<RULES_EOF
 Rules:
@@ -32,7 +41,8 @@ Rules:
 - Comments: follow $ROOT/CLAUDE.md "Comment hygiene": none unless it explains something critical a reader can't work out from the code, one or two lines; never restate the code, narrate the change or name the ticket.
 - Never hand-edit apps/api/db/schema.sql, apps/api/src/db/db-types.ts or apps/api/db/auth-schema.snapshot.sql; run pnpm drift:fix. If the schema or Better Auth options changed, pnpm drift must be green.
 - Handoffs: write every JSON handoff, and every tasks.md checkbox, with the Write or Edit tool at the absolute path given under $D, never by shell redirection, tee, sed -i or jq > into it, and never under ~/.claude.
-- Tests: unit specs run with nx run <project>:test (Docker-free). NX_DAEMON=false and NX_ISOLATE_PLUGINS=false are already exported. A spec that needs Docker/testcontainers (api:test-integration, pnpm drift) or a localhost port can't run here: never fake a pass or skip silently, list it as "unrun_specs": ["<path or target>", ...] in your JSON handoff (implement: $D/implement.json) and keep "result": "pass" if that is the only gap; the orchestrator runs them.
+- Tests: unit specs run with nx run <project>:test (Docker-free). NX_DAEMON=false and NX_ISOLATE_PLUGINS=false are already exported. Docker and localhost ports are reachable from this pane: run nx run api:test-integration when apps/api, libs/policy or libs/api-contract changed, and pnpm drift when the schema or Better Auth options changed, before you hand off. List a spec under "unrun_specs": ["<path or target>", ...] only when you tried it and it could not start (Docker unreachable, a port you cannot bind), never because it "needs Docker"; never fake a pass or skip silently. Keep "result": "pass" if that is the only gap; the orchestrator runs what is listed.
+- Evidence: in implement.json, "ran" lists every verification command you actually ran with its result, e.g. "nx run api:test-integration: 39 passed" (implement: $D/implement.json). Later stages read it instead of repeating or doubting it.
 - Shell is zsh: quote globs ('*.ts'), never echo ==, no timeout command (macOS has none), no foreground sleep.
 RULES_EOF
 
@@ -41,7 +51,7 @@ import sys
 t, out, *kv = sys.argv[1:]
 v = {"KEY": "$KEY", "D": "$D", "W": "$W", "ROOT": "$ROOT", "BRANCH": """$(st_get "$KEY" '.branch')""",
      "WORKTREE": """$(st_get "$KEY" '.worktree_path')""", "GOAL_LINE": """$(st_get "$KEY" '.goal_line')""",
-     "SECURITY_MD": "$SEC", "TESTED": """$TESTED""", "E2E_NOTE": """$E2E_NOTE""", "RUN_ID": "${RUN_ID:-}",
+     "SECURITY_MD": "$SEC", "TESTED": """$TESTED""", "E2E_NOTE": """$E2E_NOTE""", "NOT_VERIFIED": open("$NOT_VERIFIED_FILE").read().strip(), "RUN_ID": "${RUN_ID:-}",
      "NUM": "$(issue_num "$KEY")", "RULES": open("$RULES_FILE").read().strip(), "RULES_FILE": "$RULES_FILE"}
 v.update(x.split("=", 1) for x in kv)
 s = open(t).read()
@@ -52,4 +62,5 @@ if "{{" in s:
 open(out, "w").write(s)
 PY
 [ $? -eq 0 ] || exit 2
+[ -s "$D/note.$STAGE.txt" ] && printf '\nExtra instructions for this attempt, from the orchestrator:\n%s\n' "$(cat "$D/note.$STAGE.txt")" >> "$OUT"
 echo "$OUT"

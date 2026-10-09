@@ -8,7 +8,9 @@
 # stdout: {"triggered":bool,"reason":str,"inserted_lines":n,"paths":[...]}
 #
 # Triggers: more than THRESHOLD inserted lines (generated files, lockfiles, snapshots and .md excluded),
-# or a touched path under migrations, libs/policy, auth, tenancy scoping or money code.
+# or a touched path under migrations, libs/policy, auth, tenancy scoping or money code. The money
+# words (fee, payment, ledger, wallet, school-account) count only under apps/api and libs/policy:
+# a web page named fees-page is not money code.
 # Covers committed, staged, unstaged and untracked work.
 
 set -euo pipefail
@@ -18,7 +20,7 @@ THRESHOLD=600
 
 SIZE_EXCLUDE='(^|/)(pnpm-lock\.yaml|package-lock\.json|yarn\.lock)$|\.snap$|(^|/)__snapshots__/|\.md$|^apps/api/src/db/db-types\.ts$|^apps/api/db/schema\.sql$|^apps/api/db/auth-schema\.snapshot\.sql$|(^|/)routeTree\.gen\.ts$'
 
-CRITICAL='^apps/api/db/migrations/|^libs/policy/|^apps/api/src/(.*/)?auth[^/]*(/|$)|^apps/api/src/app/common/auth/|^apps/api/src/app/common/campus-(guard|scope)|organization-auth|wallet|ledger|payment|fee|school[-_]account'
+CRITICAL='^apps/api/db/migrations/|^libs/policy/|^apps/api/src/(.*/)?auth[^/]*(/|$)|^apps/api/src/app/common/auth/|^apps/api/src/app/common/campus-(guard|scope)|^(apps/api|libs/policy)/.*(organization-auth|wallet|ledger|payment|fee|school[-_]account)'
 PATH_EXCLUDE='\.md$|^apps/api/src/db/db-types\.ts$|^apps/api/db/schema\.sql$|^apps/api/db/auth-schema\.snapshot\.sql$|(^|/)routeTree\.gen\.ts$'
 
 emit() {  # <triggered> <reason> <lines> <paths, newline separated>

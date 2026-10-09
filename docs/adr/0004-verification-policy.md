@@ -33,4 +33,13 @@ Two parts of this decision were relaxed after it was written:
 - **CI is allowed.** `.github/workflows/validate-pr.yml` runs `pnpm validate` on pull requests. It adds no gate of its own; `pnpm validate` stays the single definition of "green".
 - **Opt-in browser e2e is allowed.** The `eduvault-e2e` skill drives the `run-local` stack with `playwright-cli` and `curl`, only when a diff touches `apps/web-admin`, `apps/web-portal` or UI-visible API. It has no project in the workspace, so it is kept out of `pnpm validate`, `validate:quick` and CI. The static-check-first order above is unchanged.
 
-Still true: no deployment or infrastructure code, and a gate that needs a browser never blocks the default loop.
+Still true: no deployment or infrastructure code.
+
+## Amended 2026-10-09: browser e2e is required
+
+Replaces the "Opt-in browser e2e is allowed" paragraph above.
+
+- **Required before a PR is ready.** Every change whose diff touches product code (`apps/web-admin`, `apps/web-portal`, `libs/ui`, `libs/shared`, `apps/api` source, migrations or seed, `libs/api-contract`, `libs/policy`) must pass an `eduvault-e2e` run on the local stack, with browser steps, before its PR leaves draft. API-only diffs run browser steps too, because the screens read from them; the curl checks stay as part of the run. Docs, tests, tooling and `.claude`-only diffs need none.
+- **A run that cannot happen is not a pass.** `BLOCKED (environment)` stops the change until the stack runs; it no longer lets `/ship` push.
+- **Still outside `pnpm validate`, `validate:quick` and CI.** There is no Playwright project, so the speed and flakiness reasons above still keep browser e2e out of the deterministic gates. The run is an agent-driven check that the definition of done requires, not a gate a script enforces.
+- Decided by the engineer; logged as D-051 in the technical reference.

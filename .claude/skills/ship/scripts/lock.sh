@@ -8,6 +8,9 @@
 #        lock.sh refresh <lock_file> <run_id>   # 0 refreshed   40 another run owns it, or it was released
 #        lock.sh release <lock_file> <run_id>   # deletes it only if it's still yours; always 0
 #        lock.sh status  <lock_file> [run_id]   # {held, run_id, mine, age, live, heartbeats: [pids]}; always 0
+#        lock.sh steal   <lock_file> <run_id>   # take a lock whose owner died: no heartbeat process is running
+#                                                # for it and its last refresh is over STEAL_GRACE (30 s) old.
+#                                                # 0 stolen (prints the previous owner)   40 its heartbeat is alive
 #   `status` is the only way to ask whether a heartbeat is running: never `ps | grep heartbeat` —
 #   a /spike's heartbeat on epic-*/.spike-lock is the parent's, not a rival /ship.
 set -u
@@ -15,6 +18,7 @@ set -u
 CMD=${1:-} LOCK=${2:-} RUN_ID=${3:-}
 MUTEX="$LOCK.mutex"
 STALE=600
+GRACE=${LOCK_STEAL_GRACE:-30}
 
 mtime() { stat -f %m "$1" 2>/dev/null || stat -c %Y "$1" 2>/dev/null || echo 0; }
 
@@ -51,7 +55,7 @@ if [ "$CMD" = status ]; then
       live: ($age != null and $age < $st), heartbeats: $p}'
   exit 0
 fi
-[ -n "$LOCK" ] && [ -n "$RUN_ID" ] || { echo "usage: lock.sh acquire|refresh|release|status <lock_file> <run_id>" >&2; exit 2; }
+[ -n "$LOCK" ] && [ -n "$RUN_ID" ] || { echo "usage: lock.sh acquire|refresh|release|steal|status <lock_file> <run_id>" >&2; exit 2; }
 mkdir -p "$(dirname "$LOCK")"
 enter
 trap leave EXIT
@@ -70,6 +74,14 @@ case "$CMD" in
     write ;;
   release)
     [ "$(owner)" = "$RUN_ID" ] && rm -f "$LOCK" ;;
-  *) echo "usage: lock.sh acquire|refresh|release|status <lock_file> <run_id>" >&2; exit 2 ;;
+  steal)
+    # The grace covers a run that has just acquired and not yet started its heartbeat.
+    if [ -f "$LOCK" ] && [ "$(owner)" != "$RUN_ID" ]; then
+      [ "$(beat_age)" -lt "$GRACE" ] && { echo "held by $(owner), refreshed ${GRACE}s ago or less: not stealing"; exit 40; }
+      [ -n "$(pgrep -f "heartbeat.sh $LOCK " 2>/dev/null)" ] && { echo "held by $(owner): its heartbeat is running"; exit 40; }
+      echo "stole the lock from $(owner), last seen $(jq -r .heartbeat "$LOCK")"
+    fi
+    write ;;
+  *) echo "usage: lock.sh acquire|refresh|release|steal|status <lock_file> <run_id>" >&2; exit 2 ;;
 esac
 exit 0

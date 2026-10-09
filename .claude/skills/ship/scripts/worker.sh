@@ -5,8 +5,10 @@
 # A fresh process also replaces /clear and always ends a finished /goal.
 #
 # usage:
-#   worker.sh dispatch <KEY> <stage> [prompt_file]    prompt defaults to prompt.sh's rendering;
-#                                                     model/effort come from effort.sh
+#   worker.sh dispatch <KEY> <stage> [prompt_file] [--note "<text>"]
+#                                                     prompt defaults to prompt.sh's rendering; model/effort come
+#                                                     from effort.sh; --note appends extra instructions for this
+#                                                     stage (state.sh note), kept until the stage passes
 #       exit 0  dispatched; prints {"agent","pane","model","effort","attempts","stray_patch","replaced_pane"}
 #            11 attempts exhausted (> 3)          12 worker busy (working/blocked) — never restart it
 #            13 couldn't stop or start Claude     14 blocked right after start (prints the pane)
@@ -92,9 +94,18 @@ tidy() {          # <stage> <n> — never discards: the patch is written and che
 
 case "$CMD" in
 dispatch)
-  STAGE=$3 PROMPT=${4:-$(bash "$W/prompt.sh" "$KEY" "$STAGE")}
+  STAGE=$3 PROMPT="" NOTE=""; shift 3
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --note) NOTE=${2:-}; [ -n "$NOTE" ] || { echo "--note needs text" >&2; exit 2; }; shift 2 ;;
+      *) PROMPT=$1; shift ;;
+    esac
+  done
+  [ -z "$NOTE" ] || bash "$W/state.sh" note "$KEY" "$STAGE" "$NOTE" >/dev/null
+  [ -n "$PROMPT" ] || PROMPT=$(bash "$W/prompt.sh" "$KEY" "$STAGE")
   [ -s "$PROMPT" ] || { echo "empty prompt file $PROMPT" >&2; exit 2; }
   read -r MODEL EFFORT _ < <(bash "$W/effort.sh" "$KEY" "$STAGE") || exit 2
+  PREV=$(st_get "$KEY" ".stages[\"$STAGE\"].result")
   N=$(st_get "$KEY" ".stages[\"$STAGE\"].attempts" | grep -E '^[0-9]+$' || echo 0)
   if [ "$(st_get "$KEY" ".stages[\"$STAGE\"].result")" = running ] && [ -z "$(st_get "$KEY" ".stages[\"$STAGE\"].model")" ] &&
      [ "$N" -gt 0 ]; then ATTEMPTS=$N; else ATTEMPTS=$(( N + 1 )); fi
@@ -163,6 +174,8 @@ dispatch)
   # prompt as its answer.
   bash "$W/ready.sh" "$NEW" 30 >/dev/null || { herdr pane read "$PANE" 2>/dev/null | tail -25; exit 14; }
 
+  # a stage that had finished and runs again invalidates what rested on it
+  case "$PREV" in pass|fail) bash "$W/state.sh" stale-after "$KEY" "$STAGE" >/dev/null ;; esac
   # recorded BEFORE the prompt: a death from here on resumes by reattaching, not restarting
   st_set "$KEY" ".stages[\"$STAGE\"] = {result: \"running\", started_at: \$t, started_epoch: \$e,
       model: \$m, effort: \$f, attempts: \$a}" \

@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Eduvault: a school-management monorepo (Nx + pnpm catalogs). Verification is static checks plus API integration tests; browser e2e is opt-in (the `eduvault-e2e` skill, never part of `pnpm validate`). Details in `docs/`.
+Eduvault: a school-management monorepo (Nx + pnpm catalogs). Verification is static checks, API integration tests and a required browser e2e run (the `eduvault-e2e` skill, outside `pnpm validate` and CI). Details in `docs/`.
 
 Coding conventions, and which gate enforces each: `docs/conventions.md`. Read it before writing code in `apps/` or `libs/`.
 
@@ -42,6 +42,7 @@ Unit tests (`nx run <project>:test`) never start Docker. Integration tests (`api
 1. `pnpm validate:quick` is green.
 2. If `apps/api`, `libs/policy`, `libs/api-contract` or any migration changed: `nx run api:test-integration` is green too.
 3. If the DB schema or Better Auth options changed: `pnpm drift` is green (run `pnpm drift:fix` first).
+4. If the diff touches product code (the e2e gate prints `browser`): an `eduvault-e2e` run on the local stack ends in PASS. `BLOCKED` is not a pass.
 
 ## Gotchas
 

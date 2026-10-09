@@ -1,9 +1,9 @@
 #!/bin/bash
-# e2e-gate: whether the opt-in e2e stage runs, from the changed paths alone.
-# usage: e2e-gate.sh <KEY>   prints {"skip": bool, "mode": "browser|api|skip", "reason", "app_paths": [...]}
+# e2e-gate: whether the required e2e stage runs, from the changed paths alone.
+# usage: e2e-gate.sh <KEY>   prints {"skip": bool, "mode": "browser|skip", "reason", "app_paths": [...]}
 #                            and writes the same line to $D/e2e-gate.json
-#   browser  apps/web-*, or libs/ui, libs/api-contract, libs/policy, libs/shared changed
-#   api      only apps/api runtime code or migrations changed: verify through direct API calls
+#   browser  any product code changed: apps/web-*, apps/api runtime code or migrations, libs/ui,
+#            libs/api-contract, libs/policy, libs/shared (the classifier no longer emits api)
 #   skip     docs, tests, tooling or .github/.claude only: records e2e: skipped with the reason
 # exit 0 = recorded, 1 = error
 set -u
@@ -22,15 +22,14 @@ TOUCHED=$(cd "$TREE" && {
 N=$(printf '%s\n' "$TOUCHED" | wc -l | tr -d ' ')
 GATE="$(dirname "$0")/../../eduvault-e2e/scripts/e2e-gate.sh"
 MODE=$(printf '%s\n' "$TOUCHED" | bash "$GATE" --stdin 2>/dev/null) || { echo "e2e-gate: classifier failed" >&2; exit 1; }
-case "$MODE" in browser | api | skip) ;; *) echo "e2e-gate: unexpected verdict '$MODE'" >&2; exit 1 ;; esac
-RUN=$(printf '%s\n' "$TOUCHED" | grep -vE '^(\.github/|\.claude/|\.husky/|docs/)|\.md$' || true)
+case "$MODE" in browser | skip) ;; *) echo "e2e-gate: unexpected verdict '$MODE'" >&2; exit 1 ;; esac
+APP=$(printf '%s\n' "$TOUCHED" | bash "$GATE" --list 2>/dev/null)
 case "$MODE" in
   skip) R="e2e-gate: none of the $N changed paths is served by the stack (docs, tests, tooling or CI only)" ;;
-  browser) R="e2e-gate: web app or a lib it imports changed" ;;
-  api) R="e2e-gate: server-side paths only: verify through direct API calls" ;;
+  browser) R="e2e-gate: $(printf '%s\n' "$APP" | head -1) is product code ($(printf '%s\n' "$APP" | grep -c .) product path(s) changed)" ;;
 esac
 
-X=$(jq -nc --arg m "$MODE" --arg r "$R" --arg a "$([ "$MODE" = skip ] || printf '%s' "$RUN")" \
+X=$(jq -nc --arg m "$MODE" --arg r "$R" --arg a "$([ "$MODE" = skip ] || printf '%s' "$APP")" \
   '{skip: ($m == "skip"), mode: $m, reason: $r, app_paths: ($a | split("\n") | map(select(. != "")))}')
 [ "$MODE" = skip ] && bash "$W/state.sh" stage "$KEY" e2e skipped "$(jq -nc --arg r "$R" '{reason: $r}')"
 mkdir -p "$D"; echo "$X" > "$D/e2e-gate.json"

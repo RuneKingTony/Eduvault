@@ -35,9 +35,9 @@ Every module's spec carries a `describe('isolation')` block built on `twoSchools
 - **Pre-commit (Husky):** Prettier on staged files, then `nx affected -t lint typecheck`.
 - **Claude Code:** a PostToolUse hook runs Prettier on each edited file; a Stop hook runs `nx affected -t lint typecheck` and refuses to finish while it fails.
 
-## Opt-in browser e2e
+## Browser e2e: required before a PR is ready
 
-Not a gate: it is outside `pnpm validate`, `validate:quick` and CI. Run it when a diff touches `apps/web-admin`, `apps/web-portal` or UI-visible API (`bash .claude/skills/eduvault-e2e/scripts/e2e-gate.sh` prints `skip`, `api` or `browser`).
+Required for every change that touches product code ([ADR 0004, amended](adr/0004-verification-policy.md#amended-2026-10-09-browser-e2e-is-required)): web apps, `libs/ui`, `libs/shared`, API source, migrations, seed, `libs/api-contract` or `libs/policy`. `bash .claude/skills/eduvault-e2e/scripts/e2e-gate.sh` prints `browser` for those and `skip` for docs, tests, tooling and `.claude`-only diffs. A run that ends `BLOCKED (environment)` is not a pass: start the stack and run again. It stays outside `pnpm validate`, `validate:quick` and CI, because there is no Playwright project; the definition of done in `CLAUDE.md` requires it instead.
 
 | Need                        | Command                                                                                |
 | --------------------------- | -------------------------------------------------------------------------------------- |
@@ -49,4 +49,4 @@ The browser is driven through the `playwright-cli` skill and the API through `cu
 
 ## Not verified by any gate
 
-Browser behaviour in the default loop. The SPAs' sign-in and school/campus switching are covered by component tests with fake clients; against the real API they are covered only by the opt-in e2e run or by hand with the `run-local` recipe.
+No script enforces the browser e2e run: `pnpm validate` and CI pass without it, so it is required by the definition of done and checked in review and by `/ship`. Within the default loop, sign-in and school/campus switching are covered by component tests with fake clients.
