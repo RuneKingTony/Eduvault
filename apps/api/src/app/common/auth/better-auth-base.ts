@@ -45,14 +45,19 @@ export const getDatabaseHooks = (
   session: {
     create: {
       before: async (session) => {
-        if (session['activeOrganizationId']) return;
+        const active: unknown = session['activeOrganizationId'];
+        if (typeof active === 'string' && active !== '') {
+          return;
+        }
         const school = await pool.query<{ organizationId: string }>(
           `SELECT "organizationId" FROM member
            WHERE "userId" = $1 ORDER BY "createdAt", id LIMIT 1`,
           [session.userId]
         );
         const organizationId = school.rows[0]?.organizationId;
-        if (!organizationId) return;
+        if (organizationId === undefined) {
+          return;
+        }
 
         const campus = await pool.query<{ teamId: string }>(
           `SELECT tm."teamId" FROM "teamMember" tm

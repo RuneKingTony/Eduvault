@@ -30,7 +30,9 @@ export class AuthContextService {
     const result = (await this.authService.api
       .getSession({ headers })
       .catch(() => null)) as PluginSession | null;
-    if (!result?.user || result.user.banned) return undefined;
+    if (!result?.user || result.user.banned === true) {
+      return undefined;
+    }
     return {
       user: {
         id: result.user.id,
@@ -47,12 +49,16 @@ export class AuthContextService {
     session: SessionContext
   ): Promise<OrgContext | undefined> {
     const { activeOrganizationId: organizationId, headers } = session;
-    if (!organizationId) return undefined;
+    if (organizationId === null) {
+      return undefined;
+    }
 
     const member = await this.authService.api
       .getActiveMember({ headers })
       .catch(() => null);
-    if (member?.organizationId !== organizationId) return undefined;
+    if (member?.organizationId !== organizationId) {
+      return undefined;
+    }
 
     const schoolWide = seesAllCampuses(member.role);
     const campuses = schoolWide
@@ -60,21 +66,25 @@ export class AuthContextService {
           query: { organizationId },
           headers,
         })
-      : (await this.authService.api.listUserTeams({ headers })).filter(
-          (team) => team.organizationId === organizationId
-        );
+      : await this.listUserCampuses(headers, organizationId);
     const campusIds = campuses.map((team) => team.id);
+    const activeTeamId = session.activeTeamId ?? null;
 
     return {
       user: session.user,
       organizationId,
       role: member.role,
       activeCampusId:
-        session.activeTeamId && campusIds.includes(session.activeTeamId)
-          ? session.activeTeamId
+        activeTeamId !== null && campusIds.includes(activeTeamId)
+          ? activeTeamId
           : null,
       campusScope: schoolWide ? 'all' : campusIds,
       headers,
     };
+  }
+
+  private async listUserCampuses(headers: Headers, organizationId: string) {
+    const teams = await this.authService.api.listUserTeams({ headers });
+    return teams.filter((team) => team.organizationId === organizationId);
   }
 }

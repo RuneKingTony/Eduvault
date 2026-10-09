@@ -23,7 +23,9 @@ export function SignInForm({ authClient }: { authClient: EduvaultAuthClient }) {
             name: fieldValue(form, 'name') || email,
           });
     setPending(false);
-    if (result.error) setError(result.error.message ?? 'Something went wrong');
+    if (result.error) {
+      setError(result.error.message ?? 'Something went wrong');
+    }
   }
 
   return (
@@ -42,11 +44,11 @@ export function SignInForm({ authClient }: { authClient: EduvaultAuthClient }) {
         minLength={8}
         required
       />
-      {error ? (
-        <p role="alert" className="text-sm text-red-600">
+      {error === null ? null : (
+        <p role="alert" className="text-sm text-destructive">
           {error}
         </p>
-      ) : null}
+      )}
       <Button type="submit" disabled={pending}>
         {mode === 'sign-in' ? 'Sign in' : 'Sign up'}
       </Button>

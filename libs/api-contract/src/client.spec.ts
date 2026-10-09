@@ -2,7 +2,7 @@ import { ApiError, createApiClient } from './client';
 import { contract } from './contract';
 
 const jsonResponse = (status: number, body: unknown) =>
-  new Response(JSON.stringify(body), {
+  Response.json(body, {
     status,
     headers: { 'content-type': 'application/json' },
   });

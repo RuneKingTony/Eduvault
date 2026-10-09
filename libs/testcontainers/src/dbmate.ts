@@ -8,10 +8,13 @@ function findDbmate(from: string): string {
   let dir = resolve(from);
   for (;;) {
     const candidate = join(dir, 'node_modules', '.bin', 'dbmate');
-    if (existsSync(candidate)) return candidate;
+    if (existsSync(candidate)) {
+      return candidate;
+    }
     const parent = dirname(dir);
-    if (parent === dir)
+    if (parent === dir) {
       throw new Error('dbmate binary not found; run pnpm install');
+    }
     dir = parent;
   }
 }
@@ -27,7 +30,9 @@ export function runMigrations(options: {
   const hasMigrations =
     existsSync(options.migrationsDir) &&
     readdirSync(options.migrationsDir).some((f) => f.endsWith('.sql'));
-  if (!hasMigrations) return;
+  if (!hasMigrations) {
+    return;
+  }
   execFileSync(
     findDbmate(dirname(fileURLToPath(import.meta.url))),
     [
@@ -42,7 +47,7 @@ export function runMigrations(options: {
   );
 }
 
-const VOLATILE_LINES = /^(\\restrict |\\unrestrict |-- Dumped (from|by) )/;
+const VOLATILE_LINES = /^(?:\\restrict |\\unrestrict |-- Dumped (?:from|by) )/;
 
 /**
  * Dumps the schema with the pg_dump that ships in the server image, so the
@@ -61,7 +66,9 @@ export async function dumpSchema(
     '-d',
     container.getDatabase(),
   ]);
-  if (dump.exitCode !== 0) throw new Error(`pg_dump failed: ${dump.output}`);
+  if (dump.exitCode !== 0) {
+    throw new Error(`pg_dump failed: ${dump.output}`);
+  }
 
   const versions = await container.exec([
     'psql',
@@ -81,7 +88,7 @@ export async function dumpSchema(
     .split('\n')
     .filter((line) => !VOLATILE_LINES.test(line))
     .join('\n')
-    .replace(/\n{3,}/g, '\n\n')
+    .replaceAll(/\n{3,}/g, '\n\n')
     .trim();
   const rows = versions.output
     .split('\n')

@@ -93,7 +93,7 @@ function runKyselyCodegen(url: string): string {
 
 function nextMigrationFile(): string {
   const taken = existsSync(migrationsDir) ? readdirSync(migrationsDir) : [];
-  const stamp = new Date().toISOString().replace(/\D/g, '').slice(0, 14);
+  const stamp = new Date().toISOString().replaceAll(/\D/g, '').slice(0, 14);
   const name = taken.some((f) => f.includes('better_auth'))
     ? 'better_auth_update'
     : 'better_auth_schema';
@@ -102,19 +102,17 @@ function nextMigrationFile(): string {
 
 async function checkAuth(pg: Awaited<ReturnType<typeof startPostgres>>) {
   const missing = runAuthGenerate(pg.uri);
-  if (missing) {
-    if (write) {
-      const file = nextMigrationFile();
-      writeFileSync(file, toMigration(missing));
-      console.log(`created  ${rel(file)}`);
-      runMigrations({ url: pg.uri, migrationsDir });
-    } else {
-      failures.push(
-        `DRIFT better-auth expects schema that no migration provides:\n${missing}\n${FIX}`
-      );
-    }
-  } else {
+  if (missing === null) {
     console.log('ok       migrations satisfy better-auth');
+  } else if (write) {
+    const file = nextMigrationFile();
+    writeFileSync(file, toMigration(missing));
+    console.log(`created  ${rel(file)}`);
+    runMigrations({ url: pg.uri, migrationsDir });
+  } else {
+    failures.push(
+      `DRIFT better-auth expects schema that no migration provides:\n${missing}\n${FIX}`
+    );
   }
 
   await pg.container.exec([
@@ -127,7 +125,7 @@ async function checkAuth(pg: Awaited<ReturnType<typeof startPostgres>>) {
     'CREATE DATABASE auth_fresh',
   ]);
   const full = runAuthGenerate(withDatabase(pg.uri, 'auth_fresh'));
-  if (!full) {
+  if (full === null) {
     throw new Error('better-auth generated nothing for an empty database');
   }
   reconcile(files.authSnapshot, full);
@@ -138,10 +136,15 @@ async function main() {
   const pg = await startPostgres();
   try {
     runMigrations({ url: pg.uri, migrationsDir });
-    if (wants('auth')) await checkAuth(pg);
-    if (wants('schema'))
+    if (wants('auth')) {
+      await checkAuth(pg);
+    }
+    if (wants('schema')) {
       reconcile(files.schema, await dumpSchema(pg.container));
-    if (wants('types')) reconcile(files.kyselyTypes, runKyselyCodegen(pg.uri));
+    }
+    if (wants('types')) {
+      reconcile(files.kyselyTypes, runKyselyCodegen(pg.uri));
+    }
   } finally {
     await pg.stop();
   }

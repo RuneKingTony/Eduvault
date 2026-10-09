@@ -39,6 +39,28 @@ async function headersFor(email: string) {
   return new Headers({ cookie });
 }
 
+async function createCampus({
+  organizationId,
+  name,
+  address,
+  headers,
+}: {
+  organizationId: string;
+  name: string;
+  address: string;
+  headers: Headers;
+}) {
+  const team = await auth.api.createTeam({
+    body: { name, organizationId },
+    headers,
+  });
+  await db
+    .insertInto('campus')
+    .values({ team_id: team.id, organization_id: organizationId, address })
+    .execute();
+  return team.id;
+}
+
 async function main() {
   const existing = await db
     .selectFrom('user')
@@ -75,44 +97,27 @@ async function main() {
   const greenfieldHeaders = await headersFor(users.greenfieldOwner[1]);
   const riversideHeaders = await headersFor(users.riversideOwner[1]);
 
-  const createCampus = async (
-    organizationId: string,
-    name: string,
-    address: string,
-    headers: Headers
-  ) => {
-    const team = await auth.api.createTeam({
-      body: { name, organizationId },
-      headers,
-    });
-    await db
-      .insertInto('campus')
-      .values({ team_id: team.id, organization_id: organizationId, address })
-      .execute();
-    return team.id;
-  };
-
-  const main = await createCampus(
-    greenfield.id,
-    'Main Campus',
-    '1 Green Road',
-    greenfieldHeaders
-  );
-  const annex = await createCampus(
-    greenfield.id,
-    'Annex',
-    '9 Hill Street',
-    greenfieldHeaders
-  );
-  const riversideMain = await createCampus(
-    riverside.id,
-    'Riverside Main',
-    '5 River Lane',
-    riversideHeaders
-  );
+  const mainCampus = await createCampus({
+    organizationId: greenfield.id,
+    name: 'Main Campus',
+    address: '1 Green Road',
+    headers: greenfieldHeaders,
+  });
+  const annex = await createCampus({
+    organizationId: greenfield.id,
+    name: 'Annex',
+    address: '9 Hill Street',
+    headers: greenfieldHeaders,
+  });
+  const riversideMain = await createCampus({
+    organizationId: riverside.id,
+    name: 'Riverside Main',
+    address: '5 River Lane',
+    headers: riversideHeaders,
+  });
 
   // createTeam does not enrol its creator; Better Auth only activates teams a user belongs to.
-  for (const teamId of [main, annex]) {
+  for (const teamId of [mainCampus, annex]) {
     await auth.api.addTeamMember({
       body: { teamId, userId: ids.greenfieldOwner },
       headers: greenfieldHeaders,
@@ -131,7 +136,7 @@ async function main() {
     },
   });
   await auth.api.addTeamMember({
-    body: { teamId: main, userId: ids.greenfieldTeacher },
+    body: { teamId: mainCampus, userId: ids.greenfieldTeacher },
     headers: greenfieldHeaders,
   });
 
@@ -139,7 +144,7 @@ async function main() {
   await auth.api.addMember({
     body: { userId: ids.multi, organizationId: greenfield.id, role: 'teacher' },
   });
-  for (const teamId of [main, annex]) {
+  for (const teamId of [mainCampus, annex]) {
     await auth.api.addTeamMember({
       body: { teamId, userId: ids.multi },
       headers: greenfieldHeaders,
@@ -195,13 +200,13 @@ async function main() {
     .values([
       {
         organization_id: greenfield.id,
-        campus_id: main,
+        campus_id: mainCampus,
         full_name: 'Ada Obi',
         admission_number: 'GF-001',
       },
       {
         organization_id: greenfield.id,
-        campus_id: main,
+        campus_id: mainCampus,
         full_name: 'Bayo Ade',
         admission_number: 'GF-002',
       },
@@ -222,7 +227,9 @@ async function main() {
 
   console.log('Seeded 2 schools (Greenfield: 2 campuses, Riverside: 1).');
   console.log(`Sign in with any of these (password: ${SEED_PASSWORD}):`);
-  for (const [, email] of Object.values(users)) console.log(`  ${email}`);
+  for (const [, email] of Object.values(users)) {
+    console.log(`  ${email}`);
+  }
 }
 
 main()

@@ -1,5 +1,6 @@
 import { useState, type SubmitEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { Campus, Student } from '@eduvault/api-contract';
 import { Button, TextField, fieldValue } from '@eduvault/ui';
 import { useApi } from '../api';
 import { ErrorMessage } from '../components/error-message';
@@ -46,59 +47,98 @@ export function StudentsPage() {
     <section className="flex flex-col gap-4">
       <h2 className="text-lg font-semibold">Students</h2>
       <ErrorMessage error={students.error ?? create.error ?? remove.error} />
-      <ul className="divide-y rounded-md border">
-        {students.data?.map((student) => (
-          <li
-            key={student.id}
-            className="flex items-center justify-between p-3"
-          >
-            <span>
-              {student.fullName}{' '}
-              <span className="text-sm text-muted-foreground">
-                {student.admissionNumber} · {campusName(student.campusId)}
-              </span>
-            </span>
-            <button
-              type="button"
-              className="text-sm text-red-600"
-              onClick={() => remove.mutate(student.id)}
-            >
-              Remove
-            </button>
-          </li>
-        ))}
-        {students.data?.length === 0 ? (
-          <li className="p-3 text-muted-foreground">No students yet.</li>
-        ) : null}
-      </ul>
-      <form onSubmit={submit} className="flex flex-wrap items-end gap-3">
-        <TextField label="Full name" name="fullName" required />
-        <TextField label="Admission number" name="admissionNumber" required />
-        <div className="flex flex-col gap-1">
-          <label
-            htmlFor="student-campus"
-            className="text-sm font-medium text-foreground"
-          >
-            Campus
-          </label>
-          <select
-            id="student-campus"
-            className="rounded-md border border-input px-3 py-2 text-sm"
-            value={campusId}
-            onChange={(event) => setCampusId(event.target.value)}
-          >
-            <option value="">Active campus</option>
-            {campuses.data?.map((campus) => (
-              <option key={campus.id} value={campus.id}>
-                {campus.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <Button type="submit" disabled={create.isPending}>
-          Add student
-        </Button>
-      </form>
+      <StudentList
+        students={students.data}
+        campusName={campusName}
+        onRemove={(id) => remove.mutate(id)}
+      />
+      <StudentForm
+        campuses={campuses.data}
+        campusId={campusId}
+        onCampusChange={setCampusId}
+        pending={create.isPending}
+        onSubmit={submit}
+      />
     </section>
+  );
+}
+
+function StudentList({
+  students,
+  campusName,
+  onRemove,
+}: {
+  students: Student[] | undefined;
+  campusName: (id: string) => string;
+  onRemove: (id: string) => void;
+}) {
+  return (
+    <ul className="divide-y rounded-md border">
+      {students?.map((student) => (
+        <li key={student.id} className="flex items-center justify-between p-3">
+          <span>
+            {student.fullName}{' '}
+            <span className="text-sm text-muted-foreground">
+              {student.admissionNumber} · {campusName(student.campusId)}
+            </span>
+          </span>
+          <button
+            type="button"
+            className="text-sm text-destructive"
+            onClick={() => onRemove(student.id)}
+          >
+            Remove
+          </button>
+        </li>
+      ))}
+      {students?.length === 0 ? (
+        <li className="p-3 text-muted-foreground">No students yet.</li>
+      ) : null}
+    </ul>
+  );
+}
+
+function StudentForm({
+  campuses,
+  campusId,
+  onCampusChange,
+  pending,
+  onSubmit,
+}: {
+  campuses: Campus[] | undefined;
+  campusId: string;
+  onCampusChange: (id: string) => void;
+  pending: boolean;
+  onSubmit: (event: SubmitEvent<HTMLFormElement>) => void;
+}) {
+  return (
+    <form onSubmit={onSubmit} className="flex flex-wrap items-end gap-3">
+      <TextField label="Full name" name="fullName" required />
+      <TextField label="Admission number" name="admissionNumber" required />
+      <div className="flex flex-col gap-1">
+        <label
+          htmlFor="student-campus"
+          className="text-sm font-medium text-foreground"
+        >
+          Campus
+        </label>
+        <select
+          id="student-campus"
+          className="rounded-md border border-input px-3 py-2 text-sm"
+          value={campusId}
+          onChange={(event) => onCampusChange(event.target.value)}
+        >
+          <option value="">Active campus</option>
+          {campuses?.map((campus) => (
+            <option key={campus.id} value={campus.id}>
+              {campus.name}
+            </option>
+          ))}
+        </select>
+      </div>
+      <Button type="submit" disabled={pending}>
+        Add student
+      </Button>
+    </form>
   );
 }

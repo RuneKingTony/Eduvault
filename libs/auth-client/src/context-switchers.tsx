@@ -21,30 +21,7 @@ export function ContextSwitchers({
   const schools = authClient.useListOrganizations();
   const activeSchoolId = session.data?.session.activeOrganizationId ?? null;
   const activeCampusId = session.data?.session.activeTeamId ?? null;
-  const [campuses, setCampuses] = useState<{
-    schoolId: string;
-    options: SwitcherOption[];
-  } | null>(null);
-
-  useEffect(() => {
-    if (!activeSchoolId) return;
-    let cancelled = false;
-    void authClient.organization.listUserTeams().then((result) => {
-      if (cancelled) return;
-      setCampuses({
-        schoolId: activeSchoolId,
-        options: (result.data ?? [])
-          .filter((team) => team.organizationId === activeSchoolId)
-          .map((team) => ({ id: team.id, name: team.name })),
-      });
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [authClient, activeSchoolId]);
-
-  const schoolCampuses =
-    campuses?.schoolId === activeSchoolId ? campuses.options : [];
+  const schoolCampuses = useSchoolCampuses(authClient, activeSchoolId);
 
   return (
     <div className="flex items-center gap-4">
@@ -72,4 +49,39 @@ export function ContextSwitchers({
       ) : null}
     </div>
   );
+}
+
+function useSchoolCampuses(
+  authClient: EduvaultAuthClient,
+  schoolId: string | null
+): SwitcherOption[] {
+  const [campuses, setCampuses] = useState<{
+    schoolId: string;
+    options: SwitcherOption[];
+  } | null>(null);
+
+  useEffect(() => {
+    if (schoolId === null) {
+      return;
+    }
+    let cancelled = false;
+    void authClient.organization.listUserTeams().then((result) => {
+      if (cancelled) {
+        return;
+      }
+      setCampuses({
+        schoolId,
+        options: (result.data ?? [])
+          .filter((team) => team.organizationId === schoolId)
+          .map((team) => ({ id: team.id, name: team.name })),
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [authClient, schoolId]);
+
+  return campuses !== null && campuses.schoolId === schoolId
+    ? campuses.options
+    : [];
 }

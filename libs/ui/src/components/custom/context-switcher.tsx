@@ -34,7 +34,7 @@ export function ContextSwitcher({
         disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
       >
-        {value ? null : <option value="">Select…</option>}
+        {(value ?? '') === '' ? <option value="">Select…</option> : null}
         {options.map((option) => (
           <option key={option.id} value={option.id}>
             {option.name}

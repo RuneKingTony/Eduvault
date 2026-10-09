@@ -23,7 +23,7 @@ export class StudentController {
   @OrganizationAuth('student', 'read')
   list(
     @Org() org: OrgContext,
-    @Query(zod(routes.list.query)) query: { campusId?: string | undefined }
+    @Query(zod(routes.list.query)) query: { campusId?: string }
   ): Promise<RouteOutput<typeof routes.list>> {
     return this.students.list(org, query.campusId);
   }

@@ -89,8 +89,8 @@ test.describe('school isolation', () => {
         .expect(201)
     ).body;
 
-    let both = await addMember(orgA, await signUp(), 'admin');
-    both = await addMember(orgB, both, 'admin');
+    let both = await addMember(orgA, await signUp(), { role: 'admin' });
+    both = await addMember(orgB, both, { role: 'admin' });
     await setActiveOrganization(both, orgA.id);
 
     const list = (await api(both).get('/students').expect(200)).body;
@@ -132,10 +132,11 @@ test.describe('campus isolation', () => {
         .send(student(campus2.id, '2'))
         .expect(201)
     ).body;
-    const teacher = await addMember(org, await signUp(), 'teacher', {
+    const teacher = await addMember(org, await signUp(), {
+      role: 'teacher',
       campuses: [campus1],
     });
-    const admin = await addMember(org, await signUp(), 'admin');
+    const admin = await addMember(org, await signUp(), { role: 'admin' });
 
     const own = (await api(teacher).get('/students').expect(200)).body;
     expect(own.map((s: { id: string }) => s.id)).toEqual([s1.id]);
@@ -179,7 +180,8 @@ test.describe('campus isolation', () => {
       currency: 'NGN',
       campusId: campus2.id,
     });
-    const teacher = await addMember(org, await signUp(), 'teacher', {
+    const teacher = await addMember(org, await signUp(), {
+      role: 'teacher',
       campuses: [campus1],
     });
 
@@ -215,10 +217,11 @@ test.describe('role per school', () => {
       .send({ name: 'B', currency: 'NGN' })
       .expect(201);
 
-    let user = await addMember(orgA, await signUp(), 'teacher', {
+    let user = await addMember(orgA, await signUp(), {
+      role: 'teacher',
       campuses: [campusA],
     });
-    user = await addMember(orgB, user, 'admin');
+    user = await addMember(orgB, user, { role: 'admin' });
 
     await setActiveOrganization(user, orgA.id);
     await api(user).get('/students').expect(200);
@@ -250,7 +253,7 @@ test.describe('role per school', () => {
   }) => {
     const owner = await signUp();
     const org = await createOrganization(owner);
-    const learner = await addMember(org, await signUp(), 'student');
+    const learner = await addMember(org, await signUp(), { role: 'student' });
     await api(learner).get('/fee-schedules').expect(200);
     await api(learner).get('/students').expect(403);
     await api(learner).get('/school-account').expect(403);
@@ -277,8 +280,8 @@ test.describe('active school and campus', () => {
     const before = await api(user).get('/api/auth/get-session').expect(200);
     expect(before.body.session.activeOrganizationId ?? null).toBeNull();
 
-    await addMember(orgA, user, 'teacher', { campuses: [campusA] });
-    await addMember(orgB, user, 'teacher', { campuses: [campusB] });
+    await addMember(orgA, user, { role: 'teacher', campuses: [campusA] });
+    await addMember(orgB, user, { role: 'teacher', campuses: [campusB] });
     await signIn(user);
 
     const after = await api(user).get('/api/auth/get-session').expect(200);
@@ -303,10 +306,11 @@ test.describe('active school and campus', () => {
     const a2 = await createCampus(orgA, 'A2');
     await createCampus(orgB, 'B1');
 
-    let user = await addMember(orgA, await signUp(), 'teacher', {
+    let user = await addMember(orgA, await signUp(), {
+      role: 'teacher',
       campuses: [a1, a2],
     });
-    user = await addMember(orgB, user, 'teacher');
+    user = await addMember(orgB, user, { role: 'teacher' });
 
     expect((await api(user).get('/campuses').expect(200)).body).toHaveLength(2);
 

@@ -25,7 +25,7 @@ export default defineConfig({
     rollupOptions: {
       external: (id) =>
         id.startsWith('node:') ||
-        (/^[a-z@][a-z0-9/\-_.]*$/i.test(id) && !id.startsWith('@eduvault/')),
+        (/^[a-z@][\w/\-.]*$/i.test(id) && !id.startsWith('@eduvault/')),
       output: { inlineDynamicImports: true, entryFileNames: 'main.cjs' },
     },
   },

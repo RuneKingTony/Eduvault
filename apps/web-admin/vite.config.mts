@@ -26,7 +26,9 @@ export default defineConfig({
     rollupOptions: {
       onwarn(warning, warn) {
         // zod ships /* @__PURE__ */ annotations Rollup cannot place; harmless.
-        if (warning.code === 'INVALID_ANNOTATION') return;
+        if (warning.code === 'INVALID_ANNOTATION') {
+          return;
+        }
         warn(warning);
       },
     },

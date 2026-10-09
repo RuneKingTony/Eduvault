@@ -70,10 +70,11 @@ test.describe('campuses', () => {
     const owner = await signUp();
     const org = await createOrganization(owner);
     const campus = await createCampus(org);
-    const teacher = await addMember(org, await signUp(), 'teacher', {
+    const teacher = await addMember(org, await signUp(), {
+      role: 'teacher',
       campuses: [campus],
     });
-    const admin = await addMember(org, await signUp(), 'admin');
+    const admin = await addMember(org, await signUp(), { role: 'admin' });
 
     await api(teacher).post('/campuses').send({ name: 'X' }).expect(403);
     await api(teacher)
@@ -132,7 +133,7 @@ test.describe('fee schedules', () => {
 
     const everywhere = await api(owner)
       .post('/fee-schedules')
-      .send({ name: 'Tuition', amountMinor: 150000, currency: 'NGN' })
+      .send({ name: 'Tuition', amountMinor: 150_000, currency: 'NGN' })
       .expect(201);
     expect(everywhere.body.campusId).toBeNull();
 

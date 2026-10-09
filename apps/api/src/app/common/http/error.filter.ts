@@ -29,7 +29,9 @@ const pgCode = (error: unknown): string | undefined =>
 const betterAuthStatus = (
   error: unknown
 ): { status: number; message: string } | undefined => {
-  if (!(error instanceof Error) || error.name !== 'APIError') return undefined;
+  if (!(error instanceof Error) || error.name !== 'APIError') {
+    return undefined;
+  }
   const status = (error as { statusCode?: unknown }).statusCode;
   return typeof status === 'number' && status >= 400 && status < 500
     ? { status, message: error.message }
@@ -46,31 +48,38 @@ export class ErrorFilter implements ExceptionFilter {
     response.status(status).json(body);
   }
 
+  private describeHttp(exception: HttpException): {
+    status: number;
+    body: ApiErrorBody;
+  } {
+    const status = exception.getStatus();
+    const raw = exception.getResponse();
+    const payload =
+      typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+    return {
+      status,
+      body: {
+        code:
+          typeof payload['code'] === 'string'
+            ? payload['code']
+            : (CODES[status] ?? 'Error'),
+        message:
+          typeof payload['message'] === 'string'
+            ? payload['message']
+            : exception.message,
+        ...(Array.isArray(payload['issues'])
+          ? { issues: payload['issues'] as ApiErrorBody['issues'] }
+          : {}),
+      },
+    };
+  }
+
   private describe(exception: unknown): {
     status: number;
     body: ApiErrorBody;
   } {
     if (exception instanceof HttpException) {
-      const status = exception.getStatus();
-      const raw = exception.getResponse();
-      const payload =
-        typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
-      return {
-        status,
-        body: {
-          code:
-            typeof payload['code'] === 'string'
-              ? payload['code']
-              : (CODES[status] ?? 'Error'),
-          message:
-            typeof payload['message'] === 'string'
-              ? payload['message']
-              : exception.message,
-          ...(Array.isArray(payload['issues'])
-            ? { issues: payload['issues'] as ApiErrorBody['issues'] }
-            : {}),
-        },
-      };
+      return this.describeHttp(exception);
     }
 
     const upstream = betterAuthStatus(exception);

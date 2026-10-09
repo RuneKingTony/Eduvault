@@ -22,7 +22,9 @@ export function runAuthGenerate(databaseUrl: string): string | null {
         stdio: 'pipe',
       }
     );
-    if (!existsSync(output)) return null;
+    if (!existsSync(output)) {
+      return null;
+    }
     const sql = readFileSync(output, 'utf8').trim();
     return sql ? `${sql}\n` : null;
   } finally {
@@ -35,8 +37,12 @@ const splitTopLevel = (text: string): string[] => {
   let depth = 0;
   let current = '';
   for (const char of text) {
-    if (char === '(') depth++;
-    if (char === ')') depth--;
+    if (char === '(') {
+      depth++;
+    }
+    if (char === ')') {
+      depth--;
+    }
     if (char === ',' && depth === 0) {
       parts.push(current.trim());
       current = '';
@@ -44,13 +50,17 @@ const splitTopLevel = (text: string): string[] => {
       current += char;
     }
   }
-  if (current.trim()) parts.push(current.trim());
+  if (current.trim()) {
+    parts.push(current.trim());
+  }
   return parts;
 };
 
 const formatStatement = (statement: string): string => {
   const match = /^(create table "[^"]+") \((.*)\)$/s.exec(statement);
-  if (!match) return `${statement};`;
+  if (!match) {
+    return `${statement};`;
+  }
   const columns = splitTopLevel(match[2] ?? '').map(
     (column) =>
       `  ${column.replace(
@@ -62,9 +72,7 @@ const formatStatement = (statement: string): string => {
 };
 
 const tablesOf = (statements: string[]) =>
-  statements
-    .map((s) => /^create table "([^"]+)"/.exec(s)?.[1])
-    .filter((name): name is string => Boolean(name));
+  statements.map((s) => /^create table "([^"]+)"/.exec(s)?.[1]).filter(Boolean);
 
 /**
  * Wraps Better Auth's raw output as a dbmate migration. With
@@ -76,9 +84,11 @@ export function toMigration(rawSql: string): string {
     .split(/;\s*\n/)
     .map((s) => s.replace(/;\s*$/, '').trim())
     .filter(Boolean);
-  const up = statements.map(formatStatement).join('\n\n');
+  const up = statements
+    .map((statement) => formatStatement(statement))
+    .join('\n\n');
   const down = tablesOf(statements)
-    .reverse()
+    .toReversed()
     .map((table) => `DROP TABLE "${table}";`)
     .join('\n');
   return `-- migrate:up\n${up}\n\n-- migrate:down\n${down}\n`;

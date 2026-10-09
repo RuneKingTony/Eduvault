@@ -4,12 +4,10 @@ import { feeSchedulesQueryOptions } from '../queries';
 
 export const Route = createFileRoute('/fees')({
   loader: async ({ context: { queryClient, api } }) => {
-    await Promise.all([
-      queryClient.query({
-        ...feeSchedulesQueryOptions(api),
-        staleTime: 'static',
-      }),
-    ]);
+    await queryClient.query({
+      ...feeSchedulesQueryOptions(api),
+      staleTime: 'static',
+    });
   },
   component: FeesPage,
 });

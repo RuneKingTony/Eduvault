@@ -37,7 +37,9 @@ export const OrganizationAuth = <R extends Resource>(
 export const CurrentSession = createParamDecorator(
   (_data: unknown, context: ExecutionContext): SessionContext => {
     const { authSession } = context.switchToHttp().getRequest<AuthedRequest>();
-    if (!authSession) throw new UnauthorizedException();
+    if (!authSession) {
+      throw new UnauthorizedException();
+    }
     return authSession;
   }
 );
@@ -46,7 +48,9 @@ export const CurrentSession = createParamDecorator(
 export const Org = createParamDecorator(
   (_data: unknown, context: ExecutionContext): OrgContext => {
     const { org } = context.switchToHttp().getRequest<AuthedRequest>();
-    if (!org) throw new UnauthorizedException();
+    if (!org) {
+      throw new UnauthorizedException();
+    }
     return org;
   }
 );
