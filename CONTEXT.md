@@ -12,6 +12,10 @@ Terms the code and the people using it share. Adapted from the earlier school-ma
 
 **School-wide** — a money record with no campus. Only people who see every campus see it, except that a payment shows to anyone who can see one of the students it pays for, and a campus bursar can still record a payment into a school-wide money account.
 
+**Super admin** — an Eduvault operator with the platform role `superadmin` (`user.role`). Creates schools and their owners in the platform console and belongs to no school; the first one comes from `nx run api:bootstrap-admin`, never from a screen.
+
+**Temporary password** — the one-time password generated on the server when someone's account is created (a school owner today, staff and guardians later). It is shown once to whoever creates the account, never stored in clear, and the account is held on "Choose your own password" until its owner replaces it.
+
 ## Calendar and classes
 
 **Session** — one academic year of a school (`2026/2027`), split into terms. "School year" on screen.

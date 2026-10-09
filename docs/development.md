@@ -68,7 +68,7 @@ If a vendored file needs a real fix (an accessibility bug, say), edit it, add a 
 
 ## Integration tests
 
-`apps/api/test/support/base-test.ts` exposes the `baseTest` fixture: `signUp`, `signIn`, `createOrganization`, `createCampus`, `addMember`, `promoteToAdmin`, `setActiveOrganization`, `setActiveCampus` and an `api(user)` supertest helper. Each test starts from truncated tables; one Postgres container serves the whole run.
+`apps/api/test/support/base-test.ts` exposes the `baseTest` fixture: `createUser` (sign-up is off, so accounts are made on the server), `signIn`, `createOrganization`, `createSchoolViaPlatform`, `createCampus`, `addMember`, `makeSuperAdmin`, `setActiveOrganization`, `setActiveCampus` and an `api(user)` supertest helper. Each test starts from truncated tables; one Postgres container serves the whole run.
 
 ## Troubleshooting
 
