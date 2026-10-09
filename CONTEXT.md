@@ -10,13 +10,13 @@ Terms the code and the people using it share. Adapted from the earlier school-ma
 
 **Active school / campus** — `session.activeOrganizationId` and `session.activeTeamId`. Every school-scoped query is scoped by them.
 
-**School-wide** — a money record with no campus. Only people who see every campus see it, except that a payment shows to anyone who can see one of the students it pays for.
+**School-wide** — a money record with no campus. Only people who see every campus see it, except that a payment shows to anyone who can see one of the students it pays for, and a campus bursar can still record a payment into a school-wide money account.
 
 ## Calendar and classes
 
 **Session** — one academic year of a school (`2026/2027`), split into terms. "School year" on screen.
 
-**Term** — one period of a session, with dates. A new school year starts with three (First, Second and Third term). One term per school is current. Fees, scores, attendance and report cards all belong to a term.
+**Term** — one period of a session, with dates. A new school year starts with three (First, Second and Third term). One term per school is current; making a term current carries each student's class into it. Fees, scores, attendance and report cards all belong to a term.
 
 **Holiday** — a day in a term when the school is closed. School days are a term's weekdays minus its holidays.
 
@@ -24,17 +24,17 @@ Terms the code and the people using it share. Adapted from the earlier school-ma
 
 **Arm** — one class of a level on one campus (JSS 2 Gold). "Class" on screen. Positions and attendance are per arm. Arms carry over each school year and are archived, never deleted.
 
-**Class teacher** — a teacher responsible for an arm for a school year, as lead, assistant or uniform teacher. An arm can have several.
+**Class teacher** — a teacher responsible for an arm for a school year, as lead, assistant or uniform teacher. An arm can have several, but only one lead.
 
 **Subject teacher** — the one teacher who teaches a subject to an arm in a term.
 
-**Enrolment** — a student's place in one session at one level. One per student per session; promotion creates the next one.
+**Enrolment** — a student's place in one session at one level. One per student per session; Start new school year (later, promotion) creates the next one.
 
 **Placement** — which arm and campus an enrolment sits in for a term. A mid-session move adds a placement; earlier terms keep theirs.
 
 ## Students
 
-**Admission** — a student joining a school. Admission numbers are per school, prefixed with the school's short name (`GF-0123`).
+**Admission** — a student joining a school, which also creates the portal logins for the student and any new guardian. Admission numbers are per school, prefixed with the school's admission prefix (`GF-0123`).
 
 **New intake** — an active student in their first session at the school. New-student fee lines apply to them.
 
@@ -46,23 +46,29 @@ Terms the code and the people using it share. Adapted from the earlier school-ma
 
 **Graduated** — a final-year student recorded as finishing. "Graduate class" records a whole final-year class, minus anyone repeating.
 
+**Start new school year** — the year-end bulk action that moves active students to the next level and the class of the same name, creating next year's enrolments and first-term placements. Repeaters are unticked and final-year students graduate. Promotion replaces it in the grading phase.
+
 **Archive** — taking a student off the roll (Left or Graduated) while keeping every record. Students are never deleted.
 
-**Guardian** — a parent or carer linked to one or more students, always with their own portal login (an email, or a username such as `okeke-family`). Any number of a student's guardians can be marked as paying fees.
+**Guardian** — a parent or carer linked to one or more students, always with their own portal login (an email, or a username such as `okeke-family`). Any number of a student's guardians can be marked as paying fees; every linked guardian sees the child's fees and purchases in the portal, paying or not.
 
 ## Staff
 
-**Member** — a person in a school with zero or more roles. A member with no roles can do nothing.
+**Member** — a person in a school with zero or more roles. A member with no roles sees nothing of the school, though they can still request leave.
 
-**Leave** — a staff member's request for days off (annual, sick, personal, study, maternity or paternity). Approved by someone with leave approval (`leave:approve`, the owner and principal by default), never by the requester.
+**Leave** — a staff member's request for days off (annual, sick, personal, study, maternity or paternity). Days off count weekdays minus school holidays, and a request can't overlap the requester's own. Approved by someone with leave approval (`leave:approve`, the owner and principal by default), never by the requester.
 
 **Announcement** — news for parents and students in the portal, for everyone or one campus. Drafted, published, pinned or withdrawn; never deleted.
 
-**Approval** — a second person's sign-off on a correction, a payment cancellation or a store write-off. Nobody approves their own request. A school can switch approval off for each kind ("Approval rules").
+**Approval** — a second person's sign-off on a correction, a payment cancellation, a store write-off or staff leave. Nobody approves or declines their own request. A school can switch approval off for each money kind ("Approval rules"); leave always needs one.
+
+**Activity** — a line recording who did what in the school, written with the change and never edited. "Recent activity" on the dashboard, filtered by campus and by what the viewer may see. Not the platform's audit log.
+
+**File** — an uploaded proof of transfer, school logo or guardian photo. Belongs to one record and is served only to people who may see that record; a proof is never deleted or replaced.
 
 ## Money
 
-**Reference** — names one movement of money or stock. Applied at most once, so a retried request or a double click cannot move the same money twice.
+**Reference** — names one movement of money or stock. Applied at most once, so a retried request or a double click cannot move the same money twice; reusing it for a different request is refused.
 
 **Journal entry** — one movement of money, as balanced debit and credit lines. Entries are never edited; corrections are new entries. "For your accountant" on screen.
 
@@ -70,9 +76,9 @@ Terms the code and the people using it share. Adapted from the earlier school-ma
 
 **Balance** — what a student owes (or holds as credit): the sum of their journal lines. Never stored. "Owing", "Paid up" or "In credit" on screen.
 
-**Money account** — where money physically sits: a cash box, a bank account, a POS terminal, later a gateway.
+**Money account** — where money physically sits: a cash box, a bank account, a POS terminal, later a gateway. A closed account is retired, never deleted.
 
-**Fee line** — one charge on the fee schedule: a fee type and amount for a level and term, optionally for one campus, only new or returning students, or opt-in. "School fees" means tuition; everything else is "Other fees".
+**Fee line** — one charge on the fee schedule: a fee type and amount for a level and term, optionally for one campus, only new or returning students, or opt-in. An opt-in is per student and fee type for a school year. "School fees" means tuition; everything else is "Other fees".
 
 **Fee type** — the category of a fee line (Tuition, PTA fee, School bus). A ledger account under fee income.
 
@@ -84,23 +90,25 @@ Terms the code and the people using it share. Adapted from the earlier school-ma
 
 **Payment** — money received, recorded at once with a receipt (`RCT-2026-00088`). One payment can be split across siblings. A bank transfer needs proof attached. "Payment rules" sets which ways to pay the school accepts.
 
-**Void** — undoing a payment. "Cancel a payment" on screen. The row is kept and marked, and the reversal is a new movement once approved. Money records are never deleted.
+**Void** — undoing a payment. "Cancel a payment" on screen. The row is kept and marked, and the reversal is a new movement once approved. Money records are never deleted. A store sale's payment can't be cancelled on its own.
 
 **Adjustment** — a correction to a student's account: a credit note ("Reduce a fee"), a write-off ("Cancel a balance") or a refund of credit. Needs a second person's approval unless the school has switched that approval off. "Discounts and refunds" on screen.
 
-**Discount** — a standing reduction for one student (a sibling discount, a scholarship), applied as a negative line each time they are charged within its terms.
+**Discount** — a standing reduction for one student (a sibling discount, a scholarship), applied as a negative line each time they are charged within its terms. Every discount applies, each capped at the fees it is taken on.
 
-**Opening balance** — a student's debt or credit, or a store's stock, carried in from before the school started using Eduvault.
+**Opening balance** — a student's debt or credit, a money account's balance, or a store's stock, carried in from before the school started using Eduvault.
 
 **Who owes** — the list of student balances, split into current students and those who left or graduated.
 
-**Family statement** — a paying guardian's children's accounts shown together. Each child keeps their own account.
+**Family statement** — a paying guardian's children's accounts shown together. Each child keeps their own account; the family total adds up what is owed and shows credit separately.
 
 ## Store
 
 **Store** — the shop on a campus that sells uniforms and textbooks to students. One per campus. Items are paid for at the store, not added to school fees.
 
-**Item** — something the school holds. In the store: a uniform piece in one size, or a textbook for a level, with a cost price and a selling price. Later also consumables, assets and library books.
+**Item** — something the school holds. In the store: a uniform piece in one size, or a textbook for a level, with a cost price (the default for new deliveries) and a selling price. Later also consumables, assets and library books.
+
+**Average cost** — what one unit of an item in a store is worth on the books: the stock's value divided by the quantity on hand, updated by each delivery. Sales and count differences are valued at it.
 
 **Delivery** — stock arriving at a store from a supplier, paid from a money account.
 
@@ -108,7 +116,7 @@ Terms the code and the people using it share. Adapted from the earlier school-ma
 
 **Stock movement** — a change in quantity of an item in a store. Stock on hand is the sum of movements, never a stored count.
 
-**Stock count** — a physical count of a store. Any difference waits for approval as a "Store write-off", then posts at cost to Store stock losses.
+**Stock count** — a physical count of every item in a store. Any difference waits for approval as a "Store write-off", then posts at average cost to Store stock losses. One count per store waits at a time.
 
 **Requisition** — (later phase) a staff request for consumables, approved before it is issued.
 
@@ -130,4 +138,4 @@ Terms the code and the people using it share. Adapted from the earlier school-ma
 
 **Grade band** — one step of a grade scale: a minimum score, a grade and a remark.
 
-**Promotion** — the end-of-session decision for an enrolment: promote, repeat, graduate or withdraw. Suggested by rule, confirmed by staff.
+**Promotion** — the end-of-session decision for an enrolment: promote, repeat, graduate or withdraw. Suggested by rule, confirmed by staff. Replaces Start new school year.
