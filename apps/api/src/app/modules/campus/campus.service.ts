@@ -11,7 +11,7 @@ import { CampusRepository } from './campus.repository';
 
 interface CreateInput {
   name: string;
-  address?: string | null | undefined;
+  address?: string | null;
 }
 
 @Injectable()
@@ -37,7 +37,9 @@ export class CampusService {
       throw new NotFoundException('Campus not found');
     }
     const campus = await this.campuses.findById(ctx.organizationId, id);
-    if (!campus) throw new NotFoundException('Campus not found');
+    if (!campus) {
+      throw new NotFoundException('Campus not found');
+    }
     return campus;
   }
 

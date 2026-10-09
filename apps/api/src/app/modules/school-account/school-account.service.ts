@@ -13,7 +13,9 @@ export class SchoolAccountService {
 
   async get(ctx: OrgContext): Promise<SchoolAccount> {
     const account = await this.accounts.find(ctx.organizationId);
-    if (!account) throw new NotFoundException('School account not found');
+    if (!account) {
+      throw new NotFoundException('School account not found');
+    }
     return account;
   }
 
@@ -26,13 +28,17 @@ export class SchoolAccountService {
     input: SchoolAccountPatch
   ): Promise<SchoolAccount> {
     const account = await this.accounts.update(ctx.organizationId, input);
-    if (!account) throw new NotFoundException('School account not found');
+    if (!account) {
+      throw new NotFoundException('School account not found');
+    }
     return account;
   }
 
   async remove(ctx: OrgContext): Promise<{ id: string }> {
     const id = await this.accounts.remove(ctx.organizationId);
-    if (!id) throw new NotFoundException('School account not found');
+    if (id === undefined) {
+      throw new NotFoundException('School account not found');
+    }
     return { id };
   }
 }

@@ -1,7 +1,7 @@
 import type { FeeSchedule } from '@eduvault/api-contract';
 
 export interface NewFeeSchedule {
-  campusId?: string | null | undefined;
+  campusId?: string | null;
   name: string;
   amountMinor: number;
   currency: string;

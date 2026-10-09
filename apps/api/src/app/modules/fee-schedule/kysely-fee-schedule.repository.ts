@@ -42,13 +42,13 @@ export class KyselyFeeScheduleRepository extends FeeScheduleRepository {
       .selectFrom('fee_schedule')
       .selectAll()
       .where('organization_id', '=', organizationId);
-    if (campusId) {
+    if (campusId !== undefined) {
       query = query.where((eb) =>
         eb.or([eb('campus_id', '=', campusId), eb('campus_id', 'is', null)])
       );
     }
     const rows = await query.orderBy('name').orderBy('id').execute();
-    return rows.map(toFee);
+    return rows.map((row) => toFee(row));
   }
 
   async findById(

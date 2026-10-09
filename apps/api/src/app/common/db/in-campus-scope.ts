@@ -8,7 +8,11 @@ export function inCampusScope<TB extends keyof DB>(
   column: ReferenceExpression<DB, TB>,
   scope: CampusScope
 ) {
-  if (scope === 'all') return eb.val(true);
-  if (scope.length === 0) return eb.val(false);
+  if (scope === 'all') {
+    return eb.val(true);
+  }
+  if (scope.length === 0) {
+    return eb.val(false);
+  }
   return eb(column, 'in', scope);
 }

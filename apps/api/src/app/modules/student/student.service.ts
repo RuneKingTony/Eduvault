@@ -10,7 +10,7 @@ import { CampusService } from '../campus/campus.service';
 import { StudentRepository } from './student.repository';
 
 interface StudentInput {
-  campusId?: string | undefined;
+  campusId?: string;
   fullName: string;
   admissionNumber: string;
 }
@@ -23,7 +23,7 @@ export class StudentService {
   ) {}
 
   list(ctx: OrgContext, campusId?: string): Promise<Student[]> {
-    if (campusId && !canSeeCampus(ctx.campusScope, campusId)) {
+    if (campusId !== undefined && !canSeeCampus(ctx.campusScope, campusId)) {
       throw new NotFoundException('Campus not found');
     }
     return this.students.list(ctx.organizationId, ctx.campusScope, campusId);
@@ -35,13 +35,15 @@ export class StudentService {
       ctx.campusScope,
       id
     );
-    if (!student) throw new NotFoundException('Student not found');
+    if (!student) {
+      throw new NotFoundException('Student not found');
+    }
     return student;
   }
 
   async create(ctx: OrgContext, input: StudentInput): Promise<Student> {
     const campusId = input.campusId ?? ctx.activeCampusId;
-    if (!campusId) {
+    if (campusId === null) {
       throw new BadRequestException(
         'campusId is required when the session has no active campus'
       );
@@ -60,11 +62,13 @@ export class StudentService {
     input: Partial<StudentInput>
   ): Promise<Student> {
     await this.get(ctx, id);
-    if (input.campusId) {
+    if (input.campusId !== undefined) {
       await this.campuses.assertInSchool(ctx, input.campusId);
     }
     const student = await this.students.update(ctx.organizationId, id, input);
-    if (!student) throw new NotFoundException('Student not found');
+    if (!student) {
+      throw new NotFoundException('Student not found');
+    }
     return student;
   }
 
