@@ -7,7 +7,7 @@ model: sonnet
 effort: medium
 metadata:
   author: Jude Okafor
-  version: '1.0'
+  version: '1.1'
   ported-from: fogado spike 1.4
 ---
 
@@ -52,12 +52,16 @@ ticket pane with `SHIP_MAX_PARALLEL=<cap>` so ship's `slot.sh` admits the same n
 ## Start: every invocation except `--status`
 
 1. `mkdir -p $D`. `RUN_ID=$(uuidgen)`. `bash $W/lock.sh acquire $D/.spike-lock $RUN_ID` -> 40 means another
-   spike owns this epic: halt with its output. The file is `.spike-lock`, never `.lock`, because `slot.sh`
+   spike owns this epic. Then `bash $W/lock.sh status $D/.spike-lock`: `heartbeats` empty and `age` over 180 is a
+   dead owner (a killed session), so `bash $W/lock.sh steal $D/.spike-lock $RUN_ID` and carry on; anything else
+   halts with acquire's output. Never `rm` the lock. The file is `.spike-lock`, never `.lock`, because `slot.sh`
    counts every `.lock` as a running ship.
 2. `echo $PPID` in the foreground, then leave `bash $W/heartbeat.sh $D/.spike-lock $RUN_ID <pid>` running in
    the background. Exit 40 means another session took the epic: **stop at once**.
-3. `bash $SP/init.sh <EPIC> <flags…>` -> `{cap, budget_left, only, run_started, …}`. Print one line with cap
-   and budget. It marks the cached graph stale, so the first walk refetches GitHub.
+3. `bash $SP/init.sh <EPIC> <flags…>` -> `{cap, budget_left, only, run_started, auto_decide, …}`. Print one line
+   with cap and budget (`ship_max_parallel` always equals `cap`). `auto_decide` false: say so in that line, since
+   each ticket's `/propose` then runs inside its ship pane and waits for a person. It marks the cached graph
+   stale, so the first walk refetches GitHub.
    Under `--dry-run` skip steps 1-2 (and never needs Herdr).
 
 ## The loop
@@ -75,10 +79,12 @@ auto_resume, eligible, inflight, done, halted, held, frozen, blocked, errors, �
    (only held tickets, and what waits behind them, remain) -> report _complete except held_. `budget_done`
    -> stop report. `stalled` (nothing running, nothing can start, no pane waiting on the user) -> stop report.
 4. **Dispatch.** First each `auto_resume` key (a `died` ticket, resumed once per run):
-   `bash $SP/dispatch.sh <EPIC> <KEY> --auto-resume [--auto-decide]` (17 = refused, log it). Then each key in
-   `dispatch`, in order: `bash $SP/dispatch.sh <EPIC> <KEY> [--auto-decide]` -> `<KEY> -> pane <pane>`.
-   Never exceed `slots`. Exits: 12 already live, skip; 13 Herdr is broken, halt the run; 14/15 log it,
-   `observe.sh` reports it; 16 pane start failed, nothing recorded, the next walk retries.
+   `bash $SP/dispatch.sh <EPIC> <KEY> --auto-resume` (17 = refused, log it). Then each key in `dispatch`, in
+   order: `bash $SP/dispatch.sh <EPIC> <KEY>` -> `<KEY> -> pane <pane>`. `dispatch.sh` reads `auto_decide` from
+   `$D/status.json` on every call (a flag passed once is stored), so no dispatch or resume ever drops it.
+   Never exceed `slots`. Dispatches that overlap queue on a mutex, so background them freely. Exits: 12 already
+   live, skip; 13 Herdr is broken, halt the run; 14/15 log it, `observe.sh` reports it; 16 pane start failed,
+   nothing recorded, the next walk retries; 18 the mutex was held 10 minutes, retry on the next walk.
    Each ticket's `/ship` starts in `bypassPermissions` (`dispatch.sh`), so `blocked-ui` is a real question or a
    startup dialog. A ticket pane belongs to ship: the only typing into it is `relay.sh --answer` with the
    user's own words. Answering yourself would approve an action in the user's name.
@@ -100,7 +106,9 @@ Only on the user's explicit ask in this session:
   then `relay.sh <EPIC> <KEY> --answer "<their exact words or option number>"`.
 - **Link** a soft edge on GitHub: `$ROOT/.claude/skills/github-issues/scripts/gh-issues.sh create-link <n> blocked-by <m>`
   (dry-run unless `--yes`), then confirm with `list-links <n>`.
-- **Diagnose**: `diagnose.sh <EPIC> <KEY>` (read-only).
+- **Diagnose**: `diagnose.sh <EPIC> <KEY>` (read-only: ship's stage and lock, panes, the e2e stack's ports and
+  who holds them). Run it on the first `waiting-user` for a ticket and on any in-flight line labelled
+  "waiting on a background task", before telling the user anything about why it is idle.
 - **Close issues**: spike never does. Closing is the human's, one ticket at a time.
 
 ## Outcomes, from ship's files only
@@ -108,18 +116,18 @@ Only on the user's explicit ask in this session:
 `observe.sh` reads `.claude/opsx/<KEY>/` (`status.json`, `.lock`) and confirms merges with `gh pr view`.
 Never judge a ticket by its pane's chat.
 
-| state                 | meaning                                                                                                  | spike does                                                                                                                 |
-| --------------------- | -------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `done`                | merge-gate `pass` and the PR is `MERGED`                                                                 | dependents become eligible                                                                                                 |
-| `running`             | ship's lock heartbeat < 10 min old (or dispatched < 15 min ago)                                          | waits                                                                                                                      |
-| `blocked-ui`          | the pane waits on a permission prompt or question                                                        | reports it; freezes its component                                                                                          |
-| `waiting-user`        | live lock, pane idle > 20 min                                                                            | reports it with the pane's last lines; holds its slot, freezes nothing                                                     |
-| `held`                | no live lock, PR not merged: merge-gate recorded `held` (`hold-merge`), or `pass` with the PR still open | not a halt: freezes nothing, frees its slot, keeps its pane; dependents stay blocked. Ends a run as _complete except held_ |
-| `halted`              | ship stopped and released its lock, not merged                                                           | freezes its component; never re-dispatched                                                                                 |
-| `died`                | a stale ship lock is still on disk                                                                       | auto-resumed once per run; a second death freezes like `halted`                                                            |
-| `withdrawn`           | the user withdrew it                                                                                     | frees its slot                                                                                                             |
-| `merged-outside-ship` | PR `MERGED` but merge-gate never passed                                                                  | counts as `done`, flagged on the board                                                                                     |
-| `none`                | not started (partial ship state is adopted; `/ship` resumes)                                             | eligible when its blockers are done                                                                                        |
+| state                 | meaning                                                                                                    | spike does                                                                                                                 |
+| --------------------- | ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `done`                | merge-gate `pass` and the PR is `MERGED`                                                                   | dependents become eligible                                                                                                 |
+| `running`             | ship's lock heartbeat < 10 min old and its process alive (or dispatched < 15 min ago)                      | waits. An idle pane waiting on a background task (stack still listening) stays here, labelled on the board                 |
+| `blocked-ui`          | the pane waits on a permission prompt or question                                                          | reports it; freezes its component                                                                                          |
+| `waiting-user`        | live lock, pane idle > 20 min and its last message asks something (no question: idle > 60 min)             | reports it with the pane's last lines; holds its slot, freezes nothing                                                     |
+| `held`                | no live lock, PR not merged: merge-gate recorded `held` (`hold-merge`), or `pass` with the PR still open   | not a halt: freezes nothing, frees its slot, keeps its pane; dependents stay blocked. Ends a run as _complete except held_ |
+| `halted`              | ship stopped and released its lock, not merged                                                             | freezes its component; never re-dispatched                                                                                 |
+| `died`                | a ship lock is still on disk and its heartbeat is over 3 min old with no heartbeat process, or over 10 min | auto-resumed once per run; a second death freezes like `halted`                                                            |
+| `withdrawn`           | the user withdrew it                                                                                       | frees its slot                                                                                                             |
+| `merged-outside-ship` | PR `MERGED` but merge-gate never passed                                                                    | counts as `done`, flagged on the board                                                                                     |
+| `none`                | not started (partial ship state is adopted; `/ship` resumes)                                               | eligible when its blockers are done                                                                                        |
 
 Because merging is human, a normal run parks every finished ticket at `held` until you merge its PR; its
 dependents start on the next walk after the merge. Merge, then `/ship <KEY>` in its pane runs cleanup.

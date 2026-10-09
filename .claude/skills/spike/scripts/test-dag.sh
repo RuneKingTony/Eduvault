@@ -156,6 +156,128 @@ OUT=$(bash "$HERE/walk.sh" EDU-100 --status 2>/dev/null); RC=$?
 [ $RC = 0 ] && head -1 <<<"$OUT" | grep -q '^spike loop: not running' && grep -q 'Nothing in flight' <<<"$OUT" && grep -q '0 done' <<<"$OUT" && ok "--status works with no Herdr and fixtures" || bad "--status" "$OUT"
 check "--status leaves no run state" test ! -e "$SPIKE_OPSX/epic-EDU-100/status.json"
 
+# ---- observe.sh liveness and idle classification, walk.sh notify and board, with stubbed herdr / lsof ------------
+cat > "$T/bin/herdr" <<'H'
+#!/bin/bash
+d=${HS:?}
+case "$1 $2" in
+  "agent get") if [ -f "$d/agent.$3" ]; then jq -nc --arg s "$(cat "$d/agent.$3")" '{result:{agent:{agent_status:$s}}}'
+               else echo '{"error":{"code":"agent_not_found"}}'; exit 1; fi ;;
+  "agent read") cat "$d/text.$3" 2>/dev/null ;;
+  "pane read") cat "$d/text.pane" 2>/dev/null ;;
+  "pane get") echo '{"result":{"pane":{"agent":null}}}' ;;
+  *) exit 1 ;;
+esac
+H
+printf '#!/bin/bash\ncase "$*" in *":${LSOF_PORT:-none}"*) echo 4242 ;; *) exit 1 ;; esac\n' > "$T/bin/lsof"
+chmod +x "$T/bin/herdr" "$T/bin/lsof"
+ago() { echo $(( $(date +%s) - $1 )); }
+# case <hb age> <dispatched age> <agent status|-> <idle seconds|-> <pane text>: a ticket EDU-101 dispatched
+# to agent a1 with a ship lock, its ship files 40 minutes old; sets SO (the opsx dir) and HS (the herdr stub dir)
+case_() {
+  n=$((n + 1)); export SPIKE_OPSX=$T/opsx$n GH_ISSUES_FIXTURE_DIR=$FIX/linear SPIKE_NOTIFY=0 HS=$T/hs$n; SO=$SPIKE_OPSX
+  mkdir -p "$SO/EDU-101" "$HS"
+  bash "$HERE/graph.sh" EDU-100 --fresh >/dev/null
+  jq -nc --argjson e "$(ago "$2")" --argjson i "$( [ "$4" = - ] && echo null || ago "$4")" \
+    '{dispatched:{"EDU-101":{agent:"a1",pane:"p1",epoch:$e,at:"x"}},concurrency:3} + (if $i then {idle_since:{"EDU-101":$i}} else {} end)' \
+    > "$SO/epic-EDU-100/status.json"
+  jq -nc --argjson h "$(ago "$1")" '{run_id:"r",heartbeat_epoch:$h}' > "$SO/EDU-101/.lock"
+  echo '{"stages":{"implement":{"result":"running","started_epoch":1}}}' > "$SO/EDU-101/status.json"
+  touch -t 202001010000 "$SO/EDU-101/status.json"
+  [ "$3" = - ] || echo "$3" > "$HS/agent.a1"
+  printf '%s\n' "$5" > "$HS/text.a1"
+}
+observe_() { PATH="$T/bin:$PATH" HS=$HS bash "$HERE/observe.sh" EDU-100 | jq -c '.["EDU-101"]'; }
+st_() { jq -r .state <<<"$1"; }
+hbproc() { bash -c 'sleep 25; :' heartbeat.sh "$SO/EDU-101/.lock" x >/dev/null 2>&1 & HBPID=$!; }
+hbkill() { kill "$HBPID" 2>/dev/null; wait "$HBPID" 2>/dev/null; return 0; }
+
+case_ 300 3000 working - ''
+o=$(observe_); [ "$(st_ "$o")" = died ] && jq -r .reason <<<"$o" | grep -q 'heartbeat 5 min old and ship.s process is gone' && ok "a 5 min stale heartbeat with no process is died now" || bad "fast death" "$o"
+case_ 300 3000 working - ''; hbproc
+o=$(observe_); hbkill; [ "$(st_ "$o")" = running ] && ok "a 5 min old heartbeat with its process alive is still running" || bad "heartbeat process alive" "$o"
+case_ 300 3000 - - ''; hbproc
+o=$(observe_); hbkill; [ "$(st_ "$o")" = died ] && ok "a lost agent is died even with a heartbeat process" || bad "agent gone" "$o"
+case_ 100 3000 working - ''
+o=$(observe_); [ "$(st_ "$o")" = running ] && ok "a fresh heartbeat is never checked for death" || bad "fresh heartbeat" "$o"
+case_ 400 100 working - ''
+o=$(observe_); [ "$(st_ "$o")" = running ] && jq -r .reason <<<"$o" | grep -q starting && ok "a lock older than the dispatch is the previous run's: starting" || bad "previous run's lock" "$o"
+case_ 700 3000 working - ''
+o=$(observe_); [ "$(st_ "$o")" = died ] && jq -r .reason <<<"$o" | grep -q 'stale lock, never released' && ok "a 10 min stale lock is still died" || bad "stale lock died" "$o"
+
+case_ 30 3000 idle 1500 '⏺ Should I send simplify back to dedupe the shells?'
+o=$(observe_); [ "$(st_ "$o")" = waiting-user ] && jq -r .question <<<"$o" | grep -q 'send simplify back' && ok "idle 25 min and a question is waiting-user" || bad "waiting-user with a question" "$o"
+case_ 30 3000 idle 1500 '⏺ Stack is starting in the background. Waiting on it.'
+o=$(observe_); [ "$(st_ "$o")" = running ] && jq -r .reason <<<"$o" | grep -q 'waiting on a background task' && ok "idle 25 min on a background task is running, labelled" || bad "background wait" "$o"
+case_ 30 3000 idle 1500 '⏺ Review passed.'
+o=$(observe_); [ "$(st_ "$o")" = waiting-user ] && jq -r .reason <<<"$o" | grep -q 'no question' && ok "idle with no question and no task is waiting-user, flagged" || bad "idle no question" "$o"
+case_ 30 3000 idle 1500 '⏺ Review passed.'
+jq '.stack = {up: true, name: "x", api_port: 3999}' "$SO/EDU-101/status.json" > "$T/s.json" && cp "$T/s.json" "$SO/EDU-101/status.json"; touch -t 202001010000 "$SO/EDU-101/status.json"
+o=$(PATH="$T/bin:$PATH" LSOF_PORT=3999 HS=$HS bash "$HERE/observe.sh" EDU-100 | jq -c '.["EDU-101"]'); [ "$(st_ "$o")" = running ] && jq -r .reason <<<"$o" | grep -q 'background task' && ok "a listening stack counts as activity" || bad "stack listening" "$o"
+case_ 30 3000 idle 4000 '⏺ Stack is starting in the background. Waiting on it.'
+o=$(observe_); [ "$(st_ "$o")" = waiting-user ] && ok "a background wait past BG_WAIT_MAX escalates" || bad "background wait escalates" "$o"
+case_ 30 3000 idle 100 '⏺ Should I continue?'
+o=$(observe_); [ "$(st_ "$o")" = running ] && ok "idle under the threshold is running" || bad "idle under threshold" "$o"
+case_ 30 3000 working 1500 '⏺ Should I continue?'
+observe_ >/dev/null
+[ "$(jq -r '.idle_since["EDU-101"] // "none"' "$SO/epic-EDU-100/status.json")" = none ] && ok "a working pane clears its idle time" || bad "idle cleared"
+echo idle > "$HS/agent.a1"; o=$(observe_)
+[ "$(st_ "$o")" = running ] && [ "$(jq -r '.idle_since["EDU-101"] // empty' "$SO/epic-EDU-100/status.json" | wc -c | tr -d ' ')" -gt 1 ] && ok "a pane that flaps starts counting again from zero" || bad "flap" "$o"
+case_ 30 3000 idle 1500 '⏺ Should I continue?'
+before=$(cat "$SO/epic-EDU-100/status.json"); PATH="$T/bin:$PATH" HS=$HS SPIKE_READONLY=1 bash "$HERE/observe.sh" EDU-100 >/dev/null
+[ "$(cat "$SO/epic-EDU-100/status.json")" = "$before" ] && ok "SPIKE_READONLY leaves the idle record alone" || bad "readonly idle"
+
+# lib.sh helpers
+cd "$HERE" || exit 1
+L=$( . ./lib.sh; printf '⏺ Fix the dedupe?\n⏺ That is just the heartbeat ending normally\n⏺ Bash(ls)\n' | last_block )
+grep -q 'dedupe' <<<"$L" && ok "last_block skips heartbeat chatter and tool calls" || bad "last_block" "$L"
+( . ./lib.sh; printf '⏺ Done.\n' | asks_question ) && bad "asks_question on a statement" || ok "a statement is not a question"
+( . ./lib.sh; printf '⏺ Merge it now?\n' | asks_question ) && ok "a question is asked" || bad "asks_question"
+n=$((n + 1)); export SPIKE_OPSX=$T/opsx$n; mkdir -p "$SPIKE_OPSX/epic-EDU-100"
+jq -nc --argjson h "$(ago 300)" '{run_id:"r",heartbeat_epoch:$h}' > "$SPIKE_OPSX/epic-EDU-100/.spike-lock"
+( . ./lib.sh; loop_live EDU-100 ) && bad "dead spike loop reads live" || ok "a spike loop 5 min stale with no heartbeat process is not live"
+jq -nc --argjson h "$(ago 30)" '{run_id:"r",heartbeat_epoch:$h}' > "$SPIKE_OPSX/epic-EDU-100/.spike-lock"
+( . ./lib.sh; loop_live EDU-100 ) && ok "a fresh spike loop is live" || bad "fresh spike loop"
+cd - >/dev/null || exit 1
+
+# walk.sh: halt text, closed panes, notify cooldown
+case_ 700 3000 - - ''
+jq '.dispatched["EDU-101"].closed_at = "x"' "$SO/epic-EDU-100/status.json" > "$T/s.json" && cp "$T/s.json" "$SO/epic-EDU-100/status.json"
+echo '{"EDU-101":{"state":"halted","ship_stage":"implement","halt_reason":"typecheck failed in app-shell.tsx","last_line":"That is just the heartbeat ending normally","pane":"p1"}}' > "$T/obs.json"
+OUT=$(PATH="$T/bin:$PATH" SPIKE_OBS=$T/obs.json bash "$HERE/walk.sh" EDU-100 --status 2>&1)
+grep -q 'typecheck failed in app-shell.tsx' <<<"$OUT" && ! grep -q 'heartbeat ending' <<<"$OUT" && ok "halt text prefers halt_reason over the pane's last line" || bad "halt_reason first" "$OUT"
+grep 'EDU-101 ' <<<"$OUT" | grep -q 'pane p1' && bad "closed pane still on the board" "$OUT" || ok "a closed pane drops off its board row"
+
+case_ 30 3000 - - ''
+echo '{"EDU-101":{"state":"waiting-user","ship_stage":"implement","question":"merge it?","pane":"p1"}}' > "$T/obsW.json"
+echo '{"EDU-101":{"state":"running","ship_stage":"implement","ship_result":"running","pane":"p1"}}' > "$T/obsR.json"
+refresh() { PATH="$T/bin:$PATH" SPIKE_OBS=$1 NOTIFY_COOLDOWN=${2:-1800} bash "$HERE/walk.sh" EDU-100 --refresh >/dev/null 2>&1; }
+nlog() { grep -c 'notified: EDU-101' "$SO/epic-EDU-100/log.md" 2>/dev/null || echo 0; }
+refresh "$T/obsW.json"; [ "$(nlog)" = 1 ] && ok "entering waiting-user notifies once" || bad "first notify" "$(nlog)"
+refresh "$T/obsW.json"; [ "$(nlog)" = 1 ] && ok "staying in it does not notify again" || bad "stay" "$(nlog)"
+refresh "$T/obsR.json"; refresh "$T/obsW.json"
+[ "$(nlog)" = 1 ] && ok "a flap back into the same state inside the cooldown is not re-announced" || bad "flap notify" "$(nlog)"
+refresh "$T/obsR.json" 0; refresh "$T/obsW.json" 0
+[ "$(nlog)" = 2 ] && ok "after the cooldown a re-entry is announced" || bad "cooldown expiry" "$(nlog)"
+
+# dispatch.sh --dry-run forwards the epic's auto_decide; init.sh's ship_max_parallel is the cap
+case_ 700 3000 - - ''
+rm -f "$SO/EDU-101/.lock"
+dd_() { PATH="$T/bin:$PATH" HERDR_ENV=1 HS=$HS bash "$HERE/dispatch.sh" EDU-100 EDU-101 --dry-run "$@" 2>&1 | jq -r .auto_decide; }
+[ "$(dd_)" = false ] && ok "dispatch without auto_decide stays off" || bad "auto_decide off"
+[ "$(dd_ --auto-decide)" = true ] && ok "dispatch --auto-decide forwards it" || bad "auto_decide flag"
+jq '.auto_decide = true' "$SO/epic-EDU-100/status.json" > "$T/s.json" && cp "$T/s.json" "$SO/epic-EDU-100/status.json"
+[ "$(dd_)" = true ] && ok "dispatch and resume read auto_decide from status.json" || bad "auto_decide from status"
+[ "$(dd_ --resume)" = true ] && ok "a resume keeps auto_decide" || bad "auto_decide on resume"
+e2e linear EDU-100 --concurrency 2
+[ "$(SHIP_MAX_PARALLEL=3 bash "$HERE/init.sh" EDU-100 --concurrency 2 --dry-run | jq -r '.ship_max_parallel')" = 2 ] && ok "init.sh ship_max_parallel is the cap in force" || bad "ship_max_parallel"
+
+# diagnose.sh stack section
+case_ 30 3000 working - ''
+jq '.stack = {up: true, name: "wt", api_port: 3999, admin_port: 3998}' "$SO/EDU-101/status.json" > "$T/s.json" && cp "$T/s.json" "$SO/EDU-101/status.json"
+OUT=$(PATH="$T/bin:$PATH" LSOF_PORT=3999 HS=$HS bash "$HERE/diagnose.sh" EDU-100 EDU-101 2>&1)
+grep -q 'api :3999  listening, pid 4242' <<<"$OUT" && grep -q 'admin :3998  free' <<<"$OUT" && ok "diagnose reports who holds each stack port" || bad "diagnose stack" "$OUT"
+
 # ---- every dispatch path refuses without Herdr -----------------------------------------------------------
 for cmd in "dispatch.sh EDU-100 EDU-101" "dispatch.sh EDU-100 EDU-101 --dry-run" "dispatch.sh EDU-100 EDU-101 --resume" \
            "relay.sh EDU-100 EDU-101 --show" "withdraw.sh EDU-100 EDU-101" "wait.sh EDU-100" "reap.sh EDU-100"; do

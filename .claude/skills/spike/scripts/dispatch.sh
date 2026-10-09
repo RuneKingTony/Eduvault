@@ -13,11 +13,14 @@
 # The spike's own pane, in the tab you ran /spike from, is never split.
 #
 # usage: dispatch.sh <EPIC> <KEY> [--auto-decide] [--resume|--auto-resume] [--dry-run]
+#   --auto-decide  forwarded to /ship and stored in the epic's status.json, so every later dispatch and resume
+#                  keeps it without being told again (it is read from there on every call)
 #   --resume       the user-approved re-run of a halted/died ticket: reuses its recorded pane when that
-#                  pane is still open with no busy Claude in it, otherwise opens a new column
+#                  pane is still open with no busy Claude in it, otherwise opens a new column. Panes of its earlier
+#                  attempts that hold no Claude any more are closed once the new one runs
 #   --auto-resume  walk.sh's `auto_resume`: --resume for a died ticket (stale ship lock still on disk), at
 #                  most once per run (`.auto_resumed[KEY]`, against `.run_started`); a halted ticket is refused
-#   --dry-run      decide the placement and print it ({key, dry_run, tab, pane, anchor, direction}) without
+#   --dry-run      decide the placement and print it ({key, dry_run, tab, pane, anchor, direction, auto_decide}) without
 #                  creating, splitting, exiting or starting anything
 # exit:  0 started (prints {key, pane, anchor, direction, agent, attempts, auto_resume})
 #        12 already live (its agent is working/blocked, or ship's lock for it is live) — skip it
@@ -26,7 +29,10 @@
 #        16 `herdr agent start` failed in the chosen pane and in a fresh column — nothing recorded;
 #           retry on the next walk
 #        17 --auto-resume refused: not died, or already auto-resumed in this run
-# Every pane gets HERDR_ENV=1, SHIP_MAX_PARALLEL=<cap> and SPIKE_EPIC=<EPIC>.
+#        18 another dispatch held the pane-choice mutex for 10 minutes
+# Every pane gets HERDR_ENV=1, SHIP_MAX_PARALLEL=<cap> and SPIKE_EPIC=<EPIC>. Dispatches run one at a time from
+# choosing a pane until the ticket is recorded in status.json (.dispatch.mutex): two parallel dispatches would
+# otherwise both claim the root pane. A pane is renamed to its ticket only once Claude runs in it.
 set -u
 . "$(dirname "$0")/lib.sh"
 
@@ -43,6 +49,7 @@ for a in "$@"; do case "$a" in
   *) echo "unknown flag $a"; exit 2 ;;
 esac; done
 [ "$(es_get "$EPIC" '.auto_decide')" = true ] && FLAGS=" --auto-decide"
+AD=false; [ -n "$FLAGS" ] && AD=true
 test "${HERDR_ENV:-}" = 1 || { echo "not inside Herdr (HERDR_ENV != 1)"; exit 13; }
 if $AUTO; then
   # ship's halts are deterministic, so only a killed run (its lock never released) is retried, and once
@@ -72,6 +79,19 @@ pane_status() {
   jq -r '.result.pane | if (.agent // null) != null then (.agent_status // "unknown")
          elif (.agent_session // null) != null then "stale" else "none" end' <<<"$j"
 }
+
+MUTEX=$(epic_dir "$EPIC")/.dispatch.mutex
+release_mutex() { rmdir "$MUTEX" 2>/dev/null; }
+if ! $DRY; then
+  mkdir -p "$(epic_dir "$EPIC")"; GOT=false
+  for _ in $(seq 1 600); do
+    if mkdir "$MUTEX" 2>/dev/null; then GOT=true; trap release_mutex EXIT; break; fi
+    [ $(( $(date +%s) - $(mtime "$MUTEX") )) -gt 400 ] && rmdir "$MUTEX" 2>/dev/null
+    sleep 1
+  done
+  $GOT || { echo "$KEY: another dispatch has held $MUTEX for 10 minutes"; exit 18; }
+  $AD && [ "$(es_get "$EPIC" '.auto_decide')" != true ] && es_set "$EPIC" '.auto_decide = true'
+fi
 
 # the ticket's /ship must admit as many parallel runs as spike dispatches, or slot.sh parks the extras
 CAP=$(es_get "$EPIC" '.concurrency'); CAP=${CAP:-3}; [ "$CAP" -gt 10 ] && CAP=10
@@ -135,12 +155,11 @@ if [ -z "$PANE" ]; then
     new_column
   fi
 fi
-$DRY && { jq -nc --arg k "$KEY" --arg t "$TAB" --arg p "$PANE" --arg a "$ANCHOR" --arg d "$DIR" --argjson ar "$AUTO" \
-            '{key: $k, dry_run: true, tab: $t, pane: $p, anchor: $a, direction: $d, auto_resume: $ar}'; exit 0; }
+$DRY && { jq -nc --arg k "$KEY" --arg t "$TAB" --arg p "$PANE" --arg a "$ANCHOR" --arg d "$DIR" --argjson ar "$AUTO" --argjson ad "$AD" \
+            '{key: $k, dry_run: true, tab: $t, pane: $p, anchor: $a, direction: $d, auto_resume: $ar, auto_decide: $ad}'; exit 0; }
 prep_pane() {
   # a reused pane's shell predates this dispatch, so it may lack this run's env
   $REUSED && herdr pane run "$PANE" "export HERDR_ENV=1 SHIP_MAX_PARALLEL=$CAP SPIKE_EPIC=$EPIC" >/dev/null 2>&1
-  herdr pane rename "$PANE" "spike · $KEY" >/dev/null 2>&1
   bash "$SP/rebalance.sh" "$TAB"
 }
 start_agent() {
@@ -168,13 +187,35 @@ if ! $started; then
   exit 16
 fi
 
+herdr pane rename "$PANE" "spike · $KEY" >/dev/null 2>&1
+bash "$SP/rebalance.sh" "$TAB"
+
 # recorded the moment Claude runs, so no started ticket is ever missing from .dispatched; a
 # re-dispatch clears withdrawn_at/closed_at and keeps every earlier pane in .panes
 es_set "$EPIC" '.dispatched[$k] = ((.dispatched[$k] // {}) as $o
     | {at: $t, epoch: $e, tab: $tab, pane: $p, anchor: $a, direction: $dir, agent: $n, attempts: (($o.attempts // 0) + 1),
        panes: (($o.panes // (if $o.pane then [{pane: $o.pane, agent: $o.agent, at: $o.at}] else [] end))
-               + [{pane: $p, agent: $n, at: $t}])})' \
+               + [{pane: $p, agent: $n, at: $t}])})
+    | del(.idle_since[$k])' \
   --arg k "$KEY" --arg t "$(now_iso)" --argjson e "$(date +%s)" --arg tab "$TAB" --arg p "$PANE" --arg a "$ANCHOR" --arg dir "$DIR" --arg n "$NAME"
+release_mutex
+# the earlier attempts' panes, once nothing runs in them, would otherwise stay as dead shells beside the new one
+close_superseded() {
+  local p t n
+  for p in $(es_get "$EPIC" ".dispatched[\"$KEY\"].panes[]?.pane"); do
+    [ "$p" = "$PANE" ] && continue
+    pane_gone "$p" && continue
+    [ "$(es_get "$EPIC" '[.dispatched | to_entries[] | select(.key != $k) | select(.value.closed_at | not) | select(.value.pane == $p)] | length' \
+         --arg k "$KEY" --arg p "$p")" = 0 ] || continue
+    case "$(pane_status "$p")" in none|stale) ;; *) continue ;; esac
+    t=$(herdr pane get "$p" 2>/dev/null | jq -r '.result.pane.tab_id // empty')
+    n=$(herdr tab get "${t:-$TAB}" 2>/dev/null | jq -r '.result.tab.pane_count // 0')
+    [ "${n:-0}" -gt 1 ] && herdr pane close "$p" >/dev/null 2>&1 &&
+      echo "$(now_iso) $KEY closed superseded pane $p" >> "$(epic_dir "$EPIC")/log.md"
+  done
+  return 0
+}
+$RESUME && close_superseded
 if $AUTO; then
   es_set "$EPIC" '.auto_resumed[$k] = {at: $t, epoch: $e, pane: $p}' --arg k "$KEY" --arg t "$(now_iso)" --argjson e "$(date +%s)" --arg p "$PANE"
   echo "$(now_iso) $KEY auto-resumed after it died (pane $PANE)" >> "$(epic_dir "$EPIC")/log.md"
@@ -192,6 +233,6 @@ if ! herdr agent prompt "$NAME" "/ship $KEY$FLAGS" --wait --until working --time
   herdr pane send-keys "$PANE" enter >/dev/null 2>&1
   herdr agent wait "$NAME" --until working --timeout 60000 >/dev/null 2>&1 || exit 15
 fi
-jq -nc --arg k "$KEY" --arg p "$PANE" --arg a "$ANCHOR" --arg d "$DIR" --arg n "$NAME" --argjson ar "$AUTO" \
+jq -nc --arg k "$KEY" --arg p "$PANE" --arg a "$ANCHOR" --arg d "$DIR" --arg n "$NAME" --argjson ar "$AUTO" --argjson ad "$AD" \
   --argjson at "$(es_get "$EPIC" ".dispatched[\"$KEY\"].attempts")" \
-  '{key: $k, pane: $p, anchor: $a, direction: $d, agent: $n, attempts: $at, auto_resume: $ar}'
+  '{key: $k, pane: $p, anchor: $a, direction: $d, agent: $n, attempts: $at, auto_resume: $ar, auto_decide: $ad}'

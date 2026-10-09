@@ -13,7 +13,8 @@
 #   --dry-run: write the merged config to <epic dir>/dry-status.json instead, never status.json
 #   --status:  write nothing, just print the stored config
 #   prints {concurrency, cap, only, max_tickets, budget_left, auto_decide, ship_max_parallel, started,
-#           run_started, dry_run}
+#           run_started, dry_run}; ship_max_parallel is the cap every ticket pane's ship runs with
+#           (dispatch.sh exports SHIP_MAX_PARALLEL=<cap>), so it always equals cap
 set -u
 . "$(dirname "$0")/lib.sh"
 
@@ -53,11 +54,11 @@ else
   # links edited minutes before this run must be seen: age the cache past any --max-age
   $DRY || { [ -f "$D/graph.json" ] && touch -t 200001010000 "$D/graph.json"; }
 fi
-jq -c --arg p "${SHIP_MAX_PARALLEL:-3}" --arg d "$DRY" '
+jq -c --arg d "$DRY" '
   ([(.concurrency // 3), 10] | min) as $cap | (.run_started // 0) as $rs
   | ([.dispatched // {} | .[] | select((.epoch // 0) >= $rs)] | length) as $used
   | {concurrency, cap: $cap, only, max_tickets,
      budget_left: (if .max_tickets then ([.max_tickets - $used, 0] | max) else null end),
-     auto_decide: (.auto_decide // false), ship_max_parallel: ($p | tonumber), started, run_started,
+     auto_decide: (.auto_decide // false), ship_max_parallel: $cap, started, run_started,
      dry_run: ($d == "true")}' "$OUT"
 rm -f "$D/.empty.json"

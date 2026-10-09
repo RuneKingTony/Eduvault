@@ -1,6 +1,7 @@
 #!/bin/bash
 # One screen on one ticket, so nobody reads ship's status.json, handoff JSONs and panes by hand:
-# ship's current stage and why, its lock, spike's pane and ship's worker, the pane's last lines, the PR.
+# ship's current stage and why, its lock, spike's pane and ship's worker, its e2e stack's ports and who holds
+# them, the pane's last lines, the PR.
 # Read-only: writes nothing, never types into a pane.
 #
 # usage: diagnose.sh <EPIC> <KEY> [lines=10]
@@ -40,6 +41,24 @@ if [ -n "$disp" ]; then
 else pane="" agent=""; echo "spike pane: not dispatched by spike"; fi
 wn=$(jq -r '.worker.agent_name // empty' "$s" 2>/dev/null)
 [ -n "$wn" ] && echo "worker:     $(jq -r '.worker.pane_id' "$s") · $wn · $(ast "$wn")"
+
+# the ticket's e2e stack: the ports ship recorded in status.json, who holds each, and the worktree stack's own pids
+if [ -f "$s" ] && jq -e '.stack' "$s" >/dev/null 2>&1; then
+  echo "stack:      $(jq -r '.stack | "\(.name // "?") · up=\(.up // false) · database \(.database // "?")"' "$s")"
+  for pk in api_port admin_port portal_port web_port; do
+    port=$(jq -r --arg k "$pk" '.stack[$k] // empty' "$s"); [ -n "$port" ] || continue
+    pid=$(lsof -iTCP:"$port" -sTCP:LISTEN -t 2>/dev/null | head -1)
+    if [ -n "$pid" ]; then
+      cwd=$(lsof -a -p "$pid" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p' | head -1)
+      echo "  ${pk%_port} :$port  listening, pid $pid ($(ps -o comm= -p "$pid" 2>/dev/null | xargs basename 2>/dev/null)) cwd ${cwd:-?}"
+    else echo "  ${pk%_port} :$port  free"; fi
+  done
+  sf=$ROOT/var/e2e/stacks/$(jq -r '.stack.name // empty' "$s")/state.json
+  [ -f "$sf" ] && for pk in api_pid admin_pid portal_pid web_pid; do
+    pid=$(jq -r --arg k "$pk" '.[$k] // empty' "$sf"); [ -n "$pid" ] || continue
+    kill -0 "$pid" 2>/dev/null && echo "  state.json $pk $pid alive" || echo "  state.json $pk $pid DEAD"
+  done
+else echo "stack:      none recorded"; fi
 
 pr=$(jq -r '.pr_url // empty' "$s" 2>/dev/null)
 if [ -n "$pr" ]; then

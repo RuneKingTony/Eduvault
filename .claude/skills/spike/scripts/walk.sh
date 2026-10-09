@@ -14,7 +14,9 @@
 # Needs you: blocked-ui, waiting-user (with the pane's question), halted (with ship's stage and last line),
 # died (after its one auto-resume, or with no live loop to resume it) and held — each with the action to take.
 # Notifies (notify.sh) once per entry into halted / died / blocked-ui / waiting-user, remembered in
-# status.json `.notified`; a died ticket whose auto-resume is still pending isn't announced.
+# status.json `.notified`; a died ticket whose auto-resume is still pending isn't announced. The message
+# carries the failed handoff's reason (else the pane's last real message) and the command that fixes it. A ticket
+# that leaves a state and re-enters the same one within NOTIFY_COOLDOWN s (default 1800) is not announced again.
 set -u
 . "$(dirname "$0")/lib.sh"
 
@@ -58,7 +60,7 @@ jq -c --slurpfile o "$TMP/obs.json" --slurpfile s "$TMP/st.json" --slurpfile g "
   ($o[0]) as $o | ($s[0]) as $st | . as $w
   | def ago($t): if ($t // 0) == 0 then "?" else ($now - $t) as $x
       | if $x < 3600 then "\($x / 60 | floor) min" else "\($x / 3600 | floor) h \($x % 3600 / 60 | floor) min" end end;
-    def pane($k): ($st.dispatched[$k].pane // $o[$k].pane // "?");
+    def pane($k): if $st.dispatched[$k].closed_at then "(closed)" else ($st.dispatched[$k].pane // $o[$k].pane // "?") end;
     def stage($k): ($o[$k].ship_stage // "an unknown stage");
     def q($k): ($o[$k].question // (($o[$k].pane_tail // "") | split("\n") | map(select(. != "")) | last) // "?");
     def relay($k): "`relay.sh \($e) \($k) --show`, ask the user, then `relay.sh \($e) \($k) --answer \"<their answer>\"`";
@@ -67,7 +69,7 @@ jq -c --slurpfile o "$TMP/obs.json" --slurpfile s "$TMP/st.json" --slurpfile g "
     ($w.waiting_user[] | .key as $k
       | "- **\($k)** is waiting on you in pane \(pane($k)) (\(.reason // "idle")): “\(q($k))” → \(relay($k))"),
     ($w.halted[] | select(.state == "halted") | .key as $k
-      | "- **\($k)** halted at \(stage($k)): \($o[$k].last_line // $o[$k].halt_reason // "no reason recorded (`diagnose.sh \($e) \($k)`)") → fix it with `/ship \($k)` in pane \(pane($k)), or on the user’s ask `dispatch.sh \($e) \($k) --resume`"),
+      | "- **\($k)** halted at \(stage($k)): \($o[$k].halt_reason // $o[$k].last_line // "no reason recorded (`diagnose.sh \($e) \($k)`)") → fix it with `/ship \($k)` in pane \(pane($k)), or on the user’s ask `dispatch.sh \($e) \($k) --resume`"),
     ($w.halted[] | select(.state == "died") | .key as $k
       | if ($w.auto_resume_pending | index($k)) then
           (if $live then empty else "- **\($k)** died at \(stage($k)) → it auto-resumes once when the loop runs: `/spike \($e)`" end)
@@ -76,7 +78,7 @@ jq -c --slurpfile o "$TMP/obs.json" --slurpfile s "$TMP/st.json" --slurpfile g "
   ] as $needs
   | [ ($w.inflight[] as $k
         | if $o[$k].reason == "starting" and ($o[$k].ship_stage | not) then "- \($k) · starting · \(ago($st.dispatched[$k].epoch)) · pane \(pane($k))"
-          else "- \($k) · \(stage($k))\(if $o[$k].ship_result == "running" then "" else " (next)" end) · \(ago($o[$k].since)) · pane \(pane($k))" end),
+          else "- \($k) · \(stage($k))\(if $o[$k].ship_result == "running" then "" else " (next)" end) · \(ago($o[$k].since)) · pane \(pane($k))\(if ($o[$k].reason // "") | startswith("waiting on a background task") then " · \($o[$k].reason)" else "" end)" end),
       ($w.halted[] | select(.state == "died") | .key as $k | select($live and ($w.auto_resume_pending | index($k)))
         | "- \($k) · died at \(stage($k)) · auto-resume pending") ] as $fly
   | ([$g[0].nodes[] | select(.external | not) | .key] - ($w.out_of_scope // []) | length) as $total
@@ -119,7 +121,7 @@ table() {  # one row per in-scope ticket
        | ( ($w.blocked[$k] // []) as $b
            | if ($b | length) > 0 then "waits on \($b | join(", "))"
              else ($o[$k].reason // $o[$k].stage // "") end ) as $detail
-       | "| \($k) \(.summary | .[0:60]) | \($state) | \($detail)\(if $d[$k] then " · pane \($d[$k].pane // $d[$k].agent)" else "" end) | \($o[$k].pr_url // "") |")' \
+       | "| \($k) \(.summary | .[0:60]) | \($state) | \($detail)\(if $d[$k] and ($d[$k].closed_at | not) then " · pane \($d[$k].pane // $d[$k].agent)" else "" end) | \($o[$k].pr_url // "") |")' \
     "$D/graph.json"
 }
 
@@ -166,21 +168,30 @@ mv "$TMP/progress.md" "$D/progress.md"
 TAB=$(live_tab "$EPIC") && T=$(jq -r .title "$TMP/board.json") &&
   [ "$(herdr tab get "$TAB" 2>/dev/null | jq -r '.result.tab.label')" != "$T" ] && herdr tab rename "$TAB" "$T" >/dev/null 2>&1
 
-jq -c --slurpfile o "$TMP/obs.json" --slurpfile n "$TMP/next.json" --arg t "$(now_iso)" '
+jq -c --slurpfile o "$TMP/obs.json" --slurpfile n "$TMP/next.json" --arg t "$(now_iso)" --argjson ts "$(date +%s)" \
+  --argjson cd "${NOTIFY_COOLDOWN:-1800}" '
   (.notified // {}) as $old | ($n[0].auto_resume_pending // []) as $p
-  | [$o[0] | to_entries[] | select(.value.state | IN("halted", "died", "blocked-ui", "waiting-user"))
+  | def entering($e; $c): $e == null or $e.state != $c.state or (($e.gone // false) and ($ts - ($e.epoch // 0)) >= $cd);
+  [$o[0] | to_entries[] | select(.value.state | IN("halted", "died", "blocked-ui", "waiting-user"))
      | select(.value.state != "died" or (.key as $k | $p | index($k) | not))
      | {key, state: .value.state, stage: (.value.ship_stage // "?"),
-        msg: (.value.question // .value.last_line // .value.reason // "")}] as $now
-  | {new: [$now[] | select($old[.key].state != .state)],
-     map: ($now | map({(.key): {state, at: (if $old[.key].state == .state then $old[.key].at else $t end)}}) | add // {}),
+        msg: (.value.question // .value.halt_reason // .value.last_line // .value.reason // "")}] as $now
+  | ([$now[].key]) as $keys
+  | {new: [$now[] | select(entering($old[.key]; .))],
+     map: (([$now[] | . as $c | ($old[$c.key] // null) as $e
+             | {($c.key): (if entering($e; $c) then {state: $c.state, at: $t, epoch: $ts}
+                           else {state: $e.state, at: $e.at, epoch: ($e.epoch // $ts)} end)}] | add // {})
+           + ([$old | to_entries[] | select(.key as $k | $keys | index($k) | not)
+               | select($ts - (.value.epoch // 0) < $cd) | {(.key): (.value + {gone: true})}] | add // {})),
      old: $old}' "$TMP/st.json" > "$TMP/notify.json"
 jq -r '.new[] | [.key, .state, .stage, .msg] | @tsv' "$TMP/notify.json" | while IFS=$'\t' read -r k s g m; do
   case "$s" in
-    halted) v="halted at $g" ;; died) v="died again at $g" ;;
-    blocked-ui) v="is on a prompt" ;; *) v="is waiting on you" ;;
+    halted) v="halted at $g" f="/ship $k" ;;
+    died) v="died again at $g" f="dispatch.sh $EPIC $k --resume" ;;
+    blocked-ui) v="is on a prompt" f="relay.sh $EPIC $k --show" ;;
+    *) v="is waiting on you" f="relay.sh $EPIC $k --show, or diagnose.sh $EPIC $k when it asks nothing" ;;
   esac
-  bash "$SP/notify.sh" "spike · $EPIC" "$k $v${m:+: $m}" >/dev/null
+  bash "$SP/notify.sh" "spike · $EPIC" "$k $v${m:+: $m} → $f" >/dev/null
   echo "$(now_iso) notified: $k $v" >> "$D/log.md"
 done
 jq -e '.map != .old' "$TMP/notify.json" >/dev/null &&

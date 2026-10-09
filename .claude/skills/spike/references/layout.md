@@ -26,6 +26,9 @@ Tab "spike · EDU-329"
   **and** Herdr reports no agent in it (`herdr pane get` → no `.agent`). A root pane still holding
   an idle Claude (its ticket was re-dispatched elsewhere) is not free: `herdr agent start` needs a
   shell prompt. Otherwise the rightmost top-row pane of the tab is split (any pane, recorded or not).
+- **One at a time.** Dispatches queue on `$D/.dispatch.mutex` from choosing a pane until the ticket is recorded, so
+  parallel background dispatches never claim the same pane or open two tabs. The pane is renamed to its ticket
+  only once Claude runs in it, so a failed start leaves no mislabelled pane.
 - **Rebalance.** Split ratios drift once panes close (Herdr gives a closed pane's width to its tree
   neighbour), so `rebalance.sh <TAB>` runs after every dispatch and at the end of every `reap.sh`,
   moving each top-row boundary back to W/N. Run it by hand to even out a tab.
@@ -50,13 +53,17 @@ Tab "spike · EDU-329"
 | 13      | Herdr is broken (not in Herdr, tab create or pane split failed)                                              | halt the run                                                                                                                                                                         |
 | 14 / 15 | Claude on a startup dialog / `/ship` didn't start (recorded)                                                 | log it; observe reports it. Ready means `idle`, or `done` with `interactive_ready` and the prompt showing (`ship/scripts/ready.sh`): a reused pane's fresh Claude can inherit `done` |
 | 16      | `herdr agent start` failed in the chosen pane; nothing recorded, a split pane was closed, a reused pane kept | log it; it is retried on the next walk                                                                                                                                               |
+| 17      | `--auto-resume` refused: not died, or already auto-resumed this run                                          | log it; the user decides                                                                                                                                                             |
+| 18      | another dispatch held the mutex for 10 minutes                                                               | retry on the next walk                                                                                                                                                               |
 
 ## Resume, withdraw, diagnose
 
 - `dispatch.sh <EPIC> <KEY> --resume` — only with the user's OK, for a `halted` or `died` ticket.
   Refuses (12) while ship's lock is live. If the recorded pane still exists with no agent, or with
   an idle Claude (which is `/exit`ed first), `/ship` starts there with a fresh Claude; if the pane
-  is gone or its Claude is busy, a new column opens. `attempts` goes up and the pane joins `panes`.
+  is gone or its Claude is busy, a new column opens. `attempts` goes up and the pane joins `panes`. Earlier
+  panes of that ticket that hold no Claude (clean shell or dead session) and no other live ticket are closed once
+  the new one runs, unless that would close the tab.
 - `withdraw.sh <EPIC> <KEY> [--close]` — takes a dispatched ticket out of the run (e.g. a Blocks link
   added mid-run now gates it). Sets `withdrawn_at`, so its slot frees on the next walk; it is
   `withdrawn` while ship's lock stays live, then `none` (eligible once its blockers are done). It
