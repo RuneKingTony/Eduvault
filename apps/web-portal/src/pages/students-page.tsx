@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
+import { ErrorMessage } from '@eduvault/ui';
 import { useApi } from '../api';
-import { ErrorMessage } from '../components/error-message';
 import { campusesQueryOptions, studentsQueryOptions } from '../queries';
 
 export function StudentsPage() {

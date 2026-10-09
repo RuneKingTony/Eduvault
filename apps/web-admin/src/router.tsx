@@ -1,6 +1,6 @@
 import { createRouter, type ErrorComponentProps } from '@tanstack/react-router';
+import { ErrorMessage } from '@eduvault/ui';
 import { defaultApi } from './api';
-import { ErrorMessage } from './components/error-message';
 import { NotFoundPage, PendingPage } from './components/page-fallbacks';
 import { queryClient } from './query-client';
 import { routeTree } from './routeTree.gen';

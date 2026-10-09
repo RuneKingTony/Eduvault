@@ -148,6 +148,22 @@ export const NAV_GROUPS: readonly NavGroup[] = [
   },
 ];
 
+export const PLATFORM_NAV_GROUPS: readonly NavGroup[] = [
+  {
+    id: 'platform',
+    label: 'Platform',
+    items: [
+      {
+        id: 'schools',
+        label: 'Schools',
+        pageTitle: 'Schools',
+        route: '/platform/schools',
+        icon: 'school',
+      },
+    ],
+  },
+];
+
 export const EXTRA_PAGE_TITLES: Readonly<Record<string, string>> = isDev
   ? { '/dev/ui': 'Component gallery' }
   : {};

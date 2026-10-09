@@ -1,9 +1,8 @@
 import type { SubmitEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Can } from '@eduvault/auth-client';
-import { Button, TextField, fieldValue } from '@eduvault/ui';
+import { Button, TextField, fieldValue, ErrorMessage } from '@eduvault/ui';
 import { useApi } from '../api';
-import { ErrorMessage } from '../components/error-message';
 import { campusesQueryOptions } from '../queries';
 
 export function CampusesPage() {

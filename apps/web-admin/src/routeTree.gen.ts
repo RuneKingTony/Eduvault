@@ -13,8 +13,11 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApprovalsRouteImport } from './routes/approvals'
 import { Route as CampusesRouteImport } from './routes/campuses'
 import { Route as FeesRouteImport } from './routes/fees'
+import { Route as PlatformRouteImport } from './routes/platform'
 import { Route as StudentsRouteImport } from './routes/students'
 import { Route as DevUiRouteImport } from './routes/dev/ui'
+import { Route as PlatformIndexRouteImport } from './routes/platform.index'
+import { Route as PlatformSchoolsRouteImport } from './routes/platform.schools'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -36,6 +39,11 @@ const FeesRoute = FeesRouteImport.update({
   path: '/fees',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PlatformRoute = PlatformRouteImport.update({
+  id: '/platform',
+  path: '/platform',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const StudentsRoute = StudentsRouteImport.update({
   id: '/students',
   path: '/students',
@@ -46,14 +54,27 @@ const DevUiRoute = DevUiRouteImport.update({
   path: '/dev/ui',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PlatformIndexRoute = PlatformIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => PlatformRoute,
+} as any)
+const PlatformSchoolsRoute = PlatformSchoolsRouteImport.update({
+  id: '/schools',
+  path: '/schools',
+  getParentRoute: () => PlatformRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/approvals': typeof ApprovalsRoute
   '/campuses': typeof CampusesRoute
   '/fees': typeof FeesRoute
+  '/platform': typeof PlatformRouteWithChildren
   '/students': typeof StudentsRoute
   '/dev/ui': typeof DevUiRoute
+  '/platform/schools': typeof PlatformSchoolsRoute
+  '/platform/': typeof PlatformIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -62,6 +83,8 @@ export interface FileRoutesByTo {
   '/fees': typeof FeesRoute
   '/students': typeof StudentsRoute
   '/dev/ui': typeof DevUiRoute
+  '/platform/schools': typeof PlatformSchoolsRoute
+  '/platform': typeof PlatformIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -69,23 +92,45 @@ export interface FileRoutesById {
   '/approvals': typeof ApprovalsRoute
   '/campuses': typeof CampusesRoute
   '/fees': typeof FeesRoute
+  '/platform': typeof PlatformRouteWithChildren
   '/students': typeof StudentsRoute
   '/dev/ui': typeof DevUiRoute
+  '/platform/schools': typeof PlatformSchoolsRoute
+  '/platform/': typeof PlatformIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/approvals' | '/campuses' | '/fees' | '/students' | '/dev/ui'
+    | '/'
+    | '/approvals'
+    | '/campuses'
+    | '/fees'
+    | '/platform'
+    | '/students'
+    | '/dev/ui'
+    | '/platform/schools'
+    | '/platform/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/approvals' | '/campuses' | '/fees' | '/students' | '/dev/ui'
-  id:
-    | '__root__'
+  to:
     | '/'
     | '/approvals'
     | '/campuses'
     | '/fees'
     | '/students'
     | '/dev/ui'
+    | '/platform/schools'
+    | '/platform'
+  id:
+    | '__root__'
+    | '/'
+    | '/approvals'
+    | '/campuses'
+    | '/fees'
+    | '/platform'
+    | '/students'
+    | '/dev/ui'
+    | '/platform/schools'
+    | '/platform/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -93,6 +138,7 @@ export interface RootRouteChildren {
   ApprovalsRoute: typeof ApprovalsRoute
   CampusesRoute: typeof CampusesRoute
   FeesRoute: typeof FeesRoute
+  PlatformRoute: typeof PlatformRouteWithChildren
   StudentsRoute: typeof StudentsRoute
   DevUiRoute: typeof DevUiRoute
 }
@@ -127,6 +173,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FeesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/platform': {
+      id: '/platform'
+      path: '/platform'
+      fullPath: '/platform'
+      preLoaderRoute: typeof PlatformRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/students': {
       id: '/students'
       path: '/students'
@@ -141,14 +194,43 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DevUiRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/platform/': {
+      id: '/platform/'
+      path: '/'
+      fullPath: '/platform/'
+      preLoaderRoute: typeof PlatformIndexRouteImport
+      parentRoute: typeof PlatformRoute
+    }
+    '/platform/schools': {
+      id: '/platform/schools'
+      path: '/schools'
+      fullPath: '/platform/schools'
+      preLoaderRoute: typeof PlatformSchoolsRouteImport
+      parentRoute: typeof PlatformRoute
+    }
   }
 }
+
+interface PlatformRouteChildren {
+  PlatformSchoolsRoute: typeof PlatformSchoolsRoute
+  PlatformIndexRoute: typeof PlatformIndexRoute
+}
+
+const PlatformRouteChildren: PlatformRouteChildren = {
+  PlatformSchoolsRoute: PlatformSchoolsRoute,
+  PlatformIndexRoute: PlatformIndexRoute,
+}
+
+const PlatformRouteWithChildren = PlatformRoute._addFileChildren(
+  PlatformRouteChildren,
+)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ApprovalsRoute: ApprovalsRoute,
   CampusesRoute: CampusesRoute,
   FeesRoute: FeesRoute,
+  PlatformRoute: PlatformRouteWithChildren,
   StudentsRoute: StudentsRoute,
   DevUiRoute: DevUiRoute,
 }

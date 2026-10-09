@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
+import { ErrorMessage } from '@eduvault/ui';
 import { money } from '@eduvault/shared';
 import { useApi } from '../api';
-import { ErrorMessage } from '../components/error-message';
 import { feeSchedulesQueryOptions } from '../queries';
 
 export function FeesPage() {

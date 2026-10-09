@@ -63,6 +63,9 @@ function useAccess(): MePermissions {
   const router = useRouter();
   const api = useApi();
   const { access } = useRouteContext({ from: '__root__' });
+  if (access === null) {
+    throw new Error('The school shell needs school access');
+  }
   const { data } = useQuery({
     ...mePermissionsQueryOptions(api),
     initialData: access,
@@ -110,13 +113,15 @@ function useShellModel(access: MePermissions) {
   };
 }
 
-function PhoneNav({
+export function PhoneNav({
   open,
   onOpenChange,
+  description = 'Pages in this school.',
   children,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  description?: string;
   children: ReactNode;
 }) {
   return (
@@ -127,7 +132,7 @@ function PhoneNav({
       >
         <SheetHeader className="sr-only">
           <SheetTitle>Navigation</SheetTitle>
-          <SheetDescription>Pages in this school.</SheetDescription>
+          <SheetDescription>{description}</SheetDescription>
         </SheetHeader>
         <Sidebar collapsible="none" className="w-full">
           {children}
@@ -137,7 +142,7 @@ function PhoneNav({
   );
 }
 
-function ShellMain({
+export function ShellMain({
   compact,
   pathname,
 }: {
