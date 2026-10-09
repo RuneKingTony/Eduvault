@@ -6,18 +6,21 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuTrigger,
+  Button,
   SidebarMenuButton,
 } from '@eduvault/ui';
 import type { EduvaultAuthClient } from './auth-client';
 
 export interface SchoolSwitcherProps {
   authClient: EduvaultAuthClient;
-  renderCrest: (schoolName: string) => ReactNode;
+  appearance?: 'sidebar' | 'button';
+  renderCrest?: (schoolName: string) => ReactNode;
   onSwitched: () => void;
 }
 
 export function SchoolSwitcher({
   authClient,
+  appearance = 'sidebar',
   renderCrest,
   onSwitched,
 }: SchoolSwitcherProps) {
@@ -42,13 +45,20 @@ export function SchoolSwitcher({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <SidebarMenuButton size="lg" tooltip={activeName}>
-          {renderCrest(activeName)}
-          <span className="min-w-0 flex-1 truncate font-semibold">
-            {activeName}
-          </span>
-          <ChevronsUpDownIcon className="ml-auto size-4 opacity-70" />
-        </SidebarMenuButton>
+        {appearance === 'button' ? (
+          <Button type="button" variant="outline">
+            <span className="min-w-0 flex-1 truncate">{activeName}</span>
+            <ChevronsUpDownIcon className="size-4 opacity-70" />
+          </Button>
+        ) : (
+          <SidebarMenuButton size="lg" tooltip={activeName}>
+            {renderCrest?.(activeName)}
+            <span className="min-w-0 flex-1 truncate font-semibold">
+              {activeName}
+            </span>
+            <ChevronsUpDownIcon className="ml-auto size-4 opacity-70" />
+          </SidebarMenuButton>
+        )}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="min-w-56">
         <DropdownMenuLabel>School</DropdownMenuLabel>

@@ -8,6 +8,7 @@ const me = (overrides: Partial<Me> = {}): Me => ({
   mustChangePassword: false,
   platformRole: null,
   schoolCount: 1,
+  suspendedSchool: null,
   ...overrides,
 });
 
@@ -86,6 +87,26 @@ describe('entryState', () => {
         me: loaded(me()),
       })
     ).toBe('no-school');
+  });
+
+  it('is suspended when the active school is paused, after no-school and before ready', () => {
+    const paused = me({ suspendedSchool: { id: 'o1', name: 'Greenfield' } });
+    expect(entryState({ session: signedIn, me: loaded(paused) })).toBe(
+      'suspended'
+    );
+    expect(
+      entryState({
+        session: signedIn,
+        me: loaded({ ...paused, schoolCount: 0 }),
+      })
+    ).toBe('no-school');
+    expect(
+      entryState({
+        session: signedIn,
+        me: loaded({ ...paused, platformRole: 'superadmin' }),
+        platform: true,
+      })
+    ).toBe('platform');
   });
 
   it('is ready with a school', () => {
