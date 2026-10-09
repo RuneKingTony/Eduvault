@@ -7,6 +7,7 @@ import {
   can,
   parsePermissionMap,
   resolvePermissions,
+  splitRoles,
   type PermissionMap,
 } from '@eduvault/policy';
 import type { Request } from 'express';
@@ -73,10 +74,7 @@ export class AuthContextService {
       return undefined;
     }
 
-    const roles = member.role
-      .split(',')
-      .map((role) => role.trim())
-      .filter((role) => role !== '');
+    const roles = splitRoles(member.role);
     const permissions = await this.loadPermissions(organizationId, roles);
     const schoolWide = can(permissions, 'campus', 'readAll');
     const campuses = schoolWide
@@ -100,16 +98,14 @@ export class AuthContextService {
           : null,
       campusScope: schoolWide ? 'all' : campusIds,
       classScope: 'all',
-      studentScope: [],
       acting: null,
       headers,
     };
   }
 
   /**
-   * Better Auth's addTeamMember route demands `member:update`, which no starter
-   * role holds, so a campus creator is enrolled through its adapter. The route
-   * guard has already checked `team:create`.
+   * addTeamMember demands `member:update`, which no starter role holds; the
+   * route guard has already checked `team:create`.
    */
   async enrolInCampus(teamId: string, userId: string): Promise<void> {
     const context = (await this.authService.instance
@@ -120,7 +116,6 @@ export class AuthContextService {
     ).findOrCreateTeamMember({ teamId, userId });
   }
 
-  /** Read on every request so a role change applies on the next one. */
   private async loadPermissions(
     organizationId: string,
     roles: string[]

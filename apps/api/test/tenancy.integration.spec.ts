@@ -1,10 +1,6 @@
 import { baseTest, expect } from './support/base-test';
 import { twoSchools, type TwoSchools } from './support/two-schools';
 
-// The bursar on Lekki holds `student:read` only, so every write by `lekkiOnly`
-// answers 403 for the missing permission. `DELETE /students/:id` no longer
-// exists, so it answers 404 to everyone.
-
 const test = baseTest.extend<{ schools: TwoSchools }>({
   schools: async (
     { app, signUp, createOrganization, createCampus, addMember },

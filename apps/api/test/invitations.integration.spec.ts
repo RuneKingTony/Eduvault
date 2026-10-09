@@ -1,9 +1,14 @@
-// Read when the app is built for this file, so the flag applies to its API only.
-process.env['E2E_TRUST_INVITEES'] = 'true';
-
+import { afterAll, beforeAll, vi } from 'vitest';
 import { baseTest as test, expect } from './support/base-test';
 
 test.describe('invitations with E2E_TRUST_INVITEES', () => {
+  beforeAll(() => {
+    vi.stubEnv('E2E_TRUST_INVITEES', 'true');
+  });
+  afterAll(() => {
+    vi.unstubAllEnvs();
+  });
+
   test('an invitee accepts without a verified email and holds the starter role on the campus', async ({
     api,
     signUp,

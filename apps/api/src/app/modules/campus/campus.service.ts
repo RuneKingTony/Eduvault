@@ -26,9 +26,12 @@ export class CampusService {
     private readonly authContext: AuthContextService
   ) {}
 
-  /** 404 unless the campus exists in the given school. */
-  async assertInSchool(ctx: OrgContext, campusId: string): Promise<void> {
-    if (!(await this.campuses.existsInSchool(ctx.organizationId, campusId))) {
+  /** 404 unless the campus is in the caller's scope and exists in the school. */
+  async assertInScope(ctx: OrgContext, campusId: string): Promise<void> {
+    if (
+      !canSeeCampus(ctx.campusScope, campusId) ||
+      !(await this.campuses.existsInSchool(ctx.organizationId, campusId))
+    ) {
       throw new NotFoundException('Campus not found');
     }
   }

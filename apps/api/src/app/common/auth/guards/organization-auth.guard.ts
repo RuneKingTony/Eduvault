@@ -6,6 +6,7 @@ import {
   type ExecutionContext,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import type { ApiErrorCode } from '@eduvault/api-contract';
 import { can } from '@eduvault/policy';
 import { AuthContextService } from '../auth-context.service';
 import type { AuthedRequest } from '../auth.types';
@@ -28,7 +29,7 @@ export class OrganizationAuthGuard implements CanActivate {
     const org = await this.context.resolveOrganization(session);
     if (!org) {
       throw new ForbiddenException({
-        code: 'NoSchool',
+        code: 'NoSchool' satisfies ApiErrorCode,
         message: 'No active school for this session',
       });
     }

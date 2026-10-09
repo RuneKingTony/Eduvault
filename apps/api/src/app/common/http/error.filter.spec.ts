@@ -3,6 +3,7 @@ import {
   Logger,
   type ArgumentsHost,
   NotFoundException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import { ErrorFilter } from './error.filter';
 
@@ -27,6 +28,19 @@ describe('ErrorFilter', () => {
       body: { code: 'NotFound', message: 'Student not found' },
     });
     expect(run(new ForbiddenException('nope')).body.code).toBe('Forbidden');
+  });
+
+  it('keeps a listed code from the exception and falls back to the status for any other', () => {
+    expect(
+      run(new ForbiddenException({ code: 'NoSchool', message: 'No school' }))
+        .body.code
+    ).toBe('NoSchool');
+    expect(
+      run(new ForbiddenException({ code: 'Made up', message: 'x' })).body.code
+    ).toBe('Forbidden');
+    expect(run(new UnprocessableEntityException('x')).body.code).toBe(
+      'BadRequest'
+    );
   });
 
   it('maps Postgres violations to 409', () => {

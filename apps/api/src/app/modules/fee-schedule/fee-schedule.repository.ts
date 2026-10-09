@@ -11,10 +11,6 @@ export interface NewFeeSchedule {
 export type FeeSchedulePatch = Partial<NewFeeSchedule>;
 
 export abstract class FeeScheduleRepository {
-  /**
-   * Schedules on campuses in scope plus the school-wide ones; with a campus,
-   * only that campus's plus the school-wide ones.
-   */
   abstract list(
     organizationId: string,
     scope: CampusScope,

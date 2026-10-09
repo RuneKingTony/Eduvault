@@ -9,6 +9,7 @@ import type { Campus } from '@eduvault/api-contract';
 import { toPermissionMap, type Permission } from '@eduvault/policy';
 import { AppModule } from '../../src/app/app.module';
 import type { AppAuth } from '../../src/app/common/auth';
+import { castToBetterAuthRoles } from '../../src/app/common/auth/better-auth-roles';
 import { loadEnv } from '../../src/app/common/config/env';
 import { configureApp } from '../../src/app/configure-app';
 
@@ -30,7 +31,6 @@ interface TestOrganization {
 }
 
 interface AddMemberInput {
-  /** Role slugs: `member`, a starter role such as `bursar`, or a custom role. */
   roles: string[];
   campuses?: Pick<Campus, 'id'>[];
 }
@@ -89,9 +89,7 @@ export interface Fixtures {
     user: TestUser,
     input: AddMemberInput
   ) => Promise<TestUser>;
-  /** Inserts a custom role row directly (`source = 'custom'`). */
   createRole: (org: TestOrganization, role: NewRole) => Promise<void>;
-  /** A new member holding a one-off custom role with exactly these permissions. */
   withPermissions: (
     org: TestOrganization,
     permissions: readonly Permission[],
@@ -231,8 +229,7 @@ export const baseTest = vitestTest.extend<Fixtures>({
         body: {
           userId: user.id,
           organizationId: org.id,
-          // Role slugs live in organizationRole, so the typed list lacks them.
-          role: roles as ('owner' | 'member')[],
+          role: castToBetterAuthRoles(roles),
         },
       });
       for (const campus of campuses) {

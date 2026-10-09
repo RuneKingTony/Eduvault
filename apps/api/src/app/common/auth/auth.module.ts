@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Inject, Module, type OnApplicationBootstrap } from '@nestjs/common';
 import { AuthModule } from '@thallesp/nestjs-better-auth';
 import type { Pool } from 'pg';
 import { ENV_TOKEN, type Env } from '../config/env';
@@ -7,6 +7,7 @@ import { AuthContextService } from './auth-context.service';
 import { OrganizationAuthGuard } from './guards/organization-auth.guard';
 import { SessionAuthGuard } from './guards/session-auth.guard';
 import { createAuth } from './better-auth';
+import { syncAllStarterRoles } from './starter-roles';
 
 @Module({
   imports: [
@@ -22,4 +23,10 @@ import { createAuth } from './better-auth';
   providers: [AuthContextService, SessionAuthGuard, OrganizationAuthGuard],
   exports: [AuthContextService, SessionAuthGuard, OrganizationAuthGuard],
 })
-export class EduvaultAuthModule {}
+export class EduvaultAuthModule implements OnApplicationBootstrap {
+  constructor(@Inject(DB_TOKEN) private readonly pool: Pool) {}
+
+  async onApplicationBootstrap() {
+    await syncAllStarterRoles(this.pool);
+  }
+}

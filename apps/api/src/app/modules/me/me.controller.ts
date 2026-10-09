@@ -24,7 +24,6 @@ export class MeController {
     };
   }
 
-  /** Needs a school but no permission: every member may ask what they can do. */
   @Get('permissions')
   @OrganizationAuth()
   permissions(

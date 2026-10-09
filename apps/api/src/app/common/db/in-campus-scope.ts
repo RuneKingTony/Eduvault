@@ -4,10 +4,7 @@ import type { CampusScope } from '../campus-scope';
 
 export interface InCampusScopeOptions {
   scope: CampusScope;
-  /**
-   * Who sees a row whose campus is null: 'all' means every member of the
-   * school, 'readAllOnly' (the default) only a caller whose scope is 'all'.
-   */
+  /** Who sees a row with no campus: 'all' every member, 'readAllOnly' scope 'all' only. */
   nullMeans?: 'all' | 'readAllOnly';
 }
 

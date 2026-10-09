@@ -7,7 +7,10 @@ import {
   toPermissionMap,
   toPermissions,
 } from '@eduvault/policy';
-import { syncStarterRoles } from '../src/app/common/auth/starter-roles';
+import {
+  syncAllStarterRoles,
+  syncStarterRoles,
+} from '../src/app/common/auth/starter-roles';
 import { baseTest, expect } from './support/base-test';
 import { twoSchools, type TwoSchools } from './support/two-schools';
 
@@ -243,6 +246,50 @@ test.describe('campus scope', () => {
     await api(clerk).post('/students').send(student(lekki.id, 'Y')).expect(201);
   });
 
+  test('a fee-schedule campusId filter outside the scope answers 404 "Campus not found"', async ({
+    api,
+    withPermissions,
+    schools: { orgA, lekki, ikeja },
+  }) => {
+    const reader = await withPermissions(orgA, ['feeSchedule:read'], {
+      campuses: [lekki],
+    });
+    const res = await api(reader)
+      .get(`/fee-schedules?campusId=${ikeja.id}`)
+      .expect(404);
+    expect(res.body.message).toBe('Campus not found');
+  });
+
+  test('creating or moving a fee schedule onto a campus outside the scope answers 404 "Campus not found"', async ({
+    api,
+    withPermissions,
+    schools: { owner, orgA, lekki, ikeja },
+  }) => {
+    const clerk = await withPermissions(
+      orgA,
+      ['feeSchedule:create', 'feeSchedule:read', 'feeSchedule:update'],
+      { campuses: [lekki] }
+    );
+    const own = await api(clerk)
+      .post('/fee-schedules')
+      .send({ ...FEE, campusId: lekki.id })
+      .expect(201);
+    const create = await api(clerk)
+      .post('/fee-schedules')
+      .send({ ...FEE, campusId: ikeja.id })
+      .expect(404);
+    expect(create.body.message).toBe('Campus not found');
+    const move = await api(clerk)
+      .patch(`/fee-schedules/${own.body.id}`)
+      .send({ campusId: ikeja.id })
+      .expect(404);
+    expect(move.body.message).toBe('Campus not found');
+    await api(owner)
+      .post('/fee-schedules')
+      .send({ ...FEE, campusId: ikeja.id })
+      .expect(201);
+  });
+
   test('DELETE /students/:id no longer exists', async ({
     api,
     schools: { owner, studentLekki },
@@ -316,8 +363,90 @@ test.describe('/me/permissions', () => {
   });
 });
 
+test.describe('isolation', () => {
+  const editedBursar = {
+    student: ['read', 'create'],
+  };
+
+  const editBursarInA = (pool: Pool, organizationId: string) =>
+    pool.query(
+      `UPDATE "organizationRole"
+       SET permission = $2, "editedAt" = now()
+       WHERE "organizationId" = $1 AND role = 'bursar'`,
+      [organizationId, JSON.stringify(editedBursar)]
+    );
+
+  test('a same-slug role edited in one school leaves the other school unchanged', async ({
+    api,
+    pool,
+    signUp,
+    addMember,
+    schools: { orgA, orgB, campusB, lekkiOnly },
+  }) => {
+    const bursarB = await addMember(orgB, await signUp(), {
+      roles: ['bursar'],
+      campuses: [campusB],
+    });
+    await editBursarInA(pool, orgA.id);
+
+    const inA = await api(lekkiOnly).get('/me/permissions').expect(200);
+    expect(inA.body.permissions.student).toEqual(
+      expect.arrayContaining(['read', 'create'])
+    );
+    const inB = await api(bursarB).get('/me/permissions').expect(200);
+    expect(inB.body).toMatchObject({
+      organizationId: orgB.id,
+      roles: ['bursar'],
+      permissions: { student: ['read'] },
+      campusScope: [campusB.id],
+    });
+    await api(bursarB)
+      .post('/students')
+      .send(student(campusB.id, 'B1'))
+      .expect(403);
+  });
+
+  test("the owner of one school sees only that school's roles and scope", async ({
+    api,
+    schools: { ownerB, orgB, campusB },
+  }) => {
+    const res = await api(ownerB).get('/me/permissions').expect(200);
+    expect(res.body).toMatchObject({
+      organizationId: orgB.id,
+      roles: ['owner'],
+      campusScope: 'all',
+    });
+    const campuses = await api(ownerB).get('/campuses').expect(200);
+    expect(campuses.body.map((campus: { id: string }) => campus.id)).toEqual([
+      campusB.id,
+    ]);
+  });
+
+  test("syncStarterRoles for one school leaves the other school's rows alone", async ({
+    pool,
+    schools: { orgA, orgB },
+  }) => {
+    await pool.query(
+      `UPDATE "organizationRole" SET permission = '{}'
+       WHERE "organizationId" = ANY($1) AND role = 'teacher'`,
+      [[orgA.id, orgB.id]]
+    );
+    const before = await rolesOf(pool, orgB.id);
+
+    await syncStarterRoles(pool, orgA.id);
+
+    expect(await rolesOf(pool, orgB.id)).toEqual(before);
+    const teacherA = (await rolesOf(pool, orgA.id)).find(
+      (row) => row.role === 'teacher'
+    );
+    expect(parsePermissionMap(teacherA?.permission ?? '')).toEqual({
+      student: ['read'],
+    });
+  });
+});
+
 test.describe('starter roles', () => {
-  test('a new school has the six starter roles with the M1.1 sets', async ({
+  test('a new school has the six starter roles with their permission sets', async ({
     pool,
     schools: { orgA },
   }) => {
@@ -370,5 +499,35 @@ test.describe('starter roles', () => {
     expect(permissionOf('bursar')).toBe('{}');
     expect(permissionOf('guardian')).toBeDefined();
     expect(rows).toHaveLength(STARTER_ROLES.length);
+  });
+  test('syncAllStarterRoles gives every existing school the six roles and is safe to repeat', async ({
+    pool,
+    schools: { orgA, orgB },
+  }) => {
+    await pool.query(
+      `DELETE FROM "organizationRole" WHERE "organizationId" = ANY($1)`,
+      [[orgA.id, orgB.id]]
+    );
+
+    await syncAllStarterRoles(pool);
+    await syncAllStarterRoles(pool);
+
+    for (const org of [orgA, orgB]) {
+      expect(await rolesOf(pool, org.id)).toHaveLength(STARTER_ROLES.length);
+    }
+  });
+
+  test('a school cannot hold two rows for one role slug', async ({
+    pool,
+    schools: { orgA },
+  }) => {
+    await expect(
+      pool.query(
+        `INSERT INTO "organizationRole"
+           ("organizationId", role, permission, label, source)
+         VALUES ($1, 'bursar', '{}', 'Bursar', 'custom')`,
+        [orgA.id]
+      )
+    ).rejects.toMatchObject({ code: '23505' });
   });
 });

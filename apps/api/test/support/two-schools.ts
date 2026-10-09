@@ -6,7 +6,6 @@ type SchoolFixtures = Pick<
   'app' | 'signUp' | 'createOrganization' | 'createCampus' | 'addMember'
 >;
 
-/** `lekkiOnly` is a bursar on Lekki; `noPermission` holds only `member`. */
 export async function twoSchools({
   app,
   signUp,

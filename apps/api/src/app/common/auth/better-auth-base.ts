@@ -25,7 +25,6 @@ export const advancedBaseConfig: NonNullable<BetterAuthOptions['advanced']> = {
 };
 
 interface OrganizationFlags {
-  /** Local e2e only: lets an invitee accept without a verified email. */
   trustInvitees?: boolean;
 }
 
