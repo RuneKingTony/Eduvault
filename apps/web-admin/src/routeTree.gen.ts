@@ -12,6 +12,8 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as CampusesRouteImport } from './routes/campuses'
 import { Route as FeesRouteImport } from './routes/fees'
+import { Route as StudentsRouteImport } from './routes/students'
+import { Route as DevUiRouteImport } from './routes/dev/ui'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -28,35 +30,53 @@ const FeesRoute = FeesRouteImport.update({
   path: '/fees',
   getParentRoute: () => rootRouteImport,
 } as any)
+const StudentsRoute = StudentsRouteImport.update({
+  id: '/students',
+  path: '/students',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DevUiRoute = DevUiRouteImport.update({
+  id: '/dev/ui',
+  path: '/dev/ui',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/campuses': typeof CampusesRoute
   '/fees': typeof FeesRoute
+  '/students': typeof StudentsRoute
+  '/dev/ui': typeof DevUiRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/campuses': typeof CampusesRoute
   '/fees': typeof FeesRoute
+  '/students': typeof StudentsRoute
+  '/dev/ui': typeof DevUiRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/campuses': typeof CampusesRoute
   '/fees': typeof FeesRoute
+  '/students': typeof StudentsRoute
+  '/dev/ui': typeof DevUiRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/campuses' | '/fees'
+  fullPaths: '/' | '/campuses' | '/fees' | '/students' | '/dev/ui'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/campuses' | '/fees'
-  id: '__root__' | '/' | '/campuses' | '/fees'
+  to: '/' | '/campuses' | '/fees' | '/students' | '/dev/ui'
+  id: '__root__' | '/' | '/campuses' | '/fees' | '/students' | '/dev/ui'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   CampusesRoute: typeof CampusesRoute
   FeesRoute: typeof FeesRoute
+  StudentsRoute: typeof StudentsRoute
+  DevUiRoute: typeof DevUiRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -82,6 +102,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FeesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/students': {
+      id: '/students'
+      path: '/students'
+      fullPath: '/students'
+      preLoaderRoute: typeof StudentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dev/ui': {
+      id: '/dev/ui'
+      path: '/dev/ui'
+      fullPath: '/dev/ui'
+      preLoaderRoute: typeof DevUiRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -89,6 +123,8 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   CampusesRoute: CampusesRoute,
   FeesRoute: FeesRoute,
+  StudentsRoute: StudentsRoute,
+  DevUiRoute: DevUiRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

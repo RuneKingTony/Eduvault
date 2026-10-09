@@ -1,4 +1,8 @@
-import base, { reactConfig, tailwindConfig } from '../../eslint.config.mjs';
+import base, {
+  noEnum,
+  reactConfig,
+  tailwindConfig,
+} from '../../eslint.config.mjs';
 
 const noAuth = {
   group: ['better-auth', 'better-auth/*', '@eduvault/auth-client'],
@@ -36,7 +40,11 @@ export default [
     // rules are relaxed here instead of patching the output.
     files: ['src/components/ui/**/*.tsx'],
     rules: {
+      'no-restricted-syntax': ['error', noEnum],
       'jsx-a11y/anchor-has-content': 'off',
+      'jsx-a11y/click-events-have-key-events': 'off',
+      'jsx-a11y/no-noninteractive-element-interactions': 'off',
+      '@typescript-eslint/consistent-type-imports': 'off',
       '@typescript-eslint/prefer-nullish-coalescing': 'off',
       '@typescript-eslint/no-unused-expressions': 'off',
       'react/forbid-dom-props': 'off',

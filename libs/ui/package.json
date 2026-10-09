@@ -5,9 +5,11 @@
   "type": "module",
   "dependencies": {
     "@fontsource-variable/inter": "catalog:ui",
-    "@fontsource-variable/roboto": "catalog:ui",
+    "@fontsource-variable/roboto-mono": "catalog:ui",
+    "@fontsource/playfair-display": "catalog:ui",
     "class-variance-authority": "catalog:ui",
     "clsx": "catalog:ui",
+    "cmdk": "catalog:ui",
     "lucide-react": "catalog:ui",
     "next-themes": "catalog:ui",
     "radix-ui": "catalog:ui",

@@ -4,11 +4,18 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@eduvault/shared": "workspace:*",
     "@eduvault/ui": "workspace:*",
     "better-auth": "catalog:auth",
+    "lucide-react": "catalog:ui",
     "react": "catalog:react"
   },
   "devDependencies": {
-    "@types/react": "catalog:react"
+    "@testing-library/dom": "catalog:testing",
+    "@testing-library/jest-dom": "catalog:testing",
+    "@testing-library/react": "catalog:testing",
+    "@types/react": "catalog:react",
+    "@vitejs/plugin-react": "catalog:vite-react",
+    "jsdom": "catalog:testing"
   }
 }

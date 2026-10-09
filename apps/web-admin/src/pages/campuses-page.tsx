@@ -32,7 +32,7 @@ export function CampusesPage() {
 
   return (
     <section className="flex flex-col gap-4">
-      <h2 className="text-lg font-semibold">Campuses</h2>
+      <h1>Campuses</h1>
       <ErrorMessage error={campuses.error ?? create.error} />
       <ul className="divide-y rounded-md border">
         {campuses.data?.map((campus) => (

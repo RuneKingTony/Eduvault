@@ -1,13 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { StudentsPage } from '../pages/students-page';
-import { campusesQueryOptions, studentsQueryOptions } from '../queries';
+import { DashboardPage } from '../pages/dashboard-page';
 
 export const Route = createFileRoute('/')({
-  loader: async ({ context: { queryClient, api } }) => {
-    await Promise.all([
-      queryClient.query({ ...studentsQueryOptions(api), staleTime: 'static' }),
-      queryClient.query({ ...campusesQueryOptions(api), staleTime: 'static' }),
-    ]);
-  },
-  component: StudentsPage,
+  component: DashboardPage,
 });
