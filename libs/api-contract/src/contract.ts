@@ -25,12 +25,17 @@ const crud = <
   Item extends z.ZodType,
   Create extends z.ZodType,
   Update extends z.ZodType,
->(
-  base: string,
-  item: Item,
-  create: Create,
-  update: Update
-) => ({
+>({
+  base,
+  item,
+  create,
+  update,
+}: {
+  base: string;
+  item: Item;
+  create: Create;
+  update: Update;
+}) => ({
   list: defineRoute({
     method: 'GET',
     path: base,
@@ -72,25 +77,30 @@ export const contract = defineContract({
   }),
   me: defineRoute({ method: 'GET', path: '/me', response: meSchema }),
   campuses: {
-    ...crud('/campuses', campusSchema, createCampusSchema, updateCampusSchema),
+    ...crud({
+      base: '/campuses',
+      item: campusSchema,
+      create: createCampusSchema,
+      update: updateCampusSchema,
+    }),
     list: defineRoute({
       method: 'GET',
       path: '/campuses',
       response: z.array(campusSchema),
     }),
   },
-  feeSchedules: crud(
-    '/fee-schedules',
-    feeScheduleSchema,
-    createFeeScheduleSchema,
-    updateFeeScheduleSchema
-  ),
-  students: crud(
-    '/students',
-    studentSchema,
-    createStudentSchema,
-    updateStudentSchema
-  ),
+  feeSchedules: crud({
+    base: '/fee-schedules',
+    item: feeScheduleSchema,
+    create: createFeeScheduleSchema,
+    update: updateFeeScheduleSchema,
+  }),
+  students: crud({
+    base: '/students',
+    item: studentSchema,
+    create: createStudentSchema,
+    update: updateStudentSchema,
+  }),
   schoolAccount: {
     get: defineRoute({
       method: 'GET',

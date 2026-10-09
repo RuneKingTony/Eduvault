@@ -28,7 +28,7 @@ const isRoute = (node: RouteDef | Contract): node is RouteDef =>
   'method' in node && 'path' in node && 'response' in node;
 
 const fillPath = (path: string, params: Record<string, unknown> = {}) =>
-  path.replace(/:(\w+)/g, (_, key: string) =>
+  path.replaceAll(/:(\w+)/g, (_, key: string) =>
     encodeURIComponent(String(params[key]))
   );
 

@@ -16,8 +16,11 @@ const toRelative = (file: string, target: string) => {
 function* walk(dir: string): Generator<string> {
   for (const entry of readdirSync(dir)) {
     const path = join(dir, entry);
-    if (statSync(path).isDirectory()) yield* walk(path);
-    else if (/\.tsx?$/.test(path)) yield path;
+    if (statSync(path).isDirectory()) {
+      yield* walk(path);
+    } else if (/\.tsx?$/.test(path)) {
+      yield path;
+    }
   }
 }
 
@@ -35,15 +38,11 @@ if (readFileSync(utilsFile, 'utf8') !== utilsSource) {
 for (const file of walk(srcRoot)) {
   const source = readFileSync(file, 'utf8');
   const rewritten = source
-    .replace(
-      /(from\s+['"])@\/([^'"]+)(['"])/g,
-      (_match, open: string, target: string, close: string) =>
-        `${open}${toRelative(file, target)}${close}`
+    .replaceAll(/(?<=from\s+['"])@\/([^'"]+)/g, (_match, target: string) =>
+      toRelative(file, target)
     )
-    .replace(
-      /(from\s+['"])cn(['"])/g,
-      (_match, open: string, close: string) =>
-        `${open}${toRelative(file, 'lib/utils')}${close}`
+    .replaceAll(/(?<=from\s+['"])cn(?=['"])/g, () =>
+      toRelative(file, 'lib/utils')
     );
   if (rewritten !== source) {
     writeFileSync(file, rewritten);
@@ -66,9 +65,13 @@ const seenImports = new Set<string>();
 const dedupedTheme = themeSource
   .split('\n')
   .filter((line) => {
-    if (!line.startsWith('@import')) return true;
+    if (!line.startsWith('@import')) {
+      return true;
+    }
     const key = line.replaceAll('"', "'");
-    if (seenImports.has(key)) return false;
+    if (seenImports.has(key)) {
+      return false;
+    }
     seenImports.add(key);
     return true;
   })

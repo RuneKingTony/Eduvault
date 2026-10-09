@@ -1,8 +1,8 @@
 export function slugify(input: string): string {
   return input
     .normalize('NFKD')
-    .replace(/[̀-ͯ]/g, '')
+    .replaceAll(/\p{M}/gu, '')
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
+    .replaceAll(/[^a-z0-9]+/g, '-')
+    .replaceAll(/^-|-$/g, '');
 }

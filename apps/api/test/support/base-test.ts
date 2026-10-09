@@ -28,7 +28,8 @@ interface TestOrganization {
   owner: TestUser;
 }
 
-interface AddMemberOptions {
+interface AddMemberInput {
+  role: 'owner' | 'admin' | 'teacher' | 'student';
   campuses?: Pick<Campus, 'id'>[];
 }
 
@@ -74,8 +75,7 @@ interface Fixtures {
   addMember: (
     org: TestOrganization,
     user: TestUser,
-    role: 'owner' | 'admin' | 'teacher' | 'student',
-    options?: AddMemberOptions
+    input: AddMemberInput
   ) => Promise<TestUser>;
   /** Makes the user a platform admin (admin plugin `user.role = 'admin'`). */
   promoteToAdmin: (user: TestUser) => Promise<TestUser>;
@@ -118,8 +118,8 @@ export const baseTest = vitestTest.extend<Fixtures>({
   ],
 
   api: async ({ app }, use) => {
+    const http = () => request(app.getHttpServer());
     await use((user) => {
-      const http = () => request(app.getHttpServer());
       const withAuth = (req: request.Test) => {
         req.set('Origin', ORIGIN);
         return user ? req.set('Cookie', user.cookie) : req;
@@ -181,7 +181,7 @@ export const baseTest = vitestTest.extend<Fixtures>({
   createOrganization: async ({ app, signIn }, use) => {
     await use(async (owner, name = `School ${randomUUID().slice(0, 8)}`) => {
       const { api } = app.get(AuthService<AppAuth>);
-      const slug = `${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${randomUUID().slice(0, 6)}`;
+      const slug = `${name.toLowerCase().replaceAll(/[^a-z0-9]+/g, '-')}-${randomUUID().slice(0, 6)}`;
       const org = await api.createOrganization({
         body: { name, slug, userId: owner.id },
       });
@@ -205,12 +205,12 @@ export const baseTest = vitestTest.extend<Fixtures>({
   },
 
   addMember: async ({ app, signIn }, use) => {
-    await use(async (org, user, role, options = {}) => {
+    await use(async (org, user, { role, campuses = [] }) => {
       const { api } = app.get(AuthService<AppAuth>);
       await api.addMember({
         body: { userId: user.id, organizationId: org.id, role },
       });
-      for (const campus of options.campuses ?? []) {
+      for (const campus of campuses) {
         await api.addTeamMember({
           body: { teamId: campus.id, userId: user.id },
           headers: headersFor(org.owner.cookie),

@@ -13,7 +13,9 @@ export function App({ authClient }: { authClient: EduvaultAuthClient }) {
   const session = authClient.useSession();
   const queryClient = useQueryClient();
 
-  if (session.isPending) return <p className="p-6">Loading…</p>;
+  if (session.isPending) {
+    return <p className="p-6">Loading…</p>;
+  }
   if (!session.data) {
     return (
       <main className="p-6">

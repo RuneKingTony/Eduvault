@@ -4,9 +4,10 @@ import { campusesQueryOptions } from '../queries';
 
 export const Route = createFileRoute('/campuses')({
   loader: async ({ context: { queryClient, api } }) => {
-    await Promise.all([
-      queryClient.query({ ...campusesQueryOptions(api), staleTime: 'static' }),
-    ]);
+    await queryClient.query({
+      ...campusesQueryOptions(api),
+      staleTime: 'static',
+    });
   },
   component: CampusesPage,
 });

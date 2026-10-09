@@ -15,7 +15,7 @@ export function CreateSchoolForm({
   async function submit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     const name = fieldValue(new FormData(event.currentTarget), 'name');
-    const slug = `${slugify(name)}-${Math.random().toString(36).slice(2, 6)}`;
+    const slug = `${slugify(name)}-${crypto.randomUUID().slice(0, 4)}`;
     const result = await authClient.organization.create({ name, slug });
     if (result.error) {
       setError(result.error.message ?? 'Could not create the school');
@@ -28,11 +28,11 @@ export function CreateSchoolForm({
     <form onSubmit={submit} className="mx-auto flex max-w-sm flex-col gap-3">
       <h1 className="text-xl font-semibold">Create your school</h1>
       <TextField label="School name" name="name" required />
-      {error ? (
-        <p role="alert" className="text-sm text-red-600">
+      {error === null ? null : (
+        <p role="alert" className="text-sm text-destructive">
           {error}
         </p>
-      ) : null}
+      )}
       <Button type="submit">Create school</Button>
     </form>
   );
