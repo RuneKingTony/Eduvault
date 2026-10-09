@@ -24,8 +24,17 @@ export const advancedBaseConfig: NonNullable<BetterAuthOptions['advanced']> = {
   defaultCookieAttributes: { httpOnly: true, sameSite: 'lax' },
 };
 
-export const getOrganizationOptions = (pool: Pool) =>
+interface OrganizationFlags {
+  /** Local e2e only: lets an invitee accept without a verified email. */
+  trustInvitees?: boolean;
+}
+
+export const getOrganizationOptions = (
+  pool: Pool,
+  { trustInvitees = false }: OrganizationFlags = {}
+) =>
   ({
+    requireEmailVerificationOnInvitation: !trustInvitees,
     ac: betterAuthAc,
     roles: betterAuthRoles,
     creatorRole: 'owner',
@@ -53,9 +62,9 @@ export const getOrganizationOptions = (pool: Pool) =>
     },
   }) satisfies OrganizationOptions;
 
-export const getPlugins = (pool: Pool) => [
+export const getPlugins = (pool: Pool, flags: OrganizationFlags = {}) => [
   admin(),
-  organization(getOrganizationOptions(pool)),
+  organization(getOrganizationOptions(pool, flags)),
 ];
 
 /**
