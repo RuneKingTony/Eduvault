@@ -6,6 +6,7 @@ import {
   canAny,
   parsePermissionMap,
   resolvePermissions,
+  splitRoles,
   splitPermission,
   toPermissionMap,
 } from './index';
@@ -100,5 +101,15 @@ describe('roles', () => {
     expect(parsePermissionMap('not json')).toEqual({});
     expect(parsePermissionMap('[]')).toEqual({});
     expect(parsePermissionMap('null')).toEqual({});
+  });
+
+  it('splits a comma-joined role string and ignores blanks', () => {
+    expect(splitRoles('teacher, principal,,')).toEqual([
+      'teacher',
+      'principal',
+    ]);
+    expect(splitRoles('')).toEqual([]);
+    expect(splitRoles(null)).toEqual([]);
+    expect(splitRoles(undefined)).toEqual([]);
   });
 });

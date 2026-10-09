@@ -2,8 +2,6 @@ import { createAccessControl } from 'better-auth/plugins/access';
 import { defaultStatements } from 'better-auth/plugins/organization/access';
 import { statements } from './statements';
 
-// Better Auth's own routes (invitations, members, teams, roles) check these.
-// The app list in statements.ts is what can(), CAP_AREAS and /me/permissions use.
 // PURE markers keep better-auth out of the SPA bundles that import this lib.
 const betterAuthStatements = { ...defaultStatements, ...statements } as const;
 

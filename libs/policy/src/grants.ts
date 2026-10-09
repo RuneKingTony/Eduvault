@@ -1,9 +1,5 @@
-import { MEMBER_ROLE, OWNER_ROLE, toPermissions } from './roles';
-import {
-  splitPermission,
-  type Permission,
-  type PermissionMap,
-} from './statements';
+import { MEMBER_ROLE, OWNER_ROLE, holds, toPermissions } from './roles';
+import type { Permission, PermissionMap } from './statements';
 
 export interface GrantRequest {
   slug: string;
@@ -32,9 +28,8 @@ export function canGrantRole(request: GrantRequest): GrantCheck {
   if (slug === OWNER_ROLE) {
     return { allowed: assignerIsOwner, missing: [] };
   }
-  const missing = toPermissions(rolePermissions).filter((permission) => {
-    const [resource, action] = splitPermission(permission);
-    return !(assignerPermissions[resource]?.includes(action) ?? false);
-  });
+  const missing = toPermissions(rolePermissions).filter(
+    (permission) => !holds(assignerPermissions, permission)
+  );
   return { allowed: missing.length === 0, missing };
 }

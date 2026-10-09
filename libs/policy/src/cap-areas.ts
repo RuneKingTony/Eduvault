@@ -1,8 +1,5 @@
-import {
-  splitPermission,
-  type Permission,
-  type PermissionMap,
-} from './statements';
+import { holds } from './roles';
+import type { Permission, PermissionMap } from './statements';
 
 export interface CapExtra {
   label: string;
@@ -64,7 +61,6 @@ export const CAP_AREAS: readonly CapArea[] = [
   },
 ];
 
-/** Owner-only permissions that sit outside `CAP_AREAS` until their slice lands. */
 export const LEGACY_PERMISSIONS: readonly Permission[] = [
   'feeSchedule:create',
   'feeSchedule:read',
@@ -73,11 +69,6 @@ export const LEGACY_PERMISSIONS: readonly Permission[] = [
   'schoolAccount:create',
   'schoolAccount:delete',
 ];
-
-function holds(permissions: PermissionMap, permission: Permission): boolean {
-  const [resource, action] = splitPermission(permission);
-  return permissions[resource]?.includes(action) ?? false;
-}
 
 export function capLevel(permissions: PermissionMap, area: CapArea): CapLevel {
   const every = (list: readonly Permission[]) =>

@@ -97,7 +97,6 @@ export function toPermissions(map: PermissionMap): Permission[] {
   );
 }
 
-/** Reads a Better Auth `permission` column, dropping anything not in the list. */
 export function parsePermissionMap(json: string): PermissionMap {
   let parsed: unknown;
   try {
@@ -119,6 +118,14 @@ export function parsePermissionMap(json: string): PermissionMap {
       : []
   );
   return toPermissionMap(held);
+}
+
+/** Better Auth stores a member's roles as one comma-joined string. */
+export function splitRoles(role: string | null | undefined): string[] {
+  return (role ?? '')
+    .split(',')
+    .map((slug) => slug.trim())
+    .filter((slug) => slug !== '');
 }
 
 /** `owner` and `member` live in code; every other role is an `organizationRole` row. */
@@ -144,17 +151,22 @@ export function resolvePermissions(
   return toPermissionMap([...held]);
 }
 
+export function holds(
+  permissions: PermissionMap,
+  permission: Permission
+): boolean {
+  const [resource, action] = splitPermission(permission);
+  return permissions[resource]?.includes(action) ?? false;
+}
+
 export function can<R extends Resource>(
   permissions: PermissionMap,
   resource: R,
   action: ActionOf<R>
 ): boolean {
-  return permissions[resource]?.includes(action) ?? false;
+  return holds(permissions, `${resource}:${action}` as Permission);
 }
 
 export function canAny(permissions: PermissionMap, gate: Gate): boolean {
-  return gate.some((permission) => {
-    const [resource, action] = splitPermission(permission);
-    return permissions[resource]?.includes(action) ?? false;
-  });
+  return gate.some((permission) => holds(permissions, permission));
 }
