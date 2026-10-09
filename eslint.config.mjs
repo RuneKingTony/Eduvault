@@ -1,3 +1,4 @@
+import path from 'node:path';
 import nx from '@nx/eslint-plugin';
 import tseslint from 'typescript-eslint';
 import unusedImports from 'eslint-plugin-unused-imports';
@@ -7,12 +8,61 @@ import react from 'eslint-plugin-react';
 import reactHooks from 'eslint-plugin-react-hooks';
 import jsxA11y from 'eslint-plugin-jsx-a11y';
 import pluginQuery from '@tanstack/eslint-plugin-query';
+import sonarjs from 'eslint-plugin-sonarjs';
+import unicorn from 'eslint-plugin-unicorn';
+import importX from 'eslint-plugin-import-x';
+import regexp from 'eslint-plugin-regexp';
+import vitest from '@vitest/eslint-plugin';
+import betterTailwindcss from 'eslint-plugin-better-tailwindcss';
+import { createTypeScriptImportResolver } from 'eslint-import-resolver-typescript';
 
 const tsFiles = ['**/*.ts', '**/*.tsx', '**/*.mts'];
 const reactFiles = ['**/*.tsx'];
 
 const onlyFor = (files, configs) =>
   configs.map((config) => ({ ...config, files }));
+
+const promote = (level) => (level === 'warn' || level === 1 ? 'error' : level);
+
+// Presets ship some rules as `warn`, and the Nx lint target has no
+// --max-warnings, so a warning would be invisible.
+const asErrors = (config) => ({
+  ...config,
+  rules: Object.fromEntries(
+    Object.entries(config.rules ?? {}).map(([name, setting]) => [
+      name,
+      Array.isArray(setting)
+        ? [promote(setting[0]), ...setting.slice(1)]
+        : promote(setting),
+    ])
+  ),
+});
+
+const rawColourClass =
+  '^(?:[a-z-]+:)*-?(?:bg|text|border|ring|fill|stroke|from|via|to|outline|divide|decoration|accent|caret|shadow|placeholder)-(?:red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|slate|gray|zinc|neutral|stone|white|black)(?:-\\d+)?(?:/\\d+)?$';
+
+export const tailwindConfig = (entryPoint) => [
+  {
+    files: reactFiles,
+    plugins: { 'better-tailwindcss': betterTailwindcss },
+    settings: { 'better-tailwindcss': { entryPoint } },
+    rules: {
+      ...betterTailwindcss.configs['recommended-error'].rules,
+      'better-tailwindcss/enforce-consistent-line-wrapping': 'off',
+      'better-tailwindcss/no-restricted-classes': [
+        'error',
+        {
+          restrict: [
+            {
+              pattern: rawColourClass,
+              message: 'Use a semantic theme token such as bg-primary.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+];
 
 export const noEnum = {
   selector: 'TSEnumDeclaration',
@@ -67,6 +117,7 @@ const importMetaEnv = {
 
 export const spaConfig = [
   ...reactConfig,
+  ...tailwindConfig('src/styles.css'),
   {
     files: ['src/**/*.{ts,tsx}'],
     rules: {
@@ -160,6 +211,31 @@ export default [
       },
     },
   },
+  ...onlyFor(tsFiles, [
+    asErrors(sonarjs.configs.recommended),
+    asErrors(unicorn.configs.recommended),
+    asErrors(regexp.configs['flat/recommended']),
+  ]),
+  {
+    files: tsFiles,
+    plugins: { 'import-x': importX },
+    settings: {
+      'import-x/extensions':
+        importX.flatConfigs.typescript.settings['import-x/extensions'],
+      'import-x/parsers':
+        importX.flatConfigs.typescript.settings['import-x/parsers'],
+      'import-x/resolver-next': [
+        createTypeScriptImportResolver({
+          project: path.join(import.meta.dirname, 'tsconfig.base.json'),
+        }),
+      ],
+    },
+    rules: {
+      'import-x/no-cycle': 'error',
+      'import-x/no-duplicates': ['error', { 'prefer-inline': true }],
+      'import-x/no-self-import': 'error',
+    },
+  },
   {
     files: ['**/*.ts', '**/*.tsx', '**/*.mts', '**/*.js', '**/*.mjs'],
     plugins: { 'unused-imports': unusedImports },
@@ -180,6 +256,42 @@ export default [
     rules: {
       eqeqeq: ['error', 'always'],
       'no-console': ['error', { allow: ['warn', 'error'] }],
+      'no-nested-ternary': 'error',
+      'no-else-return': 'error',
+      'no-lonely-if': 'error',
+      'no-unneeded-ternary': 'error',
+      'no-implicit-coercion': 'error',
+      'no-param-reassign': 'error',
+      'prefer-template': 'error',
+      'object-shorthand': 'error',
+      complexity: ['error', 10],
+      'max-depth': ['error', 3],
+      'max-nested-callbacks': ['error', 3],
+      'max-lines-per-function': [
+        'error',
+        { max: 60, skipBlankLines: true, skipComments: true },
+      ],
+      '@typescript-eslint/max-params': ['error', { max: 3 }],
+      '@typescript-eslint/no-shadow': 'error',
+      '@typescript-eslint/no-use-before-define': [
+        'error',
+        { functions: false },
+      ],
+      '@typescript-eslint/strict-boolean-expressions': 'error',
+      'unicorn/filename-case': 'off',
+      'unicorn/import-style': [
+        'error',
+        { styles: { 'node:path': { default: true, named: true } } },
+      ],
+      'unicorn/no-useless-undefined': [
+        'error',
+        { checkArguments: false, checkArrowFunctionBody: false },
+      ],
+      'unicorn/no-nested-ternary': 'off',
+      'unicorn/no-null': 'off',
+      'unicorn/prevent-abbreviations': 'off',
+      'sonarjs/no-unused-vars': 'off',
+      'sonarjs/prefer-read-only-props': 'off',
       'no-restricted-syntax': ['error', noEnum],
       '@typescript-eslint/consistent-type-definitions': ['error', 'interface'],
       '@typescript-eslint/consistent-type-exports': 'error',
@@ -240,8 +352,16 @@ export default [
     rules: { 'check-file/filename-naming-convention': 'off' },
   },
   {
+    ...asErrors(vitest.configs.recommended),
+    files: ['**/*.spec.{ts,tsx}', '**/test/**/*.ts'],
+  },
+  {
     files: ['**/*.spec.{ts,tsx}', '**/test/**/*.ts'],
     rules: {
+      'max-lines-per-function': 'off',
+      'max-nested-callbacks': 'off',
+      'sonarjs/no-hardcoded-passwords': 'off',
+      'unicorn/no-await-expression-member': 'off',
       '@typescript-eslint/no-non-null-assertion': 'off',
       '@typescript-eslint/no-unsafe-argument': 'off',
       '@typescript-eslint/no-unsafe-assignment': 'off',
@@ -252,4 +372,9 @@ export default [
     },
   },
   eslintConfigPrettier,
+  {
+    // eslint-config-prettier disables `curly`; braces on every block is safe with Prettier.
+    files: tsFiles,
+    rules: { curly: ['error', 'all'] },
+  },
 ];
