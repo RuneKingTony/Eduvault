@@ -6,13 +6,17 @@ import {
   createCampusSchema,
   createFeeScheduleSchema,
   createSchoolAccountSchema,
+  createSchoolResultSchema,
+  createSchoolSchema,
   createStudentSchema,
   feeScheduleSchema,
   healthSchema,
   idParamsSchema,
   mePermissionsSchema,
   meSchema,
+  platformSchoolListSchema,
   schoolAccountSchema,
+  setPasswordSchema,
   studentSchema,
   updateCampusSchema,
   updateFeeScheduleSchema,
@@ -96,6 +100,27 @@ export const contract = defineContract({
       path: '/me/permissions',
       response: mePermissionsSchema,
     }),
+    setPassword: defineRoute({
+      method: 'POST',
+      path: '/me/password',
+      body: setPasswordSchema,
+      response: z.void(),
+    }),
+  },
+  platform: {
+    schools: {
+      list: defineRoute({
+        method: 'GET',
+        path: '/platform/schools',
+        response: platformSchoolListSchema,
+      }),
+      create: defineRoute({
+        method: 'POST',
+        path: '/platform/schools',
+        body: createSchoolSchema,
+        response: createSchoolResultSchema,
+      }),
+    },
   },
   campuses: {
     ...crud({
