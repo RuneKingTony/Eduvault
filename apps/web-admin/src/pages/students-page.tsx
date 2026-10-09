@@ -2,7 +2,15 @@ import { useState, type SubmitEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Campus, Student } from '@eduvault/api-contract';
 import { Can } from '@eduvault/auth-client';
-import { Button, TextField, fieldValue, ErrorMessage } from '@eduvault/ui';
+import {
+  Button,
+  ErrorMessage,
+  NativeSelect,
+  NativeSelectOption,
+  TextField,
+  fieldValue,
+} from '@eduvault/ui';
+import { useActing } from '../acting-store';
 import { useApi } from '../api';
 import { campusesQueryOptions, studentsQueryOptions } from '../queries';
 
@@ -12,6 +20,7 @@ export function StudentsPage() {
   const students = useQuery(studentsQueryOptions(api));
   const campuses = useQuery(campusesQueryOptions(api));
   const [campusId, setCampusId] = useState('');
+  const acting = useActing();
 
   const refresh = () =>
     queryClient.invalidateQueries({ queryKey: ['students'] });
@@ -48,6 +57,7 @@ export function StudentsPage() {
         <StudentForm
           campuses={campuses.data}
           campusId={campusId}
+          campusRequired={acting !== null}
           onCampusChange={setCampusId}
           pending={create.isPending}
           onSubmit={submit}
@@ -86,12 +96,14 @@ function StudentList({
 function StudentForm({
   campuses,
   campusId,
+  campusRequired,
   onCampusChange,
   pending,
   onSubmit,
 }: {
   campuses: Campus[] | undefined;
   campusId: string;
+  campusRequired: boolean;
   onCampusChange: (id: string) => void;
   pending: boolean;
   onSubmit: (event: SubmitEvent<HTMLFormElement>) => void;
@@ -107,19 +119,21 @@ function StudentForm({
         >
           Campus
         </label>
-        <select
+        <NativeSelect
           id="student-campus"
-          className="rounded-md border border-input px-3 py-2 text-sm"
           value={campusId}
+          required={campusRequired}
           onChange={(event) => onCampusChange(event.target.value)}
         >
-          <option value="">Active campus</option>
+          <NativeSelectOption value="">
+            {campusRequired ? 'Choose a campus' : 'Active campus'}
+          </NativeSelectOption>
           {campuses?.map((campus) => (
-            <option key={campus.id} value={campus.id}>
+            <NativeSelectOption key={campus.id} value={campus.id}>
               {campus.name}
-            </option>
+            </NativeSelectOption>
           ))}
-        </select>
+        </NativeSelect>
       </div>
       <Button type="submit" disabled={pending}>
         Add student

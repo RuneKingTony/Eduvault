@@ -57,16 +57,23 @@ function PasswordBlock({
 }
 
 /** The one place a temporary password is shown; only Done closes it. */
-export function CreatedSchoolDialog({
-  result,
+export function TemporaryPasswordDialog({
+  open,
+  title,
+  description,
+  email,
+  password,
   onDone,
 }: {
-  result: CreateSchoolResult | null;
+  open: boolean;
+  title: string;
+  description: string;
+  email: string;
+  password: string | null;
   onDone: () => void;
 }) {
-  const password = result?.temporaryPassword ?? null;
   return (
-    <Dialog open={result !== null}>
+    <Dialog open={open}>
       <DialogContent
         showCloseButton={false}
         onEscapeKeyDown={(event) => {
@@ -77,15 +84,11 @@ export function CreatedSchoolDialog({
         }}
       >
         <DialogHeader>
-          <DialogTitle>{result?.school.name} created</DialogTitle>
-          <DialogDescription>
-            {password === null
-              ? `${result?.owner.email ?? ''} already has an account and is now the owner.`
-              : 'Give the owner this temporary password. They choose their own at first sign-in. It won’t be shown again.'}
-          </DialogDescription>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
-        {result === null || password === null ? null : (
-          <PasswordBlock email={result.owner.email} password={password} />
+        {password === null ? null : (
+          <PasswordBlock email={email} password={password} />
         )}
         <DialogFooter>
           <Button type="button" onClick={onDone}>
@@ -94,5 +97,29 @@ export function CreatedSchoolDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+export function CreatedSchoolDialog({
+  result,
+  onDone,
+}: {
+  result: CreateSchoolResult | null;
+  onDone: () => void;
+}) {
+  const password = result?.temporaryPassword ?? null;
+  return (
+    <TemporaryPasswordDialog
+      open={result !== null}
+      title={`${result?.school.name ?? ''} created`}
+      description={
+        password === null
+          ? `${result?.owner.email ?? ''} already has an account and is now the owner.`
+          : 'Give the owner this temporary password. They choose their own at first sign-in. It won’t be shown again.'
+      }
+      email={result?.owner.email ?? ''}
+      password={password}
+      onDone={onDone}
+    />
   );
 }

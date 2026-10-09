@@ -10,17 +10,23 @@ import {
 } from '../ui/empty';
 import { Skeleton } from '../ui/skeleton';
 
-export function NotFoundState({ children }: { children?: ReactNode }) {
+export function NotFoundState({
+  title = 'Page not found',
+  description = 'We couldn’t find that page. It may have been moved.',
+  children,
+}: {
+  title?: string;
+  description?: string;
+  children?: ReactNode;
+}) {
   return (
     <Empty className="border">
       <EmptyHeader>
         <EmptyMedia variant="icon">
           <SearchXIcon />
         </EmptyMedia>
-        <EmptyTitle>Page not found</EmptyTitle>
-        <EmptyDescription>
-          We couldn’t find that page. It may have been moved.
-        </EmptyDescription>
+        <EmptyTitle>{title}</EmptyTitle>
+        <EmptyDescription>{description}</EmptyDescription>
       </EmptyHeader>
       <EmptyContent>{children}</EmptyContent>
     </Empty>

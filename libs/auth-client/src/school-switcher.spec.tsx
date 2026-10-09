@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { SchoolSwitcher } from './school-switcher';
 import { fakeClient, openMenu, renderInSidebar } from './menu-test-utils';
 
@@ -74,5 +74,24 @@ describe('SchoolSwitcher', () => {
     );
     expect(setActive).not.toHaveBeenCalled();
     expect(onSwitched).not.toHaveBeenCalled();
+  });
+
+  it('renders a plain button outside the sidebar', () => {
+    const authClient = fakeClient({
+      useSession: () => ({ data: { session: { activeOrganizationId: 'o1' } } }),
+      useListOrganizations: () => ({ data: schools }),
+      organization: { setActive: vi.fn() },
+    });
+    render(
+      <SchoolSwitcher
+        authClient={authClient}
+        appearance="button"
+        onSwitched={vi.fn()}
+      />
+    );
+    openMenu(/Greenfield College/);
+    expect(
+      screen.getByRole('menuitem', { name: /Lekki Prep/ })
+    ).toBeInTheDocument();
   });
 });

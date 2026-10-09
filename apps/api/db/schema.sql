@@ -14,6 +14,18 @@ SET xmloption = content;
 SET client_min_messages = warning;
 SET row_security = off;
 
+--
+-- Name: audit_log_refuse_change(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.audit_log_refuse_change() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  RAISE EXCEPTION 'audit_log is append-only';
+END;
+$$;
+
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
@@ -36,6 +48,27 @@ CREATE TABLE public.account (
     password text,
     "createdAt" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     "updatedAt" timestamp with time zone NOT NULL
+);
+
+--
+-- Name: audit_log; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.audit_log (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    kind text NOT NULL,
+    actor_user_id text NOT NULL,
+    organization_id text,
+    method text,
+    action text,
+    path text NOT NULL,
+    status smallint NOT NULL,
+    reason text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT audit_log_action_check CHECK ((action = ANY (ARRAY['school.create'::text, 'school.suspend'::text, 'school.reactivate'::text, 'school.replaceOwner'::text]))),
+    CONSTRAINT audit_log_kind_check CHECK ((kind = ANY (ARRAY['acting'::text, 'platform'::text]))),
+    CONSTRAINT audit_log_reason_check CHECK (((char_length(reason) >= 1) AND (char_length(reason) <= 200))),
+    CONSTRAINT audit_log_shape_check CHECK ((((kind = 'acting'::text) AND (method IS NOT NULL) AND (organization_id IS NOT NULL) AND (action IS NULL)) OR ((kind = 'platform'::text) AND (action IS NOT NULL) AND (method IS NULL))))
 );
 
 --
@@ -162,7 +195,10 @@ CREATE TABLE public.school_account (
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     city text,
     admission_prefix text NOT NULL,
-    CONSTRAINT school_account_admission_prefix_check CHECK ((admission_prefix ~ '^[A-Z]{2,6}$'::text))
+    suspended_at timestamp with time zone,
+    suspended_by text,
+    CONSTRAINT school_account_admission_prefix_check CHECK ((admission_prefix ~ '^[A-Z]{2,6}$'::text)),
+    CONSTRAINT school_account_suspended_check CHECK (((suspended_at IS NULL) = (suspended_by IS NULL)))
 );
 
 --
@@ -260,6 +296,13 @@ CREATE TABLE public.verification (
 
 ALTER TABLE ONLY public.account
     ADD CONSTRAINT account_pkey PRIMARY KEY (id);
+
+--
+-- Name: audit_log audit_log_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.audit_log
+    ADD CONSTRAINT audit_log_pkey PRIMARY KEY (id);
 
 --
 -- Name: campus campus_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -443,6 +486,18 @@ ALTER TABLE ONLY public.verification
 CREATE INDEX "account_userId_idx" ON public.account USING btree ("userId");
 
 --
+-- Name: audit_log_created_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX audit_log_created_idx ON public.audit_log USING btree (created_at DESC);
+
+--
+-- Name: audit_log_organization_created_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX audit_log_organization_created_idx ON public.audit_log USING btree (organization_id, created_at DESC);
+
+--
 -- Name: campus_organization_id_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -533,11 +588,31 @@ CREATE INDEX "team_organizationId_idx" ON public.team USING btree ("organization
 CREATE INDEX verification_identifier_idx ON public.verification USING btree (identifier);
 
 --
+-- Name: audit_log audit_log_append_only; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER audit_log_append_only BEFORE DELETE OR UPDATE ON public.audit_log FOR EACH ROW EXECUTE FUNCTION public.audit_log_refuse_change();
+
+--
 -- Name: account account_userId_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.account
     ADD CONSTRAINT "account_userId_fkey" FOREIGN KEY ("userId") REFERENCES public."user"(id) ON DELETE CASCADE;
+
+--
+-- Name: audit_log audit_log_actor_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.audit_log
+    ADD CONSTRAINT audit_log_actor_user_id_fkey FOREIGN KEY (actor_user_id) REFERENCES public."user"(id) ON DELETE RESTRICT;
+
+--
+-- Name: audit_log audit_log_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.audit_log
+    ADD CONSTRAINT audit_log_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE RESTRICT;
 
 --
 -- Name: campus campus_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -624,6 +699,13 @@ ALTER TABLE ONLY public.school_account
     ADD CONSTRAINT school_account_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE CASCADE;
 
 --
+-- Name: school_account school_account_suspended_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.school_account
+    ADD CONSTRAINT school_account_suspended_by_fkey FOREIGN KEY (suspended_by) REFERENCES public."user"(id) ON DELETE RESTRICT;
+
+--
 -- Name: session session_userId_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -679,4 +761,5 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20261009155210'),
     ('20261009185725'),
     ('20261009190000'),
-    ('20261009210000');
+    ('20261009210000'),
+    ('20261010090000');

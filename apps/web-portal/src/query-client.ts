@@ -1,5 +1,5 @@
-import { QueryClient } from '@tanstack/react-query';
+import { createEduvaultQueryClient } from '@eduvault/auth-client';
 
-export const queryClient = new QueryClient({
-  defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } },
-});
+export const createQueryClient = () => createEduvaultQueryClient();
+
+export const queryClient = createQueryClient();

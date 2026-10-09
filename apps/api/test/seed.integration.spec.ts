@@ -74,6 +74,90 @@ test.describe('dev seed', () => {
         .toSorted((a, b) => a.localeCompare(b))
     ).toEqual(['GF', 'HA', 'SB']);
 
+    const joined = await pool.query<{
+      slug: string;
+      created: string;
+      suspended: boolean;
+    }>(
+      `SELECT o.slug,
+              to_char(o."createdAt" AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS created,
+              sa.suspended_at IS NOT NULL AS suspended
+       FROM organization o JOIN school_account sa ON sa.organization_id = o.id
+       ORDER BY o.slug`
+    );
+    expect(joined.rows).toEqual([
+      { slug: 'greenfield', created: '2026-08-19', suspended: false },
+      { slug: 'hilltop', created: '2026-08-27', suspended: false },
+      { slug: 'stbrendan', created: '2026-09-09', suspended: true },
+    ]);
+
+    const audit = await pool.query<{
+      kind: string;
+      method: string | null;
+      action: string | null;
+      reason: string | null;
+      slug: string | null;
+    }>(
+      `SELECT a.kind, a.method, a.action, a.reason, o.slug
+       FROM audit_log a LEFT JOIN organization o ON o.id = a.organization_id
+       ORDER BY a.created_at, a.id`
+    );
+    expect(audit.rows.filter((row) => row.kind === 'acting')).toEqual([
+      {
+        kind: 'acting',
+        method: 'GET',
+        action: null,
+        reason: null,
+        slug: 'hilltop',
+      },
+      {
+        kind: 'acting',
+        method: 'GET',
+        action: null,
+        reason: null,
+        slug: 'hilltop',
+      },
+      {
+        kind: 'acting',
+        method: 'PATCH',
+        action: null,
+        reason: 'SUP-2207',
+        slug: 'hilltop',
+      },
+    ]);
+    expect(
+      audit.rows
+        .filter((row) => row.kind === 'platform')
+        .map((row) => [row.action, row.slug])
+    ).toEqual([
+      ['school.create', 'greenfield'],
+      ['school.create', 'hilltop'],
+      ['school.create', 'stbrendan'],
+      ['school.suspend', 'stbrendan'],
+    ]);
+
+    const platform = await api({ cookie: adminCookie })
+      .get('/platform/schools')
+      .expect(200);
+    expect(platform.body.totals).toEqual({
+      schools: 3,
+      active: 2,
+      students: 28,
+      actingRequests: 3,
+    });
+
+    const mary = await api()
+      .post('/api/auth/sign-in/email')
+      .send({ email: emailOf('mary'), password: SEED_PASSWORD })
+      .expect(200);
+    const maryCookie = (mary.headers['set-cookie'] as unknown as string[])
+      .map((c) => c.split(';')[0])
+      .join('; ');
+    const paused = await api({ cookie: maryCookie })
+      .get('/students')
+      .expect(403);
+    expect(paused.body).toMatchObject({ code: 'SchoolSuspended' });
+
     const before = await counts();
     lines.length = 0;
     const second = await runSeed(app, { log });

@@ -26,6 +26,7 @@ import {
   cn,
   useIsCompact,
 } from '@eduvault/ui';
+import { useActing, type ActingState } from '../acting-store';
 import { useApi } from '../api';
 import { mePermissionsQueryOptions } from '../queries';
 import {
@@ -41,6 +42,7 @@ import { CommandMenu, type CommandEntry } from './command-menu';
 import { MyAccessProvider, useMyAccess } from './my-access';
 import { ShellSidebar } from './shell-sidebar';
 import { useRailOpen } from './shell-state';
+import { ActingBanner } from './acting-banner';
 import { ShellTopbar } from './shell-topbar';
 import { useCommandShortcut } from './use-command-shortcut';
 
@@ -59,6 +61,13 @@ function commandEntries(groups: readonly NavGroup[]): CommandEntry[] {
     );
 }
 
+/** Cached access may only seed a key it was fetched for, or it would outlive a switch. */
+const matchesActing = (access: MePermissions, acting: ActingState | null) =>
+  acting === null
+    ? access.acting === null
+    : access.acting?.organizationId === acting.organizationId &&
+      access.acting.writes === (acting.reason !== null);
+
 function useAccess(): MePermissions {
   const router = useRouter();
   const api = useApi();
@@ -66,9 +75,12 @@ function useAccess(): MePermissions {
   if (access === null) {
     throw new Error('The school shell needs school access');
   }
+  const acting = useActing();
   const { data } = useQuery({
-    ...mePermissionsQueryOptions(api),
-    initialData: access,
+    ...mePermissionsQueryOptions(api, acting),
+    ...(matchesActing(access, acting)
+      ? { initialData: access }
+      : { placeholderData: access }),
   });
   const previous = useRef(data);
   useEffect(() => {
@@ -77,7 +89,7 @@ function useAccess(): MePermissions {
       void router.invalidate();
     }
   }, [data, router]);
-  return data;
+  return data ?? access;
 }
 
 function useShellModel(access: MePermissions) {
@@ -251,6 +263,7 @@ function ShellFrame({ access }: { access: MePermissions }) {
           }}
         />
         <div className="flex min-w-0 flex-1 flex-col">
+          <ActingBanner />
           <ShellTopbar
             compact={compact}
             groupLabel={model.current?.group.label ?? undefined}

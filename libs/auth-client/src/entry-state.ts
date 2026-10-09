@@ -6,6 +6,7 @@ export type EntryState =
   | 'change-password'
   | 'platform'
   | 'no-school'
+  | 'suspended'
   | 'ready';
 
 interface EntryInput {
@@ -37,7 +38,10 @@ function signedInState({
   const hasSchool =
     me.schoolCount > 0 &&
     (session.session.activeOrganizationId ?? null) !== null;
-  return hasSchool ? 'ready' : 'no-school';
+  if (!hasSchool) {
+    return 'no-school';
+  }
+  return me.suspendedSchool === null ? 'ready' : 'suspended';
 }
 
 export function entryState({

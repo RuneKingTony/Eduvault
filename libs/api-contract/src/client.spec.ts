@@ -52,4 +52,60 @@ describe('createApiClient', () => {
     });
     await expect(client.schoolAccount.get({})).rejects.toBeInstanceOf(ApiError);
   });
+
+  it('sends the headers option on every call, read afresh each time', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockImplementation(() =>
+        Promise.resolve(jsonResponse(200, { status: 'ok' }))
+      );
+    let acting = 'school-a';
+    const client = createApiClient(contract, {
+      baseUrl: 'http://api.test',
+      fetch: fetchMock,
+      headers: () => ({ 'x-eduvault-acting-org': acting }),
+    });
+
+    await client.health({});
+    acting = 'school-b';
+    await client.health({});
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      'http://api.test/health',
+      expect.objectContaining({
+        headers: { 'x-eduvault-acting-org': 'school-a' },
+      })
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      'http://api.test/health',
+      expect.objectContaining({
+        headers: { 'x-eduvault-acting-org': 'school-b' },
+      })
+    );
+  });
+
+  it('keeps the content type beside the headers option when sending a body', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(null, { status: 204 }));
+    const client = createApiClient(contract, {
+      baseUrl: 'http://api.test',
+      fetch: fetchMock,
+      headers: () => ({ 'x-eduvault-acting-reason': 'SUP-1' }),
+    });
+
+    await client.me.setPassword({ body: { newPassword: 'long enough pw' } });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://api.test/me/password',
+      expect.objectContaining({
+        headers: {
+          'x-eduvault-acting-reason': 'SUP-1',
+          'content-type': 'application/json',
+        },
+      })
+    );
+  });
 });

@@ -5,10 +5,13 @@ import { AuthService } from '@thallesp/nestjs-better-auth';
 import { Pool } from 'pg';
 import request from 'supertest';
 import { test as vitestTest } from 'vitest';
-import type {
-  Campus,
-  CreateSchoolInput,
-  CreateSchoolResult,
+import {
+  ACTING_ORG_HEADER,
+  ACTING_REASON_HEADER,
+  encodeActingReason,
+  type Campus,
+  type CreateSchoolInput,
+  type CreateSchoolResult,
 } from '@eduvault/api-contract';
 import { toPermissionMap, type Permission } from '@eduvault/policy';
 import { AppModule } from '../../src/app/app.module';
@@ -20,14 +23,14 @@ import { configureApp } from '../../src/app/configure-app';
 const ORIGIN = 'http://localhost:4200';
 export const PASSWORD = 'correct-horse-battery';
 
-interface TestUser {
+export interface TestUser {
   id: string;
   email: string;
   password: string;
   cookie: string;
 }
 
-interface TestOrganization {
+export interface TestOrganization {
   id: string;
   name: string;
   slug: string;
@@ -61,6 +64,69 @@ const nextAddress = () => {
   return `203.0.113.${nextHost}`;
 };
 
+export const acting = (organizationId: string, reason?: string) => ({
+  [ACTING_ORG_HEADER]: organizationId,
+  ...(reason === undefined
+    ? {}
+    : { [ACTING_REASON_HEADER]: encodeActingReason(reason) }),
+});
+
+interface AuditRowFilter {
+  organizationId?: string;
+  kind?: 'acting' | 'platform';
+  method?: string;
+  action?: string;
+}
+
+interface AuditLogRow {
+  id: string;
+  kind: string;
+  actor_user_id: string;
+  organization_id: string | null;
+  method: string | null;
+  action: string | null;
+  path: string;
+  status: number;
+  reason: string | null;
+}
+
+const DEADLINE_MS = 3000;
+const DEADLOCK = '40P01';
+
+export async function waitForAuditRows(
+  pool: Pool,
+  filter: AuditRowFilter,
+  count: number
+): Promise<AuditLogRow[]> {
+  const conditions: string[] = [];
+  const values: string[] = [];
+  for (const [column, value] of [
+    ['organization_id', filter.organizationId],
+    ['kind', filter.kind],
+    ['method', filter.method],
+    ['action', filter.action],
+  ] as const) {
+    if (value !== undefined) {
+      values.push(value);
+      conditions.push(`${column} = $${values.length}`);
+    }
+  }
+  const where =
+    conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+  const deadline = Date.now() + DEADLINE_MS;
+  for (;;) {
+    const { rows } = await pool.query<AuditLogRow>(
+      `SELECT id, kind, actor_user_id, organization_id, method, action, path, status, reason
+       FROM audit_log ${where} ORDER BY created_at, id`,
+      values
+    );
+    if (rows.length >= count || Date.now() > deadline) {
+      return rows;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+}
+
 const headersFor = (cookie: string) => new Headers({ cookie, origin: ORIGIN });
 
 export interface Fixtures {
@@ -72,6 +138,7 @@ export interface Fixtures {
     get: (path: string) => request.Test;
     post: (path: string) => request.Test;
     patch: (path: string) => request.Test;
+    put: (path: string) => request.Test;
     delete: (path: string) => request.Test;
   };
   createUser: (input?: {
@@ -143,9 +210,20 @@ export const baseTest = vitestTest.extend<Fixtures>({
 
   resetDatabase: [
     async ({ pool }, use) => {
-      await pool.query(
-        'TRUNCATE TABLE "user", "organization", "verification" RESTART IDENTITY CASCADE'
-      );
+      // The previous test's acting audit row is written after its response and
+      // can deadlock with this truncate; the retry lets that insert finish.
+      for (let attempt = 1; ; attempt += 1) {
+        try {
+          await pool.query(
+            'TRUNCATE TABLE "user", "organization", "verification" RESTART IDENTITY CASCADE'
+          );
+          break;
+        } catch (error) {
+          if ((error as { code?: string }).code !== DEADLOCK || attempt >= 3) {
+            throw error;
+          }
+        }
+      }
       await use(undefined);
     },
     { auto: true },
@@ -162,6 +240,7 @@ export const baseTest = vitestTest.extend<Fixtures>({
         get: (path) => withAuth(http().get(path)),
         post: (path) => withAuth(http().post(path)),
         patch: (path) => withAuth(http().patch(path)),
+        put: (path) => withAuth(http().put(path)),
         delete: (path) => withAuth(http().delete(path)),
       };
     });

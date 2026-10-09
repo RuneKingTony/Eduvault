@@ -5,10 +5,12 @@ import {
   bootstrapSuperAdmin,
   parseBootstrapEnv,
   type AppAuth,
+  type AuthenticatedUser,
   type OrgContext,
 } from '../../src/app/common/auth';
 import { castToBetterAuthRoles } from '../../src/app/common/auth/better-auth-roles';
 import { ENV_TOKEN, type Env } from '../../src/app/common/config/env';
+import { AuditRepository } from '../../src/app/common/audit';
 import { KYSELY_TOKEN, type Database } from '../../src/app/common/db/tokens';
 import { CampusService } from '../../src/app/modules/campus/campus.service';
 import { PlatformService } from '../../src/app/modules/platform/platform.service';
@@ -23,7 +25,13 @@ import {
   SUPER_ADMIN_EMAIL,
   FORCED_CHANGE_PERSONA,
 } from './members';
-import { GREENFIELD_SLUG, schools } from './schools';
+import { seededActingRequests } from './acting-requests';
+import {
+  GREENFIELD_SLUG,
+  HILLTOP_SLUG,
+  SUSPENDED_SLUG,
+  schools,
+} from './schools';
 import { runSeedCheck } from './seed-check';
 import { students } from './students';
 
@@ -53,7 +61,10 @@ const lookup = (map: Map<string, string>, key: string, what: string) => {
   return value;
 };
 
-async function createSchools(app: INestApplicationContext) {
+async function createSchools(
+  app: INestApplicationContext,
+  actor: AuthenticatedUser
+) {
   const campusService = app.get(CampusService, { strict: false });
   const accounts = app.get(AccountService, { strict: false });
   const platform = app.get(PlatformService, { strict: false });
@@ -74,7 +85,7 @@ async function createSchools(app: INestApplicationContext) {
   const owners = new Map<string, OrgContext>();
   for (const school of schools) {
     const ownerPersona = lookupPersona(school.owner);
-    const created = await platform.createSchool({
+    const created = await platform.createSchool(actor, {
       name: school.name,
       slug: school.slug,
       admissionPrefix: school.admissionPrefix,
@@ -145,7 +156,7 @@ async function createStudents(
 async function ensureSuperAdmin(
   app: INestApplicationContext,
   log: (line: string) => void
-) {
+): Promise<AuthenticatedUser> {
   const auth = app.get(AuthService<AppAuth>, { strict: false }).instance;
   const credentials = parseBootstrapEnv({
     ...process.env,
@@ -158,14 +169,54 @@ async function ensureSuperAdmin(
   if (outcome === 'created') {
     log(`Created the super admin ${credentials.email}.`);
   }
-  return credentials.email;
+  const db = app.get<Database>(KYSELY_TOKEN, { strict: false });
+  return db
+    .selectFrom('user')
+    .select(['id', 'email', 'name'])
+    .where('email', '=', credentials.email.toLowerCase())
+    .executeTakeFirstOrThrow();
+}
+
+/** Better Auth stamps `now`, so the seed backdates when each school joined. */
+async function backdateSchools(
+  db: Database,
+  organizationIds: Map<string, string>,
+  offsetDays: number
+) {
+  for (const school of schools) {
+    await db
+      .updateTable('organization')
+      .set({
+        createdAt: `${shiftDate(school.createdOn, offsetDays)}T09:00:00Z`,
+      })
+      .where('id', '=', lookup(organizationIds, school.slug, 'school'))
+      .execute();
+  }
+}
+
+async function addSupportActivity(
+  app: INestApplicationContext,
+  actor: AuthenticatedUser,
+  organizationIds: Map<string, string>
+) {
+  const audit = app.get(AuditRepository, { strict: false });
+  for (const request of seededActingRequests) {
+    await audit.recordActing({
+      actorUserId: actor.id,
+      organizationId: lookup(organizationIds, HILLTOP_SLUG, 'school'),
+      ...request,
+    });
+  }
+  await app
+    .get(PlatformService, { strict: false })
+    .suspend(actor, lookup(organizationIds, SUSPENDED_SLUG, 'school'));
 }
 
 export async function runSeed(
   app: INestApplicationContext,
   { log = console.log, now }: SeedOptions = {}
 ): Promise<SeedResult> {
-  const superAdminEmail = await ensureSuperAdmin(app, log);
+  const superAdmin = await ensureSuperAdmin(app, log);
   const db = app.get<Database>(KYSELY_TOKEN, { strict: false });
   const marker = await db
     .selectFrom('organization')
@@ -181,11 +232,14 @@ export async function runSeed(
   const today = shiftDate(PROTOTYPE_TODAY, seedOffsetDays(now, SEED_TODAY));
   log(`Seeding Eduvault dev data; seed "today" is ${today}.`);
 
-  const created = await createSchools(app);
+  const offsetDays = seedOffsetDays(now, SEED_TODAY);
+  const created = await createSchools(app, superAdmin);
+  await backdateSchools(db, created.organizationIds, offsetDays);
   await addMembers(app, created);
   await createStudents(app, created.campusIds);
+  await addSupportActivity(app, superAdmin, created.organizationIds);
 
-  const failures = await runSeedCheck(app);
+  const failures = await runSeedCheck(app, offsetDays);
   if (failures.length > 0) {
     log('Seed check failed:');
     for (const failure of failures) {
@@ -198,7 +252,7 @@ export async function runSeed(
     `Seeded ${schools.length} schools, ${personas.length} users and ${students.length} students; seed check passed.`
   );
   log(`Sign in with any of these (password: ${SEED_PASSWORD}):`);
-  log(`  ${superAdminEmail}  Super admin (staff app, no school)`);
+  log(`  ${superAdmin.email}  Super admin (staff app, no school)`);
   for (const { name, email } of personas) {
     log(`  ${email}  ${name}`);
   }

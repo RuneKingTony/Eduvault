@@ -29,14 +29,7 @@ export class MeController {
   @Get('permissions')
   @OrganizationAuth()
   permissions(@Org() org: OrgContext): RouteOutput<typeof routes.permissions> {
-    return {
-      organizationId: org.organizationId,
-      roles: org.roles,
-      permissions: org.permissions,
-      campusScope: org.campusScope,
-      classScope: org.classScope,
-      acting: org.acting,
-    };
+    return this.me.permissions(org);
   }
 
   @Post('password')

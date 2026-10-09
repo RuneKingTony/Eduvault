@@ -5,20 +5,16 @@ import {
   type PlatformSchool,
 } from '@eduvault/api-contract';
 import { PlatformSchoolsPage } from '../pages/platform-schools-page';
-import { renderWithApi } from '../test-utils';
+import { platformSchool, renderWithApi, schoolList } from '../test-utils';
 
 const created = (
   overrides: Partial<CreateSchoolResult> = {}
 ): CreateSchoolResult => {
-  const school: PlatformSchool = {
-    id: 's1',
-    name: 'Greenfield College',
+  const school: PlatformSchool = platformSchool({
     slug: 'greenfield-college',
     admissionPrefix: 'GC',
-    city: 'Lagos',
     owners: [{ id: 'o1', name: 'Funmi', email: 'funmi@greenfield.test' }],
-    createdAt: '2026-08-12T10:00:00.000Z',
-  };
+  });
   return {
     school,
     owner: { id: 'o1', email: 'funmi@greenfield.test' },
@@ -28,10 +24,13 @@ const created = (
 };
 
 function setup(create: ReturnType<typeof vi.fn>) {
-  const list = vi.fn().mockResolvedValue({ items: [] });
-  renderWithApi(<PlatformSchoolsPage />, {
-    platform: { schools: { list, create } },
-  });
+  const list = vi.fn().mockResolvedValue(schoolList([]));
+  renderWithApi(
+    <PlatformSchoolsPage onOpenSchool={vi.fn()} onOpenAudit={vi.fn()} />,
+    {
+      platform: { schools: { list, create } },
+    }
+  );
   return { list, create };
 }
 

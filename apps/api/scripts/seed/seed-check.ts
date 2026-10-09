@@ -3,8 +3,10 @@ import { KYSELY_TOKEN, type Database } from '../../src/app/common/db/tokens';
 import { CampusService } from '../../src/app/modules/campus/campus.service';
 import { StudentService } from '../../src/app/modules/student/student.service';
 import { orgContextFor } from './actors';
+import { SEEDED_ACTING_REASON } from './acting-requests';
+import { shiftDate } from './date-shift';
 import { emailOf, SUPER_ADMIN_EMAIL } from './members';
-import { schools } from './schools';
+import { HILLTOP_SLUG, SUSPENDED_SLUG, schools } from './schools';
 import { students } from './students';
 
 // Until class scope narrows teachers to their arms, Emeka sees all of Lekki.
@@ -37,10 +39,39 @@ async function checkSuperAdmin(db: Database, check: Check) {
   check('super admin', superAdmin?.email ?? 'missing', expected);
 }
 
+function checkSchoolState(
+  check: Check,
+  {
+    school,
+    offsetDays,
+    account,
+  }: {
+    school: (typeof schools)[number];
+    offsetDays: number;
+    account: { createdAt: Date | string; suspended_at: unknown } | undefined;
+  }
+) {
+  check(
+    `${school.slug} created on`,
+    account
+      ? new Date(account.createdAt).toISOString().slice(0, 10)
+      : 'missing',
+    shiftDate(school.createdOn, offsetDays)
+  );
+  check(
+    `${school.slug} suspended`,
+    account?.suspended_at === null ? 'no' : 'yes',
+    school.slug === SUSPENDED_SLUG ? 'yes' : 'no'
+  );
+}
+
 async function checkSchool(
   db: Database,
   check: Check,
-  school: (typeof schools)[number]
+  {
+    school,
+    offsetDays,
+  }: { school: (typeof schools)[number]; offsetDays: number }
 ) {
   const account = await db
     .selectFrom('school_account')
@@ -49,7 +80,12 @@ async function checkSchool(
       'organization.id',
       'school_account.organization_id'
     )
-    .select(['school_account.admission_prefix', 'organization.id'])
+    .select([
+      'school_account.admission_prefix',
+      'school_account.suspended_at',
+      'organization.id',
+      'organization.createdAt',
+    ])
     .where('organization.slug', '=', school.slug)
     .executeTakeFirst();
   check(
@@ -57,6 +93,7 @@ async function checkSchool(
     account?.admission_prefix ?? 'missing',
     school.admissionPrefix
   );
+  checkSchoolState(check, { school, offsetDays, account });
   const levels = await db
     .selectFrom('class_level')
     .select(['code', 'next_level_id'])
@@ -73,15 +110,36 @@ async function checkSchool(
   );
 }
 
-async function checkPlatform(db: Database, check: Check) {
+async function checkSupportActivity(db: Database, check: Check) {
+  const rows = await db
+    .selectFrom('audit_log')
+    .innerJoin('organization', 'organization.id', 'audit_log.organization_id')
+    .select(['audit_log.method', 'audit_log.reason'])
+    .where('audit_log.kind', '=', 'acting')
+    .where('organization.slug', '=', HILLTOP_SLUG)
+    .execute();
+  check('Hilltop acting requests', rows.length, 3);
+  check(
+    'Hilltop acting writes',
+    rows
+      .filter((row) => row.method !== 'GET')
+      .map((row) => row.reason ?? '')
+      .join(','),
+    SEEDED_ACTING_REASON
+  );
+}
+
+async function checkPlatform(db: Database, check: Check, offsetDays: number) {
   await checkSuperAdmin(db, check);
   for (const school of schools) {
-    await checkSchool(db, check, school);
+    await checkSchool(db, check, { school, offsetDays });
   }
+  await checkSupportActivity(db, check);
 }
 
 export async function runSeedCheck(
-  app: INestApplicationContext
+  app: INestApplicationContext,
+  offsetDays: number
 ): Promise<string[]> {
   const failures: string[] = [];
   const check: Check = (label, actual, expected) => {
@@ -91,7 +149,7 @@ export async function runSeedCheck(
   };
 
   const db = app.get<Database>(KYSELY_TOKEN, { strict: false });
-  await checkPlatform(db, check);
+  await checkPlatform(db, check, offsetDays);
   const organizations = await db
     .selectFrom('organization')
     .select('slug')

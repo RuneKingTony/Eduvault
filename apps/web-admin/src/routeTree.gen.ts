@@ -17,7 +17,9 @@ import { Route as PlatformRouteImport } from './routes/platform'
 import { Route as StudentsRouteImport } from './routes/students'
 import { Route as DevUiRouteImport } from './routes/dev/ui'
 import { Route as PlatformIndexRouteImport } from './routes/platform.index'
-import { Route as PlatformSchoolsRouteImport } from './routes/platform.schools'
+import { Route as PlatformAuditRouteImport } from './routes/platform.audit'
+import { Route as PlatformSchoolsIndexRouteImport } from './routes/platform.schools.index'
+import { Route as PlatformSchoolsSchoolIdRouteImport } from './routes/platform.schools.$schoolId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -59,9 +61,19 @@ const PlatformIndexRoute = PlatformIndexRouteImport.update({
   path: '/',
   getParentRoute: () => PlatformRoute,
 } as any)
-const PlatformSchoolsRoute = PlatformSchoolsRouteImport.update({
-  id: '/schools',
-  path: '/schools',
+const PlatformAuditRoute = PlatformAuditRouteImport.update({
+  id: '/audit',
+  path: '/audit',
+  getParentRoute: () => PlatformRoute,
+} as any)
+const PlatformSchoolsIndexRoute = PlatformSchoolsIndexRouteImport.update({
+  id: '/schools/',
+  path: '/schools/',
+  getParentRoute: () => PlatformRoute,
+} as any)
+const PlatformSchoolsSchoolIdRoute = PlatformSchoolsSchoolIdRouteImport.update({
+  id: '/schools/$schoolId',
+  path: '/schools/$schoolId',
   getParentRoute: () => PlatformRoute,
 } as any)
 
@@ -73,8 +85,10 @@ export interface FileRoutesByFullPath {
   '/platform': typeof PlatformRouteWithChildren
   '/students': typeof StudentsRoute
   '/dev/ui': typeof DevUiRoute
-  '/platform/schools': typeof PlatformSchoolsRoute
+  '/platform/audit': typeof PlatformAuditRoute
   '/platform/': typeof PlatformIndexRoute
+  '/platform/schools/$schoolId': typeof PlatformSchoolsSchoolIdRoute
+  '/platform/schools/': typeof PlatformSchoolsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -83,8 +97,10 @@ export interface FileRoutesByTo {
   '/fees': typeof FeesRoute
   '/students': typeof StudentsRoute
   '/dev/ui': typeof DevUiRoute
-  '/platform/schools': typeof PlatformSchoolsRoute
+  '/platform/audit': typeof PlatformAuditRoute
   '/platform': typeof PlatformIndexRoute
+  '/platform/schools/$schoolId': typeof PlatformSchoolsSchoolIdRoute
+  '/platform/schools': typeof PlatformSchoolsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -95,8 +111,10 @@ export interface FileRoutesById {
   '/platform': typeof PlatformRouteWithChildren
   '/students': typeof StudentsRoute
   '/dev/ui': typeof DevUiRoute
-  '/platform/schools': typeof PlatformSchoolsRoute
+  '/platform/audit': typeof PlatformAuditRoute
   '/platform/': typeof PlatformIndexRoute
+  '/platform/schools/$schoolId': typeof PlatformSchoolsSchoolIdRoute
+  '/platform/schools/': typeof PlatformSchoolsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -108,8 +126,10 @@ export interface FileRouteTypes {
     | '/platform'
     | '/students'
     | '/dev/ui'
-    | '/platform/schools'
+    | '/platform/audit'
     | '/platform/'
+    | '/platform/schools/$schoolId'
+    | '/platform/schools/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -118,8 +138,10 @@ export interface FileRouteTypes {
     | '/fees'
     | '/students'
     | '/dev/ui'
-    | '/platform/schools'
+    | '/platform/audit'
     | '/platform'
+    | '/platform/schools/$schoolId'
+    | '/platform/schools'
   id:
     | '__root__'
     | '/'
@@ -129,8 +151,10 @@ export interface FileRouteTypes {
     | '/platform'
     | '/students'
     | '/dev/ui'
-    | '/platform/schools'
+    | '/platform/audit'
     | '/platform/'
+    | '/platform/schools/$schoolId'
+    | '/platform/schools/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -201,24 +225,42 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PlatformIndexRouteImport
       parentRoute: typeof PlatformRoute
     }
-    '/platform/schools': {
-      id: '/platform/schools'
+    '/platform/audit': {
+      id: '/platform/audit'
+      path: '/audit'
+      fullPath: '/platform/audit'
+      preLoaderRoute: typeof PlatformAuditRouteImport
+      parentRoute: typeof PlatformRoute
+    }
+    '/platform/schools/': {
+      id: '/platform/schools/'
       path: '/schools'
-      fullPath: '/platform/schools'
-      preLoaderRoute: typeof PlatformSchoolsRouteImport
+      fullPath: '/platform/schools/'
+      preLoaderRoute: typeof PlatformSchoolsIndexRouteImport
+      parentRoute: typeof PlatformRoute
+    }
+    '/platform/schools/$schoolId': {
+      id: '/platform/schools/$schoolId'
+      path: '/schools/$schoolId'
+      fullPath: '/platform/schools/$schoolId'
+      preLoaderRoute: typeof PlatformSchoolsSchoolIdRouteImport
       parentRoute: typeof PlatformRoute
     }
   }
 }
 
 interface PlatformRouteChildren {
-  PlatformSchoolsRoute: typeof PlatformSchoolsRoute
+  PlatformAuditRoute: typeof PlatformAuditRoute
   PlatformIndexRoute: typeof PlatformIndexRoute
+  PlatformSchoolsSchoolIdRoute: typeof PlatformSchoolsSchoolIdRoute
+  PlatformSchoolsIndexRoute: typeof PlatformSchoolsIndexRoute
 }
 
 const PlatformRouteChildren: PlatformRouteChildren = {
-  PlatformSchoolsRoute: PlatformSchoolsRoute,
+  PlatformAuditRoute: PlatformAuditRoute,
   PlatformIndexRoute: PlatformIndexRoute,
+  PlatformSchoolsSchoolIdRoute: PlatformSchoolsSchoolIdRoute,
+  PlatformSchoolsIndexRoute: PlatformSchoolsIndexRoute,
 }
 
 const PlatformRouteWithChildren = PlatformRoute._addFileChildren(

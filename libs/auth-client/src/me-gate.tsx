@@ -1,5 +1,13 @@
 import type { ReactNode } from 'react';
-import { queryOptions, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  MutationCache,
+  QueryCache,
+  type Query,
+  QueryClient,
+  queryOptions,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 import {
   ApiError,
   type ApiClient,
@@ -12,6 +20,36 @@ import { EntryGate } from './entry-gate';
 export const ME_KEY = ['me'] as const;
 
 type MeApi = Pick<ApiClient<AppContract>, 'me'>;
+
+/** Exact, or the refetched permissions would be refused again and loop. */
+export function refreshMeOnSuspension(client: QueryClient, error: Error) {
+  if (error instanceof ApiError && error.body.code === 'SchoolSuspended') {
+    void client.invalidateQueries({ queryKey: ME_KEY, exact: true });
+  }
+}
+
+type FailedQuery = Query<unknown, unknown, unknown>;
+
+export function createEduvaultQueryClient(
+  onError?: (error: Error, client: QueryClient, query?: FailedQuery) => void
+): QueryClient {
+  const holder: { client?: QueryClient } = {};
+  const handle = (error: Error, query?: FailedQuery) => {
+    if (holder.client === undefined) {
+      return;
+    }
+    refreshMeOnSuspension(holder.client, error);
+    onError?.(error, holder.client, query);
+  };
+  holder.client = new QueryClient({
+    defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } },
+    queryCache: new QueryCache({
+      onError: (error, query) => handle(error, query),
+    }),
+    mutationCache: new MutationCache({ onError: (error) => handle(error) }),
+  });
+  return holder.client;
+}
 
 export const meQueryOptions = (api: MeApi) =>
   queryOptions({
@@ -58,6 +96,9 @@ export function MeGate({
       }}
       onSignedOut={() => {
         queryClient.clear();
+      }}
+      onSchoolSwitched={() => {
+        queryClient.removeQueries();
       }}
     >
       {children}

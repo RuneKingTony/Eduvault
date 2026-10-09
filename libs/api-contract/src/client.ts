@@ -22,6 +22,7 @@ export type ApiClient<C extends Contract> = {
 export interface ClientOptions {
   baseUrl: string;
   fetch?: typeof fetch;
+  headers?: () => Record<string, string>;
 }
 
 const isRoute = (node: RouteDef | Contract): node is RouteDef =>
@@ -61,8 +62,12 @@ async function call(
   const response = await doFetch(url, {
     method: route.method,
     credentials: 'include',
-    headers:
-      input.body === undefined ? {} : { 'content-type': 'application/json' },
+    headers: {
+      ...options.headers?.(),
+      ...(input.body === undefined
+        ? {}
+        : { 'content-type': 'application/json' }),
+    },
     body: input.body === undefined ? undefined : JSON.stringify(input.body),
   });
   const payload: unknown = await response.json().catch(() => undefined);

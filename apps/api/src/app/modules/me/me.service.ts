@@ -9,26 +9,54 @@ import type {
   RouteOutput,
   contract,
 } from '@eduvault/api-contract';
-import type { AppAuth, SessionContext } from '../../common/auth';
+import {
+  AuthContextService,
+  type AppAuth,
+  type OrgContext,
+  type SessionContext,
+} from '../../common/auth';
 import { MeRepository } from './me.repository';
 
 @Injectable()
 export class MeService {
   constructor(
     private readonly authService: AuthService<AppAuth>,
-    private readonly me: MeRepository
+    private readonly me: MeRepository,
+    private readonly context: AuthContextService
   ) {}
 
   async get(
     session: SessionContext
   ): Promise<RouteOutput<typeof contract.me.get>> {
+    const { activeOrganizationId } = session;
+    const [schoolCount, suspendedSchool] = await Promise.all([
+      this.me.countSchools(session.user.id),
+      activeOrganizationId === null
+        ? null
+        : this.context.findSuspendedSchool(activeOrganizationId),
+    ]);
     return {
       user: session.user,
       activeOrganizationId: session.activeOrganizationId,
       activeCampusId: session.activeTeamId,
       mustChangePassword: session.mustChangePassword,
       platformRole: session.platformRole,
-      schoolCount: await this.me.countSchools(session.user.id),
+      schoolCount,
+      suspendedSchool: suspendedSchool ?? null,
+    };
+  }
+
+  permissions(org: OrgContext): RouteOutput<typeof contract.me.permissions> {
+    return {
+      organizationId: org.organizationId,
+      roles: org.roles,
+      permissions: org.permissions,
+      campusScope: org.campusScope,
+      classScope: org.classScope,
+      acting: org.acting && {
+        organizationId: org.acting.organizationId,
+        writes: org.acting.writes,
+      },
     };
   }
 

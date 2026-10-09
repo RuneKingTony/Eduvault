@@ -160,6 +160,13 @@ export const PLATFORM_NAV_GROUPS: readonly NavGroup[] = [
         route: '/platform/schools',
         icon: 'school',
       },
+      {
+        id: 'audit',
+        label: 'Audit log',
+        pageTitle: 'Audit log',
+        route: '/platform/audit',
+        icon: 'history',
+      },
     ],
   },
 ];

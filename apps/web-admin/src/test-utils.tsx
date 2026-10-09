@@ -1,7 +1,12 @@
 import type { ReactElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render } from '@testing-library/react';
-import type { MePermissions, Student } from '@eduvault/api-contract';
+import type {
+  AuditRow,
+  MePermissions,
+  PlatformSchool,
+  Student,
+} from '@eduvault/api-contract';
 import {
   PermissionsProvider,
   accessOfStarter,
@@ -17,6 +22,59 @@ export const student = (overrides: Partial<Student> = {}): Student => ({
   fullName: 'Ada Obi',
   admissionNumber: 'GF-001',
   createdAt: '2026-01-01T00:00:00.000Z',
+  ...overrides,
+});
+
+export const platformSchool = (
+  overrides: Partial<PlatformSchool> = {}
+): PlatformSchool => ({
+  id: 's1',
+  name: 'Greenfield College',
+  slug: 'greenfield',
+  admissionPrefix: 'GF',
+  city: 'Lagos',
+  owners: [{ id: 'o1', name: 'Funmi Adeyemi', email: 'funmi@greenfield.test' }],
+  students: 28,
+  campuses: 2,
+  status: 'active',
+  createdAt: '2026-08-12T10:00:00.000Z',
+  ...overrides,
+});
+
+export const auditRow = (overrides: Partial<AuditRow> = {}): AuditRow => ({
+  id: 'a1',
+  kind: 'acting',
+  actor: { id: 'u1', name: 'Jude' },
+  school: { id: 's1', name: 'Greenfield College' },
+  method: 'GET',
+  action: null,
+  path: '/students',
+  status: 200,
+  reason: null,
+  createdAt: '2026-10-07T09:05:00.000Z',
+  ...overrides,
+});
+
+export const schoolList = (
+  items: PlatformSchool[],
+  overrides: Partial<{
+    totals: {
+      schools: number;
+      active: number;
+      students: number;
+      actingRequests: number;
+    };
+    nextCursor: string | null;
+  }> = {}
+) => ({
+  items,
+  totals: {
+    schools: items.length,
+    active: items.filter((school) => school.status === 'active').length,
+    students: items.reduce((total, school) => total + school.students, 0),
+    actingRequests: 0,
+  },
+  nextCursor: null,
   ...overrides,
 });
 

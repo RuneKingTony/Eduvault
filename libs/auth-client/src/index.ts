@@ -3,6 +3,7 @@ export * from './auth-card';
 export * from './sign-in-form';
 export * from './change-password-form';
 export * from './no-school-screen';
+export * from './suspended-screen';
 export * from './entry-state';
 export * from './role-labels';
 export * from './permissions';

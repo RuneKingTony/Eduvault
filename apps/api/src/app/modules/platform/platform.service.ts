@@ -4,28 +4,48 @@ import {
   InternalServerErrorException,
   Logger,
 } from '@nestjs/common';
+import { z } from 'zod';
 import type {
   CreateSchoolInput,
   CreateSchoolResult,
   PlatformSchool,
+  PlatformSchoolList,
+  PlatformSchoolMember,
+  ReplaceOwnerInput,
+  ReplaceOwnerResult,
+  RouteQuery,
+  contract,
 } from '@eduvault/api-contract';
+import { AuditRepository, type AuditAction } from '../../common/audit';
+import { isSlugConflict, type AuthenticatedUser } from '../../common/auth';
+import { decodeCursor, encodeCursor } from '../../common/http/cursor';
+import { errorMessage } from '../../common/http/error-message';
+import { PlatformRepository, type SchoolKey } from './platform.repository';
+import { schoolNotFound } from './school-not-found';
 import {
-  AccountService,
-  OrganizationAdminService,
-  isSlugConflict,
-} from '../../common/auth';
-import { PlatformRepository } from './platform.repository';
+  SchoolProvisioningService,
+  type SchoolOwner,
+} from './school-provisioning.service';
 
-interface SchoolOwner {
-  id: string;
-  email: string;
-  temporaryPassword: string | null;
-  createdHere: boolean;
-}
-
-const SCHOOL_CURRENCY = 'NGN';
+const SCHOOL_PAGE_SIZE = 10;
 
 const slugTaken = () => new ConflictException('That slug is taken.');
+
+const schoolKeySchema = z.object({ name: z.string(), id: z.string() });
+
+const SUSPENSION = {
+  'school.suspend': {
+    segment: 'suspend',
+    conflict: 'This school is already suspended.',
+  },
+  'school.reactivate': {
+    segment: 'reactivate',
+    conflict: 'This school is not suspended.',
+  },
+} as const;
+
+const encode = (key: SchoolKey | undefined): string | null =>
+  key === undefined ? null : encodeCursor(key);
 
 /**
  * Platform routes are not school-scoped, so no method here takes an OrgContext;
@@ -36,25 +56,145 @@ export class PlatformService {
   private readonly logger = new Logger(PlatformService.name);
 
   constructor(
-    private readonly accounts: AccountService,
-    private readonly organizations: OrganizationAdminService,
-    private readonly platform: PlatformRepository
+    private readonly provisioning: SchoolProvisioningService,
+    private readonly platform: PlatformRepository,
+    private readonly audit: AuditRepository
   ) {}
 
-  async listSchools(): Promise<{ items: PlatformSchool[] }> {
-    return { items: await this.platform.listSchools() };
+  async listSchools(
+    query: RouteQuery<typeof contract.platform.schools.list>
+  ): Promise<PlatformSchoolList> {
+    const [page, totals, actingRequests] = await Promise.all([
+      this.platform.listSchools({
+        q: query.q,
+        after:
+          query.cursor === undefined
+            ? undefined
+            : decodeCursor(query.cursor, schoolKeySchema),
+        limit: SCHOOL_PAGE_SIZE,
+      }),
+      this.platform.totals(),
+      this.audit.countActing(),
+    ]);
+    return {
+      items: page.items,
+      totals: { ...totals, actingRequests },
+      nextCursor: encode(page.next),
+    };
   }
 
-  async createSchool(input: CreateSchoolInput): Promise<CreateSchoolResult> {
+  async listSchoolOptions(): Promise<{
+    items: { id: string; name: string }[];
+  }> {
+    return { items: await this.platform.listSchoolOptions() };
+  }
+
+  async getSchool(id: string): Promise<PlatformSchool> {
+    const school = await this.platform.findSchool(id);
+    if (!school) {
+      throw schoolNotFound();
+    }
+    return school;
+  }
+
+  async listMembers(id: string): Promise<{ items: PlatformSchoolMember[] }> {
+    await this.getSchool(id);
+    return { items: await this.platform.listMembers(id) };
+  }
+
+  suspend(actor: AuthenticatedUser, id: string): Promise<PlatformSchool> {
+    return this.changeSuspension(actor, id, 'school.suspend');
+  }
+
+  reactivate(actor: AuthenticatedUser, id: string): Promise<PlatformSchool> {
+    return this.changeSuspension(actor, id, 'school.reactivate');
+  }
+
+  private async changeSuspension(
+    actor: AuthenticatedUser,
+    id: string,
+    action: 'school.suspend' | 'school.reactivate'
+  ): Promise<PlatformSchool> {
+    await this.getSchool(id);
+    const { segment, conflict } = SUSPENSION[action];
+    const changed = await this.platform.setSuspended({
+      organizationId: id,
+      by: action === 'school.suspend' ? actor.id : null,
+      audit: {
+        actorUserId: actor.id,
+        organizationId: id,
+        action,
+        path: `/platform/schools/${id}/${segment}`,
+        status: 200,
+      },
+    });
+    if (!changed) {
+      throw new ConflictException(conflict);
+    }
+    return this.getSchool(id);
+  }
+
+  async replaceOwner(
+    actor: AuthenticatedUser,
+    id: string,
+    input: ReplaceOwnerInput
+  ): Promise<ReplaceOwnerResult> {
+    const school = await this.getSchool(id);
+    const owner = await this.resolveNewOwner(school, input.newOwner);
+    try {
+      await this.platform.replaceOwner({
+        organizationId: id,
+        newOwnerUserId: owner.id,
+        previousOwner: input.previousOwner,
+        audit: {
+          actorUserId: actor.id,
+          organizationId: id,
+          action: 'school.replaceOwner',
+          path: `/platform/schools/${id}/owner`,
+          status: 200,
+        },
+      });
+    } catch (error) {
+      await this.provisioning.discard(owner);
+      throw error;
+    }
+    await this.provisioning.welcome(owner, id);
+    return {
+      school: await this.getSchool(id),
+      temporaryPassword: owner.temporaryPassword,
+    };
+  }
+
+  private async resolveNewOwner(
+    school: PlatformSchool,
+    newOwner: ReplaceOwnerInput['newOwner']
+  ): Promise<SchoolOwner> {
+    const owner =
+      'memberId' in newOwner
+        ? await this.provisioning.ownerFromMember(school.id, newOwner.memberId)
+        : await this.provisioning.resolveOwner({
+            ownerName: newOwner.name,
+            ownerEmail: newOwner.email,
+          });
+    const [only, ...rest] = school.owners;
+    if (only?.id === owner.id && rest.length === 0) {
+      throw new ConflictException('That person is already the only owner.');
+    }
+    return owner;
+  }
+
+  async createSchool(
+    actor: AuthenticatedUser,
+    input: CreateSchoolInput
+  ): Promise<CreateSchoolResult> {
     if (await this.platform.slugTaken(input.slug)) {
       throw slugTaken();
     }
-    const owner = await this.resolveOwner(input);
+    const owner = await this.provisioning.resolveOwner(input);
     try {
-      const school = await this.createSchoolFor(owner.id, input);
-      if (!owner.createdHere) {
-        await this.organizations.startIdleSessionsIn(owner.id, school.id);
-      }
+      const school = await this.provisioning.createSchoolFor(owner.id, input);
+      await this.provisioning.welcome(owner, school.id);
+      await this.recordCreate(actor, school.id, 201);
       return {
         school,
         owner: { id: owner.id, email: owner.email },
@@ -62,88 +202,32 @@ export class PlatformService {
       };
     } catch (error) {
       const raced = isSlugConflict(error);
-      await this.compensate(input.slug, owner, raced);
+      await this.provisioning.compensateCreate(input.slug, owner, raced);
       if (raced) {
         throw slugTaken();
       }
-      this.logger.error(
-        `Create school failed: ${error instanceof Error ? error.message : 'unknown error'}`
-      );
+      this.logger.error(`Create school failed: ${errorMessage(error)}`);
+      await this.recordCreate(actor, null, 500).catch((auditError: unknown) => {
+        this.logger.error(
+          `Could not audit a failed create school: ${errorMessage(auditError)}`
+        );
+      });
       throw new InternalServerErrorException('Could not create the school');
     }
   }
 
-  private async resolveOwner(input: CreateSchoolInput): Promise<SchoolOwner> {
-    const existing = await this.accounts.findByEmail(input.ownerEmail);
-    if (existing) {
-      if (existing.isSuperAdmin) {
-        throw new ConflictException(
-          'A super admin cannot own a school. Use another email.'
-        );
-      }
-      return {
-        id: existing.id,
-        email: existing.email,
-        temporaryPassword: null,
-        createdHere: false,
-      };
-    }
-    const created = await this.accounts.createAccount({
-      name: input.ownerName,
-      email: input.ownerEmail,
-      mustChangePassword: true,
-    });
-    return {
-      id: created.user.id,
-      email: created.user.email,
-      temporaryPassword: created.temporaryPassword,
-      createdHere: true,
-    };
-  }
-
-  private async createSchoolFor(
-    ownerId: string,
-    input: CreateSchoolInput
-  ): Promise<PlatformSchool> {
-    const { id } = await this.organizations.create({
-      name: input.name,
-      slug: input.slug,
-      userId: ownerId,
-    });
-    await this.platform.insertSchoolAccount({
-      organizationId: id,
-      name: input.name,
-      city: input.city ?? null,
-      admissionPrefix: input.admissionPrefix,
-      currency: SCHOOL_CURRENCY,
-    });
-    const school = await this.platform.findSchool(id);
-    if (!school) {
-      throw new Error('School disappeared after it was created');
-    }
-    return school;
-  }
-
-  /**
-   * Better Auth's calls run outside our transactions, so a failed create is
-   * undone by hand; a raced slug is someone else's school and is left alone.
-   */
-  private async compensate(
-    slug: string,
-    owner: SchoolOwner,
-    raced: boolean
+  /** Written last, so a rolled-back school is never left behind a RESTRICT key. */
+  private recordCreate(
+    actor: AuthenticatedUser,
+    organizationId: string | null,
+    status: number
   ): Promise<void> {
-    try {
-      if (!raced) {
-        await this.organizations.deleteBySlug(slug);
-      }
-      if (owner.createdHere) {
-        await this.accounts.deleteAccount(owner.id);
-      }
-    } catch (error) {
-      this.logger.error(
-        `Could not undo a failed create school: ${error instanceof Error ? error.message : 'unknown error'}`
-      );
-    }
+    return this.audit.recordPlatform({
+      actorUserId: actor.id,
+      organizationId,
+      action: 'school.create' satisfies AuditAction,
+      path: '/platform/schools',
+      status,
+    });
   }
 }
