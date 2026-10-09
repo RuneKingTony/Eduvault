@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Creates the e2e personas through the real API and records every school, campus and student in a ledger.
 # Usage: provision.sh   prints the run directory (tmp/e2e/<run>) on stdout; personas.json and ledger.json are inside.
-# admin, teacher and student are tried through invite/accept and recorded as blocked when the API refuses (see references/personas.md).
+# Only owner and foreign can be created over HTTP today; every other persona is recorded blocked with the slice that
+# unblocks it (see references/personas.md).
 set -eu
 ROOT="$(git rev-parse --show-toplevel)"
 . "$(dirname "$0")/stack-env.sh"
@@ -29,49 +30,55 @@ record() { # kind id schoolId persona
     '. + [{kind:$k,id:$i,schoolId:$s,actor:{email:$e,password:$p}}]' "$LEDGER" >"$LEDGER.tmp" && mv "$LEDGER.tmp" "$LEDGER"
 }
 sign_up() { call "$1" POST /api/auth/sign-up/email "$(jq -nc --arg n "E2E $2" --arg e "$(email "$2")" --arg p "$PASSWORD" '{name:$n,email:$e,password:$p}')" | jq -r .user.id; }
-
-school_for() { # key schoolLabel -> prints "<jar> <schoolId> <mainId>" after building school, campus, student
-  local key="$1" label="$2" slug jar="$DIR/$1.jar" uid school main
-  slug="$(echo "$label" | tr '[:upper:]' '[:lower:]')-$RUN"
-  uid=$(sign_up "$jar" "$key")
-  school=$(call "$jar" POST /api/auth/organization/create "$(jq -nc --arg n "$label $RUN" --arg s "$slug" '{name:$n,slug:$s}')" | jq -r .id)
-  record school "$school" "$school" "$key"
-  main=$(call "$jar" POST /campuses "$(jq -nc --arg n "$label Main" '{name:$n}')" | jq -r .id)
-  record campus "$main" "$school" "$key"
-  echo "$uid $school $main"
+campus_in() { # jar schoolId key name -> campus id
+  local id
+  id=$(call "$1" POST /campuses "$(jq -nc --arg n "$4" '{name:$n}')" | jq -r .id)
+  record campus "$id" "$2" "$3"; echo "$id"
 }
-student_in() { # jar campusId school key label
+student_in() { # jar campusId school key label -> student id
   local id
   id=$(call "$1" POST /students "$(jq -nc --arg c "$2" --arg n "E2E $5 $RUN" --arg a "E2E-$5-$RUN" '{campusId:$c,fullName:$n,admissionNumber:$a}')" | jq -r .id)
   record student "$id" "$3" "$4"; echo "$id"
 }
+school_for() { # key label -> prints "<userId> <schoolId>" after sign-up and school creation
+  local key="$1" label="$2" slug uid school
+  slug="$(echo "$label" | tr '[:upper:]' '[:lower:]')-$RUN"
+  uid=$(sign_up "$DIR/$key.jar" "$key")
+  school=$(call "$DIR/$key.jar" POST /api/auth/organization/create "$(jq -nc --arg n "$label $RUN" --arg s "$slug" '{name:$n,slug:$s}')" | jq -r .id)
+  record school "$school" "$school" "$key"
+  echo "$uid $school"
+}
+add_persona() { # key userId schoolId campusId
+  jq --arg k "$1" --arg e "$(email "$1")" --arg p "$PASSWORD" --arg u "$2" --arg s "$3" --arg c "$4" \
+    '. + {($k):{email:$e,password:$p,userId:$u,schoolId:$s,campusId:$c,blocked:null,unblocked_by:null}}' "$PERSONAS" >"$PERSONAS.tmp" && mv "$PERSONAS.tmp" "$PERSONAS"
+}
+block_persona() { # key slice
+  jq --arg k "$1" --arg e "$(email "$1")" --arg p "$PASSWORD" --arg b "$2" \
+    '. + {($k):{email:$e,password:$p,userId:"",schoolId:"",campusId:"",blocked:"no HTTP endpoint provisions this persona yet",unblocked_by:$b}}' "$PERSONAS" >"$PERSONAS.tmp" && mv "$PERSONAS.tmp" "$PERSONAS"
+}
 
-read -r OWNER_UID SCHOOL MAIN < <(school_for owner Greenfield)
+read -r OWNER_UID SCHOOL < <(school_for owner Greenfield)
 OJAR="$DIR/owner.jar"
-ANNEX=$(call "$OJAR" POST /campuses '{"name":"Annex"}' | jq -r .id); record campus "$ANNEX" "$SCHOOL" owner
-OSTUDENT=$(student_in "$OJAR" "$MAIN" "$SCHOOL" owner owner-student)
-read -r FOREIGN_UID FSCHOOL FMAIN < <(school_for foreign Riverside)
+LEKKI=$(campus_in "$OJAR" "$SCHOOL" owner Lekki)
+IKEJA=$(campus_in "$OJAR" "$SCHOOL" owner Ikeja)
+OSTUDENT=$(student_in "$OJAR" "$LEKKI" "$SCHOOL" owner owner-student)
+
+read -r FOREIGN_UID FSCHOOL < <(school_for foreign Hilltop)
+FMAIN=$(campus_in "$DIR/foreign.jar" "$FSCHOOL" foreign Main)
 FSTUDENT=$(student_in "$DIR/foreign.jar" "$FMAIN" "$FSCHOOL" foreign foreign-student)
 
-BLOCKED=''
-for key in admin teacher student; do
-  uid=''
-  if [ -z "$BLOCKED" ]; then
-    jar="$DIR/$key.jar"
-    uid=$(sign_up "$jar" "$key")
-    inv=$(call "$OJAR" POST /api/auth/organization/invite-member "$(jq -nc --arg e "$(email "$key")" --arg r "$key" --arg o "$SCHOOL" --arg t "$MAIN" '{email:$e,role:$r,organizationId:$o,teamId:$t}')" | jq -r .id)
-    if ! err=$(call "$jar" POST /api/auth/organization/accept-invitation "$(jq -nc --arg i "$inv" '{invitationId:$i}')" 2>&1); then
-      case "$err" in *EMAIL_VERIFICATION_REQUIRED*) BLOCKED='accepting an invitation needs a verified email and no HTTP endpoint adds a member' ;; *) echo "$err" >&2; exit 1 ;; esac
-    fi
-  else
-    uid=''
-  fi
-  jq --arg k "$key" --arg e "$(email "$key")" --arg p "$PASSWORD" --arg u "$uid" --arg s "$SCHOOL" --arg c "$MAIN" --arg b "$BLOCKED" \
-    '. + {($k):{email:$e,password:$p,userId:$u,schoolId:$s,campusId:$c,blocked:(if $b=="" then null else $b end)}}' "$PERSONAS" >"$PERSONAS.tmp" && mv "$PERSONAS.tmp" "$PERSONAS"
-done
+add_persona owner "$OWNER_UID" "$SCHOOL" "$LEKKI"
+add_persona foreign "$FOREIGN_UID" "$FSCHOOL" "$FMAIN"
+block_persona superadmin 'M1.2'
+block_persona admin 'M1.3 + M1.2'
+block_persona bursar 'M1.3 + M1.2'
+block_persona bursar2 'M1.3 + M1.2'
+block_persona principal 'M1.3'
+block_persona newhire 'M1.3'
+block_persona teacher 'M1.3 (role), M2.3 (class scope)'
+block_persona student 'M2.4 + M2.8'
+block_persona guardian 'M2.4 + M2.8'
 
-jq --arg o "$(email owner)" --arg f "$(email foreign)" --arg p "$PASSWORD" --arg os "$SCHOOL" --arg fs "$FSCHOOL" \
-  --arg oc "$MAIN" --arg ou "$OWNER_UID" --arg fu "$FOREIGN_UID" --arg fc "$FMAIN" \
-  '. + {owner:{email:$o,password:$p,userId:$ou,schoolId:$os,campusId:$oc,blocked:null},foreign:{email:$f,password:$p,userId:$fu,schoolId:$fs,campusId:$fc,blocked:null},
-        ownerStudentId:"'"$OSTUDENT"'",foreignStudentId:"'"$FSTUDENT"'",annexCampusId:"'"$ANNEX"'",runId:"'"$RUN"'"}' "$PERSONAS" >"$PERSONAS.tmp" && mv "$PERSONAS.tmp" "$PERSONAS"
+jq --arg os "$OSTUDENT" --arg fs "$FSTUDENT" --arg ik "$IKEJA" --arg r "$RUN" \
+  '. + {ownerStudentId:$os,foreignStudentId:$fs,ikejaCampusId:$ik,runId:$r}' "$PERSONAS" >"$PERSONAS.tmp" && mv "$PERSONAS.tmp" "$PERSONAS"
 echo "$DIR"
