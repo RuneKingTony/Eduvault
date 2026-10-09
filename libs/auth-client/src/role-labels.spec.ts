@@ -1,15 +1,21 @@
-import { roleLabels } from './role-labels';
+import { listedRoles, roleLabel, rolesLabel } from './role-labels';
 
-describe('roleLabels', () => {
-  it('joins the roles and capitalises them', () => {
-    expect(roleLabels('owner,bursar')).toBe('Owner, Bursar');
+describe('rolesLabel', () => {
+  it('joins the labels of starter roles and the owner', () => {
+    expect(rolesLabel(['owner', 'bursar'])).toBe('Owner, Bursar');
+  });
+
+  it('falls back to the slug for a custom role', () => {
+    expect(rolesLabel(['exams-officer'])).toBe('exams-officer');
+    expect(roleLabel('exams-officer')).toBe('exams-officer');
   });
 
   it('never lists the member role', () => {
-    expect(roleLabels('member,teacher')).toBe('Teacher');
+    expect(rolesLabel(['member', 'teacher'])).toBe('Teacher');
+    expect(listedRoles(['member', 'teacher'])).toEqual(['teacher']);
   });
 
-  it.each([undefined, null, '', 'member'])('reads %j as no roles', (role) => {
-    expect(roleLabels(role)).toBe('Member, no roles');
+  it.each([[[]], [['member']]])('reads %j as no roles', (roles) => {
+    expect(rolesLabel(roles)).toBe('Member, no roles');
   });
 });

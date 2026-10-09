@@ -23,7 +23,8 @@ import {
   useThemeChoice,
 } from '@eduvault/ui';
 import type { EduvaultAuthClient } from './auth-client';
-import { roleLabels } from './role-labels';
+import { useOptionalPermissions } from './permissions';
+import { rolesLabel } from './role-labels';
 
 export interface UserMenuUser {
   name: string;
@@ -38,7 +39,8 @@ export interface UserMenuProps {
   side?: 'top' | 'bottom';
   /** Shows "Command menu" when given; the portal has none. */
   onOpenCommandMenu?: () => void;
-  showMyAccess?: boolean;
+  /** Shows "My access" when given; the portal has none. */
+  onOpenMyAccess?: () => void;
   onSignedOut?: () => void;
 }
 
@@ -91,16 +93,23 @@ function UserMenuHeader({ user }: { user: UserMenuUser }) {
   );
 }
 
+const splitRoles = (role: string | null | undefined): string[] =>
+  (role ?? '')
+    .split(',')
+    .map((name) => name.trim())
+    .filter((name) => name !== '');
+
 export function UserMenu({
   authClient,
   renderTrigger,
   side = 'bottom',
   onOpenCommandMenu,
-  showMyAccess = false,
+  onOpenMyAccess,
   onSignedOut,
 }: UserMenuProps) {
   const session = authClient.useSession();
   const member = authClient.useActiveMember();
+  const access = useOptionalPermissions();
   const sessionUser = session.data?.user;
   if (sessionUser === undefined) {
     return null;
@@ -109,7 +118,7 @@ export function UserMenu({
     name: sessionUser.name,
     email: sessionUser.email,
     image: sessionUser.image ?? null,
-    roles: roleLabels(member.data?.role),
+    roles: rolesLabel(access?.roles ?? splitRoles(member.data?.role)),
   };
 
   return (
@@ -118,12 +127,12 @@ export function UserMenu({
       <DropdownMenuContent side={side} align="end" className="min-w-60">
         <UserMenuHeader user={user} />
         <DropdownMenuSeparator />
-        {showMyAccess ? (
-          <DropdownMenuItem disabled>
+        {onOpenMyAccess === undefined ? null : (
+          <DropdownMenuItem onSelect={onOpenMyAccess}>
             <KeyRoundIcon />
             My access
           </DropdownMenuItem>
-        ) : null}
+        )}
         {onOpenCommandMenu === undefined ? null : (
           <DropdownMenuItem onSelect={onOpenCommandMenu}>
             <SearchIcon />
