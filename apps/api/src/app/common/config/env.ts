@@ -10,6 +10,7 @@ const envSchema = z.object({
   BETTER_AUTH_URL: z.url(),
   WEB_ADMIN_URL: z.url(),
   WEB_PORTAL_URL: z.url(),
+  SEED_TODAY: z.iso.date().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

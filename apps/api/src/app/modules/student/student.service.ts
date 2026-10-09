@@ -22,9 +22,12 @@ export class StudentService {
     private readonly campuses: CampusService
   ) {}
 
-  list(ctx: OrgContext, campusId?: string): Promise<Student[]> {
-    if (campusId !== undefined && !canSeeCampus(ctx.campusScope, campusId)) {
-      throw new NotFoundException('Campus not found');
+  async list(ctx: OrgContext, campusId?: string): Promise<Student[]> {
+    if (campusId !== undefined) {
+      if (!canSeeCampus(ctx.campusScope, campusId)) {
+        throw new NotFoundException('Campus not found');
+      }
+      await this.campuses.assertInSchool(ctx, campusId);
     }
     return this.students.list(ctx.organizationId, ctx.campusScope, campusId);
   }

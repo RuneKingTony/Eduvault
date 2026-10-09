@@ -1,4 +1,25 @@
-import { baseTest as test, expect } from './support/base-test';
+import { baseTest, expect } from './support/base-test';
+import { twoSchools, type TwoSchools } from './support/two-schools';
+
+// No campus-scoped role can write yet, so a lekkiOnly write answers 403 for
+// the missing permission.
+
+const test = baseTest.extend<{ schools: TwoSchools }>({
+  schools: async (
+    { app, signUp, createOrganization, createCampus, addMember },
+    use
+  ) => {
+    await use(
+      await twoSchools({
+        app,
+        signUp,
+        createOrganization,
+        createCampus,
+        addMember,
+      })
+    );
+  },
+});
 
 const student = (campusId: string, n: string) => ({
   campusId,
@@ -6,60 +27,118 @@ const student = (campusId: string, n: string) => ({
   admissionNumber: `ADM-${n}`,
 });
 
-test.describe('school isolation', () => {
-  test('school A cannot read or change school B data', async ({
-    api,
-    signUp,
-    createOrganization,
-    createCampus,
-  }) => {
-    const ownerA = await signUp();
-    const ownerB = await signUp();
-    const orgA = await createOrganization(ownerA, 'School A');
-    const orgB = await createOrganization(ownerB, 'School B');
-    const campusA = await createCampus(orgA);
-    const campusB = await createCampus(orgB);
-    const studentB = (
+const ids = (rows: { id: string }[]) =>
+  rows.map((row) => row.id).toSorted((a, b) => a.localeCompare(b));
+
+test.describe('students', () => {
+  test.describe('isolation', () => {
+    test('1: another school reads, updates and deletes by id as 404', async ({
+      api,
+      schools: { ownerB, studentLekki },
+    }) => {
+      await api(ownerB).get(`/students/${studentLekki.id}`).expect(404);
+      await api(ownerB)
+        .patch(`/students/${studentLekki.id}`)
+        .send({ fullName: 'x' })
+        .expect(404);
+      await api(ownerB).delete(`/students/${studentLekki.id}`).expect(404);
+    });
+
+    test('2: lists hold no other school; a foreign campus filter is 404', async ({
+      api,
+      schools: { owner, lekkiOnly, campusB, studentLekki, studentIkeja },
+    }) => {
+      const list = (await api(owner).get('/students').expect(200)).body;
+      expect(ids(list)).toEqual(ids([studentLekki, studentIkeja]));
+
+      for (const user of [owner, lekkiOnly]) {
+        const res = await api(user)
+          .get(`/students?campusId=${campusB.id}`)
+          .expect(404);
+        expect(res.body.message).toBe('Campus not found');
+      }
+    });
+
+    test('3: a Lekki-only member gets 404 for Ikeja and cannot write', async ({
+      api,
+      schools: { lekkiOnly, ikeja, studentLekki, studentIkeja },
+    }) => {
+      await api(lekkiOnly).get(`/students/${studentIkeja.id}`).expect(404);
+      await api(lekkiOnly).get(`/students?campusId=${ikeja.id}`).expect(404);
+      await api(lekkiOnly)
+        .patch(`/students/${studentLekki.id}`)
+        .send({ fullName: 'x' })
+        .expect(403);
+      await api(lekkiOnly).delete(`/students/${studentLekki.id}`).expect(403);
+    });
+
+    test('4: a Lekki-only member lists only Lekki students', async ({
+      api,
+      schools: { lekkiOnly, studentLekki },
+    }) => {
+      const list = (await api(lekkiOnly).get('/students').expect(200)).body;
+      expect(ids(list)).toEqual([studentLekki.id]);
+    });
+
+    test('5: a member without the student permission gets 403', async ({
+      api,
+      schools: { noPermission, lekki, studentLekki },
+    }) => {
+      await api(noPermission).get('/students').expect(403);
+      await api(noPermission).get(`/students/${studentLekki.id}`).expect(403);
+      await api(noPermission)
+        .post('/students')
+        .send(student(lekki.id, 'N'))
+        .expect(403);
+      await api(noPermission)
+        .patch(`/students/${studentLekki.id}`)
+        .send({ fullName: 'x' })
+        .expect(403);
+      await api(noPermission)
+        .delete(`/students/${studentLekki.id}`)
+        .expect(403);
+    });
+
+    test('6: no session answers 401', async ({
+      api,
+      schools: { lekki, studentLekki },
+    }) => {
+      await api().get('/students').expect(401);
+      await api().get(`/students/${studentLekki.id}`).expect(401);
+      await api().post('/students').send(student(lekki.id, 'N')).expect(401);
+      await api()
+        .patch(`/students/${studentLekki.id}`)
+        .send({ fullName: 'x' })
+        .expect(401);
+      await api().delete(`/students/${studentLekki.id}`).expect(401);
+    });
+
+    test('7: a cross-school campus answers 404 and the composite foreign key refuses a bypass', async ({
+      api,
+      pool,
+      schools: { owner, ownerB, orgA, lekki, campusB, studentLekki },
+    }) => {
+      await api(owner)
+        .post('/students')
+        .send(student(campusB.id, 'X'))
+        .expect(404);
       await api(ownerB)
         .post('/students')
-        .send(student(campusB.id, 'B1'))
-        .expect(201)
-    ).body;
-    const feeB = (
-      await api(ownerB)
-        .post('/fee-schedules')
-        .send({ name: 'B fee', amountMinor: 10, currency: 'NGN' })
-        .expect(201)
-    ).body;
-    await api(ownerB)
-      .post('/school-account')
-      .send({ name: 'B account', currency: 'NGN' })
-      .expect(201);
-    await api(ownerA)
-      .post('/students')
-      .send(student(campusA.id, 'A1'))
-      .expect(201);
+        .send(student(lekki.id, 'Y'))
+        .expect(404);
+      await api(owner)
+        .patch(`/students/${studentLekki.id}`)
+        .send({ campusId: campusB.id })
+        .expect(404);
 
-    expect((await api(ownerA).get('/students').expect(200)).body).toHaveLength(
-      1
-    );
-    await api(ownerA).get(`/students/${studentB.id}`).expect(404);
-    await api(ownerA)
-      .patch(`/students/${studentB.id}`)
-      .send({ fullName: 'x' })
-      .expect(404);
-    await api(ownerA).delete(`/students/${studentB.id}`).expect(404);
-    await api(ownerA).get(`/campuses/${campusB.id}`).expect(404);
-    await api(ownerA).get(`/fee-schedules/${feeB.id}`).expect(404);
-    await api(ownerA).get('/school-account').expect(404);
-    expect((await api(ownerA).get('/campuses').expect(200)).body).toHaveLength(
-      1
-    );
-    expect(
-      (await api(ownerA).get('/fee-schedules').expect(200)).body
-    ).toHaveLength(0);
-
-    await api(ownerB).get(`/students/${studentB.id}`).expect(200);
+      await expect(
+        pool.query(
+          `INSERT INTO student (organization_id, campus_id, full_name, admission_number)
+           VALUES ($1, $2, 'Raw', 'RAW-1')`,
+          [orgA.id, campusB.id]
+        )
+      ).rejects.toMatchObject({ code: '23503' });
+    });
   });
 
   test('a user in both schools sees only the active one', async ({
@@ -108,50 +187,70 @@ test.describe('school isolation', () => {
   });
 });
 
-test.describe('campus isolation', () => {
-  test('a teacher sees only their campus; owners and admins see all', async ({
-    api,
-    signUp,
-    createOrganization,
-    createCampus,
-    addMember,
-  }) => {
-    const owner = await signUp();
-    const org = await createOrganization(owner);
-    const campus1 = await createCampus(org, 'Campus 1');
-    const campus2 = await createCampus(org, 'Campus 2');
-    const s1 = (
-      await api(owner)
-        .post('/students')
-        .send(student(campus1.id, '1'))
-        .expect(201)
-    ).body;
-    const s2 = (
-      await api(owner)
-        .post('/students')
-        .send(student(campus2.id, '2'))
-        .expect(201)
-    ).body;
-    const teacher = await addMember(org, await signUp(), {
-      role: 'teacher',
-      campuses: [campus1],
+test.describe('campuses', () => {
+  test.describe('isolation', () => {
+    test('1: another school reads, updates and deletes by id as 404', async ({
+      api,
+      schools: { ownerB, lekki },
+    }) => {
+      await api(ownerB).get(`/campuses/${lekki.id}`).expect(404);
+      await api(ownerB)
+        .patch(`/campuses/${lekki.id}`)
+        .send({ name: 'x' })
+        .expect(404);
+      await api(ownerB).delete(`/campuses/${lekki.id}`).expect(404);
     });
-    const admin = await addMember(org, await signUp(), { role: 'admin' });
 
-    const own = (await api(teacher).get('/students').expect(200)).body;
-    expect(own.map((s: { id: string }) => s.id)).toEqual([s1.id]);
-    await api(teacher).get(`/students/${s1.id}`).expect(200);
-    await api(teacher).get(`/students/${s2.id}`).expect(404);
-    await api(teacher).get(`/students?campusId=${campus2.id}`).expect(404);
-    await api(teacher).get(`/campuses/${campus2.id}`).expect(404);
-    const campuses = (await api(teacher).get('/campuses').expect(200)).body;
-    expect(campuses.map((c: { id: string }) => c.id)).toEqual([campus1.id]);
+    test('2: lists hold no other school', async ({
+      api,
+      schools: { owner, lekki, ikeja },
+    }) => {
+      const list = (await api(owner).get('/campuses').expect(200)).body;
+      expect(ids(list)).toEqual(ids([lekki, ikeja]));
+    });
 
-    for (const user of [owner, admin]) {
-      const all = (await api(user).get('/students').expect(200)).body;
-      expect(all).toHaveLength(2);
-      await api(user).get(`/students/${s2.id}`).expect(200);
-    }
+    test('3: a Lekki-only member gets 404 for Ikeja and cannot write', async ({
+      api,
+      schools: { lekkiOnly, lekki, ikeja },
+    }) => {
+      await api(lekkiOnly).get(`/campuses/${ikeja.id}`).expect(404);
+      await api(lekkiOnly)
+        .patch(`/campuses/${lekki.id}`)
+        .send({ name: 'x' })
+        .expect(403);
+      await api(lekkiOnly).delete(`/campuses/${lekki.id}`).expect(403);
+    });
+
+    test('4: a Lekki-only member lists only Lekki', async ({
+      api,
+      schools: { lekkiOnly, lekki },
+    }) => {
+      const list = (await api(lekkiOnly).get('/campuses').expect(200)).body;
+      expect(ids(list)).toEqual([lekki.id]);
+    });
+
+    test('5: a member without the team permission cannot write', async ({
+      api,
+      schools: { noPermission, lekki },
+    }) => {
+      await api(noPermission).post('/campuses').send({ name: 'x' }).expect(403);
+      await api(noPermission)
+        .patch(`/campuses/${lekki.id}`)
+        .send({ name: 'x' })
+        .expect(403);
+      await api(noPermission).delete(`/campuses/${lekki.id}`).expect(403);
+    });
+
+    test('6: no session answers 401', async ({ api, schools: { lekki } }) => {
+      await api().get('/campuses').expect(401);
+      await api().get(`/campuses/${lekki.id}`).expect(401);
+      await api().post('/campuses').send({ name: 'x' }).expect(401);
+      await api()
+        .patch(`/campuses/${lekki.id}`)
+        .send({ name: 'x' })
+        .expect(401);
+      await api().delete(`/campuses/${lekki.id}`).expect(401);
+    });
   });
 
   test('fee schedules: school-wide ones reach every campus, campus ones do not leak', async ({
@@ -190,6 +289,56 @@ test.describe('campus isolation', () => {
       'Everyone',
       'Only 1',
     ]);
+  });
+});
+
+test.describe('school account', () => {
+  test.describe('isolation', () => {
+    const account = { name: 'A fees', currency: 'NGN' };
+
+    test('1: another school sees none of the account and only its own', async ({
+      api,
+      schools: { owner, ownerB, orgB },
+    }) => {
+      await api(owner).post('/school-account').send(account).expect(201);
+      await api(ownerB).get('/school-account').expect(404);
+      await api(ownerB)
+        .patch('/school-account')
+        .send({ name: 'x' })
+        .expect(404);
+      await api(ownerB).delete('/school-account').expect(404);
+
+      await api(ownerB)
+        .post('/school-account')
+        .send({ name: 'B fees', currency: 'NGN' })
+        .expect(201);
+      const own = (await api(ownerB).get('/school-account').expect(200)).body;
+      expect(own.organizationId).toBe(orgB.id);
+      expect(own.name).toBe('B fees');
+    });
+
+    test('5: members without the schoolAccount permission get 403', async ({
+      api,
+      schools: { owner, noPermission, lekkiOnly },
+    }) => {
+      await api(owner).post('/school-account').send(account).expect(201);
+      for (const user of [noPermission, lekkiOnly]) {
+        await api(user).get('/school-account').expect(403);
+        await api(user).post('/school-account').send(account).expect(403);
+        await api(user)
+          .patch('/school-account')
+          .send({ name: 'x' })
+          .expect(403);
+        await api(user).delete('/school-account').expect(403);
+      }
+    });
+
+    test('6: no session answers 401', async ({ api }) => {
+      await api().get('/school-account').expect(401);
+      await api().post('/school-account').send(account).expect(401);
+      await api().patch('/school-account').send({ name: 'x' }).expect(401);
+      await api().delete('/school-account').expect(401);
+    });
   });
 });
 

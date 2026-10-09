@@ -46,12 +46,26 @@
         "parallel": false
       }
     },
+    "seed-build": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["production", "^production"],
+      "outputs": [
+        "{projectRoot}/dist/seed.cjs",
+        "{projectRoot}/dist/seed.cjs.map"
+      ],
+      "description": "Bundle the dev seed with SWC so Nest keeps its decorator metadata",
+      "options": {
+        "command": "vite build --config vite.seed.config.mts",
+        "cwd": "apps/api"
+      }
+    },
     "db-seed": {
       "executor": "nx:run-commands",
-      "dependsOn": ["env-init"],
-      "description": "Seed deterministic dev data through Better Auth (idempotent)",
+      "dependsOn": ["env-init", "seed-build"],
+      "description": "Seed the Greenfield dev data through the API's services (idempotent)",
       "options": {
-        "command": "tsx --tsconfig tsconfig.json --env-file=.env.local scripts/seed.ts",
+        "command": "node --env-file=.env.local dist/seed.cjs",
         "cwd": "apps/api"
       }
     },

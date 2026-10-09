@@ -41,7 +41,7 @@ const cookieFrom = (setCookie: string[] | string | undefined): string =>
 
 const headersFor = (cookie: string) => new Headers({ cookie, origin: ORIGIN });
 
-interface Fixtures {
+export interface Fixtures {
   app: INestApplication;
   pool: Pool;
   resetDatabase: undefined;
