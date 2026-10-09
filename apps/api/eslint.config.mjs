@@ -7,6 +7,13 @@ const classLevelAuth = {
     'Put the auth decorator on each handler, not the class, so the guard runs once.',
 };
 
+const handlerWithoutAuth = {
+  selector:
+    'MethodDefinition:has(Decorator > CallExpression[callee.name=/^(Get|Post|Put|Patch|Delete|All)$/]):not(:has(Decorator > CallExpression[callee.name=/^(OrganizationAuth|SessionAuth)$/]))',
+  message:
+    'Every HTTP handler needs @OrganizationAuth or @SessionAuth; an unguarded route skips tenancy.',
+};
+
 const processEnv = {
   selector: "MemberExpression[object.name='process'][property.name='env']",
   message: 'Read configuration through loadEnv() in common/config/env.ts.',
@@ -73,6 +80,7 @@ export default [
         noEnum,
         noDefaultExport,
         classLevelAuth,
+        handlerWithoutAuth,
         processEnv,
       ],
     },
@@ -101,10 +109,28 @@ export default [
   },
   {
     files: ['scripts/**/*.ts'],
-    rules: { 'no-console': 'off' },
+    rules: {
+      'no-console': 'off',
+      'max-lines-per-function': 'off',
+      'unicorn/prefer-top-level-await': 'off',
+    },
   },
   {
-    files: ['src/app/common/config/env.ts', '**/*.spec.ts'],
+    // The API builds to CommonJS, which has no top-level await, and exits the
+    // process when startup fails.
+    files: ['src/main.ts'],
+    rules: {
+      'unicorn/no-process-exit': 'off',
+      'unicorn/prefer-top-level-await': 'off',
+    },
+  },
+  {
+    // The health probe is the one deliberately public route.
+    files: [
+      'src/app/common/config/env.ts',
+      'src/app/modules/health/health.controller.ts',
+      '**/*.spec.ts',
+    ],
     rules: {
       'no-restricted-syntax': [
         'error',

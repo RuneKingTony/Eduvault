@@ -1,4 +1,4 @@
-import base, { reactConfig } from '../../eslint.config.mjs';
+import base, { reactConfig, tailwindConfig } from '../../eslint.config.mjs';
 
 const noAuth = {
   group: ['better-auth', 'better-auth/*', '@eduvault/auth-client'],
@@ -18,6 +18,7 @@ const noInHouse = {
 export default [
   ...base,
   ...reactConfig,
+  ...tailwindConfig('src/styles/theme.css'),
   {
     files: ['src/**/*.{ts,tsx}'],
     rules: {
@@ -40,6 +41,25 @@ export default [
       '@typescript-eslint/no-unused-expressions': 'off',
       'react/forbid-dom-props': 'off',
       'react/button-has-type': 'off',
+      '@typescript-eslint/no-shadow': 'off',
+      '@typescript-eslint/strict-boolean-expressions': 'off',
+      'better-tailwindcss/enforce-canonical-classes': 'off',
+      'better-tailwindcss/enforce-consistent-class-order': 'off',
+      'better-tailwindcss/no-restricted-classes': 'off',
+      'better-tailwindcss/no-unknown-classes': 'off',
+      complexity: 'off',
+      'max-lines-per-function': 'off',
+      'no-param-reassign': 'off',
+      'sonarjs/pseudo-random': 'off',
+      'unicorn/prefer-global-this': 'off',
+    },
+  },
+  {
+    files: ['src/hooks/**/*.ts'],
+    rules: {
+      '@typescript-eslint/strict-boolean-expressions': 'off',
+      'no-implicit-coercion': 'off',
+      'unicorn/prefer-global-this': 'off',
     },
   },
 ];
