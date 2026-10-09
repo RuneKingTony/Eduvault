@@ -13,12 +13,14 @@ export const fakeAccess = (
   ...overrides,
 });
 
-/** The access of a member holding one starter role, as `/me/permissions` reports it. */
-export function accessOfStarter(slug: string): MePermissions {
+export function accessOfStarter(
+  slug: string,
+  campusScope: MePermissions['campusScope'] = 'all'
+): MePermissions {
   const role = STARTER_ROLES.find((candidate) => candidate.slug === slug);
   return fakeAccess({
     roles: [slug],
     permissions: toPermissionMap(role?.permissions ?? []),
-    campusScope: 'all',
+    campusScope,
   });
 }

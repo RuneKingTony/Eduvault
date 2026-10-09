@@ -22,7 +22,6 @@ export const PermissionsProvider = ({
   </PermissionsContext.Provider>
 );
 
-/** Null outside a provider, for shells that have no permissions to show. */
 export const useOptionalPermissions = (): MePermissions | null =>
   useContext(PermissionsContext);
 
@@ -41,7 +40,6 @@ export function useCan<R extends Resource>(
   return useCanAny([`${resource}:${action}` as Permission]);
 }
 
-/** True when the member holds any one permission of the gate. */
 export function useCanAny(gate: Gate): boolean {
   return canAny(usePermissions().permissions, gate);
 }
@@ -51,7 +49,6 @@ type CanProps = { children: ReactNode } & (
   | { anyOf: Gate; permission?: never }
 );
 
-/** Renders its children only when the permission, or one of the gate, is held. */
 export function Can({ permission, anyOf, children }: CanProps) {
   const allowed = useCanAny(anyOf ?? [permission]);
   return allowed ? children : null;

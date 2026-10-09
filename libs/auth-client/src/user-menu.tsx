@@ -5,6 +5,7 @@ import {
   SearchIcon,
   SunMoonIcon,
 } from 'lucide-react';
+import { splitRoles } from '@eduvault/policy';
 import { initials } from '@eduvault/shared';
 import {
   Avatar,
@@ -39,7 +40,6 @@ export interface UserMenuProps {
   side?: 'top' | 'bottom';
   /** Shows "Command menu" when given; the portal has none. */
   onOpenCommandMenu?: () => void;
-  /** Shows "My access" when given; the portal has none. */
   onOpenMyAccess?: () => void;
   onSignedOut?: () => void;
 }
@@ -92,12 +92,6 @@ function UserMenuHeader({ user }: { user: UserMenuUser }) {
     </DropdownMenuLabel>
   );
 }
-
-const splitRoles = (role: string | null | undefined): string[] =>
-  (role ?? '')
-    .split(',')
-    .map((name) => name.trim())
-    .filter((name) => name !== '');
 
 export function UserMenu({
   authClient,

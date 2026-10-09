@@ -7,3 +7,4 @@ export * from './school-switcher';
 export * from './user-menu';
 export * from './auth-client-context';
 export * from './sign-out-button';
+export * from './access-test-utils';
