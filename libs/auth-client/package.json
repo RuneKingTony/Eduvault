@@ -4,6 +4,8 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@eduvault/api-contract": "workspace:*",
+    "@eduvault/policy": "workspace:*",
     "@eduvault/shared": "workspace:*",
     "@eduvault/ui": "workspace:*",
     "better-auth": "catalog:auth",

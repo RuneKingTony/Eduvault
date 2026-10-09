@@ -12,7 +12,8 @@
     "@eduvault/auth-client": "workspace:*",
     "@eduvault/shared": "workspace:*",
     "@eduvault/ui": "workspace:*",
-    "lucide-react": "catalog:ui"
+    "lucide-react": "catalog:ui",
+    "@eduvault/policy": "workspace:*"
   },
   "devDependencies": {
     "@tanstack/router-plugin": "catalog:tanstack",

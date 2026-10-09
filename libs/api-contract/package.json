@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "zod": "catalog:"
+    "zod": "catalog:",
+    "@eduvault/policy": "workspace:*"
   }
 }
