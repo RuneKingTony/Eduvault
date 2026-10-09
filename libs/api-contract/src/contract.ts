@@ -10,6 +10,7 @@ import {
   feeScheduleSchema,
   healthSchema,
   idParamsSchema,
+  mePermissionsSchema,
   meSchema,
   schoolAccountSchema,
   studentSchema,
@@ -21,7 +22,7 @@ import {
 
 const removed = z.object({ id: z.uuid() });
 
-const crud = <
+const crudWithoutRemove = <
   Item extends z.ZodType,
   Create extends z.ZodType,
   Update extends z.ZodType,
@@ -61,9 +62,22 @@ const crud = <
     body: update,
     response: item,
   }),
+});
+
+const crud = <
+  Item extends z.ZodType,
+  Create extends z.ZodType,
+  Update extends z.ZodType,
+>(options: {
+  base: string;
+  item: Item;
+  create: Create;
+  update: Update;
+}) => ({
+  ...crudWithoutRemove(options),
   remove: defineRoute({
     method: 'DELETE',
-    path: `${base}/:id`,
+    path: `${options.base}/:id`,
     params: idParamsSchema,
     response: removed,
   }),
@@ -75,7 +89,14 @@ export const contract = defineContract({
     path: '/health',
     response: healthSchema,
   }),
-  me: defineRoute({ method: 'GET', path: '/me', response: meSchema }),
+  me: {
+    get: defineRoute({ method: 'GET', path: '/me', response: meSchema }),
+    permissions: defineRoute({
+      method: 'GET',
+      path: '/me/permissions',
+      response: mePermissionsSchema,
+    }),
+  },
   campuses: {
     ...crud({
       base: '/campuses',
@@ -95,7 +116,7 @@ export const contract = defineContract({
     create: createFeeScheduleSchema,
     update: updateFeeScheduleSchema,
   }),
-  students: crud({
+  students: crudWithoutRemove({
     base: '/students',
     item: studentSchema,
     create: createStudentSchema,

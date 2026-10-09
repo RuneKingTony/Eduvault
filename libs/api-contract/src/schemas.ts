@@ -1,3 +1,4 @@
+import { ACTIONS, RESOURCES } from '@eduvault/policy';
 import { z } from 'zod';
 
 export const idSchema = z.uuid();
@@ -5,6 +6,18 @@ export const currencySchema = z.string().length(3).toUpperCase();
 const timestamp = z.string();
 
 export const idParamsSchema = z.object({ id: idSchema });
+
+export const apiErrorCodeSchema = z.enum([
+  'BadRequest',
+  'Unauthorized',
+  'Forbidden',
+  'NoSchool',
+  'NotFound',
+  'Conflict',
+  'SelfApproval',
+  'InternalError',
+]);
+export type ApiErrorCode = z.infer<typeof apiErrorCodeSchema>;
 
 export const errorSchema = z.object({
   code: z.string(),
@@ -22,6 +35,27 @@ export const meSchema = z.object({
   activeOrganizationId: z.string().nullable(),
   activeCampusId: z.string().nullable(),
 });
+
+export const permissionMapSchema = z.partialRecord(
+  z.enum(RESOURCES),
+  z.array(z.enum(ACTIONS))
+);
+export type PermissionMap = z.infer<typeof permissionMapSchema>;
+
+export const scopeSchema = z.union([z.literal('all'), z.array(z.string())]);
+export type Scope = z.infer<typeof scopeSchema>;
+
+export const mePermissionsSchema = z.object({
+  organizationId: z.string(),
+  roles: z.array(z.string()),
+  permissions: permissionMapSchema,
+  campusScope: scopeSchema,
+  classScope: scopeSchema,
+  acting: z
+    .object({ organizationId: z.string(), writes: z.boolean() })
+    .nullable(),
+});
+export type MePermissions = z.infer<typeof mePermissionsSchema>;
 
 export const campusSchema = z.object({
   id: idSchema,
