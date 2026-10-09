@@ -26,7 +26,9 @@ A failure prints a unified diff of the first 40 lines. Fix with `pnpm drift:fix`
 
 ## Integration tests
 
-Each test truncates Better Auth and domain tables first. A failing isolation test means a query is missing `organization_id` or the campus scope. A 403 where 200 was expected usually means the role lacks the permission in `libs/policy`, or the session has no active school (use `signIn` after `createOrganization`/`addMember`).
+Each test truncates Better Auth and domain tables first, with the single `TRUNCATE "user", "organization", "verification" RESTART IDENTITY CASCADE` in `apps/api/test/support/base-test.ts`; everything else cascades from `user` or `organization`. A new table that references neither joins that statement, once, never per spec.
+
+Every module's spec carries a `describe('isolation')` block built on `twoSchools()` that covers the applicable cases of the twelve-case table in [conventions.md](conventions.md#isolation-cases): 1 to 7 now, 8 to 12 as their slices land (class scope M2.3, portal M2.8, money M3.1, approvals M3.5, acting M1.5). A new table or route without its block is not reviewable. A failing isolation test means a query is missing `organization_id` or the campus scope. A 403 where 200 was expected usually means the role lacks the permission in `libs/policy`, or the session has no active school (use `signIn` after `createOrganization`/`addMember`).
 
 ## Automatic checks
 
@@ -43,7 +45,7 @@ Not a gate: it is outside `pnpm validate`, `validate:quick` and CI. Run it when 
 | Create personas             | `bash .claude/skills/eduvault-e2e/scripts/provision.sh`                                |
 | Reverse a run's data        | `bash .claude/skills/eduvault-e2e/scripts/cleanup.sh "$PWD/tmp/e2e/<run>/ledger.json"` |
 
-The browser is driven through the `playwright-cli` skill and the API through `curl`; there is no Playwright project in the workspace. Personas are provisioned through the real API, screenshots go to `tmp/e2e/<run>/`, and the schools, campuses and students a run created are deleted when every step passes (user accounts cannot be removed through the API and remain until `pnpm db:reset`). If the stack is down the run stops with `BLOCKED (environment)`, which is not a pass.
+The browser is driven through the `playwright-cli` skill and the API through `curl`; there is no Playwright project in the workspace. Personas are provisioned through the real API, screenshots go to `tmp/e2e/<run>/`, and a run's schools, students and user accounts stay until `pnpm db:reset`, because students and money are never deleted (cleanup reverses only empty campuses and closes sessions). If the stack is down the run stops with `BLOCKED (environment)`, which is not a pass.
 
 ## Not verified by any gate
 

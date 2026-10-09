@@ -109,15 +109,36 @@ Layout: `src/pages/*-page.tsx` (one routed page per file), `src/components/` (ap
 
 ## Testing
 
-| Convention                                                                                                                     | Enforced by                                                |
-| ------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------- |
-| Unit specs sit beside the source as `*.spec.ts(x)`; API integration specs are `apps/api/test/*.integration.spec.ts`            | `check-file` (names), vitest config (discovery)            |
-| Unit tests never start Docker or touch the network; integration tests use the Testcontainers Postgres through `baseTest`       | `review`                                                   |
-| Every new API resource has an integration case for another school's data (404) and, where campus aware, another campus's data  | integration tests, `review`                                |
-| SPA tests render with `renderWithApi` and a partial fake `Api`; auth components take a fake auth client; nothing mocks `fetch` | `no-restricted-globals` (SPAs), `review`                   |
-| Specs avoid focused or disabled tests, `expect` inside conditionals, duplicate titles and malformed matchers                   | `@vitest/eslint-plugin` (recommended)                      |
-| Test files may use `!`, untyped values from supertest and mocks, and unbound `vi.fn()` references; production code may not     | spec override in `eslint.config.mjs`                       |
-| Scope test runs to affected or named projects; never run the whole suite                                                       | `pnpm test` exits with an error; [CLAUDE.md](../CLAUDE.md) |
+| Convention                                                                                                                                                                              | Enforced by                                                |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| Unit specs sit beside the source as `*.spec.ts(x)`; API integration specs are `apps/api/test/*.integration.spec.ts`                                                                     | `check-file` (names), vitest config (discovery)            |
+| Unit tests never start Docker or touch the network; integration tests use the Testcontainers Postgres through `baseTest`                                                                | `review`                                                   |
+| Every new API resource has an integration case for another school's data (404) and, where campus aware, another campus's data                                                           | integration tests, `review`                                |
+| Every module spec has a `describe('isolation')` block built on `twoSchools()` (`apps/api/test/support/two-schools.ts`) with one test per applicable case of the twelve-case table below | integration tests, `review`                                |
+| A table that references neither `organization` nor `user` joins the `TRUNCATE` in `base-test.ts`, once, not per spec; the rest cascade from those two                                   | integration tests, `review`                                |
+| SPA tests render with `renderWithApi` and a partial fake `Api`; auth components take a fake auth client; nothing mocks `fetch`                                                          | `no-restricted-globals` (SPAs), `review`                   |
+| Specs avoid focused or disabled tests, `expect` inside conditionals, duplicate titles and malformed matchers                                                                            | `@vitest/eslint-plugin` (recommended)                      |
+| Test files may use `!`, untyped values from supertest and mocks, and unbound `vi.fn()` references; production code may not                                                              | spec override in `eslint.config.mjs`                       |
+| Scope test runs to affected or named projects; never run the whole suite                                                                                                                | `pnpm test` exits with an error; [CLAUDE.md](../CLAUDE.md) |
+
+### Isolation cases
+
+`twoSchools()` gives school A (campuses Lekki and Ikeja; `owner`, `lekkiOnly`, `noPermission`), school B (one campus; `ownerB`) and one student per A campus plus one in B. Rows are created through Nest services as an actor (`test/support/factories/`), never raw SQL. State in the PR which cases apply and why any are skipped.
+
+| #   | Case                                                                | Expect                                                  | Applies                                                                     |
+| --- | ------------------------------------------------------------------- | ------------------------------------------------------- | --------------------------------------------------------------------------- |
+| 1   | `ownerB` reads, updates or acts on A's row by id                    | 404                                                     | every route with an id or a school singleton                                |
+| 2   | A's lists as `owner` hold no B rows; a `campusId` naming B's campus | rows absent; 404 "Campus not found"                     | every list                                                                  |
+| 3   | `lekkiOnly` reads or writes the Ikeja row                           | 404                                                     | campus-aware routes; reads only until M1.1 gives a campus-scoped write role |
+| 4   | `lekkiOnly` lists                                                   | only Lekki rows                                         | campus-aware lists                                                          |
+| 5   | `noPermission` on A's own Lekki row                                 | 403                                                     | every route behind a permission                                             |
+| 6   | No session                                                          | 401                                                     | every route                                                                 |
+| 7   | Create in A referencing B's campus, student, account or item id     | 404, and the composite foreign key refuses a raw insert | routes that take a reference                                                |
+| 8   | Class-scoped teacher reads a student outside their arms             | 404                                                     | student-bound slices, from M2.3                                             |
+| 9   | Student or guardian on a `readOwn` route asks for another child     | 404                                                     | portal slices, from M2.8                                                    |
+| 10  | Referenced money or stock create sent twice                         | one row; second answers 200 `replayed: true`            | money slices, from M3.1                                                     |
+| 11  | Creator approves their own request                                  | 409                                                     | approval slices, from M3.5                                                  |
+| 12  | Acting super admin writes without a reason                          | 403                                                     | from M1.5                                                                   |
 
 ## Not enforceable by a gate
 
