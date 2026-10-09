@@ -1,5 +1,9 @@
 export * from './auth-client';
+export * from './auth-card';
 export * from './sign-in-form';
+export * from './change-password-form';
+export * from './no-school-screen';
+export * from './entry-state';
 export * from './role-labels';
 export * from './permissions';
 export * from './my-access-sheet';
@@ -8,3 +12,5 @@ export * from './user-menu';
 export * from './auth-client-context';
 export * from './sign-out-button';
 export * from './access-test-utils';
+export * from './entry-gate';
+export * from './me-gate';

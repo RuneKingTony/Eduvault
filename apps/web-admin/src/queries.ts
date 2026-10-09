@@ -2,6 +2,13 @@ import { queryOptions } from '@tanstack/react-query';
 import type { Api } from './api';
 
 export const ME_PERMISSIONS_KEY = ['me', 'permissions'] as const;
+export const PLATFORM_SCHOOLS_KEY = ['platform', 'schools'] as const;
+
+export const platformSchoolsQueryOptions = (api: Api) =>
+  queryOptions({
+    queryKey: PLATFORM_SCHOOLS_KEY,
+    queryFn: () => api.platform.schools.list({}),
+  });
 
 export const mePermissionsQueryOptions = (api: Api) =>
   queryOptions({

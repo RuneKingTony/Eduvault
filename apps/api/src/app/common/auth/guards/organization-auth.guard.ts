@@ -11,6 +11,7 @@ import { can } from '@eduvault/policy';
 import { AuthContextService } from '../auth-context.service';
 import type { AuthedRequest } from '../auth.types';
 import { PERMISSION_KEY, type RequiredPermission } from '../decorators/tokens';
+import { assertPasswordSettled } from './password-rule';
 
 @Injectable()
 export class OrganizationAuthGuard implements CanActivate {
@@ -25,6 +26,8 @@ export class OrganizationAuthGuard implements CanActivate {
     if (!session) {
       throw new UnauthorizedException('Authentication is required');
     }
+
+    assertPasswordSettled(this.reflector, context, session);
 
     const org = await this.context.resolveOrganization(session);
     if (!org) {

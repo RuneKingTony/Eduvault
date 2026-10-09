@@ -9,6 +9,11 @@ if [ -f "$STACK_ENV" ]; then
   done <"$STACK_ENV"
 fi
 
+# The super admin a run provisions schools as. A worktree stack bootstraps it; on the shared
+# stack it must exist already, for example the seed's admin@eduvault.test (password123).
+export E2E_SUPERADMIN_EMAIL="${E2E_SUPERADMIN_EMAIL:-e2e-superadmin@eduvault.test}"
+export E2E_SUPERADMIN_PASSWORD="${E2E_SUPERADMIN_PASSWORD:-e2e-password-123}"
+
 # is_eduvault_api <url>: /health alone answers {"status":"ok"} on other projects' APIs too, so also require
 # Eduvault's own 401 body from the session guard on an unauthenticated /me.
 is_eduvault_api() {

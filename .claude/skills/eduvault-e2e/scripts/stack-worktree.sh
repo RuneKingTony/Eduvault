@@ -14,14 +14,15 @@
 # :3700/:4700 are never touched.
 #
 # Own database: the shared Postgres container (host :5434) gets a database eduvault_e2e_<name>; `up`
-# applies the worktree's migrations to it with dbmate. Nothing is copied: the personas are provisioned
-# through the API, so the shared `eduvault` database is never read or written.
+# applies the worktree's migrations with dbmate and bootstraps the super admin. Nothing is copied:
+# the other personas come through the API, so the shared `eduvault` database is never touched.
 # Browser note: session cookies are host-scoped, so two stacks on localhost share cookies inside ONE
 # browser. Concurrent runs are safe because each opens its own playwright-cli session (see close-sessions.sh).
 set -uo pipefail
 # vite configs load @nx/vite plugins; a dying nx daemon took the dev server down with it.
 export NX_DAEMON=false
 . "$(dirname "${BASH_SOURCE[0]}")/stack-sweep.sh"
+. "$(dirname "${BASH_SOURCE[0]}")/stack-env.sh"
 COMMON="$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --path-format=absolute --git-common-dir)"
 REPO_ROOT="$(cd "$COMMON/.." && pwd -P)"
 STACKS="$REPO_ROOT/var/e2e/stacks"
@@ -121,6 +122,11 @@ mkdir -p "$DIR"; : >"$DIR/api.log"; : >"$DIR/admin.log"; : >"$DIR/portal.log"
 (cd "$TREE/apps/api" && pnpm exec vite build >"$DIR/api-build.log" 2>&1) && [[ -f "$TREE/apps/api/dist/main.cjs" ]] || { tail -15 "$DIR/api-build.log" >&2; drop_db; die "API build failed"; }
 
 ADMIN_URL="http://localhost:$ADMIN_PORT"; PORTAL_URL="http://localhost:$PORTAL_PORT"
+# The stack's super admin: the one account no HTTP route can create.
+(cd "$TREE/apps/api" && pnpm exec vite build --config vite.bootstrap-admin.config.mts >"$DIR/bootstrap-build.log" 2>&1) && [[ -f "$TREE/apps/api/dist/bootstrap-admin.cjs" ]] || { tail -15 "$DIR/bootstrap-build.log" >&2; drop_db; die "bootstrap-admin build failed"; }
+(cd "$TREE/apps/api" && env NODE_ENV=development DATABASE_URL="$DB_URL" BETTER_AUTH_SECRET="$SECRET" BETTER_AUTH_URL="http://localhost:$API_PORT" \
+   WEB_ADMIN_URL="$ADMIN_URL" WEB_PORTAL_URL="$PORTAL_URL" BOOTSTRAP_ADMIN_EMAIL="$E2E_SUPERADMIN_EMAIL" BOOTSTRAP_ADMIN_PASSWORD="$E2E_SUPERADMIN_PASSWORD" \
+   node "$TREE/apps/api/dist/bootstrap-admin.cjs") >"$DIR/bootstrap.log" 2>&1 || { tail -5 "$DIR/bootstrap.log" >&2; drop_db; die "bootstrap-admin failed"; }
 (cd "$TREE/apps/api" && exec env NODE_ENV=development PORT="$API_PORT" DATABASE_URL="$DB_URL" BETTER_AUTH_SECRET="$SECRET" E2E_TRUST_INVITEES=true \
    BETTER_AUTH_URL="http://localhost:$API_PORT" WEB_ADMIN_URL="$ADMIN_URL" WEB_PORTAL_URL="$PORTAL_URL" \
    node --enable-source-maps "$TREE/apps/api/dist/main.cjs") >"$DIR/api.log" 2>&1 &

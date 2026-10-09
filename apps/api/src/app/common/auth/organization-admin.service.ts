@@ -1,0 +1,64 @@
+import { Inject, Injectable } from '@nestjs/common';
+import { AuthService } from '@thallesp/nestjs-better-auth';
+import { getOrgAdapter } from 'better-auth/plugins';
+import type { Pool } from 'pg';
+import { DB_TOKEN } from '../db/tokens';
+import type { AppAuth } from './better-auth';
+import { getOrganizationOptions } from './better-auth-base';
+
+interface NewOrganization {
+  name: string;
+  slug: string;
+  userId: string;
+}
+
+/**
+ * System-level school writes for the platform module: no session, so Better
+ * Auth treats `userId` as the creator and skips its own creation limits.
+ */
+@Injectable()
+export class OrganizationAdminService {
+  constructor(
+    private readonly authService: AuthService<AppAuth>,
+    @Inject(DB_TOKEN) private readonly pool: Pool
+  ) {}
+
+  async create(input: NewOrganization): Promise<{ id: string }> {
+    const { id } = await this.authService.api.createOrganization({
+      body: input,
+    });
+    return { id };
+  }
+
+  async startIdleSessionsIn(
+    userId: string,
+    organizationId: string
+  ): Promise<void> {
+    const { internalAdapter } = await this.authService.instance.$context;
+    const sessions = await internalAdapter.listSessions(userId);
+    for (const session of sessions) {
+      const { activeOrganizationId } = session as {
+        activeOrganizationId?: string | null;
+      };
+      if (activeOrganizationId === null || activeOrganizationId === undefined) {
+        await internalAdapter.updateSession(session.token, {
+          activeOrganizationId: organizationId,
+        });
+      }
+    }
+  }
+
+  async deleteBySlug(slug: string): Promise<void> {
+    const adapter = await this.adapter();
+    const school = await adapter.findOrganizationBySlug(slug);
+    if (school) {
+      await adapter.deleteOrganization(school.id);
+    }
+  }
+
+  private async adapter() {
+    const context = (await this.authService.instance
+      .$context) as unknown as Parameters<typeof getOrgAdapter>[0];
+    return getOrgAdapter(context, getOrganizationOptions(this.pool));
+  }
+}

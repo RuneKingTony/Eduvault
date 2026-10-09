@@ -4,5 +4,5 @@
 # Usage: playwright-cli -s="$(bash session-name.sh "$RUN_DIR" owner)" open
 set -eu
 DIR="${1:?run dir}"; P="${2:?persona}"
-case "$P" in owner) c=ow ;; admin) c=ad ;; teacher) c=te ;; student) c=st ;; foreign) c=fo ;; *) echo "unknown persona $P" >&2; exit 2 ;; esac
+case "$P" in owner) c=ow ;; superadmin) c=su ;; admin) c=ad ;; teacher) c=te ;; student) c=st ;; foreign) c=fo ;; *) echo "unknown persona $P" >&2; exit 2 ;; esac
 echo "ev-$c-$(cat "$DIR/sid")"

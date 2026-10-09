@@ -20,7 +20,7 @@ interface ShellTopbarProps {
   groupLabel?: string;
   pageTitle: string;
   onOpenNavigation: () => void;
-  onOpenSearch: () => void;
+  onOpenSearch?: () => void;
 }
 
 function RailToggle() {
@@ -92,20 +92,22 @@ export function ShellTopbar({
         )
       }
       end={
-        <Button
-          variant="outline"
-          size={compact ? 'icon-sm' : 'sm'}
-          aria-label="Search pages and actions"
-          onClick={onOpenSearch}
-        >
-          <SearchIcon />
-          {compact ? null : (
-            <>
-              Search…
-              <Kbd>⌘K</Kbd>
-            </>
-          )}
-        </Button>
+        onOpenSearch === undefined ? undefined : (
+          <Button
+            variant="outline"
+            size={compact ? 'icon-sm' : 'sm'}
+            aria-label="Search pages and actions"
+            onClick={onOpenSearch}
+          >
+            <SearchIcon />
+            {compact ? null : (
+              <>
+                Search…
+                <Kbd>⌘K</Kbd>
+              </>
+            )}
+          </Button>
+        )
       }
     >
       <Trail compact={compact} groupLabel={groupLabel} pageTitle={pageTitle} />

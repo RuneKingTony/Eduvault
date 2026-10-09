@@ -128,6 +128,9 @@ export function splitRoles(role: string | null | undefined): string[] {
     .filter((slug) => slug !== '');
 }
 
+export const isSuperAdmin = (role: string | null | undefined): boolean =>
+  splitRoles(role).includes('superadmin');
+
 /** `owner` and `member` live in code; every other role is an `organizationRole` row. */
 const CODE_ROLES = new Map<string, readonly Permission[]>([
   [OWNER_ROLE, ALL_PERMISSIONS],

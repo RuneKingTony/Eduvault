@@ -6,7 +6,8 @@ interface SeedCampus {
 interface SeedSchool {
   slug: string;
   name: string;
-  currency: string;
+  admissionPrefix: string;
+  city: string;
   /** Persona key of the owner, who creates the campuses. */
   owner: string;
   campuses: SeedCampus[];
@@ -18,7 +19,8 @@ export const schools: SeedSchool[] = [
   {
     slug: GREENFIELD_SLUG,
     name: 'Greenfield College',
-    currency: 'NGN',
+    admissionPrefix: 'GF',
+    city: 'Lagos',
     owner: 'funmi',
     campuses: [
       { name: 'Lekki', address: '14 Admiralty Way, Lekki Phase 1' },
@@ -28,14 +30,16 @@ export const schools: SeedSchool[] = [
   {
     slug: 'hilltop',
     name: 'Hilltop Academy',
-    currency: 'NGN',
+    admissionPrefix: 'HA',
+    city: 'Abuja',
     owner: 'kola',
     campuses: [{ name: 'Main', address: null }],
   },
   {
     slug: 'stbrendan',
     name: "St Brendan's Schools",
-    currency: 'NGN',
+    admissionPrefix: 'SB',
+    city: 'Ibadan',
     owner: 'mary',
     campuses: [
       { name: 'Main', address: null },

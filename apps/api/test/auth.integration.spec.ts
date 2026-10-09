@@ -1,4 +1,6 @@
 import { randomUUID } from 'node:crypto';
+import { AuthService } from '@thallesp/nestjs-better-auth';
+import type { AppAuth } from '../src/app/common/auth';
 import { baseTest as test, expect, PASSWORD } from './support/base-test';
 
 test.describe('health', () => {
@@ -9,12 +11,35 @@ test.describe('health', () => {
 });
 
 test.describe('authentication', () => {
-  test('sign-up signs the user in and sets an httpOnly lax cookie', async ({
+  test('sign-up is refused over HTTP and through the server API', async ({
+    app,
     api,
+    pool,
   }) => {
-    const res = await api()
+    await api()
       .post('/api/auth/sign-up/email')
       .send({ name: 'Ada', email: 'ada@example.test', password: PASSWORD })
+      .expect(400);
+
+    const { api: serverApi } = app.get(AuthService<AppAuth>);
+    await expect(
+      serverApi.signUpEmail({
+        body: { name: 'Ada', email: 'ada@example.test', password: PASSWORD },
+      })
+    ).rejects.toMatchObject({ statusCode: 400 });
+
+    const { rows } = await pool.query('SELECT id FROM "user"');
+    expect(rows).toHaveLength(0);
+  });
+
+  test('sign-in sets an httpOnly lax cookie that opens a session', async ({
+    api,
+    createUser,
+  }) => {
+    const user = await createUser({ email: 'ada@example.test' });
+    const res = await api()
+      .post('/api/auth/sign-in/email')
+      .send({ email: user.email, password: user.password })
       .expect(200);
 
     const cookies = [res.headers['set-cookie']].flat().join(';');
@@ -35,9 +60,9 @@ test.describe('authentication', () => {
 
   test('sign-in works and a wrong password is rejected with 401', async ({
     api,
-    signUp,
+    createUser,
   }) => {
-    const user = await signUp();
+    const user = await createUser();
     await api()
       .post('/api/auth/sign-in/email')
       .send({ email: user.email, password: user.password })
@@ -62,12 +87,12 @@ test.describe('authentication', () => {
 
   test('/me needs a session but not a school', async ({
     api,
-    signUp,
+    createUser,
     createOrganization,
   }) => {
     await api().get('/me').expect(401);
 
-    const user = await signUp();
+    const user = await createUser();
     const bare = await api(user).get('/me').expect(200);
     expect(bare.body).toMatchObject({
       user: { id: user.id, email: user.email },
@@ -79,28 +104,131 @@ test.describe('authentication', () => {
     expect(withSchool.body.activeOrganizationId).toBe(org.id);
   });
 
-  test('a signed-in user with no school gets 403, not data', async ({
+  test('a signed-in user with no school gets 403 NoSchool, not data', async ({
     api,
-    signUp,
+    createUser,
   }) => {
-    const user = await signUp();
-    const res = await api(user).get('/students').expect(403);
-    expect(res.body).toMatchObject({
-      code: 'NoSchool',
-      message: 'No active school for this session',
+    const user = await createUser();
+    for (const path of ['/students', '/me/permissions']) {
+      const res = await api(user).get(path).expect(403);
+      expect(res.body, path).toMatchObject({
+        code: 'NoSchool',
+        message: 'No active school for this session',
+      });
+    }
+  });
+
+  test('update-user cannot set the platform role or the password flag', async ({
+    api,
+    createUser,
+    pool,
+  }) => {
+    const user = await createUser();
+    const res = await api(user)
+      .post('/api/auth/update-user')
+      .send({ name: 'Renamed', role: 'superadmin', mustChangePassword: true });
+    expect([200, 400]).toContain(res.status);
+
+    const { rows } = await pool.query<{
+      role: string | null;
+      mustChangePassword: boolean;
+    }>(`SELECT role, "mustChangePassword" FROM "user" WHERE id = $1`, [
+      user.id,
+    ]);
+    expect(rows[0]?.role).not.toBe('superadmin');
+    expect(rows[0]?.mustChangePassword).toBe(false);
+  });
+
+  test('a school owner cannot reach the platform admin routes', async ({
+    api,
+    createUser,
+    createOrganization,
+    pool,
+  }) => {
+    const owner = await createUser();
+    await createOrganization(owner);
+    const other = await createUser();
+
+    const setRole = await api(owner)
+      .post('/api/auth/admin/set-role')
+      .send({ userId: other.id, role: 'superadmin' });
+    expect(setRole.status).toBe(403);
+
+    const create = await api(owner).post('/api/auth/admin/create-user').send({
+      name: 'Mallory',
+      email: 'mallory@example.test',
+      password: PASSWORD,
+      role: 'superadmin',
     });
+    expect(create.status).toBe(403);
+
+    const { rows } = await pool.query(
+      `SELECT id FROM "user" WHERE role = 'superadmin' OR email = 'mallory@example.test'`
+    );
+    expect(rows).toHaveLength(0);
+  });
+
+  test('a super admin reaches only the lookup, ban and session admin routes', async ({
+    api,
+    createUser,
+    makeSuperAdmin,
+    pool,
+  }) => {
+    const admin = await makeSuperAdmin(await createUser());
+    const other = await createUser();
+
+    await api(admin).get('/api/auth/admin/list-users').expect(200);
+
+    const refused = [
+      ['/api/auth/admin/impersonate-user', { userId: other.id }],
+      ['/api/auth/admin/set-role', { userId: other.id, role: 'superadmin' }],
+      [
+        '/api/auth/admin/set-user-password',
+        { userId: other.id, newPassword: PASSWORD },
+      ],
+      [
+        '/api/auth/admin/create-user',
+        { name: 'Mallory', email: 'mallory@example.test', password: PASSWORD },
+      ],
+      ['/api/auth/admin/remove-user', { userId: other.id }],
+    ] as const;
+    for (const [path, body] of refused) {
+      const res = await api(admin).post(path).send(body);
+      expect(res.status, path).toBe(403);
+    }
+
+    const { rows } = await pool.query(
+      `SELECT id FROM "user" WHERE role = 'superadmin' AND id <> $1`,
+      [admin.id]
+    );
+    expect(rows).toHaveLength(0);
+  });
+
+  test('a signed-in user cannot create a school through Better Auth', async ({
+    api,
+    createUser,
+    pool,
+  }) => {
+    const user = await createUser();
+    const res = await api(user)
+      .post('/api/auth/organization/create')
+      .send({ name: 'My School', slug: 'my-school' });
+    expect(res.status).toBe(403);
+
+    const { rows } = await pool.query('SELECT id FROM "organization"');
+    expect(rows).toHaveLength(0);
   });
 
   test('an invitee with an unverified email cannot accept by default', async ({
     api,
-    signUp,
+    createUser,
     createOrganization,
     createCampus,
   }) => {
-    const owner = await signUp();
+    const owner = await createUser();
     const org = await createOrganization(owner);
     const campus = await createCampus(org, 'Lekki');
-    const hire = await signUp();
+    const hire = await createUser();
     const invitation = await api(owner)
       .post('/api/auth/organization/invite-member')
       .send({
@@ -121,11 +249,11 @@ test.describe('authentication', () => {
 
   test('banned users are unauthenticated and cannot sign in', async ({
     api,
-    signUp,
-    promoteToAdmin,
+    createUser,
+    makeSuperAdmin,
   }) => {
-    const admin = await promoteToAdmin(await signUp());
-    const victim = await signUp();
+    const admin = await makeSuperAdmin(await createUser());
+    const victim = await createUser();
     await api(victim).get('/api/auth/get-session').expect(200);
 
     await api(admin)
@@ -144,11 +272,11 @@ test.describe('authentication', () => {
 test.describe('validation and not found', () => {
   test('rejects a malformed body with 400 and field issues', async ({
     api,
-    signUp,
+    createUser,
     createOrganization,
     createCampus,
   }) => {
-    const owner = await signUp();
+    const owner = await createUser();
     const org = await createOrganization(owner);
     await createCampus(org);
 
@@ -164,10 +292,10 @@ test.describe('validation and not found', () => {
 
   test('rejects a malformed id with 400 and an unknown id with 404', async ({
     api,
-    signUp,
+    createUser,
     createOrganization,
   }) => {
-    const owner = await signUp();
+    const owner = await createUser();
     await createOrganization(owner);
     await api(owner).get('/students/not-a-uuid').expect(400);
     const res = await api(owner).get(`/students/${randomUUID()}`).expect(404);

@@ -3,6 +3,7 @@ import {
   QueryClientProvider,
   focusManager,
 } from '@tanstack/react-query';
+import { ErrorMessage } from '@eduvault/ui';
 import {
   RouterProvider,
   createMemoryHistory,
@@ -30,7 +31,6 @@ import { DashboardPage } from '../pages/dashboard-page';
 import { mePermissionsQueryOptions } from '../queries';
 import { createQueryClient } from '../query-client';
 import { fakeAccess, ownerAccess, starterAccess } from '../test-utils';
-import { ErrorMessage } from './error-message';
 import { AppShell } from './app-shell';
 import { NotFoundPage } from './page-fallbacks';
 

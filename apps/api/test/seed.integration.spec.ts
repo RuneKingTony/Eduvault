@@ -30,7 +30,7 @@ test.describe('dev seed', () => {
     expect(await counts()).toEqual({
       organization: '3',
       team: '6',
-      user: String(personas.length),
+      user: String(personas.length + 1),
       student: '28',
     });
 
@@ -53,14 +53,26 @@ test.describe('dev seed', () => {
     const kemiCookie = (kemi.headers['set-cookie'] as unknown as string[])
       .map((c) => c.split(';')[0])
       .join('; ');
-    const kemiAccess = await api({ cookie: kemiCookie })
-      .get('/me/permissions')
+    const kemiMe = await api({ cookie: kemiCookie }).get('/me').expect(200);
+    expect(kemiMe.body).toMatchObject({ mustChangePassword: true });
+    const held = await api({ cookie: kemiCookie }).get('/students').expect(403);
+    expect(held.body).toMatchObject({ code: 'MustChangePassword' });
+
+    const admin = await api()
+      .post('/api/auth/sign-in/email')
+      .send({ email: 'admin@eduvault.test', password: SEED_PASSWORD })
       .expect(200);
-    expect(kemiAccess.body).toMatchObject({
-      roles: ['member'],
-      permissions: {},
-    });
-    await api({ cookie: kemiCookie }).get('/students').expect(403);
+    const adminCookie = (admin.headers['set-cookie'] as unknown as string[])
+      .map((c) => c.split(';')[0])
+      .join('; ');
+    const schoolsList = await api({ cookie: adminCookie })
+      .get('/platform/schools')
+      .expect(200);
+    expect(
+      (schoolsList.body as { items: { admissionPrefix: string }[] }).items
+        .map((school) => school.admissionPrefix)
+        .toSorted((a, b) => a.localeCompare(b))
+    ).toEqual(['GF', 'HA', 'SB']);
 
     const before = await counts();
     lines.length = 0;

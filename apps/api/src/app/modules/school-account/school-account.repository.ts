@@ -3,6 +3,8 @@ import type { SchoolAccount } from '@eduvault/api-contract';
 export interface NewSchoolAccount {
   name: string;
   currency: string;
+  admissionPrefix: string;
+  city?: string;
 }
 
 export type SchoolAccountPatch = Partial<NewSchoolAccount>;

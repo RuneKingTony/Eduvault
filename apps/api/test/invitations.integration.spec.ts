@@ -11,14 +11,14 @@ test.describe('invitations with E2E_TRUST_INVITEES', () => {
 
   test('an invitee accepts without a verified email and holds the starter role on the campus', async ({
     api,
-    signUp,
+    createUser,
     createOrganization,
     createCampus,
   }) => {
-    const owner = await signUp();
+    const owner = await createUser();
     const org = await createOrganization(owner);
     const campus = await createCampus(org, 'Lekki');
-    const hire = await signUp();
+    const hire = await createUser();
 
     const invitation = await api(owner)
       .post('/api/auth/organization/invite-member')

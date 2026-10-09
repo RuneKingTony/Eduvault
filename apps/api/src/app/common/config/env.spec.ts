@@ -47,4 +47,14 @@ describe('loadEnv', () => {
       loadEnv({ ...valid, NODE_ENV: 'production', E2E_TRUST_INVITEES: 'true' })
     ).toThrow(/E2E_TRUST_INVITEES/);
   });
+
+  it('keeps the sign-in rate limit off unless asked for', () => {
+    expect(loadEnv(valid).AUTH_RATE_LIMIT).toBe(false);
+    expect(loadEnv({ ...valid, AUTH_RATE_LIMIT: 'true' })).toMatchObject({
+      AUTH_RATE_LIMIT: true,
+    });
+    expect(() => loadEnv({ ...valid, AUTH_RATE_LIMIT: 'yes' })).toThrow(
+      /AUTH_RATE_LIMIT/
+    );
+  });
 });

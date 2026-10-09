@@ -156,7 +156,7 @@ A minimal list in the Settings frame under **School structure**, after Campuses 
 
 ## Data
 
-- Tables as in [overview: Foundation model](../brainstorming/data-model-overview.md#foundation-model): `class_level`, `class_arm`, `class_arm_teacher`. `grade_scale_id` on `class_level` arrives with grading (nullable now).
+- Tables as in [overview: Foundation model](../brainstorming/data-model-overview.md#foundation-model): `class_level`, `class_arm`, `class_arm_teacher`. `grade_scale_id` on `class_level` arrives with grading, in the migration that creates the grade-scale table (D-082).
 - Additions to flag:
   - `class_arm.retired_by` (user id, nullable) to record who archived it.
   - Partial unique index `UNIQUE (class_arm_id, session_id) WHERE role = 'lead'` (rule 8).

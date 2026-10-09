@@ -5,7 +5,17 @@ import {
   type OrganizationOptions,
 } from 'better-auth/plugins';
 import type { Pool } from 'pg';
-import { betterAuthAc, betterAuthRoles } from '@eduvault/policy';
+import {
+  betterAuthAc,
+  betterAuthRoles,
+  platformAc,
+  platformRoles,
+} from '@eduvault/policy';
+import {
+  BANNED_USER_MESSAGE,
+  PASSWORD_MIN_LENGTH,
+} from '@eduvault/api-contract';
+import { insertDefaultLevels } from './default-levels';
 import { syncStarterRoles } from './starter-roles';
 
 // Shared by the Nest factory (better-auth.ts) and the CLI shim (apps/api/auth.ts).
@@ -16,7 +26,20 @@ export const emailAndPasswordBaseConfig: NonNullable<
 > = {
   enabled: true,
   autoSignIn: true,
+  disableSignUp: true,
+  minPasswordLength: PASSWORD_MIN_LENGTH,
   requireEmailVerification: false,
+};
+
+export const userBaseConfig: NonNullable<BetterAuthOptions['user']> = {
+  additionalFields: {
+    mustChangePassword: {
+      type: 'boolean',
+      required: true,
+      defaultValue: false,
+      input: false,
+    },
+  },
 };
 
 export const advancedBaseConfig: NonNullable<BetterAuthOptions['advanced']> = {
@@ -33,6 +56,7 @@ export const getOrganizationOptions = (
   { trustInvitees = false }: OrganizationFlags = {}
 ) =>
   ({
+    allowUserToCreateOrganization: false,
     requireEmailVerificationOnInvitation: !trustInvitees,
     ac: betterAuthAc,
     roles: betterAuthRoles,
@@ -51,6 +75,7 @@ export const getOrganizationOptions = (
     organizationHooks: {
       afterCreateOrganization: async ({ organization: school }) => {
         await syncStarterRoles(pool, school.id);
+        await insertDefaultLevels(pool, school.id);
       },
     },
     // A campus is a team plus a domain row; an automatic team would have no row.
@@ -62,7 +87,13 @@ export const getOrganizationOptions = (
   }) satisfies OrganizationOptions;
 
 export const getPlugins = (pool: Pool, flags: OrganizationFlags = {}) => [
-  admin(),
+  admin({
+    adminRoles: ['superadmin'],
+    defaultRole: 'user',
+    ac: platformAc,
+    roles: platformRoles,
+    bannedUserMessage: BANNED_USER_MESSAGE,
+  }),
   organization(getOrganizationOptions(pool, flags)),
 ];
 

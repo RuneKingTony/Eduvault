@@ -1,4 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ErrorMessage } from '@eduvault/ui';
 import {
   RouterProvider,
   createMemoryHistory,
@@ -12,7 +13,6 @@ import {
   type EduvaultAuthClient,
 } from '@eduvault/auth-client';
 import { stubMatchMedia } from '@eduvault/ui/testing';
-import { ErrorMessage } from './error-message';
 import { NotFoundPage } from './portal-fallbacks';
 import { PortalShell } from './portal-shell';
 

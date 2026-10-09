@@ -69,6 +69,29 @@
         "cwd": "apps/api"
       }
     },
+    "bootstrap-admin-build": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["production", "^production"],
+      "outputs": [
+        "{projectRoot}/dist/bootstrap-admin.cjs",
+        "{projectRoot}/dist/bootstrap-admin.cjs.map"
+      ],
+      "description": "Bundle the bootstrap-admin command with SWC (no Nest)",
+      "options": {
+        "command": "vite build --config vite.bootstrap-admin.config.mts",
+        "cwd": "apps/api"
+      }
+    },
+    "bootstrap-admin": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["env-init", "bootstrap-admin-build"],
+      "description": "Create the super admin from BOOTSTRAP_ADMIN_EMAIL and BOOTSTRAP_ADMIN_PASSWORD (idempotent)",
+      "options": {
+        "command": "node --env-file-if-exists=.env.local dist/bootstrap-admin.cjs",
+        "cwd": "apps/api"
+      }
+    },
     "auth-generate": {
       "executor": "nx:run-commands",
       "description": "Emit Better Auth schema changes as a new dbmate migration and refresh the snapshot",

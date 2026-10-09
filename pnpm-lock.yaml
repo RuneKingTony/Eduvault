@@ -619,6 +619,9 @@ importers:
       '@eduvault/ui':
         specifier: workspace:*
         version: link:../ui
+      '@tanstack/react-query':
+        specifier: catalog:tanstack
+        version: 5.104.1(react@19.3.0)
       better-auth:
         specifier: catalog:auth
         version: 1.7.7(pg@8.23.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@4.1.11(@types/node@24.19.1)(jsdom@26.1.0)(vite@7.3.7(@types/node@24.19.1)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1)))

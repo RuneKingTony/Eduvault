@@ -3,13 +3,13 @@ import { twoSchools, type TwoSchools } from './support/two-schools';
 
 const test = baseTest.extend<{ schools: TwoSchools }>({
   schools: async (
-    { app, signUp, createOrganization, createCampus, addMember },
+    { app, createUser, createOrganization, createCampus, addMember },
     use
   ) => {
     await use(
       await twoSchools({
         app,
-        signUp,
+        createUser,
         createOrganization,
         createCampus,
         addMember,
@@ -134,14 +134,14 @@ test.describe('students', () => {
 
   test('a user in both schools sees only the active one', async ({
     api,
-    signUp,
+    createUser,
     createOrganization,
     createCampus,
     addMember,
     setActiveOrganization,
   }) => {
-    const ownerA = await signUp();
-    const ownerB = await signUp();
+    const ownerA = await createUser();
+    const ownerB = await createUser();
     const orgA = await createOrganization(ownerA, 'School A');
     const orgB = await createOrganization(ownerB, 'School B');
     const campusA = await createCampus(orgA);
@@ -159,7 +159,7 @@ test.describe('students', () => {
         .expect(201)
     ).body;
 
-    let both = await addMember(orgA, await signUp(), {
+    let both = await addMember(orgA, await createUser(), {
       roles: ['administrator'],
     });
     both = await addMember(orgB, both, { roles: ['administrator'] });
@@ -250,12 +250,12 @@ test.describe('campuses', () => {
 
   test('fee schedules: school-wide ones reach every campus, campus ones do not leak', async ({
     api,
-    signUp,
+    createUser,
     createOrganization,
     createCampus,
     withPermissions,
   }) => {
-    const owner = await signUp();
+    const owner = await createUser();
     const org = await createOrganization(owner);
     const campus1 = await createCampus(org, 'Campus 1');
     const campus2 = await createCampus(org, 'Campus 2');
@@ -333,7 +333,11 @@ test.describe('fee schedules', () => {
 
 test.describe('school account', () => {
   test.describe('isolation', () => {
-    const account = { name: 'A fees', currency: 'NGN' };
+    const account = {
+      name: 'A fees',
+      currency: 'NGN',
+      admissionPrefix: 'AAA',
+    };
 
     test('1: another school sees none of the account and only its own', async ({
       api,
@@ -349,7 +353,7 @@ test.describe('school account', () => {
 
       await api(ownerB)
         .post('/school-account')
-        .send({ name: 'B fees', currency: 'NGN' })
+        .send({ name: 'B fees', currency: 'NGN', admissionPrefix: 'BBB' })
         .expect(201);
       const own = (await api(ownerB).get('/school-account').expect(200)).body;
       expect(own.organizationId).toBe(orgB.id);
@@ -384,28 +388,28 @@ test.describe('school account', () => {
 test.describe('role per school', () => {
   test('the same user is a teacher in A and an administrator in B', async ({
     api,
-    signUp,
+    createUser,
     createOrganization,
     createCampus,
     addMember,
     setActiveOrganization,
   }) => {
-    const ownerA = await signUp();
-    const ownerB = await signUp();
+    const ownerA = await createUser();
+    const ownerB = await createUser();
     const orgA = await createOrganization(ownerA, 'School A');
     const orgB = await createOrganization(ownerB, 'School B');
     const campusA = await createCampus(orgA);
     const campusB = await createCampus(orgB);
     await api(ownerA)
       .post('/school-account')
-      .send({ name: 'A', currency: 'NGN' })
+      .send({ name: 'A', currency: 'NGN', admissionPrefix: 'AAA' })
       .expect(201);
     await api(ownerB)
       .post('/school-account')
-      .send({ name: 'B', currency: 'NGN' })
+      .send({ name: 'B', currency: 'NGN', admissionPrefix: 'BBB' })
       .expect(201);
 
-    let user = await addMember(orgA, await signUp(), {
+    let user = await addMember(orgA, await createUser(), {
       roles: ['teacher'],
       campuses: [campusA],
     });
@@ -435,13 +439,13 @@ test.describe('role per school', () => {
 
   test('the student role holds no staff permission', async ({
     api,
-    signUp,
+    createUser,
     createOrganization,
     addMember,
   }) => {
-    const owner = await signUp();
+    const owner = await createUser();
     const org = await createOrganization(owner);
-    const learner = await addMember(org, await signUp(), {
+    const learner = await addMember(org, await createUser(), {
       roles: ['student'],
     });
     await api(learner).get('/fee-schedules').expect(403);
@@ -453,20 +457,20 @@ test.describe('role per school', () => {
 test.describe('active school and campus', () => {
   test('a new session defaults to the first school and its first campus', async ({
     api,
-    signUp,
+    createUser,
     signIn,
     createOrganization,
     createCampus,
     addMember,
   }) => {
-    const ownerA = await signUp();
-    const ownerB = await signUp();
+    const ownerA = await createUser();
+    const ownerB = await createUser();
     const orgA = await createOrganization(ownerA, 'School A');
     const orgB = await createOrganization(ownerB, 'School B');
     const campusA = await createCampus(orgA, 'A campus');
     const campusB = await createCampus(orgB, 'B campus');
 
-    const user = await signUp();
+    const user = await createUser();
     const before = await api(user).get('/api/auth/get-session').expect(200);
     expect(before.body.session.activeOrganizationId ?? null).toBeNull();
 
@@ -481,22 +485,22 @@ test.describe('active school and campus', () => {
 
   test('setActive switches the school the routes act in', async ({
     api,
-    signUp,
+    createUser,
     createOrganization,
     createCampus,
     addMember,
     setActiveOrganization,
     setActiveCampus,
   }) => {
-    const ownerA = await signUp();
-    const ownerB = await signUp();
+    const ownerA = await createUser();
+    const ownerB = await createUser();
     const orgA = await createOrganization(ownerA, 'School A');
     const orgB = await createOrganization(ownerB, 'School B');
     const a1 = await createCampus(orgA, 'A1');
     const a2 = await createCampus(orgA, 'A2');
     await createCampus(orgB, 'B1');
 
-    let user = await addMember(orgA, await signUp(), {
+    let user = await addMember(orgA, await createUser(), {
       roles: ['teacher'],
       campuses: [a1, a2],
     });
