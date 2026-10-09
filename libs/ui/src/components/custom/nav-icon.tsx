@@ -2,6 +2,7 @@ import {
   BanknoteIcon,
   BookMarkedIcon,
   GraduationCapIcon,
+  HistoryIcon,
   HouseIcon,
   InboxIcon,
   LandmarkIcon,
@@ -29,6 +30,7 @@ const NAV_ICONS = {
   landmark: LandmarkIcon,
   settings: SettingsIcon,
   house: HouseIcon,
+  history: HistoryIcon,
 } as const satisfies Record<string, LucideIcon>;
 
 export type NavIconName = keyof typeof NAV_ICONS;
