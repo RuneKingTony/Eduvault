@@ -8,11 +8,8 @@ import { Kysely, PostgresDialect } from 'kysely';
 import { Pool } from 'pg';
 import type { DB } from '../../../db/db-types';
 import { ENV_TOKEN, type Env } from '../config/env';
-
-export const DB_TOKEN = 'DB_TOKEN';
-export const KYSELY_TOKEN = 'KYSELY_TOKEN';
-
-export type Database = Kysely<DB>;
+import { DatabaseHealth } from './database-health';
+import { DB_TOKEN, KYSELY_TOKEN, type Database } from './tokens';
 
 @Global()
 @Module({
@@ -29,8 +26,9 @@ export type Database = Kysely<DB>;
         new Kysely<DB>({ dialect: new PostgresDialect({ pool }) }),
       inject: [DB_TOKEN],
     },
+    DatabaseHealth,
   ],
-  exports: [DB_TOKEN, KYSELY_TOKEN],
+  exports: [DB_TOKEN, KYSELY_TOKEN, DatabaseHealth],
 })
 export class DatabaseModule implements OnApplicationShutdown {
   constructor(@Inject(KYSELY_TOKEN) private readonly db: Database) {}

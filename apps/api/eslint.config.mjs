@@ -12,6 +12,39 @@ const processEnv = {
   message: 'Read configuration through loadEnv() in common/config/env.ts.',
 };
 
+const pgImport = {
+  name: 'pg',
+  message: 'Repositories use the injected Kysely `Database`, not a Pool.',
+};
+
+const kyselyImport = {
+  name: 'kysely',
+  message:
+    'Only a kysely-*.repository.ts may import Kysely; services and controllers go through a repository.',
+};
+
+const kyselySubpaths = {
+  group: ['kysely/*'],
+  message: kyselyImport.message,
+};
+
+const clientPackages = {
+  group: ['react', 'react-dom', 'react-dom/*', '@tanstack/*'],
+  message: 'Client packages do not belong in the API.',
+};
+
+const databaseInternals = [
+  '**/db/tokens',
+  '**/db/database.module',
+  '**/db/db-types',
+  '**/db/in-campus-scope',
+  '**/db/rows',
+].map((group) => ({
+  group: [group],
+  message:
+    'Database internals belong to a kysely-*.repository.ts; services and controllers go through a repository.',
+}));
+
 export default [
   ...base,
   {
@@ -51,20 +84,18 @@ export default [
       'no-restricted-imports': [
         'error',
         {
-          paths: [
-            {
-              name: 'pg',
-              message:
-                'Modules use the injected Kysely `Database`, not a Pool.',
-            },
-          ],
-          patterns: [
-            {
-              group: ['react', 'react-dom', 'react-dom/*', '@tanstack/*'],
-              message: 'Client packages do not belong in the API.',
-            },
-          ],
+          paths: [pgImport, kyselyImport],
+          patterns: [clientPackages, kyselySubpaths, ...databaseInternals],
         },
+      ],
+    },
+  },
+  {
+    files: ['src/app/modules/**/kysely-*.repository.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        { paths: [pgImport], patterns: [clientPackages] },
       ],
     },
   },

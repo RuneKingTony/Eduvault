@@ -1,22 +1,14 @@
-import {
-  Controller,
-  Get,
-  Inject,
-  ServiceUnavailableException,
-} from '@nestjs/common';
-import { sql } from 'kysely';
+import { Controller, Get, ServiceUnavailableException } from '@nestjs/common';
 import type { RouteOutput, contract } from '@eduvault/api-contract';
-import { KYSELY_TOKEN, type Database } from '../../common/db/database.module';
+import { DatabaseHealth } from '../../common/db/database-health';
 
 @Controller('health')
 export class HealthController {
-  constructor(@Inject(KYSELY_TOKEN) private readonly db: Database) {}
+  constructor(private readonly database: DatabaseHealth) {}
 
   @Get()
   async check(): Promise<RouteOutput<typeof contract.health>> {
-    try {
-      await sql`SELECT 1`.execute(this.db);
-    } catch {
+    if (!(await this.database.ping())) {
       throw new ServiceUnavailableException('Database unavailable');
     }
     return { status: 'ok' };
