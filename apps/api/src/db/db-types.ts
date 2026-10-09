@@ -38,6 +38,17 @@ export interface Campus {
   updated_at: Generated<Timestamp>;
 }
 
+export interface ClassLevel {
+  code: string;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  name: string;
+  next_level_id: string | null;
+  organization_id: string;
+  sequence: number;
+  updated_at: Generated<Timestamp>;
+}
+
 export interface FeeSchedule {
   amount_minor: Int8;
   campus_id: string | null;
@@ -92,6 +103,8 @@ export interface OrganizationRole {
 }
 
 export interface SchoolAccount {
+  admission_prefix: string;
+  city: string | null;
   created_at: Generated<Timestamp>;
   currency: string;
   id: Generated<string>;
@@ -150,6 +163,7 @@ export interface User {
   emailVerified: boolean;
   id: Generated<string>;
   image: string | null;
+  mustChangePassword: Generated<boolean>;
   name: string;
   role: string | null;
   updatedAt: Generated<Timestamp>;
@@ -167,6 +181,7 @@ export interface Verification {
 export interface DB {
   account: Account;
   campus: Campus;
+  class_level: ClassLevel;
   fee_schedule: FeeSchedule;
   invitation: Invitation;
   member: Member;

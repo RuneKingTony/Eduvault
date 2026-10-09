@@ -51,6 +51,23 @@ CREATE TABLE public.campus (
 );
 
 --
+-- Name: class_level; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.class_level (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id text NOT NULL,
+    code text NOT NULL,
+    name text NOT NULL,
+    sequence integer NOT NULL,
+    next_level_id uuid,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT class_level_check CHECK ((next_level_id <> id)),
+    CONSTRAINT class_level_code_check CHECK ((code ~ '^[A-Z0-9]{2,8}$'::text))
+);
+
+--
 -- Name: fee_schedule; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -142,7 +159,10 @@ CREATE TABLE public.school_account (
     name text NOT NULL,
     currency character(3) NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    city text,
+    admission_prefix text NOT NULL,
+    CONSTRAINT school_account_admission_prefix_check CHECK ((admission_prefix ~ '^[A-Z]{2,6}$'::text))
 );
 
 --
@@ -217,7 +237,8 @@ CREATE TABLE public."user" (
     role text,
     banned boolean,
     "banReason" text,
-    "banExpires" timestamp with time zone
+    "banExpires" timestamp with time zone,
+    "mustChangePassword" boolean DEFAULT false NOT NULL
 );
 
 --
@@ -253,6 +274,34 @@ ALTER TABLE ONLY public.campus
 
 ALTER TABLE ONLY public.campus
     ADD CONSTRAINT campus_team_id_organization_id_key UNIQUE (team_id, organization_id);
+
+--
+-- Name: class_level class_level_id_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.class_level
+    ADD CONSTRAINT class_level_id_organization_id_key UNIQUE (id, organization_id);
+
+--
+-- Name: class_level class_level_organization_id_code_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.class_level
+    ADD CONSTRAINT class_level_organization_id_code_key UNIQUE (organization_id, code);
+
+--
+-- Name: class_level class_level_organization_id_sequence_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.class_level
+    ADD CONSTRAINT class_level_organization_id_sequence_key UNIQUE (organization_id, sequence);
+
+--
+-- Name: class_level class_level_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.class_level
+    ADD CONSTRAINT class_level_pkey PRIMARY KEY (id);
 
 --
 -- Name: fee_schedule fee_schedule_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -505,6 +554,20 @@ ALTER TABLE ONLY public.campus
     ADD CONSTRAINT campus_team_id_fkey FOREIGN KEY (team_id) REFERENCES public.team(id) ON DELETE CASCADE;
 
 --
+-- Name: class_level class_level_next_level_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.class_level
+    ADD CONSTRAINT class_level_next_level_id_organization_id_fkey FOREIGN KEY (next_level_id, organization_id) REFERENCES public.class_level(id, organization_id);
+
+--
+-- Name: class_level class_level_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.class_level
+    ADD CONSTRAINT class_level_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE CASCADE;
+
+--
 -- Name: fee_schedule fee_schedule_campus_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -614,4 +677,6 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20261007112254'),
     ('20261007112300'),
     ('20261009155210'),
-    ('20261009190000');
+    ('20261009185725'),
+    ('20261009190000'),
+    ('20261009210000');
