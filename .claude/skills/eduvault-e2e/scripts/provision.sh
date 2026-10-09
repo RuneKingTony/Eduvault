@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Creates the e2e personas through the real API and records every school, campus and student in a ledger.
 # Usage: provision.sh   prints the run directory (tmp/e2e/<run>) on stdout; personas.json and ledger.json are inside.
-# Only owner and foreign can be created over HTTP today; every other persona is recorded blocked with the slice that
-# unblocks it (see references/personas.md).
+# Staff personas join through Better Auth's invite-and-accept with starter role slugs and a teamId; when accepting is
+# refused (it needs a verified email and Eduvault has no mail transport until M1.3), the persona is recorded blocked with
+# the reason. superadmin, student and guardian are blocked until their slices land (see references/personas.md).
 set -eu
 ROOT="$(git rev-parse --show-toplevel)"
 . "$(dirname "$0")/stack-env.sh"
@@ -52,9 +53,22 @@ add_persona() { # key userId schoolId campusId
   jq --arg k "$1" --arg e "$(email "$1")" --arg p "$PASSWORD" --arg u "$2" --arg s "$3" --arg c "$4" \
     '. + {($k):{email:$e,password:$p,userId:$u,schoolId:$s,campusId:$c,blocked:null,unblocked_by:null}}' "$PERSONAS" >"$PERSONAS.tmp" && mv "$PERSONAS.tmp" "$PERSONAS"
 }
-block_persona() { # key slice
-  jq --arg k "$1" --arg e "$(email "$1")" --arg p "$PASSWORD" --arg b "$2" \
-    '. + {($k):{email:$e,password:$p,userId:"",schoolId:"",campusId:"",blocked:"no HTTP endpoint provisions this persona yet",unblocked_by:$b}}' "$PERSONAS" >"$PERSONAS.tmp" && mv "$PERSONAS.tmp" "$PERSONAS"
+block_persona() { # key slice [reason]
+  jq --arg k "$1" --arg e "$(email "$1")" --arg p "$PASSWORD" --arg b "$2" --arg r "${3:-no HTTP endpoint provisions this persona yet}" \
+    '. + {($k):{email:$e,password:$p,userId:"",schoolId:"",campusId:"",blocked:$r,unblocked_by:$b}}' "$PERSONAS" >"$PERSONAS.tmp" && mv "$PERSONAS.tmp" "$PERSONAS"
+}
+# staff_in <key> <school> <campusIds, comma separated> <role slugs, comma separated>
+# Signs the persona up, invites them as the owner, accepts as them; records the persona or blocks it with the API's answer.
+staff_in() {
+  local key="$1" school="$2" campuses="$3" roles="$4" uid inv why
+  uid=$(sign_up "$DIR/$key.jar" "$key") || { block_persona "$key" 'M1.2' 'sign-up failed'; return 0; }
+  inv=$(call "$OJAR" POST /api/auth/organization/invite-member "$(jq -nc --arg e "$(email "$key")" --arg o "$school" --arg c "$campuses" --arg r "$roles" \
+    '{email:$e,organizationId:$o,teamId:($c|split(",")),role:($r|split(","))}')" 2>"$DIR/$key.err" | jq -r .id) || inv=''
+  if [ -n "$inv" ] && call "$DIR/$key.jar" POST /api/auth/organization/accept-invitation "$(jq -nc --arg i "$inv" '{invitationId:$i}')" >/dev/null 2>"$DIR/$key.err"; then
+    add_persona "$key" "$uid" "$school" "${campuses%%,*}"; return 0
+  fi
+  why=$(tr -d '\n' <"$DIR/$key.err" | cut -c1-200)
+  block_persona "$key" 'M1.3' "invite-and-accept refused: ${why:-no invitation id}"
 }
 
 read -r OWNER_UID SCHOOL < <(school_for owner Greenfield)
@@ -70,12 +84,12 @@ FSTUDENT=$(student_in "$DIR/foreign.jar" "$FMAIN" "$FSCHOOL" foreign foreign-stu
 add_persona owner "$OWNER_UID" "$SCHOOL" "$LEKKI"
 add_persona foreign "$FOREIGN_UID" "$FSCHOOL" "$FMAIN"
 block_persona superadmin 'M1.2'
-block_persona admin 'M1.3 + M1.2'
-block_persona bursar 'M1.3 + M1.2'
-block_persona bursar2 'M1.3 + M1.2'
-block_persona principal 'M1.3'
-block_persona newhire 'M1.3'
-block_persona teacher 'M1.3 (role), M2.3 (class scope)'
+staff_in admin "$SCHOOL" "$LEKKI,$IKEJA" administrator
+staff_in bursar "$SCHOOL" "$LEKKI" bursar
+staff_in bursar2 "$SCHOOL" "$IKEJA" bursar
+staff_in principal "$SCHOOL" "$LEKKI,$IKEJA" teacher,principal
+staff_in newhire "$SCHOOL" "$LEKKI" member
+staff_in teacher "$SCHOOL" "$LEKKI" teacher
 block_persona student 'M2.4 + M2.8'
 block_persona guardian 'M2.4 + M2.8'
 

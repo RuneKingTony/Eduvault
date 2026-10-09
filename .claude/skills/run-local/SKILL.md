@@ -23,22 +23,23 @@ pnpm db:seed    # bundles and runs the seed; prints "Already seeded; nothing to 
 
 The seed creates three schools through the API's services (Greenfield College with Lekki and Ikeja, Hilltop Academy, St Brendan's Schools) and Greenfield's 28 students, then runs its own check. Its banner prints the seeded "today", the latest Wednesday on or before the run day; `SEED_TODAY=2026-10-07 pnpm db:seed` pins it to the prototype's date. It needs a fresh database: after `pnpm db:reset`, seed again.
 
-Seed data (password for all: `password123`; bursars are teachers and the principal an admin until M1.1):
+Seed data (password for all: `password123`; every member holds the starter role slugs from M1.1):
 
-| Email                          | Schools and roles                                  | Sees        |
-| ------------------------------ | -------------------------------------------------- | ----------- |
-| `funmi@greenfield.test`        | Greenfield owner, Lekki and Ikeja                  | 28 students |
-| `tunde.bakare@greenfield.test` | Greenfield admin, Lekki and Ikeja                  | 28          |
-| `grace.nwosu@greenfield.test`  | Greenfield admin (principal), Lekki and Ikeja      | 28          |
-| `chika.eze@greenfield.test`    | Greenfield teacher (bursar), Lekki                 | 23          |
-| `yemi.alade@greenfield.test`   | Greenfield teacher (bursar), Ikeja                 | 5           |
-| `emeka.obi@greenfield.test`    | Greenfield teacher, Lekki                          | 23          |
-| `ayo.bassey@greenfield.test`   | Greenfield teacher, Lekki                          | 23          |
-| `uche.nweke@greenfield.test`   | Greenfield teacher, Lekki                          | 23          |
-| `claire.ade@greenfield.test`   | Greenfield teacher, Lekki and Ikeja                | 28          |
-| `multi@eduvault.test`          | Greenfield teacher at Lekki, Hilltop admin at Main | 23, then 0  |
-| `kola@hilltop.test`            | Hilltop Academy owner, Main                        | 0           |
-| `principal@stbrendans.test`    | St Brendan's Schools owner, Main, Annex and Junior | 0           |
+| Email                          | Schools and roles                                          | Sees        |
+| ------------------------------ | ---------------------------------------------------------- | ----------- |
+| `funmi@greenfield.test`        | Greenfield owner, Lekki and Ikeja                          | 28 students |
+| `tunde.bakare@greenfield.test` | Greenfield administrator, Lekki and Ikeja                  | 28          |
+| `grace.nwosu@greenfield.test`  | Greenfield teacher and principal, Lekki and Ikeja          | 28          |
+| `chika.eze@greenfield.test`    | Greenfield bursar, Lekki                                   | 23          |
+| `yemi.alade@greenfield.test`   | Greenfield bursar, Ikeja                                   | 5           |
+| `emeka.obi@greenfield.test`    | Greenfield teacher, Lekki                                  | 23          |
+| `ayo.bassey@greenfield.test`   | Greenfield teacher, Lekki                                  | 23          |
+| `uche.nweke@greenfield.test`   | Greenfield teacher, Lekki                                  | 23          |
+| `claire.ade@greenfield.test`   | Greenfield teacher, Lekki and Ikeja                        | 28          |
+| `kemi.balogun@greenfield.test` | Greenfield member only (no roles), Lekki                   | none (403)  |
+| `multi@eduvault.test`          | Greenfield teacher at Lekki, Hilltop administrator at Main | 23, then 0  |
+| `kola@hilltop.test`            | Hilltop Academy owner, Main                                | 0           |
+| `principal@stbrendans.test`    | St Brendan's Schools owner, Main, Annex and Junior         | 0           |
 
 ## 3. Serve all three apps
 
