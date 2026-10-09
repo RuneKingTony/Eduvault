@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { EduvaultAuthClient } from '@eduvault/auth-client';
 import { ApiError, type Me } from '@eduvault/api-contract';
 import { ApiProvider, type Api } from './api';
+import { clearActing, getActing, startActing } from './acting-store';
 import { App } from './app';
 
 vi.mock('@tanstack/react-router', async (importOriginal) => ({
@@ -17,6 +18,7 @@ const me = (overrides: Partial<Me> = {}): Me => ({
   mustChangePassword: false,
   platformRole: null,
   schoolCount: 1,
+  suspendedSchool: null,
   ...overrides,
 });
 
@@ -188,5 +190,61 @@ describe('App', () => {
       screen.getByRole('heading', { name: /Welcome back|Sign in/ })
     ).toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('shows the paused screen for a suspended school', async () => {
+    const { api } = apiWith(
+      me({ suspendedSchool: { id: 'o1', name: 'Greenfield College' } })
+    );
+    renderApp(clientWith(signedIn), api);
+    expect(
+      await screen.findByText('Greenfield College is paused on Eduvault')
+    ).toBeInTheDocument();
+    expect(screen.getByText('Contact the school for details.')).toBeVisible();
+    expect(screen.queryByText('The router is showing')).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Sign out' })
+    ).toBeInTheDocument();
+  });
+
+  it('still opens the console for a super admin whatever a school’s state', async () => {
+    const { api } = apiWith(
+      me({
+        platformRole: 'superadmin',
+        suspendedSchool: { id: 'o1', name: 'Greenfield College' },
+      })
+    );
+    renderApp(clientWith(signedIn), api);
+    expect(
+      await screen.findByText('The router is showing')
+    ).toBeInTheDocument();
+  });
+
+  describe('acting', () => {
+    afterEach(() => {
+      clearActing();
+    });
+
+    it('ends acting when the session ends', async () => {
+      startActing('o1', 'Greenfield College');
+      renderApp(clientWith({ data: null, isPending: false }));
+      await waitFor(() => {
+        expect(getActing()).toBeNull();
+      });
+    });
+
+    it('keeps acting while the session is still loading', () => {
+      startActing('o1', 'Greenfield College');
+      renderApp(clientWith({ data: null, isPending: true }));
+      expect(getActing()).not.toBeNull();
+    });
+
+    it('keeps acting for a signed-in super admin', async () => {
+      startActing('o1', 'Greenfield College');
+      const { api } = apiWith(me({ platformRole: 'superadmin' }));
+      renderApp(clientWith(signedIn), api);
+      await screen.findByText('The router is showing');
+      expect(getActing()).not.toBeNull();
+    });
   });
 });

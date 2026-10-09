@@ -1,6 +1,7 @@
-import { MenuIcon, PanelLeftIcon, SearchIcon } from 'lucide-react';
+import { EyeIcon, MenuIcon, PanelLeftIcon, SearchIcon } from 'lucide-react';
 import {
   AppTopbar,
+  Badge,
   Breadcrumb,
   BreadcrumbItem,
   BreadcrumbList,
@@ -14,6 +15,7 @@ import {
   TooltipTrigger,
   useSidebar,
 } from '@eduvault/ui';
+import { useActing } from '../acting-store';
 
 interface ShellTopbarProps {
   compact: boolean;
@@ -68,6 +70,19 @@ function Trail({
   );
 }
 
+function ActingBadge() {
+  const acting = useActing();
+  if (acting === null) {
+    return null;
+  }
+  return (
+    <Badge variant="warning">
+      <EyeIcon />
+      {acting.reason === null ? 'Acting · read-only' : 'Acting · writes on'}
+    </Badge>
+  );
+}
+
 export function ShellTopbar({
   compact,
   groupLabel,
@@ -92,22 +107,25 @@ export function ShellTopbar({
         )
       }
       end={
-        onOpenSearch === undefined ? undefined : (
-          <Button
-            variant="outline"
-            size={compact ? 'icon-sm' : 'sm'}
-            aria-label="Search pages and actions"
-            onClick={onOpenSearch}
-          >
-            <SearchIcon />
-            {compact ? null : (
-              <>
-                Search…
-                <Kbd>⌘K</Kbd>
-              </>
-            )}
-          </Button>
-        )
+        <>
+          <ActingBadge />
+          {onOpenSearch === undefined ? null : (
+            <Button
+              variant="outline"
+              size={compact ? 'icon-sm' : 'sm'}
+              aria-label="Search pages and actions"
+              onClick={onOpenSearch}
+            >
+              <SearchIcon />
+              {compact ? null : (
+                <>
+                  Search…
+                  <Kbd>⌘K</Kbd>
+                </>
+              )}
+            </Button>
+          )}
+        </>
       }
     >
       <Trail compact={compact} groupLabel={groupLabel} pageTitle={pageTitle} />

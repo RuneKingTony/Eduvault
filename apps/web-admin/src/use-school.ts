@@ -1,4 +1,5 @@
 import type { EduvaultAuthClient } from '@eduvault/auth-client';
+import { useActing } from './acting-store';
 
 const personOf = (
   user: { name: string; email: string; image?: string | null } | undefined
@@ -13,8 +14,9 @@ export function useSchool(authClient: EduvaultAuthClient) {
   const schools = authClient.useListOrganizations();
   const activeId = session.data?.session.activeOrganizationId;
   const active = schools.data?.find((school) => school.id === activeId);
+  const acting = useActing();
   return {
-    schoolName: active?.name ?? 'your school',
+    schoolName: acting?.schoolName ?? active?.name ?? 'your school',
     user: personOf(session.data?.user),
   };
 }

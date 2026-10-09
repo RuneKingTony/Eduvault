@@ -17,6 +17,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from '@eduvault/ui';
+import { useActing } from '../acting-store';
 import type { NavGroup } from '../nav';
 import { SidebarNav } from './sidebar-nav';
 
@@ -29,24 +30,45 @@ interface ShellSidebarProps {
   onOpenMyAccess: () => void;
 }
 
+function ActedSchool({ name }: { name: string }) {
+  return (
+    <SidebarMenuButton
+      asChild
+      size="lg"
+      tooltip={name}
+      className="cursor-default"
+    >
+      <div>
+        <SchoolCrest name={name} initials={initials(name)} />
+        <span className="min-w-0 flex-1 truncate font-semibold">{name}</span>
+      </div>
+    </SidebarMenuButton>
+  );
+}
+
 function SidebarHead() {
   const authClient = useAuthClient();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const acting = useActing();
   return (
     <SidebarHeader className="gap-0 p-2 pb-0">
       <SidebarMenu>
         <SidebarMenuItem>
-          <SchoolSwitcher
-            authClient={authClient}
-            renderCrest={(name) => (
-              <SchoolCrest name={name} initials={initials(name)} />
-            )}
-            onSwitched={() => {
-              queryClient.removeQueries();
-              void navigate({ to: '/' });
-            }}
-          />
+          {acting === null ? (
+            <SchoolSwitcher
+              authClient={authClient}
+              renderCrest={(name) => (
+                <SchoolCrest name={name} initials={initials(name)} />
+              )}
+              onSwitched={() => {
+                queryClient.removeQueries();
+                void navigate({ to: '/' });
+              }}
+            />
+          ) : (
+            <ActedSchool name={acting.schoolName} />
+          )}
         </SidebarMenuItem>
       </SidebarMenu>
       <div className="mt-2 gold-rule" />
@@ -63,6 +85,7 @@ function SidebarFoot({
 }) {
   const authClient = useAuthClient();
   const queryClient = useQueryClient();
+  const acting = useActing();
   return (
     <SidebarFooter>
       <SidebarMenu>
@@ -70,7 +93,7 @@ function SidebarFoot({
           <UserMenu
             authClient={authClient}
             side="top"
-            onOpenMyAccess={onOpenMyAccess}
+            onOpenMyAccess={acting === null ? onOpenMyAccess : undefined}
             onOpenCommandMenu={onOpenCommandMenu}
             onSignedOut={() => {
               queryClient.clear();

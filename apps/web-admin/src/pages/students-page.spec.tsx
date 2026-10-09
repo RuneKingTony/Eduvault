@@ -1,4 +1,5 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { clearActing, startActing } from '../acting-store';
 import { renderWithApi, starterAccess, student } from '../test-utils';
 import { StudentsPage } from './students-page';
 
@@ -90,5 +91,56 @@ describe('StudentsPage', () => {
     expect(
       screen.queryByRole('button', { name: 'Remove' })
     ).not.toBeInTheDocument();
+  });
+
+  describe('while acting', () => {
+    afterEach(() => {
+      clearActing();
+    });
+
+    it('makes the campus required, because a super admin has no active campus', async () => {
+      startActing('s1', 'Greenfield College');
+      const create = vi.fn().mockResolvedValue(student());
+      renderWithApi(<StudentsPage />, {
+        students: { list: vi.fn().mockResolvedValue([]), create },
+        campuses: { list: vi.fn().mockResolvedValue([campus]) },
+      });
+
+      const select = await screen.findByLabelText('Campus');
+      expect(select).toBeRequired();
+      expect(
+        screen.getByRole('option', { name: 'Choose a campus' })
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole('option', { name: 'Active campus' })
+      ).not.toBeInTheDocument();
+
+      await screen.findByRole('option', { name: 'Main Campus' });
+      fireEvent.change(select, { target: { value: campus.id } });
+      fireEvent.change(screen.getByLabelText('Full name'), {
+        target: { value: 'Bayo Ade' },
+      });
+      fireEvent.change(screen.getByLabelText('Admission number'), {
+        target: { value: 'GF-002' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Add student' }));
+      await waitFor(() => {
+        expect(create).toHaveBeenCalledWith({
+          body: {
+            fullName: 'Bayo Ade',
+            admissionNumber: 'GF-002',
+            campusId: campus.id,
+          },
+        });
+      });
+    });
+
+    it('leaves the campus optional when not acting', async () => {
+      renderWithApi(<StudentsPage />, {
+        students: { list: vi.fn().mockResolvedValue([]) },
+        campuses: { list: vi.fn().mockResolvedValue([campus]) },
+      });
+      expect(await screen.findByLabelText('Campus')).not.toBeRequired();
+    });
   });
 });
