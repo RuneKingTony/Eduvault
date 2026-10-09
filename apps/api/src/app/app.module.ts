@@ -1,4 +1,10 @@
-import { Module } from '@nestjs/common';
+import {
+  Module,
+  RequestMethod,
+  type MiddlewareConsumer,
+  type NestModule,
+} from '@nestjs/common';
+import { ActingAuditMiddleware, AuditModule } from './common/audit';
 import { EduvaultAuthModule } from './common/auth';
 import { ConfigModule } from './common/config/config.module';
 import { DatabaseModule } from './common/db/database.module';
@@ -15,6 +21,7 @@ import { StudentModule } from './modules/student/student.module';
     ConfigModule,
     DatabaseModule,
     EduvaultAuthModule,
+    AuditModule,
     HealthModule,
     MeModule,
     PlatformModule,
@@ -24,4 +31,10 @@ import { StudentModule } from './modules/student/student.module';
     StudentModule,
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer): void {
+    consumer
+      .apply(ActingAuditMiddleware)
+      .forRoutes({ path: '{*splat}', method: RequestMethod.ALL });
+  }
+}

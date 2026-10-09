@@ -6,7 +6,7 @@ import {
 import { AuthService } from '@thallesp/nestjs-better-auth';
 import type { Campus } from '@eduvault/api-contract';
 import {
-  AuthContextService,
+  OrganizationAdminService,
   type AppAuth,
   type OrgContext,
 } from '../../common/auth';
@@ -18,12 +18,19 @@ interface CreateInput {
   address?: string | null;
 }
 
+/**
+ * A super admin acting in a school is no member of it, so their headers would
+ * be refused; they call Better Auth as the system, as compensation does.
+ */
+const headersFor = (ctx: OrgContext): Headers | undefined =>
+  ctx.acting ? undefined : ctx.headers;
+
 @Injectable()
 export class CampusService {
   constructor(
     private readonly campuses: CampusRepository,
     private readonly authService: AuthService<AppAuth>,
-    private readonly authContext: AuthContextService
+    private readonly organizations: OrganizationAdminService
   ) {}
 
   /** 404 unless the campus is in the caller's scope and exists in the school. */
@@ -54,11 +61,13 @@ export class CampusService {
   async create(ctx: OrgContext, input: CreateInput): Promise<Campus> {
     const team = await this.authService.api.createTeam({
       body: { name: input.name, organizationId: ctx.organizationId },
-      headers: ctx.headers,
+      headers: headersFor(ctx),
     });
     try {
-      // Better Auth only lets a user activate a campus they belong to.
-      await this.authContext.enrolInCampus(team.id, ctx.user.id);
+      if (!ctx.acting) {
+        // Better Auth only lets a user activate a campus they belong to.
+        await this.organizations.enrolInCampus(team.id, ctx.user.id);
+      }
       await this.campuses.create(ctx.organizationId, {
         id: team.id,
         address: input.address ?? null,
@@ -80,10 +89,12 @@ export class CampusService {
   ): Promise<Campus> {
     await this.get(ctx, id);
     if (input.name !== undefined) {
-      await this.authService.api.updateTeam({
-        body: { teamId: id, data: { name: input.name } },
-        headers: ctx.headers,
-      });
+      await (ctx.acting
+        ? this.organizations.renameTeam(id, input.name)
+        : this.authService.api.updateTeam({
+            body: { teamId: id, data: { name: input.name } },
+            headers: ctx.headers,
+          }));
     }
     if (input.address !== undefined) {
       await this.campuses.updateAddress(ctx.organizationId, id, input.address);
@@ -98,7 +109,7 @@ export class CampusService {
     }
     await this.authService.api.removeTeam({
       body: { teamId: id, organizationId: ctx.organizationId },
-      headers: ctx.headers,
+      headers: headersFor(ctx),
     });
     return { id };
   }

@@ -1,7 +1,11 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { AuthService } from '@thallesp/nestjs-better-auth';
 import { fromNodeHeaders } from 'better-auth/node';
-import { getOrgAdapter } from 'better-auth/plugins';
+import {
+  ACTING_ORG_HEADER,
+  ACTING_REASON_HEADER,
+  type SuspendedSchool,
+} from '@eduvault/api-contract';
 import {
   OWNER_ROLE,
   can,
@@ -14,9 +18,11 @@ import {
 import type { Request } from 'express';
 import type { Pool } from 'pg';
 import { DB_TOKEN } from '../db/tokens';
+import { actingPermissions, parseActingReason } from './acting';
 import type { AppAuth } from './better-auth';
-import { getOrganizationOptions } from './better-auth-base';
+import { findSuspendedSchool } from './suspended-school';
 import type {
+  AuthedRequest,
   AuthenticatedUser,
   OrgContext,
   SessionContext,
@@ -66,6 +72,56 @@ export class AuthContextService {
     };
   }
 
+  /**
+   * `user` stays the super admin's own so approval checks compare their id.
+   * The audit stash precedes reason parsing so a refused reason is recorded.
+   */
+  async resolveActing(
+    session: SessionContext,
+    req: AuthedRequest
+  ): Promise<OrgContext | undefined> {
+    const named = req.headers[ACTING_ORG_HEADER];
+    const organizationId = (Array.isArray(named) ? named[0] : named)?.trim();
+    if (
+      session.platformRole !== 'superadmin' ||
+      organizationId === undefined ||
+      organizationId === ''
+    ) {
+      return undefined;
+    }
+    const found = await this.pool.query(
+      'SELECT 1 FROM "organization" WHERE id = $1',
+      [organizationId]
+    );
+    if (found.rowCount === 0) {
+      throw new NotFoundException('School not found');
+    }
+    req.actingAudit = {
+      actorUserId: session.user.id,
+      organizationId,
+      reason: null,
+    };
+    const reason = parseActingReason(req.headers[ACTING_REASON_HEADER]);
+    req.actingAudit.reason = reason;
+    const writes = reason !== null;
+    return {
+      user: session.user,
+      organizationId,
+      roles: [],
+      permissions: actingPermissions(writes),
+      isOwner: writes,
+      activeCampusId: null,
+      campusScope: 'all',
+      classScope: 'all',
+      acting: { organizationId, writes, reason },
+      headers: session.headers,
+    };
+  }
+
+  findSuspendedSchool(organizationId: string): Promise<SuspendedSchool | null> {
+    return findSuspendedSchool(this.pool, organizationId);
+  }
+
   async resolveOrganization(
     session: SessionContext
   ): Promise<OrgContext | undefined> {
@@ -108,19 +164,6 @@ export class AuthContextService {
       acting: null,
       headers,
     };
-  }
-
-  /**
-   * addTeamMember demands `member:update`, which no starter role holds; the
-   * route guard has already checked `team:create`.
-   */
-  async enrolInCampus(teamId: string, userId: string): Promise<void> {
-    const context = (await this.authService.instance
-      .$context) as unknown as Parameters<typeof getOrgAdapter>[0];
-    await getOrgAdapter(
-      context,
-      getOrganizationOptions(this.pool)
-    ).findOrCreateTeamMember({ teamId, userId });
   }
 
   private async loadPermissions(

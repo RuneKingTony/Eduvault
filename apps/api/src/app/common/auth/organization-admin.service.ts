@@ -48,6 +48,21 @@ export class OrganizationAdminService {
     }
   }
 
+  /** For a super admin acting in a school, who has no session membership there. */
+  async renameTeam(teamId: string, name: string): Promise<void> {
+    const adapter = await this.adapter();
+    await adapter.updateTeam(teamId, { name });
+  }
+
+  /**
+   * addTeamMember demands `member:update`, which no starter role holds; the
+   * route guard has already checked `team:create`.
+   */
+  async enrolInCampus(teamId: string, userId: string): Promise<void> {
+    const adapter = await this.adapter();
+    await adapter.findOrCreateTeamMember({ teamId, userId });
+  }
+
   async deleteBySlug(slug: string): Promise<void> {
     const adapter = await this.adapter();
     const school = await adapter.findOrganizationBySlug(slug);
