@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import { baseTest as test, expect } from './support/base-test';
 
 test.describe('campuses', () => {
@@ -71,17 +70,23 @@ test.describe('campuses', () => {
     const org = await createOrganization(owner);
     const campus = await createCampus(org);
     const teacher = await addMember(org, await signUp(), {
-      role: 'teacher',
+      roles: ['teacher'],
       campuses: [campus],
     });
-    const admin = await addMember(org, await signUp(), { role: 'admin' });
+    const administrator = await addMember(org, await signUp(), {
+      roles: ['administrator'],
+    });
 
     await api(teacher).post('/campuses').send({ name: 'X' }).expect(403);
     await api(teacher)
       .patch(`/campuses/${campus.id}`)
       .send({ name: 'Y' })
       .expect(403);
-    await api(admin).post('/campuses').send({ name: 'Annex' }).expect(201);
+    await api(administrator)
+      .post('/campuses')
+      .send({ name: 'Annex' })
+      .expect(201);
+    await api(administrator).delete(`/campuses/${campus.id}`).expect(403);
   });
 });
 
@@ -214,7 +219,6 @@ test.describe('students', () => {
       .send({ fullName: 'Default Campus', admissionNumber: 'D1' })
       .expect(201);
     expect(defaulted.body.campusId).toBe(campus.id);
-    await api(owner).delete(`/students/${defaulted.body.id}`).expect(200);
 
     const created = await api(owner)
       .post('/students')
@@ -233,7 +237,7 @@ test.describe('students', () => {
       .expect(409);
 
     expect((await api(owner).get('/students').expect(200)).body).toHaveLength(
-      1
+      2
     );
     expect((await api(owner).get(`/students/${id}`).expect(200)).body.id).toBe(
       id
@@ -248,8 +252,7 @@ test.describe('students', () => {
       fullName: 'Ada Okafor',
     });
 
-    await api(owner).delete(`/students/${id}`).expect(200);
-    await api(owner).get(`/students/${id}`).expect(404);
-    await api(owner).delete(`/students/${randomUUID()}`).expect(404);
+    await api(owner).delete(`/students/${id}`).expect(404);
+    await api(owner).get(`/students/${id}`).expect(200);
   });
 });

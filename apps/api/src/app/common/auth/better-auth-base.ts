@@ -1,7 +1,12 @@
 import type { BetterAuthOptions } from 'better-auth';
-import { admin, organization } from 'better-auth/plugins';
+import {
+  admin,
+  organization,
+  type OrganizationOptions,
+} from 'better-auth/plugins';
 import type { Pool } from 'pg';
-import { ac, roles } from '@eduvault/policy';
+import { betterAuthAc, betterAuthRoles } from '@eduvault/policy';
+import { syncStarterRoles } from './starter-roles';
 
 // Shared by the Nest factory (better-auth.ts) and the CLI shim (apps/api/auth.ts).
 // Keep it free of Nest imports so `api:auth-generate` runs without the app.
@@ -19,19 +24,38 @@ export const advancedBaseConfig: NonNullable<BetterAuthOptions['advanced']> = {
   defaultCookieAttributes: { httpOnly: true, sameSite: 'lax' },
 };
 
-export const getPlugins = () => [
-  admin(),
-  organization({
-    ac,
-    roles,
+export const getOrganizationOptions = (pool: Pool) =>
+  ({
+    ac: betterAuthAc,
+    roles: betterAuthRoles,
     creatorRole: 'owner',
+    dynamicAccessControl: { enabled: true },
+    schema: {
+      organizationRole: {
+        additionalFields: {
+          label: { type: 'string', required: true },
+          description: { type: 'string', required: false },
+          source: { type: 'string', required: true },
+          editedAt: { type: 'date', required: false },
+        },
+      },
+    },
+    organizationHooks: {
+      afterCreateOrganization: async ({ organization: school }) => {
+        await syncStarterRoles(pool, school.id);
+      },
+    },
     // A campus is a team plus a domain row; an automatic team would have no row.
     teams: {
       enabled: true,
       defaultTeam: { enabled: false },
       allowRemovingAllTeams: true,
     },
-  }),
+  }) satisfies OrganizationOptions;
+
+export const getPlugins = (pool: Pool) => [
+  admin(),
+  organization(getOrganizationOptions(pool)),
 ];
 
 /**

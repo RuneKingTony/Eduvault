@@ -78,13 +78,14 @@ async function addMembers(
   { userIds, organizationIds, campusIds, owners }: Created
 ) {
   const { api } = app.get(AuthService<AppAuth>, { strict: false });
-  for (const { persona, school, role, campuses } of memberships) {
+  for (const { persona, school, roles, campuses } of memberships) {
     const userId = lookup(userIds, persona, 'persona');
     await api.addMember({
       body: {
         userId,
         organizationId: lookup(organizationIds, school, 'school'),
-        role,
+        // Starter role slugs live in organizationRole, so the typed list lacks them.
+        role: roles as ('owner' | 'member')[],
       },
     });
     const owner = owners.get(school);

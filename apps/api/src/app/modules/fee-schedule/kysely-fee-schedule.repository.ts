@@ -1,5 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { FeeSchedule } from '@eduvault/api-contract';
+import type { CampusScope } from '../../common/campus-scope';
+import { inCampusScope } from '../../common/db/in-campus-scope';
 import { iso } from '../../common/db/rows';
 import { KYSELY_TOKEN, type Database } from '../../common/db/tokens';
 import {
@@ -36,12 +38,19 @@ export class KyselyFeeScheduleRepository extends FeeScheduleRepository {
 
   async list(
     organizationId: string,
+    scope: CampusScope,
     campusId?: string
   ): Promise<FeeSchedule[]> {
     let query = this.db
       .selectFrom('fee_schedule')
       .selectAll()
-      .where('organization_id', '=', organizationId);
+      .where('organization_id', '=', organizationId)
+      .where((eb) =>
+        inCampusScope(eb, 'fee_schedule.campus_id', {
+          scope,
+          nullMeans: 'all',
+        })
+      );
     if (campusId !== undefined) {
       query = query.where((eb) =>
         eb.or([eb('campus_id', '=', campusId), eb('campus_id', 'is', null)])

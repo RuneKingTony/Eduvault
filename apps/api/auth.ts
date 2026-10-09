@@ -19,5 +19,5 @@ export default betterAuth({
   database: pool,
   emailAndPassword: emailAndPasswordBaseConfig,
   advanced: advancedBaseConfig,
-  plugins: getPlugins(),
+  plugins: getPlugins(pool),
 });

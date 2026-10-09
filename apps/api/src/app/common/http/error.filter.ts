@@ -19,6 +19,12 @@ const CODES: Record<number, string> = {
 
 const PG_UNIQUE_VIOLATION = '23505';
 const PG_FOREIGN_KEY_VIOLATION = '23503';
+const PG_CHECK_VIOLATION = '23514';
+
+const pgConstraint = (error: unknown): string =>
+  typeof error === 'object' && error !== null && 'constraint' in error
+    ? String(error.constraint)
+    : '';
 
 const pgCode = (error: unknown): string | undefined =>
   typeof error === 'object' && error !== null && 'code' in error
@@ -108,6 +114,25 @@ export class ErrorFilter implements ExceptionFilter {
           message: 'Resource is referenced by, or references, other records',
         },
       };
+    }
+
+    if (code === PG_CHECK_VIOLATION) {
+      // Convention: a self-approval CHECK is named `<table>_<action>_not_self`.
+      return pgConstraint(exception).includes('not_self')
+        ? {
+            status: HttpStatus.CONFLICT,
+            body: {
+              code: 'SelfApproval',
+              message: 'You created this. Someone else must approve it.',
+            },
+          }
+        : {
+            status: HttpStatus.CONFLICT,
+            body: {
+              code: 'Conflict',
+              message: 'The change breaks a rule on this record',
+            },
+          };
     }
 
     this.logger.error(

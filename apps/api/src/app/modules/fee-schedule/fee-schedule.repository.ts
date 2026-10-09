@@ -1,4 +1,5 @@
 import type { FeeSchedule } from '@eduvault/api-contract';
+import type { CampusScope } from '../../common/campus-scope';
 
 export interface NewFeeSchedule {
   campusId?: string | null;
@@ -10,9 +11,13 @@ export interface NewFeeSchedule {
 export type FeeSchedulePatch = Partial<NewFeeSchedule>;
 
 export abstract class FeeScheduleRepository {
-  /** With a campus, returns that campus's schedules plus the school-wide ones. */
+  /**
+   * Schedules on campuses in scope plus the school-wide ones; with a campus,
+   * only that campus's plus the school-wide ones.
+   */
   abstract list(
     organizationId: string,
+    scope: CampusScope,
     campusId?: string
   ): Promise<FeeSchedule[]>;
 

@@ -22,11 +22,13 @@ export class FeeScheduleService {
   }
 
   async list(ctx: OrgContext, campusId?: string): Promise<FeeSchedule[]> {
-    if (campusId !== undefined && !canSeeCampus(ctx.campusScope, campusId)) {
-      throw new NotFoundException('Campus not found');
+    if (campusId !== undefined) {
+      if (!canSeeCampus(ctx.campusScope, campusId)) {
+        throw new NotFoundException('Campus not found');
+      }
+      await this.campuses.assertInSchool(ctx, campusId);
     }
-    const fees = await this.fees.list(ctx.organizationId, campusId);
-    return fees.filter((fee) => this.visible(ctx, fee));
+    return this.fees.list(ctx.organizationId, ctx.campusScope, campusId);
   }
 
   async get(ctx: OrgContext, id: string): Promise<FeeSchedule> {

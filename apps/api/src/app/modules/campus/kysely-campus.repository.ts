@@ -44,7 +44,7 @@ export class KyselyCampusRepository extends CampusRepository {
 
   async list(organizationId: string, scope: CampusScope): Promise<Campus[]> {
     const rows = await this.select(organizationId)
-      .where((eb) => inCampusScope(eb, 'campus.team_id', scope))
+      .where((eb) => inCampusScope(eb, 'campus.team_id', { scope }))
       .orderBy('team.name')
       .orderBy('campus.team_id')
       .execute();

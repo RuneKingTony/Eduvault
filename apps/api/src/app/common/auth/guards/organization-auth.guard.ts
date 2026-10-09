@@ -27,16 +27,19 @@ export class OrganizationAuthGuard implements CanActivate {
 
     const org = await this.context.resolveOrganization(session);
     if (!org) {
-      throw new ForbiddenException('No active school for this session');
+      throw new ForbiddenException({
+        code: 'NoSchool',
+        message: 'No active school for this session',
+      });
     }
 
     const required = this.reflector.get<RequiredPermission | undefined>(
       PERMISSION_KEY,
       context.getHandler()
     );
-    if (required && !can(org.role, required.resource, required.action)) {
+    if (required && !can(org.permissions, required.resource, required.action)) {
       throw new ForbiddenException(
-        `Role "${org.role}" may not ${required.action} ${required.resource}`
+        `Missing permission ${required.resource}:${required.action}`
       );
     }
 

@@ -22,12 +22,20 @@ export class StudentService {
     private readonly campuses: CampusService
   ) {}
 
+  /** 404 unless the campus is in the school and in the caller's scope. */
+  private async assertCampusInScope(
+    ctx: OrgContext,
+    campusId: string
+  ): Promise<void> {
+    if (!canSeeCampus(ctx.campusScope, campusId)) {
+      throw new NotFoundException('Campus not found');
+    }
+    await this.campuses.assertInSchool(ctx, campusId);
+  }
+
   async list(ctx: OrgContext, campusId?: string): Promise<Student[]> {
     if (campusId !== undefined) {
-      if (!canSeeCampus(ctx.campusScope, campusId)) {
-        throw new NotFoundException('Campus not found');
-      }
-      await this.campuses.assertInSchool(ctx, campusId);
+      await this.assertCampusInScope(ctx, campusId);
     }
     return this.students.list(ctx.organizationId, ctx.campusScope, campusId);
   }
@@ -51,7 +59,7 @@ export class StudentService {
         'campusId is required when the session has no active campus'
       );
     }
-    await this.campuses.assertInSchool(ctx, campusId);
+    await this.assertCampusInScope(ctx, campusId);
     return this.students.create(ctx.organizationId, {
       campusId,
       fullName: input.fullName,
@@ -66,18 +74,12 @@ export class StudentService {
   ): Promise<Student> {
     await this.get(ctx, id);
     if (input.campusId !== undefined) {
-      await this.campuses.assertInSchool(ctx, input.campusId);
+      await this.assertCampusInScope(ctx, input.campusId);
     }
     const student = await this.students.update(ctx.organizationId, id, input);
     if (!student) {
       throw new NotFoundException('Student not found');
     }
     return student;
-  }
-
-  async remove(ctx: OrgContext, id: string): Promise<{ id: string }> {
-    await this.get(ctx, id);
-    await this.students.remove(ctx.organizationId, id);
-    return { id };
   }
 }

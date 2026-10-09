@@ -6,6 +6,7 @@ import { Pool } from 'pg';
 import request from 'supertest';
 import { test as vitestTest } from 'vitest';
 import type { Campus } from '@eduvault/api-contract';
+import { toPermissionMap, type Permission } from '@eduvault/policy';
 import { AppModule } from '../../src/app/app.module';
 import type { AppAuth } from '../../src/app/common/auth';
 import { loadEnv } from '../../src/app/common/config/env';
@@ -29,7 +30,18 @@ interface TestOrganization {
 }
 
 interface AddMemberInput {
-  role: 'owner' | 'admin' | 'teacher' | 'student';
+  /** Role slugs: `member`, a starter role such as `bursar`, or a custom role. */
+  roles: string[];
+  campuses?: Pick<Campus, 'id'>[];
+}
+
+interface NewRole {
+  slug: string;
+  permissions: readonly Permission[];
+  label?: string;
+}
+
+interface CampusScopeInput {
   campuses?: Pick<Campus, 'id'>[];
 }
 
@@ -76,6 +88,14 @@ export interface Fixtures {
     org: TestOrganization,
     user: TestUser,
     input: AddMemberInput
+  ) => Promise<TestUser>;
+  /** Inserts a custom role row directly (`source = 'custom'`). */
+  createRole: (org: TestOrganization, role: NewRole) => Promise<void>;
+  /** A new member holding a one-off custom role with exactly these permissions. */
+  withPermissions: (
+    org: TestOrganization,
+    permissions: readonly Permission[],
+    input?: CampusScopeInput
   ) => Promise<TestUser>;
   /** Makes the user a platform admin (admin plugin `user.role = 'admin'`). */
   promoteToAdmin: (user: TestUser) => Promise<TestUser>;
@@ -205,10 +225,15 @@ export const baseTest = vitestTest.extend<Fixtures>({
   },
 
   addMember: async ({ app, signIn }, use) => {
-    await use(async (org, user, { role, campuses = [] }) => {
+    await use(async (org, user, { roles, campuses = [] }) => {
       const { api } = app.get(AuthService<AppAuth>);
       await api.addMember({
-        body: { userId: user.id, organizationId: org.id, role },
+        body: {
+          userId: user.id,
+          organizationId: org.id,
+          // Role slugs live in organizationRole, so the typed list lacks them.
+          role: roles as ('owner' | 'member')[],
+        },
       });
       for (const campus of campuses) {
         await api.addTeamMember({
@@ -217,6 +242,25 @@ export const baseTest = vitestTest.extend<Fixtures>({
         });
       }
       return signIn(user);
+    });
+  },
+
+  createRole: async ({ pool }, use) => {
+    await use(async (org, { slug, permissions, label = slug }) => {
+      await pool.query(
+        `INSERT INTO "organizationRole"
+           ("organizationId", role, permission, label, source)
+         VALUES ($1, $2, $3, $4, 'custom')`,
+        [org.id, slug, JSON.stringify(toPermissionMap(permissions)), label]
+      );
+    });
+  },
+
+  withPermissions: async ({ signUp, createRole, addMember }, use) => {
+    await use(async (org, permissions, { campuses = [] } = {}) => {
+      const slug = `role-${randomUUID().slice(0, 8)}`;
+      await createRole(org, { slug, permissions });
+      return addMember(org, await signUp(), { roles: [slug], campuses });
     });
   },
 

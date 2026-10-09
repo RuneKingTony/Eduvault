@@ -85,7 +85,10 @@ test.describe('authentication', () => {
   }) => {
     const user = await signUp();
     const res = await api(user).get('/students').expect(403);
-    expect(res.body).toMatchObject({ code: 'Forbidden' });
+    expect(res.body).toMatchObject({
+      code: 'NoSchool',
+      message: 'No active school for this session',
+    });
   });
 
   test('banned users are unauthenticated and cannot sign in', async ({

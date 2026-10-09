@@ -28,7 +28,7 @@ export function createAuth(pool: Pool, env: Env) {
         secure: env.NODE_ENV === 'production',
       },
     },
-    plugins: getPlugins(),
+    plugins: getPlugins(pool),
     // AuthModule fills this from @Hook providers and refuses to start without it.
     hooks: {},
   });

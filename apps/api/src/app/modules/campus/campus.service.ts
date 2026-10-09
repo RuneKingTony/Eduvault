@@ -5,7 +5,11 @@ import {
 } from '@nestjs/common';
 import { AuthService } from '@thallesp/nestjs-better-auth';
 import type { Campus } from '@eduvault/api-contract';
-import type { AppAuth, OrgContext } from '../../common/auth';
+import {
+  AuthContextService,
+  type AppAuth,
+  type OrgContext,
+} from '../../common/auth';
 import { canSeeCampus } from '../../common/campus-scope';
 import { CampusRepository } from './campus.repository';
 
@@ -18,7 +22,8 @@ interface CreateInput {
 export class CampusService {
   constructor(
     private readonly campuses: CampusRepository,
-    private readonly authService: AuthService<AppAuth>
+    private readonly authService: AuthService<AppAuth>,
+    private readonly authContext: AuthContextService
   ) {}
 
   /** 404 unless the campus exists in the given school. */
@@ -50,18 +55,15 @@ export class CampusService {
     });
     try {
       // Better Auth only lets a user activate a campus they belong to.
-      await this.authService.api.addTeamMember({
-        body: { teamId: team.id, userId: ctx.user.id },
-        headers: ctx.headers,
-      });
+      await this.authContext.enrolInCampus(team.id, ctx.user.id);
       await this.campuses.create(ctx.organizationId, {
         id: team.id,
         address: input.address ?? null,
       });
     } catch (error) {
+      // No headers: the creator may hold team:create without team:delete.
       await this.authService.api.removeTeam({
         body: { teamId: team.id, organizationId: ctx.organizationId },
-        headers: ctx.headers,
       });
       throw error;
     }
