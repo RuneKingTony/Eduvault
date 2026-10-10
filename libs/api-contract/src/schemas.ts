@@ -23,6 +23,8 @@ export const apiErrorCodeSchema = z.enum([
   'OWNER_BY_HANDOVER',
   'ROLE_COMBINATION',
   'SELF_REMOVAL',
+  'SELF_RESET',
+  'SHARED_ACCOUNT',
   'ValidationError',
   'InternalError',
   'UnknownError',
@@ -384,6 +386,13 @@ export const createMemberResultSchema = z.object({
   temporaryPassword: z.string().nullable(),
 });
 export type CreateMemberResult = z.infer<typeof createMemberResultSchema>;
+
+export const resetMemberPasswordResultSchema = z.object({
+  temporaryPassword: z.string(),
+});
+export type ResetMemberPasswordResult = z.infer<
+  typeof resetMemberPasswordResultSchema
+>;
 
 export const updateMemberRolesSchema = z.object({
   roles: z.array(z.string().trim().min(1).max(80)),

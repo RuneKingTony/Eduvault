@@ -73,4 +73,23 @@ export class AccountService {
       temporaryPassword,
     };
   }
+
+  /**
+   * Better Auth's `setUserPassword` needs a super admin session, so the hash is
+   * written through its context, as `MeService.setPassword` does. The old
+   * password and every session of the account end together.
+   */
+  async resetPassword(userId: string): Promise<string> {
+    const temporaryPassword = generateTemporaryPassword();
+    const context = await this.authService.instance.$context;
+    await context.internalAdapter.updatePassword(
+      userId,
+      await context.password.hash(temporaryPassword)
+    );
+    await context.internalAdapter.updateUser(userId, {
+      mustChangePassword: true,
+    });
+    await context.internalAdapter.deleteUserSessions(userId);
+    return temporaryPassword;
+  }
 }

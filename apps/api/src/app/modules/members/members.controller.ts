@@ -79,6 +79,15 @@ export class MembersController {
     return this.members.updateCampuses(org, params.id, body);
   }
 
+  @Post(':id/reset-password')
+  @OrganizationAuth('member', 'update')
+  resetPassword(
+    @Org() org: OrgContext,
+    @Param(zod(routes.resetPassword.params)) params: { id: string }
+  ): Promise<RouteOutput<typeof routes.resetPassword>> {
+    return this.members.resetPassword(org, params.id);
+  }
+
   @Delete(':id')
   @OrganizationAuth('member', 'delete')
   remove(

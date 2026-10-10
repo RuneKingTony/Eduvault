@@ -244,6 +244,20 @@ export class KyselyMembersRepository extends MembersRepository {
     return Number(row.count);
   }
 
+  async belongsToOtherSchool(
+    userId: string,
+    organizationId: string
+  ): Promise<boolean> {
+    const row = await this.db
+      .selectFrom('member')
+      .where('member.userId', '=', userId)
+      .where('member.organizationId', '<>', organizationId)
+      .select('member.id')
+      .limit(1)
+      .executeTakeFirst();
+    return row !== undefined;
+  }
+
   async listRoles(organizationId: string): Promise<SchoolRoleEntry[]> {
     const rows = await this.db
       .selectFrom('organizationRole')
