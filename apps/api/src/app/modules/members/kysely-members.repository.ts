@@ -234,6 +234,19 @@ export class KyselyMembersRepository extends MembersRepository {
     return this.withCampusesOne(organizationId, row);
   }
 
+  async updateTitle(
+    organizationId: string,
+    id: string,
+    title: string
+  ): Promise<void> {
+    await this.db
+      .updateTable('member')
+      .set({ title })
+      .where('member.organizationId', '=', organizationId)
+      .where('member.id', '=', id)
+      .execute();
+  }
+
   async countOwners(organizationId: string): Promise<number> {
     const row = await this.db
       .selectFrom('member')

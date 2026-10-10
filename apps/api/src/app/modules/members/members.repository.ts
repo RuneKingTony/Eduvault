@@ -27,6 +27,12 @@ export abstract class MembersRepository {
     userId: string
   ): Promise<MemberRecord | undefined>;
 
+  abstract updateTitle(
+    organizationId: string,
+    id: string,
+    title: string
+  ): Promise<void>;
+
   abstract countOwners(organizationId: string): Promise<number>;
 
   abstract belongsToOtherSchool(

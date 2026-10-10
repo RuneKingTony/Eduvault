@@ -38,6 +38,7 @@ import {
   updateFeeScheduleSchema,
   updateMemberCampusesSchema,
   updateMemberRolesSchema,
+  updateMemberTitleSchema,
   updateSchoolAccountSchema,
   updateStudentSchema,
 } from './schemas';
@@ -239,6 +240,13 @@ export const contract = defineContract({
       path: '/members/:id/roles',
       params: idParamsSchema,
       body: updateMemberRolesSchema,
+      response: memberDetailSchema,
+    }),
+    updateTitle: defineRoute({
+      method: 'PUT',
+      path: '/members/:id/title',
+      params: idParamsSchema,
+      body: updateMemberTitleSchema,
       response: memberDetailSchema,
     }),
     updateCampuses: defineRoute({

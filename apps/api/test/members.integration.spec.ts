@@ -95,6 +95,12 @@ const idOf = async (api: Api, actor: Actor, userId: string) => {
 
 const resetUrl = (id: string) => `/members/${id}/reset-password`;
 
+const putTitle = (
+  api: Api,
+  actor: Actor,
+  { id, title }: { id: string; title: unknown }
+) => api(actor).put(`/members/${id}/title`).send({ title });
+
 const userIds = (list: MemberList) => list.items.map((item) => item.userId);
 
 test.describe('members', () => {
@@ -831,6 +837,111 @@ test.describe('members', () => {
     });
   });
 
+  test.describe('title', () => {
+    test('saves a trimmed title that the page, the list and the search show', async ({
+      api,
+      hire,
+      schools: { owner, lekki },
+    }) => {
+      const { member } = await hire(owner, { campusIds: [lekki.id] });
+      const res = await putTitle(api, owner, {
+        id: member.id,
+        title: '  Head of maths ',
+      }).expect(200);
+      expect((res.body as MemberDetail).title).toBe('Head of maths');
+      const read = await api(owner).get(`/members/${member.id}`).expect(200);
+      expect((read.body as MemberDetail).title).toBe('Head of maths');
+      const found = await api(owner).get('/members?q=maths').expect(200);
+      expect(userIds(found.body as MemberList)).toEqual([member.userId]);
+    });
+
+    test('falls back to New member when blank and refuses over 80 characters', async ({
+      api,
+      hire,
+      schools: { owner, lekki },
+    }) => {
+      const { member } = await hire(owner, {
+        campusIds: [lekki.id],
+        title: 'Bursar',
+      });
+      const blank = await putTitle(api, owner, {
+        id: member.id,
+        title: '   ',
+      }).expect(200);
+      expect((blank.body as MemberDetail).title).toBe('New member');
+      await putTitle(api, owner, {
+        id: member.id,
+        title: 'x'.repeat(81),
+      }).expect(400);
+      await putTitle(api, owner, { id: member.id, title: undefined }).expect(
+        400
+      );
+      const kept = await putTitle(api, owner, {
+        id: member.id,
+        title: 'x'.repeat(80),
+      }).expect(200);
+      expect((kept.body as MemberDetail).title).toHaveLength(80);
+    });
+
+    test('changes only the title, not roles, campuses or the account', async ({
+      api,
+      hire,
+      schools: { owner, lekki },
+    }) => {
+      const { member } = await hire(owner, { campusIds: [lekki.id] });
+      await putRoles(api, owner, {
+        id: member.id,
+        roles: ['teacher'],
+        campusIds: [lekki.id],
+      }).expect(200);
+      const res = await putTitle(api, owner, {
+        id: member.id,
+        title: 'Form tutor',
+      }).expect(200);
+      expect(res.body).toMatchObject({
+        title: 'Form tutor',
+        roles: ['member', 'teacher'],
+        campusIds: [lekki.id],
+        userId: member.userId,
+      });
+    });
+
+    test('an editor with member:update but no member:delete can retitle', async ({
+      api,
+      hire,
+      withPermissions,
+      schools: { orgA, owner, lekki },
+    }) => {
+      const editor = await withPermissions(
+        orgA,
+        ['member:read', 'member:update', 'campus:readAll'],
+        { campuses: [lekki] }
+      );
+      const { member } = await hire(owner, { campusIds: [lekki.id] });
+      await putTitle(api, editor, { id: member.id, title: 'Registrar' }).expect(
+        200
+      );
+    });
+
+    test('a reader without member:update gets 403 and the title stays', async ({
+      api,
+      hire,
+      withPermissions,
+      schools: { orgA, owner, lekki },
+    }) => {
+      const reader = await withPermissions(orgA, ['member:read'], {
+        campuses: [lekki],
+      });
+      const { member } = await hire(owner, {
+        campusIds: [lekki.id],
+        title: 'Cook',
+      });
+      await putTitle(api, reader, { id: member.id, title: 'Chef' }).expect(403);
+      const read = await api(owner).get(`/members/${member.id}`).expect(200);
+      expect((read.body as MemberDetail).title).toBe('Cook');
+    });
+  });
+
   test.describe('effect of a change', () => {
     test('shows in the member’s next /me/permissions', async ({
       api,
@@ -1011,6 +1122,10 @@ test.describe('members', () => {
         .expect(404);
       await api(ownerB).delete(`/members/${id}`).expect(404);
       await api(ownerB).post(`/members/${id}/reset-password`).expect(404);
+      await api(ownerB)
+        .put(`/members/${id}/title`)
+        .send({ title: 'Boss' })
+        .expect(404);
     });
 
     test('2: a list holds no member of another school', async ({
@@ -1045,6 +1160,10 @@ test.describe('members', () => {
         .expect(404);
       await api(editor).delete(`/members/${id}`).expect(404);
       await api(editor).post(`/members/${id}/reset-password`).expect(404);
+      await api(editor)
+        .put(`/members/${id}/title`)
+        .send({ title: 'Boss' })
+        .expect(404);
     });
 
     test('4: a Lekki-only viewer lists only members sharing Lekki', async ({
@@ -1087,6 +1206,10 @@ test.describe('members', () => {
       await api(noPermission)
         .post(`/members/${member.id}/reset-password`)
         .expect(403);
+      await api(noPermission)
+        .put(`/members/${member.id}/title`)
+        .send({ title: 'Boss' })
+        .expect(403);
     });
 
     test('6: no session answers 401 on every route', async ({
@@ -1108,6 +1231,10 @@ test.describe('members', () => {
         .expect(401);
       await api().delete(`/members/${id}`).expect(401);
       await api().post(`/members/${id}/reset-password`).expect(401);
+      await api()
+        .put(`/members/${id}/title`)
+        .send({ title: 'Boss' })
+        .expect(401);
     });
 
     test('the role catalogue and role slugs stay inside their school', async ({

@@ -68,6 +68,17 @@ export class MembersController {
     return this.members.updateRoles(org, params.id, body);
   }
 
+  @Put(':id/title')
+  @OrganizationAuth('member', 'update')
+  updateTitle(
+    @Org() org: OrgContext,
+    @Param(zod(routes.updateTitle.params)) params: { id: string },
+    @Body(zod(routes.updateTitle.body))
+    body: RouteBody<typeof routes.updateTitle>
+  ): Promise<RouteOutput<typeof routes.updateTitle>> {
+    return this.members.updateTitle(org, params.id, body.title);
+  }
+
   @Put(':id/campuses')
   @OrganizationAuth('member', 'update')
   updateCampuses(
