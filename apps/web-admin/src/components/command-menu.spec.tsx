@@ -44,6 +44,14 @@ const actions: CommandEntry[] = [
     icon: 'user-round-plus',
     keywords: ['new', 'hire'],
   },
+  {
+    id: 'create-role',
+    label: 'Create a custom role',
+    hint: 'Roles',
+    route: '/roles/new',
+    icon: 'shield-check',
+    keywords: ['permissions', 'access'],
+  },
 ];
 
 function setup(withActions = false) {
@@ -86,6 +94,14 @@ describe('CommandMenu', () => {
     expect(groupHeadings()).toEqual(['Pages', 'Settings', 'Actions']);
     fireEvent.click(screen.getByRole('option', { name: /Add a staff member/ }));
     expect(onSelect).toHaveBeenCalledWith('/members?add=1');
+  });
+
+  it('opens Create a custom role at /roles/new', () => {
+    const { onSelect } = setup(true);
+    fireEvent.click(
+      screen.getByRole('option', { name: /Create a custom role/ })
+    );
+    expect(onSelect).toHaveBeenCalledWith('/roles/new');
   });
 
   it('finds an action by a keyword', () => {

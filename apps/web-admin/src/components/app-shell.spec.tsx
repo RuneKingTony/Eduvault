@@ -105,6 +105,8 @@ async function renderAt(
       child('/members', page('Members page')),
       child('/fees', page('Fees page')),
       child('/campuses', page('Campuses page')),
+      child('/roles', page('Roles page')),
+      child('/roles/new', page('New role page')),
       child('/broken', Broken),
     ]),
     history: createMemoryHistory({ initialEntries: [path] }),
@@ -386,6 +388,22 @@ describe('AppShell access', () => {
     ).toHaveAttribute('href', '/campuses');
   });
 
+  it('opens Settings on Roles for a member who can see roles but not campuses', async () => {
+    await renderAt('/', {
+      access: fakeAccess({ permissions: { ac: ['read'] } }),
+    });
+    expect(
+      within(sidebarNav()).getByRole('link', { name: 'Settings' })
+    ).toHaveAttribute('href', '/roles');
+  });
+
+  it('marks Settings active on a role page', async () => {
+    await renderAt('/roles/new');
+    expect(
+      within(sidebarNav()).getByRole('link', { name: 'Settings' })
+    ).toHaveAttribute('aria-current', 'page');
+  });
+
   it('shows a bursar Students but no Staff and members, Fees or Settings', async () => {
     await renderAt('/', { access: starterAccess('bursar') });
     expect(linkNames()).toEqual(['Dashboard', 'Approvals', 'Students']);
@@ -439,6 +457,39 @@ describe('AppShell access', () => {
     expect(
       screen.getByRole('option', { name: /Add a staff member/ })
     ).toBeInTheDocument();
+  });
+
+  it('offers Create a custom role only with ac:create', async () => {
+    await renderAt('/');
+    fireEvent.keyDown(globalThis as unknown as Window, {
+      key: 'k',
+      ctrlKey: true,
+    });
+    const input = await screen.findByPlaceholderText(
+      'Search pages and actions…'
+    );
+    fireEvent.change(input, { target: { value: 'custom role' } });
+    expect(
+      screen.getByRole('option', { name: /Create a custom role/ })
+    ).toBeInTheDocument();
+  });
+
+  it('lets an administrator find Roles and permissions but not create a role', async () => {
+    await renderAt('/', { access: starterAccess('administrator') });
+    fireEvent.keyDown(globalThis as unknown as Window, {
+      key: 'k',
+      ctrlKey: true,
+    });
+    const input = await screen.findByPlaceholderText(
+      'Search pages and actions…'
+    );
+    fireEvent.change(input, { target: { value: 'roles' } });
+    expect(
+      screen.getByRole('option', { name: /Roles and permissions/ })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('option', { name: /Create a custom role/ })
+    ).not.toBeInTheDocument();
   });
 
   it('hides the Add a staff member action from an administrator', async () => {

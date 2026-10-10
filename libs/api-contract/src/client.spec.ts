@@ -147,4 +147,82 @@ describe('createApiClient', () => {
       })
     );
   });
+
+  it('calls the roles routes by slug and parses a role', async () => {
+    const role = {
+      slug: 'cashier',
+      label: 'Cashier',
+      description: null,
+      source: 'custom',
+      permissions: { student: ['read'] },
+      holderCount: 0,
+      editable: true,
+    };
+    const fetchMock = vi
+      .fn()
+      .mockImplementation(() => Promise.resolve(jsonResponse(200, role)));
+    const client = createApiClient(contract, {
+      baseUrl: 'http://api.test',
+      fetch: fetchMock,
+    });
+
+    const created = await client.roles.create({
+      body: { label: 'Cashier', permissions: { student: ['read'] } },
+    });
+    await client.roles.update({
+      params: { slug: 'cashier' },
+      body: { label: 'Till' },
+    });
+    await client.roles.get({ params: { slug: 'cashier' } });
+
+    expect(created.holders).toBeUndefined();
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      'http://api.test/roles',
+      expect.objectContaining({ method: 'POST' })
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      'http://api.test/roles/cashier',
+      expect.objectContaining({
+        method: 'PATCH',
+        body: JSON.stringify({ label: 'Till' }),
+      })
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
+      'http://api.test/roles/cashier',
+      expect.objectContaining({ method: 'GET' })
+    );
+  });
+
+  it('lists and deletes roles', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(200, { items: [] }))
+      .mockResolvedValueOnce(jsonResponse(200, { slug: 'cashier' }))
+      .mockResolvedValueOnce(
+        jsonResponse(409, {
+          code: 'ROLE_IN_USE',
+          message: 'Ada still has this role. Take it off them first.',
+        })
+      );
+    const client = createApiClient(contract, {
+      baseUrl: 'http://api.test',
+      fetch: fetchMock,
+    });
+
+    expect(await client.roles.list({})).toEqual({ items: [] });
+    expect(await client.roles.remove({ params: { slug: 'cashier' } })).toEqual({
+      slug: 'cashier',
+    });
+    await expect(
+      client.roles.remove({ params: { slug: 'cashier' } })
+    ).rejects.toMatchObject({ status: 409, body: { code: 'ROLE_IN_USE' } });
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      'http://api.test/roles/cashier',
+      expect.objectContaining({ method: 'DELETE' })
+    );
+  });
 });

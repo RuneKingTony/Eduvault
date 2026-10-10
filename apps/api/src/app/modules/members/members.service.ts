@@ -10,6 +10,8 @@ import {
 import {
   CAMPUS_REQUIRED,
   DEFAULT_MEMBER_TITLE,
+  MEMBER_ENTRY,
+  OWNER_ENTRY,
   unknownRoleEntry,
   type ApiErrorCode,
   type CreateMemberResult,
@@ -21,15 +23,12 @@ import {
   type SchoolRoleEntry,
 } from '@eduvault/api-contract';
 import {
-  ALL_PERMISSIONS,
-  MEMBER_ROLE,
   OWNER_ROLE,
   canGrantRole,
   can,
   needsCampusStep,
   permissionsOfRoles,
   roleDiff,
-  toPermissionMap,
   validateRoleCombo,
   type RoleDiff,
   withMemberRole,
@@ -72,22 +71,7 @@ const coded = (code: ApiErrorCode, message: string) => ({ code, message });
 
 const notFound = () => new NotFoundException('Member not found');
 
-const CODE_ROLES: readonly SchoolRoleEntry[] = [
-  {
-    slug: OWNER_ROLE,
-    label: 'Owner',
-    description: 'Can do everything in the school.',
-    source: 'code',
-    permissions: toPermissionMap(ALL_PERMISSIONS),
-  },
-  {
-    slug: MEMBER_ROLE,
-    label: 'Member',
-    description: 'On the staff list. Grants nothing on its own.',
-    source: 'code',
-    permissions: {},
-  },
-];
+const CODE_ROLES: readonly SchoolRoleEntry[] = [OWNER_ENTRY, MEMBER_ENTRY];
 
 const byLabel = (a: SchoolRoleEntry, b: SchoolRoleEntry) =>
   a.label.localeCompare(b.label) || a.slug.localeCompare(b.slug);

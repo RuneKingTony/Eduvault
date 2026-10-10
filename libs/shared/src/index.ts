@@ -1,3 +1,4 @@
+export * from './count-of';
 export * from './date';
 export * from './initials';
 export * from './naira';

@@ -14,7 +14,7 @@ import {
 } from '@tanstack/react-router';
 import type { MePermissions } from '@eduvault/api-contract';
 import { PermissionsProvider } from '@eduvault/auth-client';
-import { canAny } from '@eduvault/policy';
+import { canAny, type Gate } from '@eduvault/policy';
 import {
   Sheet,
   SheetContent,
@@ -78,14 +78,25 @@ const ADD_MEMBER_ACTION: CommandEntry = {
   keywords: ['new', 'hire', 'invite', 'staff', 'member'],
 };
 
+const CREATE_ROLE_ACTION: CommandEntry = {
+  id: 'create-role',
+  label: 'Create a custom role',
+  hint: 'Roles',
+  route: '/roles/new',
+  icon: 'shield-check',
+  keywords: ['new', 'role', 'permissions', 'access'],
+};
+
 function commandActions(
   builtRoutes: ReadonlySet<string>,
   access: MePermissions
 ): CommandEntry[] {
-  return builtRoutes.has('/members') &&
-    canAny(access.permissions, ['member:create'])
-    ? [ADD_MEMBER_ACTION]
-    : [];
+  const allowed = (route: string, gate: Gate) =>
+    builtRoutes.has(route) && canAny(access.permissions, gate);
+  return [
+    ...(allowed('/members', ['member:create']) ? [ADD_MEMBER_ACTION] : []),
+    ...(allowed('/roles/new', ['ac:create']) ? [CREATE_ROLE_ACTION] : []),
+  ];
 }
 
 function useAccess(): MePermissions {
@@ -129,7 +140,7 @@ function useShellModel(access: MePermissions) {
     label: section.label,
     hint: 'Settings',
     route: section.route,
-    icon: 'settings',
+    icon: section.icon ?? 'settings',
   }));
   return {
     groups,

@@ -10,3 +10,4 @@ export * from './temporary-password';
 export * from './member-admin.service';
 export * from './organization-admin.service';
 export * from './slug-conflict';
+export * from './role-admin.service';

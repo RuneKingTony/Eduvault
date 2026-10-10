@@ -15,11 +15,14 @@ import { Route as CampusesRouteImport } from './routes/campuses'
 import { Route as FeesRouteImport } from './routes/fees'
 import { Route as MembersRouteImport } from './routes/members'
 import { Route as PlatformRouteImport } from './routes/platform'
+import { Route as RolesRouteImport } from './routes/roles'
 import { Route as StudentsRouteImport } from './routes/students'
 import { Route as DevUiRouteImport } from './routes/dev/ui'
 import { Route as MembersMemberIdRouteImport } from './routes/members_.$memberId'
 import { Route as PlatformIndexRouteImport } from './routes/platform.index'
 import { Route as PlatformAuditRouteImport } from './routes/platform.audit'
+import { Route as RolesRoleSlugRouteImport } from './routes/roles_.$roleSlug'
+import { Route as RolesNewRouteImport } from './routes/roles_.new'
 import { Route as PlatformSchoolsIndexRouteImport } from './routes/platform.schools.index'
 import { Route as PlatformSchoolsSchoolIdRouteImport } from './routes/platform.schools.$schoolId'
 
@@ -53,6 +56,11 @@ const PlatformRoute = PlatformRouteImport.update({
   path: '/platform',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RolesRoute = RolesRouteImport.update({
+  id: '/roles',
+  path: '/roles',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const StudentsRoute = StudentsRouteImport.update({
   id: '/students',
   path: '/students',
@@ -78,6 +86,16 @@ const PlatformAuditRoute = PlatformAuditRouteImport.update({
   path: '/audit',
   getParentRoute: () => PlatformRoute,
 } as any)
+const RolesRoleSlugRoute = RolesRoleSlugRouteImport.update({
+  id: '/roles_/$roleSlug',
+  path: '/roles/$roleSlug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RolesNewRoute = RolesNewRouteImport.update({
+  id: '/roles_/new',
+  path: '/roles/new',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PlatformSchoolsIndexRoute = PlatformSchoolsIndexRouteImport.update({
   id: '/schools/',
   path: '/schools/',
@@ -96,10 +114,13 @@ export interface FileRoutesByFullPath {
   '/fees': typeof FeesRoute
   '/members': typeof MembersRoute
   '/platform': typeof PlatformRouteWithChildren
+  '/roles': typeof RolesRoute
   '/students': typeof StudentsRoute
   '/dev/ui': typeof DevUiRoute
   '/members/$memberId': typeof MembersMemberIdRoute
   '/platform/audit': typeof PlatformAuditRoute
+  '/roles/$roleSlug': typeof RolesRoleSlugRoute
+  '/roles/new': typeof RolesNewRoute
   '/platform/': typeof PlatformIndexRoute
   '/platform/schools/$schoolId': typeof PlatformSchoolsSchoolIdRoute
   '/platform/schools/': typeof PlatformSchoolsIndexRoute
@@ -110,10 +131,13 @@ export interface FileRoutesByTo {
   '/campuses': typeof CampusesRoute
   '/fees': typeof FeesRoute
   '/members': typeof MembersRoute
+  '/roles': typeof RolesRoute
   '/students': typeof StudentsRoute
   '/dev/ui': typeof DevUiRoute
   '/members/$memberId': typeof MembersMemberIdRoute
   '/platform/audit': typeof PlatformAuditRoute
+  '/roles/$roleSlug': typeof RolesRoleSlugRoute
+  '/roles/new': typeof RolesNewRoute
   '/platform': typeof PlatformIndexRoute
   '/platform/schools/$schoolId': typeof PlatformSchoolsSchoolIdRoute
   '/platform/schools': typeof PlatformSchoolsIndexRoute
@@ -126,10 +150,13 @@ export interface FileRoutesById {
   '/fees': typeof FeesRoute
   '/members': typeof MembersRoute
   '/platform': typeof PlatformRouteWithChildren
+  '/roles': typeof RolesRoute
   '/students': typeof StudentsRoute
   '/dev/ui': typeof DevUiRoute
   '/members_/$memberId': typeof MembersMemberIdRoute
   '/platform/audit': typeof PlatformAuditRoute
+  '/roles_/$roleSlug': typeof RolesRoleSlugRoute
+  '/roles_/new': typeof RolesNewRoute
   '/platform/': typeof PlatformIndexRoute
   '/platform/schools/$schoolId': typeof PlatformSchoolsSchoolIdRoute
   '/platform/schools/': typeof PlatformSchoolsIndexRoute
@@ -143,10 +170,13 @@ export interface FileRouteTypes {
     | '/fees'
     | '/members'
     | '/platform'
+    | '/roles'
     | '/students'
     | '/dev/ui'
     | '/members/$memberId'
     | '/platform/audit'
+    | '/roles/$roleSlug'
+    | '/roles/new'
     | '/platform/'
     | '/platform/schools/$schoolId'
     | '/platform/schools/'
@@ -157,10 +187,13 @@ export interface FileRouteTypes {
     | '/campuses'
     | '/fees'
     | '/members'
+    | '/roles'
     | '/students'
     | '/dev/ui'
     | '/members/$memberId'
     | '/platform/audit'
+    | '/roles/$roleSlug'
+    | '/roles/new'
     | '/platform'
     | '/platform/schools/$schoolId'
     | '/platform/schools'
@@ -172,10 +205,13 @@ export interface FileRouteTypes {
     | '/fees'
     | '/members'
     | '/platform'
+    | '/roles'
     | '/students'
     | '/dev/ui'
     | '/members_/$memberId'
     | '/platform/audit'
+    | '/roles_/$roleSlug'
+    | '/roles_/new'
     | '/platform/'
     | '/platform/schools/$schoolId'
     | '/platform/schools/'
@@ -188,9 +224,12 @@ export interface RootRouteChildren {
   FeesRoute: typeof FeesRoute
   MembersRoute: typeof MembersRoute
   PlatformRoute: typeof PlatformRouteWithChildren
+  RolesRoute: typeof RolesRoute
   StudentsRoute: typeof StudentsRoute
   DevUiRoute: typeof DevUiRoute
   MembersMemberIdRoute: typeof MembersMemberIdRoute
+  RolesRoleSlugRoute: typeof RolesRoleSlugRoute
+  RolesNewRoute: typeof RolesNewRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -237,6 +276,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PlatformRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/roles': {
+      id: '/roles'
+      path: '/roles'
+      fullPath: '/roles'
+      preLoaderRoute: typeof RolesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/students': {
       id: '/students'
       path: '/students'
@@ -271,6 +317,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/platform/audit'
       preLoaderRoute: typeof PlatformAuditRouteImport
       parentRoute: typeof PlatformRoute
+    }
+    '/roles_/$roleSlug': {
+      id: '/roles_/$roleSlug'
+      path: '/roles/$roleSlug'
+      fullPath: '/roles/$roleSlug'
+      preLoaderRoute: typeof RolesRoleSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/roles_/new': {
+      id: '/roles_/new'
+      path: '/roles/new'
+      fullPath: '/roles/new'
+      preLoaderRoute: typeof RolesNewRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/platform/schools/': {
       id: '/platform/schools/'
@@ -314,9 +374,12 @@ const rootRouteChildren: RootRouteChildren = {
   FeesRoute: FeesRoute,
   MembersRoute: MembersRoute,
   PlatformRoute: PlatformRouteWithChildren,
+  RolesRoute: RolesRoute,
   StudentsRoute: StudentsRoute,
   DevUiRoute: DevUiRoute,
   MembersMemberIdRoute: MembersMemberIdRoute,
+  RolesRoleSlugRoute: RolesRoleSlugRoute,
+  RolesNewRoute: RolesNewRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

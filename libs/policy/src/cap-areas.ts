@@ -50,6 +50,16 @@ export const CAP_AREAS: readonly CapArea[] = [
     extras: [],
   },
   {
+    id: 'roles',
+    group: 'People and access',
+    label: 'Roles',
+    important: true,
+    see: ['ac:read'],
+    change: ['ac:create', 'ac:update', 'ac:delete'],
+    changeDesc: 'Create roles and change what they allow',
+    extras: [],
+  },
+  {
     id: 'school-settings',
     group: 'People and access',
     label: 'School settings',
