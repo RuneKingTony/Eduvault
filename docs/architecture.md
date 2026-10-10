@@ -106,7 +106,7 @@ Banned users are treated as unauthenticated by `AuthContextService`, and Better 
 | Table          | Columns                                                                                                                           |
 | -------------- | --------------------------------------------------------------------------------------------------------------------------------- |
 | `organization` | `id` PK, `name`, `slug` UNIQUE, `logo`, `createdAt`, `metadata`                                                                   |
-| `member`       | `id` PK, `organizationId` FK→`organization`, `userId` FK→`user`, `role`, `createdAt`                                              |
+| `member`       | `id` PK, `organizationId` FK→`organization`, `userId` FK→`user`, `role`, `title`, `createdAt`                                     |
 | `invitation`   | `id` PK, `organizationId` FK→`organization`, `email`, `role`, `teamId`, `status`, `expiresAt`, `createdAt`, `inviterId` FK→`user` |
 | `team`         | `id` PK, `name`, `memberCount`, `organizationId` FK→`organization`, `createdAt`, `updatedAt`                                      |
 | `teamMember`   | `id` PK, `teamId` FK→`team`, `userId` FK→`user`, `membershipKey` UNIQUE, `createdAt`                                              |
@@ -121,13 +121,13 @@ All under `/api/auth/*`, mounted by `@thallesp/nestjs-better-auth`. SPAs reach t
 
 - **Core:** `sign-in/email`, `sign-in/social`, `sign-out`, `get-session`, `update-user`, `change-email`, `change-password`, `request-password-reset`, `reset-password`, `send-verification-email`, `verify-email`, `list-sessions`, `revoke-session(s)`, `revoke-other-sessions`, `list-accounts`, `link-social`, `unlink-account`, `delete-user`, and related callbacks. Sign-up is off (`sign-up/email` answers 400); accounts are created on the server.
 - **Admin, `/admin/*`:** a super admin reaches `list-users`, `get-user`, `ban-user`, `unban-user`, `list-user-sessions`, `revoke-user-session(s)` and `has-permission`; `create-user`, `update-user`, `set-role`, `set-user-password`, `remove-user` and `impersonate-user` answer 403 for everyone (D-079).
-- **Organization, `/organization/*`:** `create`, `update`, `delete`, `list`, `check-slug`, `set-active`, `get-full-organization`, `get-organization`, `list-members`, `get-active-member(-role)`, `update-member-role`, `remove-member`, `leave`, `invite-member`, `accept/reject/cancel-invitation`, `list-invitations`, `list-user-invitations`, `has-permission`, and, for teams, `create-team`, `update-team`, `remove-team`, `list-teams`, `list-user-teams`, `set-active-team`, `add-team-member`, `remove-team-member`, `list-team-members`.
+- **Organization, `/organization/*`:** `create`, `update`, `delete`, `list`, `check-slug`, `set-active`, `get-organization`, `get-active-member`, `has-permission`, and, for teams, `create-team`, `update-team`, `remove-team`, `list-teams`, `set-active-team`, `list-team-members`. Members, campus seats and invitations change only through `/members`, so the routes that read or write them (`list-members`, `get-full-organization`, `get-active-member-role`, `update-member-role`, `add-member`, `remove-member`, `leave`, the invitation routes, `list-user-teams`, `add-team-member`, `remove-team-member`) answer 404 (D-094).
 
 ### Ownership boundary
 
-- **Better Auth owns** the tables and endpoints above, password hashing, sessions and cookies, and invitations.
+- **Better Auth owns** the tables and endpoints above, password hashing, sessions and cookies. Invitations are off (D-094).
 - **Eduvault owns** the domain tables (`campus`, `school_account`, `fee_schedule`, `student`), the role permissions (`libs/policy`), the guards, and the active-school and active-campus scoping of every query.
-- Eduvault never writes Better Auth's tables except through `AuthService.api` (creating a campus calls `createTeam`; the `campus` row is ours). It reads them in the session hook, which uses SQL for the first membership.
+- Eduvault never writes Better Auth's tables except through `AuthService.api` or, for member and campus-seat writes, Better Auth's organization adapter inside one transaction (D-093); creating a campus calls `createTeam` and the `campus` row is ours. It reads them in the session hook, which uses SQL for the first membership.
 
 ### Workflow
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Creates the e2e personas through the real API and records every school, campus and student in a ledger.
-# The super admin creates each school and its owner (POST /platform/schools).
+# The super admin creates each school and its owner (POST /platform/schools); the owner creates the staff (POST /members).
 # Usage: provision.sh   prints the run directory (tmp/e2e/<run>) on stdout; personas.json and ledger.json are inside.
 set -eu
 ROOT="$(git rev-parse --show-toplevel)"
@@ -56,6 +56,25 @@ school_for() {
   : >"$DIR/$key.jar"; sign_in "$DIR/$key.jar" "$(email "$key")" "$PASSWORD" || return 1
   echo "$uid $school"
 }
+record_member() { # key memberId schoolId (the owner is the actor that can act on it)
+  jq --arg k "$1" --arg i "$2" --arg s "$3" --arg e "$(email owner)" --arg p "$PASSWORD" \
+    '. + [{kind:"member",persona:$k,id:$i,schoolId:$s,actor:{email:$e,password:$p}}]' "$LEDGER" >"$LEDGER.tmp" && mv "$LEDGER.tmp" "$LEDGER"
+}
+# staff_in <key> <display name> <schoolId> <roles json> <campus ids json> -> prints the new user id.
+staff_in() {
+  local key="$1" name="$2" school="$3" roles="$4" campuses="$5" res member uid temp
+  res=$(call "$OJAR" POST /members "$(jq -nc --arg n "$name" --arg e "$(email "$key")" --argjson c "$campuses" \
+    '{name:$n,email:$e,campusIds:$c}')") || return 1
+  member=$(jq -r .member.id <<<"$res"); uid=$(jq -r .member.userId <<<"$res"); temp=$(jq -r .temporaryPassword <<<"$res")
+  record_member "$key" "$member" "$school"
+  if [ "$roles" != '[]' ]; then
+    call "$OJAR" PUT "/members/$member/roles" "$(jq -nc --argjson r "$roles" --argjson c "$campuses" '{roles:$r,campusIds:$c}')" >/dev/null || return 1
+  fi
+  sign_in "$DIR/$key.jar" "$(email "$key")" "$temp" || return 1
+  call "$DIR/$key.jar" POST /me/password "$(jq -nc --arg p "$PASSWORD" '{newPassword:$p}')" >/dev/null || return 1
+  : >"$DIR/$key.jar"; sign_in "$DIR/$key.jar" "$(email "$key")" "$PASSWORD" || return 1
+  echo "$uid"
+}
 add_persona() { # key userId schoolId campusId
   jq --arg k "$1" --arg e "$(email "$1")" --arg p "$PASSWORD" --arg u "$2" --arg s "$3" --arg c "$4" \
     '. + {($k):{email:$e,password:$p,userId:$u,schoolId:$s,campusId:$c,blocked:null,unblocked_by:null}}' "$PERSONAS" >"$PERSONAS.tmp" && mv "$PERSONAS.tmp" "$PERSONAS"
@@ -85,12 +104,23 @@ read -r FOREIGN_UID FSCHOOL < <(school_for foreign Hilltop)
 FMAIN=$(campus_in "$DIR/foreign.jar" "$FSCHOOL" foreign Main)
 FSTUDENT=$(student_in "$DIR/foreign.jar" "$FMAIN" "$FSCHOOL" foreign foreign-student)
 
+BOTH=$(jq -nc --arg a "$LEKKI" --arg b "$IKEJA" '[$a,$b]'); LEKKI_ONLY=$(jq -nc --arg a "$LEKKI" '[$a]'); IKEJA_ONLY=$(jq -nc --arg a "$IKEJA" '[$a]')
+ADMIN_UID=$(staff_in admin 'E2E Tunde' "$SCHOOL" '["administrator"]' "$BOTH")
+BURSAR_UID=$(staff_in bursar 'E2E Chika' "$SCHOOL" '["bursar"]' "$LEKKI_ONLY")
+BURSAR2_UID=$(staff_in bursar2 'E2E Yemi' "$SCHOOL" '["bursar"]' "$IKEJA_ONLY")
+PRINCIPAL_UID=$(staff_in principal 'E2E Grace' "$SCHOOL" '["teacher","principal"]' "$BOTH")
+TEACHER_UID=$(staff_in teacher 'E2E Mr Obi' "$SCHOOL" '["teacher"]' "$LEKKI_ONLY")
+NEWHIRE_UID=$(staff_in newhire 'E2E Kemi' "$SCHOOL" '[]' "$LEKKI_ONLY")
+
 add_persona owner "$OWNER_UID" "$SCHOOL" "$LEKKI"
+add_persona admin "$ADMIN_UID" "$SCHOOL" "$LEKKI"
+add_persona bursar "$BURSAR_UID" "$SCHOOL" "$LEKKI"
+add_persona bursar2 "$BURSAR2_UID" "$SCHOOL" "$IKEJA"
+add_persona principal "$PRINCIPAL_UID" "$SCHOOL" "$LEKKI"
+add_persona teacher "$TEACHER_UID" "$SCHOOL" "$LEKKI"
+add_persona newhire "$NEWHIRE_UID" "$SCHOOL" "$LEKKI"
 add_persona foreign "$FOREIGN_UID" "$FSCHOOL" "$FMAIN"
 add_superadmin
-for staff in admin bursar bursar2 principal newhire teacher; do
-  block_persona "$staff" 'M1.3' 'no HTTP route creates staff until M1.3 (POST /members); sign-up is off'
-done
 block_persona student 'M2.4 + M2.8'
 block_persona guardian 'M2.4 + M2.8'
 

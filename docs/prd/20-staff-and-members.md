@@ -1,6 +1,6 @@
 # PRD: Staff and members
 
-- Status: draft (pre-spec)
+- Status: built in M1.3
 - Source: brand prototype `https://claude.ai/artifact/1hsDyr1KdUaYD2hnuA9sfY`, version `1791539787-0c53`
 - Milestone and slice: `M1.3` (see [roadmap](README.md))
 - Related: [permissions-and-custom-roles.md](../brainstorming/permissions-and-custom-roles.md) (Roles, Gaps 1 and 4, Endpoints, phase 2 temporary passwords), [data-model-overview.md](../brainstorming/data-model-overview.md#permission-list) (one-senior-role and handover guardrails), [21-roles-and-permissions.md](21-roles-and-permissions.md), [22-staff-leave.md](22-staff-leave.md), [technical reference](../technical-reference.md) decisions `D-001`, `D-006`, `D-010`, `D-011`, `D-015`, `D-025`
