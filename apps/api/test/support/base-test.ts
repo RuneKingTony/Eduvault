@@ -17,6 +17,7 @@ import { toPermissionMap, type Permission } from '@eduvault/policy';
 import { AppModule } from '../../src/app/app.module';
 import { AccountService, type AppAuth } from '../../src/app/common/auth';
 import { castToBetterAuthRoles } from '../../src/app/common/auth/better-auth-roles';
+import { Clock } from '../../src/app/common/clock';
 import { loadEnv } from '../../src/app/common/config/env';
 import { PlatformRepository } from '../../src/app/modules/platform/platform.repository';
 import { configureApp } from '../../src/app/configure-app';
@@ -134,6 +135,9 @@ export interface Fixtures {
   app: INestApplication;
   pool: Pool;
   resetDatabase: undefined;
+  resetClock: undefined;
+  /** The app's clock; pin it per test, it is cleared before and after each one. */
+  clock: Clock;
   /** supertest against the app, signed in as `user` when given. */
   api: (user?: Pick<TestUser, 'cookie'>) => {
     get: (path: string) => request.Test;
@@ -226,6 +230,19 @@ export const baseTest = vitestTest.extend<Fixtures>({
         }
       }
       await use(undefined);
+    },
+    { auto: true },
+  ],
+
+  clock: async ({ app }, use) => {
+    await use(app.get(Clock));
+  },
+
+  resetClock: [
+    async ({ clock }, use) => {
+      clock.set(null);
+      await use(undefined);
+      clock.set(null);
     },
     { auto: true },
   ],

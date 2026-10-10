@@ -49,6 +49,7 @@ export * from './components/custom/portal-nav';
 export * from './components/custom/portal-bottom-nav';
 export * from './components/custom/page-states';
 export * from './components/custom/table-pager';
+export * from './components/custom/numbered-pager';
 export * from './lib/storage';
 export * from './lib/notify';
 export * from './components/custom/error-message';

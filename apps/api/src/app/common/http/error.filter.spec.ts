@@ -48,6 +48,22 @@ describe('ErrorFilter', () => {
     expect(run({ code: '23503' }).status).toBe(409);
   });
 
+  it('maps an exclusion violation to Conflict, naming the school year overlap', () => {
+    expect(
+      run({ code: '23P01', constraint: 'academic_session_no_overlap' })
+    ).toEqual({
+      status: 409,
+      body: {
+        code: 'Conflict',
+        message: 'These dates overlap another school year.',
+      },
+    });
+    expect(run({ code: '23P01', constraint: 'other_no_overlap' })).toEqual({
+      status: 409,
+      body: { code: 'Conflict', message: 'The change overlaps another record' },
+    });
+  });
+
   it('maps a self-approval check violation to SelfApproval', () => {
     expect(
       run({ code: '23514', constraint: 'payment_void_approved_by_not_self' })

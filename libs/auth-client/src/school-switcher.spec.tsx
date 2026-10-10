@@ -7,7 +7,10 @@ const schools = [
   { id: 'o2', name: 'Lekki Prep' },
 ];
 
-function setup(activeOrganizationId: string | null = 'o1') {
+function setup(
+  activeOrganizationId: string | null = 'o1',
+  extra: Partial<Parameters<typeof SchoolSwitcher>[0]> = {}
+) {
   const setActive = vi.fn().mockResolvedValue({ data: {}, error: null });
   const onSwitched = vi.fn();
   const authClient = fakeClient({
@@ -20,6 +23,7 @@ function setup(activeOrganizationId: string | null = 'o1') {
       authClient={authClient}
       renderCrest={(name) => <span data-testid="crest">{name}</span>}
       onSwitched={onSwitched}
+      {...extra}
     />
   );
   return { setActive, onSwitched };
@@ -32,6 +36,33 @@ describe('SchoolSwitcher', () => {
       screen.getByRole('button', { name: /Greenfield College/ })
     ).toBeInTheDocument();
     expect(screen.getByTestId('crest')).toHaveTextContent('Greenfield College');
+  });
+
+  it('shows a subtitle under the school name when given one', () => {
+    setup('o1', { subtitle: 'Second term · 2026/2027' });
+    expect(
+      screen.getByRole('button', { name: /Second term · 2026\/2027/ })
+    ).toBeInTheDocument();
+  });
+
+  it('shows no subtitle by default', () => {
+    setup();
+    expect(screen.queryByText(/term/)).not.toBeInTheDocument();
+  });
+
+  it('adds extra items under the school list', () => {
+    setup('o1', { menuExtra: <button type="button">Extra thing</button> });
+    openMenu(/Greenfield College/);
+    expect(
+      screen.getByRole('button', { name: 'Extra thing' })
+    ).toBeInTheDocument();
+    expect(screen.getByRole('separator')).toBeInTheDocument();
+  });
+
+  it('adds no separator without extra items', () => {
+    setup();
+    openMenu(/Greenfield College/);
+    expect(screen.queryByRole('separator')).not.toBeInTheDocument();
   });
 
   it('lists the schools the person belongs to', () => {

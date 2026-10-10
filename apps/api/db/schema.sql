@@ -15,6 +15,18 @@ SET client_min_messages = warning;
 SET row_security = off;
 
 --
+-- Name: btree_gist; Type: EXTENSION; Schema: -; Owner: -
+--
+
+CREATE EXTENSION IF NOT EXISTS btree_gist WITH SCHEMA public;
+
+--
+-- Name: EXTENSION btree_gist; Type: COMMENT; Schema: -; Owner: -
+--
+
+COMMENT ON EXTENSION btree_gist IS 'support for indexing common datatypes in GiST';
+
+--
 -- Name: audit_log_refuse_change(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -29,6 +41,22 @@ $$;
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
+
+--
+-- Name: academic_session; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.academic_session (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id text NOT NULL,
+    name text NOT NULL,
+    starts_on date NOT NULL,
+    ends_on date NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT academic_session_check CHECK (((ends_on - starts_on) >= 84)),
+    CONSTRAINT academic_session_name_check CHECK ((name ~ '^\d{4}/\d{4}$'::text))
+);
 
 --
 -- Name: account; Type: TABLE; Schema: public; Owner: -
@@ -241,6 +269,21 @@ CREATE TABLE public.school_account (
 );
 
 --
+-- Name: school_holiday; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.school_holiday (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id text NOT NULL,
+    term_id uuid NOT NULL,
+    date date NOT NULL,
+    name text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT school_holiday_name_check CHECK (((length(TRIM(BOTH FROM name)) >= 1) AND (length(TRIM(BOTH FROM name)) <= 100)))
+);
+
+--
 -- Name: school_setting; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -312,6 +355,25 @@ CREATE TABLE public."teamMember" (
 );
 
 --
+-- Name: term; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.term (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id text NOT NULL,
+    session_id uuid NOT NULL,
+    sequence smallint NOT NULL,
+    name text NOT NULL,
+    starts_on date NOT NULL,
+    ends_on date NOT NULL,
+    is_current boolean DEFAULT false NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT term_check CHECK ((starts_on <= ends_on)),
+    CONSTRAINT term_sequence_check CHECK (((sequence >= 1) AND (sequence <= 3)))
+);
+
+--
 -- Name: user; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -342,6 +404,34 @@ CREATE TABLE public.verification (
     "createdAt" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     "updatedAt" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
+
+--
+-- Name: academic_session academic_session_id_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.academic_session
+    ADD CONSTRAINT academic_session_id_organization_id_key UNIQUE (id, organization_id);
+
+--
+-- Name: academic_session academic_session_no_overlap; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.academic_session
+    ADD CONSTRAINT academic_session_no_overlap EXCLUDE USING gist (organization_id WITH =, daterange(starts_on, ends_on, '[]'::text) WITH &&);
+
+--
+-- Name: academic_session academic_session_organization_id_name_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.academic_session
+    ADD CONSTRAINT academic_session_organization_id_name_key UNIQUE (organization_id, name);
+
+--
+-- Name: academic_session academic_session_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.academic_session
+    ADD CONSTRAINT academic_session_pkey PRIMARY KEY (id);
 
 --
 -- Name: account account_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -491,6 +581,20 @@ ALTER TABLE ONLY public.school_account
     ADD CONSTRAINT school_account_pkey PRIMARY KEY (id);
 
 --
+-- Name: school_holiday school_holiday_organization_id_date_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.school_holiday
+    ADD CONSTRAINT school_holiday_organization_id_date_key UNIQUE (organization_id, date);
+
+--
+-- Name: school_holiday school_holiday_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.school_holiday
+    ADD CONSTRAINT school_holiday_pkey PRIMARY KEY (id);
+
+--
 -- Name: school_setting school_setting_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -545,6 +649,27 @@ ALTER TABLE ONLY public."teamMember"
 
 ALTER TABLE ONLY public.team
     ADD CONSTRAINT team_pkey PRIMARY KEY (id);
+
+--
+-- Name: term term_id_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.term
+    ADD CONSTRAINT term_id_organization_id_key UNIQUE (id, organization_id);
+
+--
+-- Name: term term_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.term
+    ADD CONSTRAINT term_pkey PRIMARY KEY (id);
+
+--
+-- Name: term term_session_id_sequence_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.term
+    ADD CONSTRAINT term_session_id_sequence_key UNIQUE (session_id, sequence);
 
 --
 -- Name: user user_email_key; Type: CONSTRAINT; Schema: public; Owner: -
@@ -676,6 +801,12 @@ CREATE INDEX "teamMember_userId_idx" ON public."teamMember" USING btree ("userId
 CREATE INDEX "team_organizationId_idx" ON public.team USING btree ("organizationId");
 
 --
+-- Name: term_one_current; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX term_one_current ON public.term USING btree (organization_id) WHERE is_current;
+
+--
 -- Name: verification_identifier_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -686,6 +817,13 @@ CREATE INDEX verification_identifier_idx ON public.verification USING btree (ide
 --
 
 CREATE TRIGGER audit_log_append_only BEFORE DELETE OR UPDATE ON public.audit_log FOR EACH ROW EXECUTE FUNCTION public.audit_log_refuse_change();
+
+--
+-- Name: academic_session academic_session_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.academic_session
+    ADD CONSTRAINT academic_session_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE CASCADE;
 
 --
 -- Name: account account_userId_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -828,6 +966,20 @@ ALTER TABLE ONLY public.school_account
     ADD CONSTRAINT school_account_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES public."user"(id) ON DELETE SET NULL;
 
 --
+-- Name: school_holiday school_holiday_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.school_holiday
+    ADD CONSTRAINT school_holiday_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE CASCADE;
+
+--
+-- Name: school_holiday school_holiday_term_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.school_holiday
+    ADD CONSTRAINT school_holiday_term_id_organization_id_fkey FOREIGN KEY (term_id, organization_id) REFERENCES public.term(id, organization_id) ON DELETE CASCADE;
+
+--
 -- Name: school_setting school_setting_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -884,6 +1036,20 @@ ALTER TABLE ONLY public.team
     ADD CONSTRAINT "team_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES public.organization(id) ON DELETE CASCADE;
 
 --
+-- Name: term term_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.term
+    ADD CONSTRAINT term_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE CASCADE;
+
+--
+-- Name: term term_session_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.term
+    ADD CONSTRAINT term_session_id_organization_id_fkey FOREIGN KEY (session_id, organization_id) REFERENCES public.academic_session(id, organization_id) ON DELETE CASCADE;
+
+--
 -- PostgreSQL database dump complete
 --
 
@@ -900,4 +1066,5 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20261009210000'),
     ('20261010090000'),
     ('20261010100000'),
-    ('20261010120000');
+    ('20261010120000'),
+    ('20261010130000');

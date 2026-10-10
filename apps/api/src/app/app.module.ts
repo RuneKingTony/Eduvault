@@ -6,9 +6,11 @@ import {
 } from '@nestjs/common';
 import { ActingAuditMiddleware, AuditModule } from './common/audit';
 import { EduvaultAuthModule } from './common/auth';
+import { ClockModule } from './common/clock';
 import { ConfigModule } from './common/config/config.module';
 import { DatabaseModule } from './common/db/database.module';
 import { FilesModule } from './common/files';
+import { CalendarModule } from './modules/calendar/calendar.module';
 import { CampusModule } from './modules/campus/campus.module';
 import { FeeScheduleModule } from './modules/fee-schedule/fee-schedule.module';
 import { HealthModule } from './modules/health/health.module';
@@ -24,6 +26,7 @@ import { StudentModule } from './modules/student/student.module';
   imports: [
     ConfigModule,
     DatabaseModule,
+    ClockModule,
     EduvaultAuthModule,
     AuditModule,
     FilesModule,
@@ -37,6 +40,7 @@ import { StudentModule } from './modules/student/student.module';
     SchoolModule,
     FeeScheduleModule,
     StudentModule,
+    CalendarModule,
   ],
 })
 export class AppModule implements NestModule {

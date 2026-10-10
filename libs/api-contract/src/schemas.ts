@@ -9,7 +9,7 @@ import {
   ROLE_LABEL_MAX,
   toPermissionMap,
 } from '@eduvault/policy';
-import { countOf } from '@eduvault/shared';
+import { countOf, fmtDate, fmtDateRange } from '@eduvault/shared';
 import { z } from 'zod';
 
 export const idSchema = z.uuid();
@@ -653,3 +653,55 @@ export const updateRoleSchema = z.object({
 export type UpdateRoleInput = z.input<typeof updateRoleSchema>;
 
 export const removedRoleSchema = z.object({ slug: z.string() });
+
+export const SCHOOL_YEAR_NOT_FOUND_MESSAGE = 'School year not found';
+export const TERM_NOT_FOUND_MESSAGE = 'Term not found';
+export const HOLIDAY_NOT_FOUND_MESSAGE = 'Holiday not found';
+export const HOLIDAY_NAME_REQUIRED = 'Give the holiday a name.';
+export const YEAR_DATES_INVALID_MESSAGE =
+  'Choose valid dates: the end must be after the start.';
+export const YEAR_TOO_SHORT_MESSAGE = 'A school year needs at least 12 weeks.';
+export const YEAR_OVERLAP_MESSAGE = 'These dates overlap another school year.';
+export const TERM_NOT_OFFERED_MESSAGE =
+  'Only a term of this school year, or the first term of the next one, can be made current.';
+export const TERM_ENDED_DATES_MESSAGE =
+  'This term has already ended, so its dates can’t change.';
+export const TERM_ENDED_HOLIDAYS_MESSAGE =
+  'This term has already ended, so its holidays can’t change.';
+export const HOLIDAY_PAST_TERM_MESSAGE =
+  'Cannot add a holiday to a past term. Choose a current or future term.';
+export const YEAR_STARTED_MESSAGE =
+  'A school year that has already started cannot be deleted.';
+export const YEAR_HOLDS_CURRENT_MESSAGE =
+  'The current term is in this school year, so it cannot be deleted.';
+export const YEAR_REFERENCED_MESSAGE =
+  'This school year has students, charges or payments, so it cannot be deleted.';
+
+export const schoolYearExistsMessage = (name: string): string =>
+  `${name} already exists.`;
+
+export const termOutsideYearMessage = (year: {
+  name: string;
+  startsOn: string;
+  endsOn: string;
+}): string =>
+  `Keep the term inside ${year.name}: ${fmtDateRange(year.startsOn, year.endsOn)}.`;
+
+export const termOverlapMessage = (otherTerm: string): string =>
+  `These dates overlap ${otherTerm}.`;
+
+export const holidayStrandedMessage = (date: string): string =>
+  `${fmtDate(date)} is a holiday in this term that would fall outside it. Remove the holiday first.`;
+
+export const holidayOutsideMessage = (term: {
+  name: string;
+  startsOn: string;
+  endsOn: string;
+}): string =>
+  `Choose a date inside ${term.name}: ${fmtDateRange(term.startsOn, term.endsOn)}.`;
+
+export const holidayWeekendMessage = (date: string): string =>
+  `${fmtDate(date)} is a weekend. Holidays are school days off.`;
+
+export const holidayTakenMessage = (date: string, name: string): string =>
+  `${fmtDate(date)} is already a holiday: ${name}.`;

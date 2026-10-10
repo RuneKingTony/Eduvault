@@ -4,6 +4,7 @@ export const statements = {
   schoolAccount: ['read', 'update'],
   organization: ['update', 'delete'],
   student: ['create', 'read', 'update'],
+  session: ['create', 'read', 'update', 'setCurrent'],
   feeSchedule: ['create', 'read', 'update', 'delete'],
   member: ['create', 'read', 'update', 'delete'],
   ac: ['create', 'read', 'update', 'delete'],
@@ -58,6 +59,7 @@ export const PERM_HELP: Partial<Record<Permission, string>> = {
     'Hands the school over to another owner. Only an owner can do it.',
   'organization:delete':
     'Deletes the school when it has no students. Only an owner can do it.',
+  'session:setCurrent': 'Chooses which term is current.',
 };
 
 const RESOURCE_LABELS: Record<Resource, string> = {
@@ -66,6 +68,7 @@ const RESOURCE_LABELS: Record<Resource, string> = {
   schoolAccount: 'School settings',
   organization: 'School',
   student: 'Students',
+  session: 'School years and terms',
   feeSchedule: 'Fee schedules',
   member: 'Staff',
   ac: 'Roles',

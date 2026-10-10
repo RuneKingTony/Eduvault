@@ -44,8 +44,8 @@ async function acquire(
 }
 
 /**
- * Serialises a school's read-then-write membership changes (last owner,
- * duplicate add). The lock is per session, so it holds its own client.
+ * Serialises a school's read-then-write changes (last owner, duplicate add,
+ * overlapping school years). The lock is per session, so it holds its own client.
  */
 export async function withSchoolLock<T>(
   pool: Pool,

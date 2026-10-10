@@ -56,6 +56,20 @@ describe('roles', () => {
     expect(permissions.ac).toEqual(['read']);
   });
 
+  it('gives the administrator every session permission and nobody else any', () => {
+    expect(starter('administrator').session).toEqual([
+      'create',
+      'read',
+      'update',
+      'setCurrent',
+    ]);
+    expect(
+      STARTER_ROLES.filter((role) => role.slug !== 'administrator').map(
+        (role) => starter(role.slug).session
+      )
+    ).toEqual([undefined, undefined, undefined, undefined, undefined]);
+  });
+
   it('keeps ac:create, ac:update and ac:delete out of every starter role', () => {
     for (const role of STARTER_ROLES) {
       for (const action of ['ac:create', 'ac:update', 'ac:delete'] as const) {

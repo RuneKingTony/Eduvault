@@ -211,6 +211,7 @@ export const RESOURCE_PILLARS: Record<Resource, Pillar> = {
   organization: 'People and access',
   schoolAccount: 'Foundation',
   student: 'Foundation',
+  session: 'Foundation',
   feeSchedule: 'Finance',
 };
 
@@ -220,6 +221,7 @@ export const ACTION_WORDS: Record<Action, string> = {
   readAll: 'see all',
   update: 'change',
   delete: 'remove',
+  setCurrent: 'set current',
 };
 
 export function capabilityLabel(permission: Permission): string {

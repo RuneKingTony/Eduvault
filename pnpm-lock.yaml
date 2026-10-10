@@ -409,6 +409,9 @@ importers:
       '@eduvault/policy':
         specifier: workspace:*
         version: link:../../libs/policy
+      '@eduvault/shared':
+        specifier: workspace:*
+        version: link:../../libs/shared
       '@nestjs/common':
         specifier: catalog:nestjs
         version: 11.2.7(reflect-metadata@0.2.2)(rxjs@7.8.1)

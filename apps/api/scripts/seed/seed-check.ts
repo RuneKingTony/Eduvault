@@ -1,12 +1,18 @@
 import type { INestApplicationContext } from '@nestjs/common';
 import { KYSELY_TOKEN, type Database } from '../../src/app/common/db/tokens';
+import { CalendarService } from '../../src/app/modules/calendar/calendar.service';
 import { CampusService } from '../../src/app/modules/campus/campus.service';
 import { StudentService } from '../../src/app/modules/student/student.service';
 import { orgContextFor } from './actors';
 import { SEEDED_ACTING_REASON } from './acting-requests';
 import { shiftDate } from './date-shift';
 import { emailOf, SUPER_ADMIN_EMAIL } from './members';
-import { HILLTOP_SLUG, SUSPENDED_SLUG, schools } from './schools';
+import {
+  GREENFIELD_SLUG,
+  HILLTOP_SLUG,
+  SUSPENDED_SLUG,
+  schools,
+} from './schools';
 import { students } from './students';
 
 // Until class scope narrows teachers to their arms, Emeka sees all of Lekki.
@@ -129,6 +135,38 @@ async function checkSupportActivity(db: Database, check: Check) {
   );
 }
 
+async function checkCalendar(
+  app: INestApplicationContext,
+  db: Database,
+  check: Check
+) {
+  const count = async (
+    table: 'academic_session' | 'term' | 'school_holiday'
+  ) => {
+    const row = await db
+      .selectFrom(table)
+      .innerJoin('organization', 'organization.id', `${table}.organization_id`)
+      .where('organization.slug', '=', GREENFIELD_SLUG)
+      .select((eb) => eb.fn.countAll<string>().as('total'))
+      .executeTakeFirstOrThrow();
+    return Number(row.total);
+  };
+  check('Greenfield school years', await count('academic_session'), 2);
+  check('Greenfield terms', await count('term'), 6);
+  check('Greenfield holidays', await count('school_holiday'), 11);
+  const current = await db
+    .selectFrom('term')
+    .select((eb) => eb.fn.countAll<string>().as('total'))
+    .where('is_current', '=', true)
+    .executeTakeFirstOrThrow();
+  check('current terms', Number(current.total), 1);
+
+  const funmi = await orgContextFor(app, emailOf('funmi'));
+  const now = await app.get(CalendarService, { strict: false }).current(funmi);
+  check('Greenfield current term', now.term?.name ?? 'none', 'First term');
+  check('Greenfield school days', now.schoolDays, 67);
+}
+
 async function checkPlatform(db: Database, check: Check, offsetDays: number) {
   await checkSuperAdmin(db, check);
   for (const school of schools) {
@@ -167,6 +205,8 @@ export async function runSeedCheck(
     const listed = await studentService.list(funmi, campus.id);
     check(`${campus.name} students`, listed.length, expected);
   }
+
+  await checkCalendar(app, db, check);
 
   for (const [key, expected] of Object.entries(visibleStudents)) {
     const ctx = await orgContextFor(app, emailOf(key));

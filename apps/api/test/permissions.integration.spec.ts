@@ -49,6 +49,7 @@ test.describe('guard order', () => {
       { path: '/students', permission: 'student:read' },
       { path: '/fee-schedules', permission: 'feeSchedule:read' },
       { path: '/campuses/summary', permission: 'team:read' },
+      { path: '/school-years', permission: 'session:read' },
     ];
     for (const { path, permission } of routes) {
       const unauthenticated = await api().get(path).expect(401);
@@ -97,6 +98,14 @@ test.describe('guard order', () => {
       ['put', '/school-account/logo'],
       ['delete', '/school-account/logo'],
       ['patch', '/school-settings'],
+      ['get', '/school-years'],
+      ['get', `/school-years/${id}`],
+      ['post', '/school-years'],
+      ['delete', `/school-years/${id}`],
+      ['patch', `/terms/${id}`],
+      ['post', `/terms/${id}/make-current`],
+      ['post', `/terms/${id}/holidays`],
+      ['delete', `/holidays/${id}`],
     ] as const;
     for (const [method, path] of gated) {
       const res = await api(noPermission)[method](path).send({});
@@ -130,6 +139,12 @@ test.describe('guard order', () => {
       .patch('/school-settings')
       .send({ maxGuardians: 3 })
       .expect(200);
+    await api(owner).get('/school-years').expect(200);
+    await api(owner)
+      .post('/school-years')
+      .send({ name: '2040/2041', startsOn: '2040-09-03', endsOn: '2041-07-25' })
+      .expect(201);
+    await api(owner).get('/calendar/current').expect(200);
 
     const res = await api(owner).get('/me/permissions').expect(200);
     expect(res.body).toEqual({

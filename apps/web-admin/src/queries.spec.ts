@@ -2,7 +2,10 @@ import { QueryClient, QueryObserver } from '@tanstack/react-query';
 import type { Api } from './api';
 import { detail } from './test-members';
 import {
+  currentTermQueryOptions,
+  daysOffQueryOptions,
   forgetMember,
+  invalidateCalendar,
   invalidateAfterRemoval,
   invalidateRoles,
   memberQueryOptions,
@@ -10,6 +13,7 @@ import {
   roleQueryOptions,
   rolesQueryOptions,
   schoolRolesQueryOptions,
+  schoolYearsQueryOptions,
 } from './queries';
 
 describe('member removal', () => {
@@ -82,6 +86,44 @@ describe('role writes', () => {
     const api = {} as Api;
     expect(roleQueryOptions(api, 'a').queryKey).not.toEqual(
       roleQueryOptions(api, 'b').queryKey
+    );
+  });
+});
+
+describe('calendar writes', () => {
+  it('refreshes the school years, the current term and the days off', async () => {
+    const list = vi.fn().mockResolvedValue({ items: [], total: 0 });
+    const current = vi.fn().mockResolvedValue({});
+    const daysOff = vi.fn().mockResolvedValue([]);
+    const api = {
+      schoolYears: { list },
+      calendar: { current, daysOff },
+    } as unknown as Api;
+    const queryClient = new QueryClient();
+    const unsubscribe = [
+      new QueryObserver(queryClient, schoolYearsQueryOptions(api, 1)),
+      new QueryObserver(queryClient, currentTermQueryOptions(api)),
+      new QueryObserver(queryClient, daysOffQueryOptions(api, 4)),
+    ].map((observer) => observer.subscribe(() => undefined));
+    await vi.waitFor(() => {
+      expect(queryClient.isFetching()).toBe(0);
+      expect(list).toHaveBeenCalledTimes(1);
+    });
+
+    await invalidateCalendar(queryClient);
+
+    expect(list).toHaveBeenCalledTimes(2);
+    expect(current).toHaveBeenCalledTimes(2);
+    expect(daysOff).toHaveBeenCalledTimes(2);
+    for (const stop of unsubscribe) {
+      stop();
+    }
+  });
+
+  it('keys each page of school years separately', () => {
+    const api = { schoolYears: { list: vi.fn() } } as unknown as Api;
+    expect(schoolYearsQueryOptions(api, 1).queryKey).not.toEqual(
+      schoolYearsQueryOptions(api, 2).queryKey
     );
   });
 });

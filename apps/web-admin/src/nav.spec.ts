@@ -13,7 +13,6 @@ import {
   settingsLanding,
   settingsTrail,
   type NavGroup,
-  type SettingsSection,
 } from './nav';
 
 const built = new Set([
@@ -22,6 +21,7 @@ const built = new Set([
   '/students',
   '/members',
   '/fees',
+  '/calendar',
   '/campuses',
   '/roles',
   '/roles/new',
@@ -96,6 +96,7 @@ describe('nav model', () => {
     ).toEqual([
       'School profile',
       'Admissions rules',
+      'School years and terms',
       'Campuses',
       'Roles and permissions',
       'Danger zone',
@@ -122,6 +123,7 @@ describe('settings sections', () => {
     ).toEqual([
       ['School profile', 'General'],
       ['Admissions rules', 'General'],
+      ['School years and terms', 'School structure'],
       ['Campuses', 'School structure'],
       ['Roles and permissions', 'Access'],
       ['Danger zone', 'Access'],
@@ -132,6 +134,7 @@ describe('settings sections', () => {
     expect(idsFor(everything)).toEqual([
       'profile',
       'admissions',
+      'calendar',
       'campuses',
       'roles',
       'danger',
@@ -143,10 +146,20 @@ describe('settings sections', () => {
     expect(idsFor(starter('administrator'))).toEqual([
       'profile',
       'admissions',
+      'calendar',
       'campuses',
       'roles',
     ]);
     expect(settingsRoute(starter('administrator'))).toBe('/settings/profile');
+  });
+
+  it('opens Settings on the calendar for a session:read-only member, who sees only that section', () => {
+    expect(idsFor({ session: ['read'] })).toEqual(['calendar']);
+    expect(settingsRoute({ session: ['read'] })).toBe('/calendar');
+  });
+
+  it('gates the calendar route on session:read', () => {
+    expect(routeGate('/calendar')).toEqual(['session:read']);
   });
 
   it('shows a principal Campuses alone and opens it', () => {
@@ -275,6 +288,7 @@ describe('findCurrent', () => {
 
   it('marks Settings active on any settings route', () => {
     expect(current('/campuses')).toBe('settings');
+    expect(current('/calendar')).toBe('settings');
     expect(current('/roles/7')).toBe('settings');
     expect(current('/settings')).toBe('settings');
     expect(current('/settings/danger')).toBe('settings');
@@ -317,25 +331,7 @@ describe('settingsLanding', () => {
   });
 
   it('lists School years and terms for someone with session:read only', () => {
-    // `session` is not in the policy yet; the helpers take any section list, so the item is declared here.
-    const calendar: SettingsSection = {
-      id: 'calendar',
-      label: 'School years and terms',
-      route: '/calendar',
-      group: 'School structure',
-      icon: 'school',
-      gate: ['session:read'] as unknown as SettingsSection['gate'],
-    };
-    const sections = [...SETTINGS_SECTIONS, calendar];
-    const permissions = { session: ['read'] } as unknown as Parameters<
-      typeof settingsLanding
-    >[1];
-
-    const landing = settingsLanding(
-      new Set([...built, '/calendar']),
-      permissions,
-      sections
-    );
+    const landing = settingsLanding(built, { session: ['read'] });
 
     expect(landing.kind).toBe('list');
     expect(

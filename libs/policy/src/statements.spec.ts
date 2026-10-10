@@ -61,6 +61,24 @@ describe('statements', () => {
     expect(permLabel('organization:delete')).toBe('School: delete');
   });
 
+  it('has the session resource with a setCurrent permission and its help', () => {
+    expect(ALL_PERMISSIONS).toEqual(
+      expect.arrayContaining([
+        'session:create',
+        'session:read',
+        'session:update',
+        'session:setCurrent',
+      ])
+    );
+    expect(ALL_PERMISSIONS).not.toContain('session:delete');
+    expect(permLabel('session:setCurrent')).toBe(
+      'School years and terms: set current'
+    );
+    expect(PERM_HELP['session:setCurrent']).toBe(
+      'Chooses which term is current.'
+    );
+  });
+
   it('keeps SENSITIVE and PERM_HELP to listed permissions', () => {
     for (const permission of SENSITIVE) {
       expect(ALL_PERMISSIONS).toContain(permission);

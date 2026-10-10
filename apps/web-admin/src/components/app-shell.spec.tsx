@@ -23,13 +23,18 @@ import {
   AuthClientProvider,
   type EduvaultAuthClient,
 } from '@eduvault/auth-client';
-import { ApiError, type MePermissions } from '@eduvault/api-contract';
+import {
+  ApiError,
+  type CalendarCurrent,
+  type MePermissions,
+} from '@eduvault/api-contract';
 import { stubMatchMedia } from '@eduvault/ui/testing';
 import { requireGate } from '../access';
 import { ApiProvider, type Api } from '../api';
 import { DashboardPage } from '../pages/dashboard-page';
 import { mePermissionsQueryOptions } from '../queries';
 import { createQueryClient } from '../query-client';
+import { currentCalendar, noCalendar } from '../test-calendar';
 import { fakeAccess, ownerAccess, starterAccess } from '../test-utils';
 import { profile } from '../test-school';
 import { AppShell } from './app-shell';
@@ -71,6 +76,7 @@ interface RenderOptions {
   access?: MePermissions;
   realDashboard?: boolean;
   logoUrl?: string | null;
+  calendar?: CalendarCurrent;
 }
 
 async function renderAt(
@@ -80,6 +86,7 @@ async function renderAt(
     access = ownerAccess(),
     realDashboard = false,
     logoUrl = null,
+    calendar = noCalendar(),
   }: RenderOptions = {}
 ) {
   let current = access;
@@ -87,6 +94,7 @@ async function renderAt(
   const api = {
     me: { permissions },
     schoolAccount: { get: vi.fn().mockResolvedValue(profile({ logoUrl })) },
+    calendar: { current: vi.fn().mockResolvedValue(calendar) },
   } as unknown as Api;
   const root = createRootRoute({
     component: AppShell,
@@ -112,6 +120,7 @@ async function renderAt(
       child('/students', page('Students page')),
       child('/members', page('Members page')),
       child('/fees', page('Fees page')),
+      child('/calendar', page('Calendar page')),
       child('/campuses', page('Campuses page')),
       child('/roles', page('Roles page')),
       child('/roles/new', page('New role page')),
@@ -282,6 +291,44 @@ describe('AppShell', () => {
     ).toHaveAttribute('data-state', 'collapsed');
   });
 
+  it('shows the current term and year under the school name', async () => {
+    await renderAt('/', { calendar: currentCalendar() });
+    expect(
+      await within(sidebarNav()).findByText('First term · 2026/2027')
+    ).toBeInTheDocument();
+  });
+
+  it('shows no subtitle before the school has a school year', async () => {
+    await renderAt('/');
+    await waitFor(() => {
+      expect(authClient.useListOrganizations).toBeDefined();
+    });
+    expect(within(sidebarNav()).queryByText(/·/)).not.toBeInTheDocument();
+  });
+
+  it('adds School years and terms to the school menu with session:read', async () => {
+    await renderAt('/');
+    fireEvent.keyDown(
+      within(sidebarNav()).getByRole('button', { name: /Greenfield College/ }),
+      { key: 'Enter' }
+    );
+    expect(
+      await screen.findByRole('menuitem', { name: 'School years and terms' })
+    ).toHaveAttribute('href', '/calendar');
+  });
+
+  it('leaves School years and terms out of the school menu without session:read', async () => {
+    await renderAt('/', { access: starterAccess('teacher') });
+    fireEvent.keyDown(
+      within(sidebarNav()).getByRole('button', { name: /Greenfield College/ }),
+      { key: 'Enter' }
+    );
+    await screen.findByRole('menuitem', { name: 'Lakeside Academy' });
+    expect(
+      screen.queryByRole('menuitem', { name: 'School years and terms' })
+    ).not.toBeInTheDocument();
+  });
+
   it('opens and closes the command menu with Cmd+K and finds pages', async () => {
     await renderAt('/');
     fireEvent.keyDown(globalThis as unknown as Window, {
@@ -438,6 +485,15 @@ describe('AppShell access', () => {
     expect(
       within(sidebarNav()).getByRole('link', { name: 'Settings' })
     ).toHaveAttribute('href', '/settings/profile');
+  });
+
+  it('opens Settings on the calendar for a session:read-only member', async () => {
+    await renderAt('/', {
+      access: fakeAccess({ permissions: { session: ['read'] } }),
+    });
+    expect(
+      within(sidebarNav()).getByRole('link', { name: 'Settings' })
+    ).toHaveAttribute('href', '/calendar');
   });
 
   it('opens Settings on Roles for a member who can see roles but not campuses', async () => {

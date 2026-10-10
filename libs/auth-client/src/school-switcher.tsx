@@ -1,10 +1,11 @@
-import type { ReactNode } from 'react';
+import type { ComponentProps, ReactNode } from 'react';
 import { CheckIcon, ChevronsUpDownIcon } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
   Button,
   SidebarMenuButton,
@@ -15,13 +16,53 @@ export interface SchoolSwitcherProps {
   authClient: EduvaultAuthClient;
   appearance?: 'sidebar' | 'button';
   renderCrest?: (schoolName: string) => ReactNode;
+  subtitle?: string;
+  menuExtra?: ReactNode;
   onSwitched: () => void;
+}
+
+function SwitcherTrigger({
+  appearance,
+  activeName,
+  crest,
+  subtitle,
+  ...triggerProps
+}: {
+  appearance: 'sidebar' | 'button';
+  activeName: string;
+  crest: ReactNode;
+  subtitle: string | undefined;
+} & ComponentProps<'button'>) {
+  if (appearance === 'button') {
+    return (
+      <Button type="button" variant="outline" {...triggerProps}>
+        <span className="min-w-0 flex-1 truncate">{activeName}</span>
+        <ChevronsUpDownIcon className="size-4 opacity-70" />
+      </Button>
+    );
+  }
+  return (
+    <SidebarMenuButton size="lg" tooltip={activeName} {...triggerProps}>
+      {crest}
+      <span className="flex min-w-0 flex-1 flex-col text-left leading-tight">
+        <span className="truncate font-semibold">{activeName}</span>
+        {subtitle === undefined ? null : (
+          <span className="truncate text-xs font-normal text-muted-foreground">
+            {subtitle}
+          </span>
+        )}
+      </span>
+      <ChevronsUpDownIcon className="ml-auto size-4 opacity-70" />
+    </SidebarMenuButton>
+  );
 }
 
 export function SchoolSwitcher({
   authClient,
   appearance = 'sidebar',
   renderCrest,
+  subtitle,
+  menuExtra,
   onSwitched,
 }: SchoolSwitcherProps) {
   const session = authClient.useSession();
@@ -45,20 +86,12 @@ export function SchoolSwitcher({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        {appearance === 'button' ? (
-          <Button type="button" variant="outline">
-            <span className="min-w-0 flex-1 truncate">{activeName}</span>
-            <ChevronsUpDownIcon className="size-4 opacity-70" />
-          </Button>
-        ) : (
-          <SidebarMenuButton size="lg" tooltip={activeName}>
-            {renderCrest?.(activeName)}
-            <span className="min-w-0 flex-1 truncate font-semibold">
-              {activeName}
-            </span>
-            <ChevronsUpDownIcon className="ml-auto size-4 opacity-70" />
-          </SidebarMenuButton>
-        )}
+        <SwitcherTrigger
+          appearance={appearance}
+          activeName={activeName}
+          crest={renderCrest?.(activeName)}
+          subtitle={subtitle}
+        />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="min-w-56">
         <DropdownMenuLabel>School</DropdownMenuLabel>
@@ -73,6 +106,12 @@ export function SchoolSwitcher({
             {school.id === activeId ? <CheckIcon aria-label="Current" /> : null}
           </DropdownMenuItem>
         ))}
+        {menuExtra === undefined ? null : (
+          <>
+            <DropdownMenuSeparator />
+            {menuExtra}
+          </>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );
