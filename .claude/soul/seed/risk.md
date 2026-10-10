@@ -6,4 +6,4 @@
 
 - `[risk-002]` Never bypass hooks or guards: no --no-verify, no HUSKY=0, no hooksPath change, no nohup or background &. Fix the failing check instead; use run_in_background for long commands.
   - why: A bypassed gate ships the failure it exists to catch, and detached processes outlive the session.
-  - evidence: score 0 · 0 decisions · last confirmed 2026-10-07 · confidence: high
+  - evidence: score 1 · 2 decisions · last confirmed 2026-10-09 · confidence: high
