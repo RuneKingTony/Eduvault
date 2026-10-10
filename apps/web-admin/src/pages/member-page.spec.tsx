@@ -4,7 +4,7 @@ import {
   type MePermissions,
   type MemberDetail,
 } from '@eduvault/api-contract';
-import { renderWithApi, starterAccess } from '../test-utils';
+import { actingAccess, renderWithApi, starterAccess } from '../test-utils';
 import { CATALOGUE, IKEJA, LEKKI, detail } from '../test-members';
 import { MemberPage, type NewAccountNotice } from './member-page';
 
@@ -122,5 +122,40 @@ describe('MemberPage', () => {
     expect(await screen.findByText('Member not found')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Go back' }));
     expect(onBack).toHaveBeenCalled();
+  });
+
+  describe('acting', () => {
+    it('renders read-only for a super admin without a reason', async () => {
+      setup({
+        member: detail({ roles: ['member', 'teacher'] }),
+        access: actingAccess(false),
+      });
+      await screen.findByRole('heading', { name: 'Ada Obi' });
+      expect(
+        screen.queryByRole('button', { name: 'More actions' })
+      ).not.toBeInTheDocument();
+      expect(screen.queryByText(/^1\. Roles/)).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: 'Next' })
+      ).not.toBeInTheDocument();
+      expect(screen.getAllByRole('switch').length).toBeGreaterThan(0);
+      for (const control of [
+        ...screen.getAllByRole('switch'),
+        ...screen.getAllByRole('checkbox'),
+      ]) {
+        expect(control).toBeDisabled();
+      }
+    });
+
+    it('offers the controls once the super admin has given a reason', async () => {
+      setup({
+        member: detail({ roles: ['member', 'teacher'] }),
+        access: actingAccess(true),
+      });
+      expect(
+        await screen.findByRole('button', { name: 'More actions' })
+      ).toBeInTheDocument();
+      expect(screen.getByText(/^1\. Roles/)).toBeInTheDocument();
+    });
   });
 });

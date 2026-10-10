@@ -1,5 +1,5 @@
 import { fireEvent, screen } from '@testing-library/react';
-import { renderWithApi, starterAccess } from '../test-utils';
+import { actingAccess, renderWithApi, starterAccess } from '../test-utils';
 import { CATALOGUE, IKEJA, LEKKI, summary } from '../test-members';
 import { MembersPage } from './members-page';
 
@@ -109,5 +109,20 @@ describe('MembersPage', () => {
     expect(
       screen.queryByRole('button', { name: 'Add member' })
     ).not.toBeInTheDocument();
+  });
+
+  it('lists members to a super admin acting read-only, with no Add member', async () => {
+    setup({}, actingAccess(false));
+    expect(await screen.findByText('Funmi Adeyemi')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Add member' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('offers Add member once a super admin acting has given a reason', async () => {
+    setup({}, actingAccess(true));
+    expect(
+      await screen.findByRole('button', { name: 'Add member' })
+    ).toBeInTheDocument();
   });
 });

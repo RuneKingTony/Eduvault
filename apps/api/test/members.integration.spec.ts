@@ -7,7 +7,13 @@ import {
 } from '@eduvault/api-contract';
 import { STARTER_ROLES, toPermissionMap } from '@eduvault/policy';
 import { syncAllStarterRoles } from '../src/app/common/auth/starter-roles';
-import { baseTest, expect, type Fixtures } from './support/base-test';
+import {
+  acting,
+  baseTest,
+  expect,
+  waitForAuditRows,
+  type Fixtures,
+} from './support/base-test';
 import { twoSchools, type TwoSchools } from './support/two-schools';
 
 type Actor = NonNullable<Parameters<Fixtures['api']>[0]>;
@@ -1017,6 +1023,136 @@ test.describe('members', () => {
         roles: ['teacher'],
         campusIds: [campusB.id],
       }).expect(404);
+    });
+  });
+
+  test.describe('acting', () => {
+    const REASON = 'SUP-3301 fix a title';
+
+    test('read-only acting lists and opens members across campuses', async ({
+      api,
+      createUser,
+      makeSuperAdmin,
+      schools: { orgA, owner, lekkiOnly, ikeja },
+      hire,
+    }) => {
+      const ikejaOnly = await hire(owner, { campusIds: [ikeja.id] });
+      const admin = await makeSuperAdmin(await createUser());
+      const listed = await api(admin)
+        .get('/members')
+        .set(acting(orgA.id))
+        .expect(200);
+      const ids = userIds(listed.body as MemberList);
+      expect(ids).toContain(lekkiOnly.id);
+      expect(ids).toContain(ikejaOnly.user.id);
+      const opened = await api(admin)
+        .get(`/members/${ikejaOnly.member.id}`)
+        .set(acting(orgA.id))
+        .expect(200);
+      expect((opened.body as MemberDetail).campusIds).toEqual([ikeja.id]);
+      await api(admin).get('/members/roles').set(acting(orgA.id)).expect(200);
+    });
+
+    test('without a reason every member write answers 403 ActingReadOnly', async ({
+      api,
+      createUser,
+      makeSuperAdmin,
+      schools: { orgA, owner, lekki },
+      hire,
+    }) => {
+      const target = await hire(owner, { campusIds: [lekki.id] });
+      const admin = await makeSuperAdmin(await createUser());
+      const readOnly = { code: 'ActingReadOnly' };
+      const post = await api(admin)
+        .post('/members')
+        .set(acting(orgA.id))
+        .send({ name: 'A', email: 'a@example.test', campusIds: [lekki.id] })
+        .expect(403);
+      expect(post.body).toMatchObject(readOnly);
+      const roles = await api(admin)
+        .put(`/members/${target.member.id}/roles`)
+        .set(acting(orgA.id))
+        .send({ roles: ['member', 'teacher'], campusIds: [lekki.id] })
+        .expect(403);
+      expect(roles.body).toMatchObject(readOnly);
+      const campuses = await api(admin)
+        .put(`/members/${target.member.id}/campuses`)
+        .set(acting(orgA.id))
+        .send({ campusIds: [lekki.id] })
+        .expect(403);
+      expect(campuses.body).toMatchObject(readOnly);
+      const removed = await api(admin)
+        .delete(`/members/${target.member.id}`)
+        .set(acting(orgA.id))
+        .expect(403);
+      expect(removed.body).toMatchObject(readOnly);
+      const after = await api(owner)
+        .get(`/members/${target.member.id}`)
+        .expect(200);
+      expect((after.body as MemberDetail).roles).toEqual(['member']);
+    });
+
+    test('with a reason a super admin edits, adds and removes, each audited', async ({
+      api,
+      pool,
+      createUser,
+      makeSuperAdmin,
+      schools: { orgA, owner, lekki },
+      hire,
+    }) => {
+      const target = await hire(owner, { campusIds: [lekki.id] });
+      const admin = await makeSuperAdmin(await createUser());
+      const roles = await api(admin)
+        .put(`/members/${target.member.id}/roles`)
+        .set(acting(orgA.id, REASON))
+        .send({ roles: ['member', 'teacher'], campusIds: [lekki.id] })
+        .expect(200);
+      expect((roles.body as MemberDetail).roles).toEqual(['member', 'teacher']);
+      const added = await api(admin)
+        .post('/members')
+        .set(acting(orgA.id, REASON))
+        .send({
+          name: 'Added',
+          email: 'added@example.test',
+          campusIds: [lekki.id],
+        })
+        .expect(201);
+      const created = added.body as CreateMemberResult;
+      expect(created.temporaryPassword).toEqual(expect.any(String));
+      await api(admin)
+        .delete(`/members/${created.member.id}`)
+        .set(acting(orgA.id, REASON))
+        .expect(200);
+      const rows = await waitForAuditRows(pool, { kind: 'acting' }, 3);
+      expect(rows.map((row) => [row.method, row.status, row.reason])).toEqual([
+        ['PUT', 200, REASON],
+        ['POST', 201, REASON],
+        ['DELETE', 200, REASON],
+      ]);
+      expect(rows.every((row) => row.path.startsWith('/members'))).toBe(true);
+    });
+
+    test('acting in one school cannot reach another school’s member', async ({
+      api,
+      createUser,
+      makeSuperAdmin,
+      schools: { orgA, ownerB, campusB },
+      hire,
+    }) => {
+      const theirs = await hire(ownerB, { campusIds: [campusB.id] });
+      const admin = await makeSuperAdmin(await createUser());
+      const reasoned = acting(orgA.id, REASON);
+      await api(admin)
+        .get(`/members/${theirs.member.id}`)
+        .set(reasoned)
+        .expect(404);
+      await putRoles(api, admin, { id: theirs.member.id, roles: ['member'] })
+        .set(reasoned)
+        .expect(404);
+      await api(admin)
+        .delete(`/members/${theirs.member.id}`)
+        .set(reasoned)
+        .expect(404);
     });
   });
 });
