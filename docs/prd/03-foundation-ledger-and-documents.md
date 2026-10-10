@@ -193,7 +193,7 @@ Contract types (`Replayed<T>`, `FileRef`, approval status unions) live in `@eduv
   - `ON DELETE RESTRICT`: organization, campus and student deletes refused once money exists (AC 11).
   - Isolation for each new table (`document_sequence`, `ledger_account`, `money_account`, `journal_entry`, `journal_line`, `file_object`): school B's ids answer 404 on every route, lists exclude them, and a journal line can't reference another school's account, student or campus (composite FK).
   - Files: type, size, scope and cross-school checks (AC 12–14).
-- E2E (opt-in, `eduvault-e2e`): record a transfer with a proof as Chika, double-submit the form, see one receipt and the "already recorded" toast; open the proof from the receipt; as Grace approve Chika's cancellation, as Chika see no approve button on her own.
+- E2E (required, `eduvault-e2e`): record a transfer with a proof as Chika, double-submit the form, see one receipt and the "already recorded" toast; open the proof from the receipt; as Grace approve Chika's cancellation, as Chika see no approve button on her own.
 
 ## Open decisions
 

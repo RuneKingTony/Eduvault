@@ -272,7 +272,7 @@ The payment methods are read and changed through `GET` and `PATCH /school-settin
   - Row created with every new school (hook) and backfilled by the migration.
   - Handover keeps at least one owner if the second Better Auth call fails (simulate failure); Better Auth's direct member-role route is guarded.
   - `DELETE /school` refused with one student; Better Auth's direct delete route refused.
-- E2E (opt-in): owner uploads a logo and sees it in the side nav; owner switches POS off and the bursar no longer sees POS when recording a payment (M3.4); owner hands the school to the administrator and the administrator then sees the Danger zone.
+- E2E (required, `eduvault-e2e`): owner uploads a logo and sees it in the side nav; owner switches POS off and the bursar no longer sees POS when recording a payment (M3.4); owner hands the school to the administrator and the administrator then sees the Danger zone.
 
 ## Open decisions
 

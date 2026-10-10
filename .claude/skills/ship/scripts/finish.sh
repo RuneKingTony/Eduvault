@@ -1,11 +1,12 @@
 #!/bin/bash
-# The human-requested finish, for `/ship <KEY> --finish` only: mark the PR ready, squash-merge it at the
-# head the merge gate saw, and close the issue. Nothing else in ship does any of the three. It refuses
-# unless the merge gate recorded pass and the PR is still open, mergeable, green and not held; it never
-# uses --admin and never merges around a red or pending check. Without --yes it prints the plan only.
-# Closing the issue runs without EDU_ORCHESTRATED, because the flag is the human's request.
+# The finish step, for `/ship <KEY> --finish` and for an `--auto-decide` run (which has no human gate): mark
+# the PR ready, squash-merge it at the head the merge gate saw, and close the issue. Nothing else in ship does
+# any of the three. It refuses unless the merge gate recorded pass and the PR is still open, mergeable, green
+# and not held; it never uses --admin and never merges around a red or pending check. Without --yes it
+# prints the plan only.
+# Closing the issue runs without EDU_ORCHESTRATED, because the request is explicit (--finish or --auto-decide).
 #
-# usage: finish.sh <KEY> [--yes]
+# usage: finish.sh <KEY> [--yes] [--via=auto-decide]   --via only labels the request in status.json
 # exit:  0 done (or, without --yes, ready to do)
 #        1 refused: checks not all green, conflicts with main, or a gh write failed (output says which)
 #        2 not at the gate: no PR recorded, or the merge gate has not recorded pass
@@ -15,9 +16,16 @@ set -u
 . "$(dirname "$0")/lib.sh"
 cd "$ROOT" || exit 1
 
-KEY=${1:-} YES=false
+KEY=${1:-} YES=false VIA=--finish
 [ -n "$KEY" ] || { sed -n '2,15p' "$0"; exit 2; }
-[ "${2:-}" = --yes ] && YES=true
+shift
+for a in "$@"; do
+  case "$a" in
+    --yes) YES=true ;;
+    --via=auto-decide) VIA=--auto-decide ;;
+    *) echo "unknown argument $a"; exit 2 ;;
+  esac
+done
 N=$(issue_num "$KEY") PR=$(st_get "$KEY" '.pr_url')
 [ -n "$PR" ] || { echo "no pr_url in status.json: nothing to finish for $KEY"; exit 2; }
 [ "$(st_get "$KEY" '.stages["merge-gate"].result')" = pass ] ||
@@ -54,8 +62,8 @@ if [ "$STATE" = OPEN ]; then
   gh pr merge "$PR" --squash --match-head-commit "$HEAD" >/dev/null 2>&1 ||
     { echo "gh pr merge refused (the head moved, or a rule blocks it): nothing was forced"; exit 1; }
 fi
-st_set "$KEY" '.merged = true | .finish = {at: $t, via: "--finish"}
-  | .stages["merge-gate"] = ((.stages["merge-gate"] // {}) + {result: "pass", via: "finish", at: $t})' --arg t "$(now_iso)"
+st_set "$KEY" '.merged = true | .finish = {at: $t, via: $v}
+  | .stages["merge-gate"] = ((.stages["merge-gate"] // {}) + {result: "pass", via: "finish", at: $t})' --arg t "$(now_iso)" --arg v "$VIA"
 
 CLOSE=$(env -u EDU_ORCHESTRATED bash "$GHI" close-issue "$N" --yes 2>&1) ||
   { echo "merged, but closing #$N failed: $(tail -c 200 <<<"$CLOSE" | tr '\n' ' ')"; exit 1; }

@@ -45,9 +45,10 @@ send it back once, `bash $W/worker.sh dispatch <KEY> simplify --note "<the defer
 stays deferred on the second pass goes to the PR body. To rerun any stage with extra instructions, use `--note`
 (`state.sh note <KEY> <stage> "<text>"` for a subagent stage); never edit a prompt template.
 
-**fix-blockers.** `review` blockers + majors + unmet criteria + `security` blockers (0 when skipped) == 0:
-`state.sh stage <KEY> fix-blockers skipped`; else the worker stage. Minors don't route here: they go to the PR
-body under "Unresolved review findings", as do the majors fix-blockers defers with a reason.
+**fix-blockers.** `review` blockers + majors + minors + unmet criteria + `security` blockers, majors and minors
+(0 when skipped) == 0: `state.sh stage <KEY> fix-blockers skipped`; else the worker stage, which fixes every
+finding, minors included. Only a finding fix-blockers defers with a concrete reason (`deferred` in its handoff)
+goes to the PR body under "Unresolved review findings"; a fixed finding never does.
 
 **e2e (required).** Runs whenever `e2e-gate.sh` reports `browser`, which it does for every product-code change (ADR 0004, amended; D-051). Only a `skip` verdict (docs, tests, tooling, `.claude`) goes straight to `push`.
 
@@ -78,17 +79,21 @@ halt). The PR stays a draft.
 
 **merge-gate.** `$R/merge-gate.md`.
 
-**finish** (only `/ship <KEY> --finish`: the human asks to merge and close). `state.sh next` must report
-`next: cleanup` with `awaiting_merge: true`; anything earlier: halt "nothing to finish: <KEY> is at <stage>".
-`bash $W/finish.sh <KEY>` prints the plan (mark ready, squash-merge at the gate's head, close the issue);
-echo it in one line, then `bash $W/finish.sh <KEY> --yes`. Exit 1: halt with its output, nothing is forced;
-2: the gate hasn't passed, run it; 21: PR not open; 23: held. After exit 0 `state.sh next` reports `MERGED`:
-run **cleanup** as usual, and the final report says the PR is merged and the issue closed.
+**finish** (`/ship <KEY> --finish`, where the human asks to merge and close, and automatically for an
+`--auto-decide` run, which has no human gate: it runs right after the merge gate passes, in the same run).
+`state.sh next` must report `next: cleanup` with `awaiting_merge: true`; anything earlier: halt "nothing to
+finish: <KEY> is at <stage>". `bash $W/finish.sh <KEY>` prints the plan (mark ready, squash-merge at the gate's
+head, close the issue); echo it in one line, then `bash $W/finish.sh <KEY> --yes`, adding `--via=auto-decide`
+when the run is `--auto-decide` (it is only recorded in status.json). Exit 1: halt with its output, nothing is
+forced; 2: the gate hasn't passed, run it; 21: PR not open; 23: held (`hold-merge`): not a halt, release
+and report it, the ticket parks as `held` until the human lifts the label and merges. After exit 0
+`state.sh next` reports `MERGED`: run **cleanup** as usual, and the final report says the PR is merged and
+the issue closed.
 
 **cleanup.** Each step idempotent: `bash $W/worker.sh close <KEY>`; `bash $W/stack.sh down <KEY> $RUN_ID` (exit 4: as in e2e step 5);
 `bash $W/worktree.sh remove <KEY> $RUN_ID`. Exit 1 "not MERGED" is the normal outcome before the human
-merges: do not record `cleanup pass`, and say that re-running `/ship <KEY>` after the merge removes the
-worktree. Merged (`next` reported `pr_state: MERGED`): exit 0 -> `state.sh stage <KEY> cleanup pass`; exit 3
+merges (a run that is not `--auto-decide`, or one held by `hold-merge`): do not record `cleanup pass`, and say
+that re-running `/ship <KEY>` after the merge removes the worktree. Merged (`next` reported `pr_state: MERGED`): exit 0 -> `state.sh stage <KEY> cleanup pass`; exit 3
 (gh/fetch failed): report, never force. Always release `$LOCK` before reporting. Final report: the PR URL,
 `bash $W/report.sh <KEY>`'s `.line`, any `## Human checks`, and _"CI is green on the draft PR: mark it ready
 and merge it, then close <KEY>. Re-run /ship <KEY> afterwards to remove the worktree."_

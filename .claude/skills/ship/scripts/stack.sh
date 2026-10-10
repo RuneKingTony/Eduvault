@@ -25,6 +25,8 @@ shift 2
 FORCE=false; for a in "$@"; do [ "$a" = --force ] && FORCE=true; done
 D=$(key_dir "$KEY") TREE=$(st_get "$KEY" '.worktree_path')
 E2E=$ROOT/.claude/skills/eduvault-e2e/scripts
+# A ticket that changes the e2e tooling must be tested with its own copy, not the launcher checkout's.
+[ -d "$TREE/.claude/skills/eduvault-e2e/scripts" ] && E2E=$TREE/.claude/skills/eduvault-e2e/scripts
 SW=$E2E/stack-worktree.sh
 NAME=$(basename "${TREE:-none}")
 STATE=$ROOT/var/e2e/stacks/$NAME/state.json

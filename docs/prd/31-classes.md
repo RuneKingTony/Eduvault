@@ -222,7 +222,7 @@ New module `apps/api/src/app/modules/class`. Contract under `contract.classes` a
   - Archiving refused with a current-term placement; allowed once none remain.
   - School creation seeds the level ladder; a level's next level from another school is refused.
   - Graduate (M2.5): all-or-nothing when one student isn't on the roster; enrolments completed; school memberships of graduates removed.
-- E2E (opt-in): administrator creates a class and adds a lead teacher; the teacher persona then sees only that class; teacher can't open another class (404 page).
+- E2E (required, `eduvault-e2e`): administrator creates a class and adds a lead teacher; the teacher persona then sees only that class; teacher can't open another class (404 page).
 
 ## Open decisions
 

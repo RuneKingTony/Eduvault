@@ -203,7 +203,7 @@ Term, week and holidays come from `GET /calendar/current` and `GET /calendar/day
   - 403 for each route without its `readOwn` permission, including a staff member with only `read`.
   - Statement and family totals against real journal rows, matching the staff Who owes figures for the same students [testing-002].
   - Purchases return frozen sale prices after an item price change.
-- E2E (opt-in, `eduvault-e2e`): sign in as the guardian persona, switch children, open Fees and Purchases; sign in as the student persona and check My children is absent; try a sibling's id in the URL.
+- E2E (required, `eduvault-e2e`): sign in as the guardian persona, switch children, open Fees and Purchases; sign in as the student persona and check My children is absent; try a sibling's id in the URL.
 
 ## Open decisions
 

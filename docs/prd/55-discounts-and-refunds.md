@@ -218,7 +218,7 @@ Approve and decline use a conditional update `WHERE status = 'submitted'`; zero 
   - Self-approval refused by the service (409) and by the DB check on a direct update.
   - Switched-off approval leaves `approved_by` null and posts at once.
   - Permissions: 403 for each route without its permission; acting read-only writes 403.
-- E2E (opt-in): bursar asks for a refund from "Pay the extra back", principal approves it in Approvals, the statement and cash book update; bursar submits a discount and it appears as Waiting.
+- E2E (required, `eduvault-e2e`): bursar asks for a refund from "Pay the extra back", principal approves it in Approvals, the statement and cash book update; bursar submits a discount and it appears as Waiting.
 
 ## Open decisions
 

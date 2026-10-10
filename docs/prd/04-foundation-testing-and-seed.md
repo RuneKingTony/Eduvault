@@ -228,7 +228,7 @@ No product endpoints. The seed and the e2e provisioning use the product API only
 
 - Unit (`nx run api:test`): seed date shifter (offset applied to dates and timestamps, `SEED_TODAY` override, weekday-preserving shift); fee-line and payment tables in the seed match the prototype's totals (pure data checks).
 - Integration (`api:test-integration`): `seed.integration.spec.ts` runs the seed against the test container once and asserts rule 16 and the persona counts in Screens (campus and class scope through the real API); fixtures replaced in rule 3 each covered by the existing `auth`, `crud` and `tenancy` specs, rewritten to custom roles; `twoSchools()` used by `tenancy.integration.spec.ts` for the existing student, campus and school-account routes as the first users of the pattern.
-- E2E (opt-in, `eduvault-e2e`): provisioning per rule 17 at each milestone; one read-only browser tour per seeded persona against the seeded Greenfield (screenshot of the landing page and the nav).
+- E2E (required, `eduvault-e2e`): provisioning per rule 17 at each milestone; one read-only browser tour per seeded persona against the seeded Greenfield (screenshot of the landing page and the nav).
 
 ## Open decisions
 

@@ -181,7 +181,7 @@ Today's `web-admin` `app.tsx` shows `CreateSchoolForm` at step 4; it is removed,
   - No-membership user: `/me/permissions` and a school route answer 403 `NoSchool`.
   - `bootstrap-admin` is idempotent and refuses to promote an existing ordinary user.
   - `base-test.ts` gains a server-side user helper and a super admin helper; existing specs stop using HTTP sign-up.
-- E2E (opt-in, `eduvault-e2e`): super admin bootstrap → create school → owner signs in with the temporary password → changes it → lands on Dashboard. The personas script switches from sign-up to this path.
+- E2E (required, `eduvault-e2e`): super admin bootstrap → create school → owner signs in with the temporary password → changes it → lands on Dashboard. The personas script switches from sign-up to this path.
 
 ## Open decisions
 

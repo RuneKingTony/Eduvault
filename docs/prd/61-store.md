@@ -492,7 +492,7 @@ Contract types in `@eduvault/api-contract` under `contract.store`. Every handler
   - Ledger: each flow's journal entry balances. After a sale the student's balance is unchanged and Store stock falls by the frozen cost. After any mix of deliveries, sales and approved counts, 1300 per campus equals Σ `value_minor` for that store, and selling the last unit leaves a value of 0.
   - Approvals: self-approval and self-decline are refused by API and DB check. A switched-off write-off posts with `approved_by` null. One waiting count per store.
   - Opening stock: once per store.
-- E2E (opt-in, `eduvault-e2e`):
+- E2E (required, `eduvault-e2e`):
   - Bursar records a delivery, then sells to a student by cash, and the statement shows a charge and an equal payment.
   - Bursar submits a count with a shortage; the principal approves it in Approvals; stock and Store stock losses update.
   - Foreign-school user and teacher are refused.

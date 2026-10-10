@@ -204,7 +204,7 @@ Scopes: a leave request is visible to an approver when the requester shares at l
   - Status transitions: withdraw, approve, decline only from `submitted`; concurrent approve gives one 200 and one 409.
   - Portal-only member gets 403 on `POST /leave`.
   - Overlap refused (LV-8).
-- **E2E (opt-in, `eduvault-e2e`)**: teacher persona requests leave; owner approves it from Approvals; teacher sees "Approved by …"; owner cannot act on a request they made.
+- **E2E (required, `eduvault-e2e`)**: teacher persona requests leave; owner approves it from Approvals; teacher sees "Approved by …"; owner cannot act on a request they made.
 
 ## Open decisions
 

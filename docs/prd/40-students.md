@@ -492,7 +492,7 @@ Start new school year:
     - a target year or class from school B answers 404; a student on a campus outside scope answers 404;
     - 403 without `enrollment:place`; 403 for a `graduate` row without `student:archive`;
     - 409 when no target year exists, and when `targetYearId` isn't the target.
-- **E2E (opt-in)**
+- **E2E (required, `eduvault-e2e`)**
   - Administrator: mark not seen since 40 days ago, see Inactive, back in school, record leaving, find the student on Left, undo the leaving.
   - Administrator: move for next term to another campus; the history shows both terms.
   - Administrator: start the next school year with one repeater, make its first term current, and see the movers in their new classes.

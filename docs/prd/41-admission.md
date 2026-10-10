@@ -259,7 +259,7 @@ The module stays `student`. Admission is a new handler on it, not a separate mod
   - Concurrent admissions get distinct numbers.
   - `require_guardian` and `max_guardians` enforced server-side.
   - Student login created with `mustChangePassword`.
-- **E2E (opt-in, `eduvault-e2e`)**
+- **E2E (required, `eduvault-e2e`)**
   - Administrator admits a student with one new email guardian and one existing guardian, lands on the student page, and sees both guardians and the class.
   - A campus-scoped admitter sees only their campus's classes.
   - The teacher persona has no Admit button.

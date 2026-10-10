@@ -204,7 +204,7 @@ New module `ledger` (accounts and journal) and `money-account`. Contract types i
   - `UNIQUE (organization_id, reference)` makes a second `OPEN-<student_id>` a no-op.
   - Category code race: two concurrent creates under 4000 produce one 201 and one 409.
   - 403 for each endpoint without its permission; 403 for acting read-only writes.
-- E2E (opt-in, `eduvault-e2e`): owner adds a money account and sees it selected; Lekki bursar sees the hidden-accounts callout and cannot reach the GTBank cash book by URL.
+- E2E (required, `eduvault-e2e`): owner adds a money account and sees it selected; Lekki bursar sees the hidden-accounts callout and cannot reach the GTBank cash book by URL.
 
 ## Open decisions
 

@@ -256,7 +256,7 @@ Owned by M2.2 (Settings, "Admissions rules", section "Guardians"). Cited here be
   - Class scope narrows `GET /guardians` and `GET /guardians/:id` as it narrows students.
   - Reset login: 403 without `guardian:update`, 404 out of scope, 409 for a staff user; the old password fails afterwards.
   - Photo: a file id from another school, or one already attached, answers 400.
-- **E2E (opt-in)**
+- **E2E (required, `eduvault-e2e`)**
   - Administrator adds an existing guardian to a second child from the expand row; the guardian's profile card lists both children.
   - Administrator adds a username guardian; then sign in to web-portal with the shown credentials and get the change-password screen (with M2.8).
 

@@ -199,7 +199,7 @@ POST `/billing-runs` is naturally idempotent (rule 2): a retried request creates
   - Money: the partial unique index blocks a second non-cancelled term charge; concurrent prepares (two transactions) create one charge per student; send posts one balanced entry per charge with reference = number; resend 409 with no new entries; cancel posts nothing and frees the students; posting with a reused reference returns the earlier entry; every journal line on 1100 carries `student_id`; Σ debits = Σ credits per entry; the student balance after send equals the previous balance plus the charge total.
   - Numbering: `BR-` and `CHG-` come from `document_sequence`, per school (school B starts its own sequence).
   - Lifecycle: inactive, left, graduated and withdrawn students are excluded.
-- E2E (opt-in, `eduvault-e2e`): bursar prepares Second term, opens the round, checks a charge, sends it, sees the charges in Charges and the balance in Who owes; prepares again and sees "Nothing new"; prepares, cancels, prepares again.
+- E2E (required, `eduvault-e2e`): bursar prepares Second term, opens the round, checks a charge, sends it, sees the charges in Charges and the balance in Who owes; prepares again and sees "Nothing new"; prepares, cancels, prepares again.
 
 ## Open decisions
 

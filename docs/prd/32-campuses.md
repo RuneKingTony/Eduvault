@@ -125,7 +125,7 @@ Module `apps/api/src/app/modules/campus` (exists). Contract `contract.campuses`.
 
 - Unit: count rules (rule 6) against fixtures; the principal lookup. web-admin: description and callout per scope; "New campus" and "Edit" per permission.
 - Integration (`api:test-integration`): existing `tenancy.integration.spec.ts` campus cases keep passing; add `GET /campuses/summary` for 403 without `team:read`, scope filtering, and another school's campus 404 [tenancy-002]; duplicate name 409; delete refused when a `class_arm` references the campus (and the Better Auth team survives); create rolls back the team if the `campus` insert fails.
-- E2E (opt-in): administrator adds a campus, switches the active campus to it from the switcher, and sees it in the class campus picker.
+- E2E (required, `eduvault-e2e`): administrator adds a campus, switches the active campus to it from the switcher, and sees it in the class campus picker.
 
 ## Open decisions
 

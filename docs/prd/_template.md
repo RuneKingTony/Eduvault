@@ -52,7 +52,7 @@ Given / When / Then, one per rule and per screen state that matters.
 
 - Unit (`nx run <project>:test`)
 - Integration (`api:test-integration`): an isolation test for each new table and route [tenancy-002], plus permission and money rules against real Postgres [testing-002]
-- E2E (opt-in, `eduvault-e2e`): the flows worth driving in a browser
+- E2E (required, `eduvault-e2e`): the browser flows that must end in PASS before the PR leaves draft (D-051)
 
 ## Open decisions
 

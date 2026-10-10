@@ -1,6 +1,6 @@
 # merge-gate: read when pr has passed
 
-The gate waits for CI and stops. A human merges. `bash $W/state.sh stage <KEY> merge-gate running`, then
+The gate waits for CI and stops; it never merges. The merge is the **finish** step (`$R/stages.md`): the human's `--finish`, or this run itself when it is `--auto-decide`. Otherwise a human merges. `bash $W/state.sh stage <KEY> merge-gate running`, then
 in the background `bash $W/merge-gate.sh <KEY> $RUN_ID` (it prints `waiting on <checks> (<elapsed>)` as CI
 moves; relay the latest when asked):
 
@@ -14,5 +14,5 @@ moves; relay the latest when asked):
 | 30   | halt: timed out waiting for checks                                                                                                                                                                                                                                                                                                                                                                 |
 
 Never `gh pr merge`, never `--admin`, never `gh pr ready` from here. After exit 0 the final report says CI is
-green and the PR is ready for a human to mark ready and merge, or to run `/ship <KEY> --finish`, which does
-both and closes the issue through `finish.sh` (`$R/stages.md`, finish).
+green. A `--auto-decide` run goes straight to finish (`$R/stages.md`). Otherwise the PR is ready for a human to
+mark ready and merge, or to run `/ship <KEY> --finish`, which does both and closes the issue through `finish.sh`.

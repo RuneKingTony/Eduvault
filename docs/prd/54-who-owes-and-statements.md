@@ -184,7 +184,7 @@ The portal (M3.7) reuses the statement services behind `readOwn` routes; not spe
   - Balances computed from real journal rows match the ledger; a leaver keeps their debt in "owing_gone".
   - Received this term counts only in-scope allocations of a split payment.
   - 403 without either read permission; 200 with either one (any-of guard).
-- E2E (opt-in): bursar filters Who owes, opens a statement, records a payment from it and sees the balance drop without leaving the page; opens the family view.
+- E2E (required, `eduvault-e2e`): bursar filters Who owes, opens a statement, records a payment from it and sees the balance drop without leaving the page; opens the family view.
 
 ## Open decisions
 

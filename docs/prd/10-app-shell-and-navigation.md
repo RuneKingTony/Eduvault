@@ -327,7 +327,7 @@ There is no theme button in the topbar; the theme switch is in the user menu.
   - Acting headers on `/me/permissions`: honoured for `superadmin`, ignored for everyone else, 404 for an unknown school.
   - `ErrorFilter` maps a `23514` check violation to 409 (`error.filter.spec.ts` unit case too).
   - With M3.5: `/approvals/counts` excludes own and out-of-scope items.
-- E2E (opt-in, `eduvault-e2e`): sign in as each persona and check the visible nav; the teacher's redirect from `/finance/school-fees`; the bursar's 404 on an Ikeja student; rail toggle and the mobile sheet; school switch with two schools.
+- E2E (required, `eduvault-e2e`): sign in as each persona and check the visible nav; the teacher's redirect from `/finance/school-fees`; the bursar's 404 on an Ikeja student; rail toggle and the mobile sheet; school switch with two schools.
 
 ## Open decisions
 
