@@ -1,7 +1,8 @@
 export const statements = {
   team: ['read', 'create', 'update', 'delete'],
   campus: ['readAll'],
-  schoolAccount: ['read', 'update', 'create', 'delete'],
+  schoolAccount: ['read', 'update'],
+  organization: ['update', 'delete'],
   student: ['create', 'read', 'update'],
   feeSchedule: ['create', 'read', 'update', 'delete'],
   member: ['create', 'read', 'update', 'delete'],
@@ -42,6 +43,8 @@ export const SENSITIVE: readonly Permission[] = [
   'ac:create',
   'ac:update',
   'ac:delete',
+  'organization:update',
+  'organization:delete',
 ];
 
 export const PERM_HELP: Partial<Record<Permission, string>> = {
@@ -51,12 +54,17 @@ export const PERM_HELP: Partial<Record<Permission, string>> = {
   'member:update':
     'Gives people roles, but only roles whose permissions they hold too.',
   'ac:create': 'Creates roles, using only what they can do themselves.',
+  'organization:update':
+    'Hands the school over to another owner. Only an owner can do it.',
+  'organization:delete':
+    'Deletes the school when it has no students. Only an owner can do it.',
 };
 
 const RESOURCE_LABELS: Record<Resource, string> = {
   team: 'Campuses',
   campus: 'Campus reach',
   schoolAccount: 'School settings',
+  organization: 'School',
   student: 'Students',
   feeSchedule: 'Fee schedules',
   member: 'Staff',

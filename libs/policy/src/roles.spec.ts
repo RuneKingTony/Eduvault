@@ -78,6 +78,22 @@ describe('roles', () => {
     }
   });
 
+  it('gives the administrator schoolAccount:read, campus management and reach, and the principal team:read', () => {
+    const administrator = starter('administrator');
+    expect(administrator.schoolAccount).toEqual(['read']);
+    expect(administrator.team).toEqual(['read', 'create', 'update']);
+    expect(administrator.campus).toEqual(['readAll']);
+    expect(starter('principal').team).toEqual(['read']);
+  });
+
+  it('parses a stored role that still carries the dropped schoolAccount create and delete', () => {
+    expect(
+      parsePermissionMap(
+        '{"schoolAccount":["read","create","update","delete"],"student":["read"]}'
+      )
+    ).toEqual({ schoolAccount: ['read', 'update'], student: ['read'] });
+  });
+
   it('gives the owner every ac permission', () => {
     expect(resolvePermissions(['owner'], {}).ac).toEqual([
       'create',

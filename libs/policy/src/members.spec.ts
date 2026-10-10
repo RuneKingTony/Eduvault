@@ -1,4 +1,5 @@
 import {
+  handoverRoles,
   isPortalOnly,
   needsCampusStep,
   permissionsOfRoles,
@@ -118,5 +119,28 @@ describe('roleDiff', () => {
       added: [],
       removed: [],
     });
+  });
+});
+
+describe('handoverRoles', () => {
+  it('gives the target owner in place of the senior roles', () => {
+    expect(
+      handoverRoles(['member', 'administrator', 'teacher'], ['member', 'owner'])
+        .target
+    ).toEqual(['member', 'teacher', 'owner']);
+    expect(
+      handoverRoles(['member', 'principal'], ['member', 'owner']).target
+    ).toEqual(['member', 'owner']);
+  });
+
+  it('adds member when the target holds no roles', () => {
+    expect(handoverRoles([], ['owner']).target).toEqual(['member', 'owner']);
+  });
+
+  it('takes owner from the caller and keeps the rest, or member', () => {
+    expect(
+      handoverRoles(['member'], ['member', 'owner', 'bursar']).caller
+    ).toEqual(['member', 'bursar']);
+    expect(handoverRoles(['member'], ['owner']).caller).toEqual(['member']);
   });
 });

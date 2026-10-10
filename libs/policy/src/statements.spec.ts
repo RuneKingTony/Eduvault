@@ -44,6 +44,23 @@ describe('statements', () => {
     expect(permLabel('ac:update')).toBe('Roles: update');
   });
 
+  it('has no schoolAccount create or delete and lists organization update and delete as sensitive', () => {
+    expect(ALL_PERMISSIONS).toEqual(
+      expect.arrayContaining([
+        'schoolAccount:read',
+        'schoolAccount:update',
+        'organization:update',
+        'organization:delete',
+      ])
+    );
+    expect(ALL_PERMISSIONS).not.toContain('schoolAccount:create');
+    expect(ALL_PERMISSIONS).not.toContain('schoolAccount:delete');
+    expect(SENSITIVE).toEqual(
+      expect.arrayContaining(['organization:update', 'organization:delete'])
+    );
+    expect(permLabel('organization:delete')).toBe('School: delete');
+  });
+
   it('keeps SENSITIVE and PERM_HELP to listed permissions', () => {
     for (const permission of SENSITIVE) {
       expect(ALL_PERMISSIONS).toContain(permission);

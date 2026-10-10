@@ -6,6 +6,9 @@ export const SENIOR_ROLES: readonly string[] = [
   'administrator',
   'principal',
 ];
+export const SUPERSEDED_BY_OWNER: readonly string[] = SENIOR_ROLES.filter(
+  (slug) => slug !== OWNER_ROLE
+);
 export const PORTAL_ROLES: readonly string[] = ['student', 'guardian'];
 
 export const PORTAL_SAFE_ROLES: ReadonlySet<string> = new Set([
@@ -82,4 +85,22 @@ export function validateRoleCombo(check: RoleComboCheck): string | undefined {
     return `${memberName} is a portal user (student or guardian) and can’t be given ${staffRoles.join(', ')}.`;
   }
   return undefined;
+}
+
+export interface HandoverRoles {
+  target: string[];
+  caller: string[];
+}
+
+export function handoverRoles(
+  targetRoles: readonly string[],
+  callerRoles: readonly string[]
+): HandoverRoles {
+  return {
+    target: withMemberRole([
+      ...targetRoles.filter((slug) => !SUPERSEDED_BY_OWNER.includes(slug)),
+      OWNER_ROLE,
+    ]),
+    caller: withMemberRole(callerRoles.filter((slug) => slug !== OWNER_ROLE)),
+  };
 }
