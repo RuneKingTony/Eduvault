@@ -16,6 +16,7 @@ import { Route as FeesRouteImport } from './routes/fees'
 import { Route as MembersRouteImport } from './routes/members'
 import { Route as PlatformRouteImport } from './routes/platform'
 import { Route as RolesRouteImport } from './routes/roles'
+import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as StudentsRouteImport } from './routes/students'
 import { Route as DevUiRouteImport } from './routes/dev/ui'
 import { Route as MembersMemberIdRouteImport } from './routes/members_.$memberId'
@@ -23,6 +24,10 @@ import { Route as PlatformIndexRouteImport } from './routes/platform.index'
 import { Route as PlatformAuditRouteImport } from './routes/platform.audit'
 import { Route as RolesRoleSlugRouteImport } from './routes/roles_.$roleSlug'
 import { Route as RolesNewRouteImport } from './routes/roles_.new'
+import { Route as SettingsIndexRouteImport } from './routes/settings.index'
+import { Route as SettingsAdmissionsRouteImport } from './routes/settings.admissions'
+import { Route as SettingsDangerRouteImport } from './routes/settings.danger'
+import { Route as SettingsProfileRouteImport } from './routes/settings.profile'
 import { Route as PlatformSchoolsIndexRouteImport } from './routes/platform.schools.index'
 import { Route as PlatformSchoolsSchoolIdRouteImport } from './routes/platform.schools.$schoolId'
 
@@ -61,6 +66,11 @@ const RolesRoute = RolesRouteImport.update({
   path: '/roles',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const StudentsRoute = StudentsRouteImport.update({
   id: '/students',
   path: '/students',
@@ -96,6 +106,26 @@ const RolesNewRoute = RolesNewRouteImport.update({
   path: '/roles/new',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsIndexRoute = SettingsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => SettingsRoute,
+} as any)
+const SettingsAdmissionsRoute = SettingsAdmissionsRouteImport.update({
+  id: '/admissions',
+  path: '/admissions',
+  getParentRoute: () => SettingsRoute,
+} as any)
+const SettingsDangerRoute = SettingsDangerRouteImport.update({
+  id: '/danger',
+  path: '/danger',
+  getParentRoute: () => SettingsRoute,
+} as any)
+const SettingsProfileRoute = SettingsProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => SettingsRoute,
+} as any)
 const PlatformSchoolsIndexRoute = PlatformSchoolsIndexRouteImport.update({
   id: '/schools/',
   path: '/schools/',
@@ -115,13 +145,18 @@ export interface FileRoutesByFullPath {
   '/members': typeof MembersRoute
   '/platform': typeof PlatformRouteWithChildren
   '/roles': typeof RolesRoute
+  '/settings': typeof SettingsRouteWithChildren
   '/students': typeof StudentsRoute
   '/dev/ui': typeof DevUiRoute
   '/members/$memberId': typeof MembersMemberIdRoute
   '/platform/audit': typeof PlatformAuditRoute
   '/roles/$roleSlug': typeof RolesRoleSlugRoute
   '/roles/new': typeof RolesNewRoute
+  '/settings/admissions': typeof SettingsAdmissionsRoute
+  '/settings/danger': typeof SettingsDangerRoute
+  '/settings/profile': typeof SettingsProfileRoute
   '/platform/': typeof PlatformIndexRoute
+  '/settings/': typeof SettingsIndexRoute
   '/platform/schools/$schoolId': typeof PlatformSchoolsSchoolIdRoute
   '/platform/schools/': typeof PlatformSchoolsIndexRoute
 }
@@ -138,7 +173,11 @@ export interface FileRoutesByTo {
   '/platform/audit': typeof PlatformAuditRoute
   '/roles/$roleSlug': typeof RolesRoleSlugRoute
   '/roles/new': typeof RolesNewRoute
+  '/settings/admissions': typeof SettingsAdmissionsRoute
+  '/settings/danger': typeof SettingsDangerRoute
+  '/settings/profile': typeof SettingsProfileRoute
   '/platform': typeof PlatformIndexRoute
+  '/settings': typeof SettingsIndexRoute
   '/platform/schools/$schoolId': typeof PlatformSchoolsSchoolIdRoute
   '/platform/schools': typeof PlatformSchoolsIndexRoute
 }
@@ -151,13 +190,18 @@ export interface FileRoutesById {
   '/members': typeof MembersRoute
   '/platform': typeof PlatformRouteWithChildren
   '/roles': typeof RolesRoute
+  '/settings': typeof SettingsRouteWithChildren
   '/students': typeof StudentsRoute
   '/dev/ui': typeof DevUiRoute
   '/members_/$memberId': typeof MembersMemberIdRoute
   '/platform/audit': typeof PlatformAuditRoute
   '/roles_/$roleSlug': typeof RolesRoleSlugRoute
   '/roles_/new': typeof RolesNewRoute
+  '/settings/admissions': typeof SettingsAdmissionsRoute
+  '/settings/danger': typeof SettingsDangerRoute
+  '/settings/profile': typeof SettingsProfileRoute
   '/platform/': typeof PlatformIndexRoute
+  '/settings/': typeof SettingsIndexRoute
   '/platform/schools/$schoolId': typeof PlatformSchoolsSchoolIdRoute
   '/platform/schools/': typeof PlatformSchoolsIndexRoute
 }
@@ -171,13 +215,18 @@ export interface FileRouteTypes {
     | '/members'
     | '/platform'
     | '/roles'
+    | '/settings'
     | '/students'
     | '/dev/ui'
     | '/members/$memberId'
     | '/platform/audit'
     | '/roles/$roleSlug'
     | '/roles/new'
+    | '/settings/admissions'
+    | '/settings/danger'
+    | '/settings/profile'
     | '/platform/'
+    | '/settings/'
     | '/platform/schools/$schoolId'
     | '/platform/schools/'
   fileRoutesByTo: FileRoutesByTo
@@ -194,7 +243,11 @@ export interface FileRouteTypes {
     | '/platform/audit'
     | '/roles/$roleSlug'
     | '/roles/new'
+    | '/settings/admissions'
+    | '/settings/danger'
+    | '/settings/profile'
     | '/platform'
+    | '/settings'
     | '/platform/schools/$schoolId'
     | '/platform/schools'
   id:
@@ -206,13 +259,18 @@ export interface FileRouteTypes {
     | '/members'
     | '/platform'
     | '/roles'
+    | '/settings'
     | '/students'
     | '/dev/ui'
     | '/members_/$memberId'
     | '/platform/audit'
     | '/roles_/$roleSlug'
     | '/roles_/new'
+    | '/settings/admissions'
+    | '/settings/danger'
+    | '/settings/profile'
     | '/platform/'
+    | '/settings/'
     | '/platform/schools/$schoolId'
     | '/platform/schools/'
   fileRoutesById: FileRoutesById
@@ -225,6 +283,7 @@ export interface RootRouteChildren {
   MembersRoute: typeof MembersRoute
   PlatformRoute: typeof PlatformRouteWithChildren
   RolesRoute: typeof RolesRoute
+  SettingsRoute: typeof SettingsRouteWithChildren
   StudentsRoute: typeof StudentsRoute
   DevUiRoute: typeof DevUiRoute
   MembersMemberIdRoute: typeof MembersMemberIdRoute
@@ -283,6 +342,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RolesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/students': {
       id: '/students'
       path: '/students'
@@ -332,6 +398,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RolesNewRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings/': {
+      id: '/settings/'
+      path: '/'
+      fullPath: '/settings/'
+      preLoaderRoute: typeof SettingsIndexRouteImport
+      parentRoute: typeof SettingsRoute
+    }
+    '/settings/admissions': {
+      id: '/settings/admissions'
+      path: '/admissions'
+      fullPath: '/settings/admissions'
+      preLoaderRoute: typeof SettingsAdmissionsRouteImport
+      parentRoute: typeof SettingsRoute
+    }
+    '/settings/danger': {
+      id: '/settings/danger'
+      path: '/danger'
+      fullPath: '/settings/danger'
+      preLoaderRoute: typeof SettingsDangerRouteImport
+      parentRoute: typeof SettingsRoute
+    }
+    '/settings/profile': {
+      id: '/settings/profile'
+      path: '/profile'
+      fullPath: '/settings/profile'
+      preLoaderRoute: typeof SettingsProfileRouteImport
+      parentRoute: typeof SettingsRoute
+    }
     '/platform/schools/': {
       id: '/platform/schools/'
       path: '/schools'
@@ -367,6 +461,24 @@ const PlatformRouteWithChildren = PlatformRoute._addFileChildren(
   PlatformRouteChildren,
 )
 
+interface SettingsRouteChildren {
+  SettingsAdmissionsRoute: typeof SettingsAdmissionsRoute
+  SettingsDangerRoute: typeof SettingsDangerRoute
+  SettingsProfileRoute: typeof SettingsProfileRoute
+  SettingsIndexRoute: typeof SettingsIndexRoute
+}
+
+const SettingsRouteChildren: SettingsRouteChildren = {
+  SettingsAdmissionsRoute: SettingsAdmissionsRoute,
+  SettingsDangerRoute: SettingsDangerRoute,
+  SettingsProfileRoute: SettingsProfileRoute,
+  SettingsIndexRoute: SettingsIndexRoute,
+}
+
+const SettingsRouteWithChildren = SettingsRoute._addFileChildren(
+  SettingsRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ApprovalsRoute: ApprovalsRoute,
@@ -375,6 +487,7 @@ const rootRouteChildren: RootRouteChildren = {
   MembersRoute: MembersRoute,
   PlatformRoute: PlatformRouteWithChildren,
   RolesRoute: RolesRoute,
+  SettingsRoute: SettingsRouteWithChildren,
   StudentsRoute: StudentsRoute,
   DevUiRoute: DevUiRoute,
   MembersMemberIdRoute: MembersMemberIdRoute,

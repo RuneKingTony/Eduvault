@@ -1,3 +1,4 @@
+import { QueryObserver } from '@tanstack/react-query';
 import { ApiError } from '@eduvault/api-contract';
 import { createQueryClient } from './query-client';
 import { ME_KEY } from '@eduvault/auth-client';
@@ -16,7 +17,10 @@ describe('query client', () => {
         queryFn: () => Promise.reject(forbidden()),
       })
       .catch(() => undefined);
-    expect(spy).toHaveBeenCalledWith({ queryKey: ME_PERMISSIONS_KEY });
+    expect(spy).toHaveBeenCalledWith(
+      { queryKey: ME_PERMISSIONS_KEY },
+      { cancelRefetch: false }
+    );
   });
 
   it('refetches the access after a 403 from a mutation', async () => {
@@ -27,7 +31,38 @@ describe('query client', () => {
       .build(client, { mutationFn: () => Promise.reject(forbidden()) })
       .execute(undefined)
       .catch(() => undefined);
-    expect(spy).toHaveBeenCalledWith({ queryKey: ME_PERMISSIONS_KEY });
+    expect(spy).toHaveBeenCalledWith(
+      { queryKey: ME_PERMISSIONS_KEY },
+      { cancelRefetch: false }
+    );
+  });
+
+  it('lets an access fetch that is already running finish', async () => {
+    const client = createQueryClient();
+    const options = {
+      queryKey: ME_PERMISSIONS_KEY,
+      queryFn: () =>
+        new Promise<string>((resolve) => {
+          setTimeout(() => {
+            resolve('access');
+          }, 20);
+        }),
+    };
+    client.setQueryData(ME_PERMISSIONS_KEY, 'previous school');
+    const unsubscribe = new QueryObserver(client, options).subscribe(
+      () => undefined
+    );
+    const running = client.query(options);
+
+    await client
+      .query({
+        queryKey: ['students'],
+        queryFn: () => Promise.reject(forbidden()),
+      })
+      .catch(() => undefined);
+
+    await expect(running).resolves.toBe('access');
+    unsubscribe();
   });
 
   it('leaves other errors alone', async () => {
@@ -73,7 +108,10 @@ describe('query client', () => {
       })
       .catch(() => undefined);
     expect(spy).toHaveBeenCalledWith({ queryKey: ME_KEY, exact: true });
-    expect(spy).toHaveBeenCalledWith({ queryKey: ME_PERMISSIONS_KEY });
+    expect(spy).toHaveBeenCalledWith(
+      { queryKey: ME_PERMISSIONS_KEY },
+      { cancelRefetch: false }
+    );
   });
 
   it('does the same when the suspension answers the access query itself', async () => {

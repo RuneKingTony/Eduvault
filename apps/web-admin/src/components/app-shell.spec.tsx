@@ -31,6 +31,7 @@ import { DashboardPage } from '../pages/dashboard-page';
 import { mePermissionsQueryOptions } from '../queries';
 import { createQueryClient } from '../query-client';
 import { fakeAccess, ownerAccess, starterAccess } from '../test-utils';
+import { profile } from '../test-school';
 import { AppShell } from './app-shell';
 import { NotFoundPage } from './page-fallbacks';
 
@@ -69,6 +70,7 @@ interface RenderOptions {
   queryClient?: QueryClient;
   access?: MePermissions;
   realDashboard?: boolean;
+  logoUrl?: string | null;
 }
 
 async function renderAt(
@@ -77,24 +79,30 @@ async function renderAt(
     queryClient = new QueryClient(),
     access = ownerAccess(),
     realDashboard = false,
+    logoUrl = null,
   }: RenderOptions = {}
 ) {
   let current = access;
   const permissions = vi.fn(() => Promise.resolve(current));
-  const api = { me: { permissions } } as unknown as Api;
+  const api = {
+    me: { permissions },
+    schoolAccount: { get: vi.fn().mockResolvedValue(profile({ logoUrl })) },
+  } as unknown as Api;
   const root = createRootRoute({
     component: AppShell,
     beforeLoad: async () => ({
       access: await queryClient.query(mePermissionsQueryOptions(api)),
     }),
   });
-  const child = (to: string, component: () => React.ReactNode) =>
+  const child = (to: string, component: () => React.ReactNode, gated = true) =>
     createRoute({
       getParentRoute: () => root,
       path: to,
       component,
       beforeLoad: ({ context }) => {
-        requireGate(context.access, to);
+        if (gated) {
+          requireGate(context.access, to);
+        }
       },
     });
   const router = createRouter({
@@ -107,6 +115,9 @@ async function renderAt(
       child('/campuses', page('Campuses page')),
       child('/roles', page('Roles page')),
       child('/roles/new', page('New role page')),
+      child('/settings', page('Settings index page')),
+      child('/settings/profile', page('Profile page')),
+      child('/settings/danger', page('Danger page'), false),
       child('/broken', Broken),
     ]),
     history: createMemoryHistory({ initialEntries: [path] }),
@@ -174,6 +185,47 @@ describe('AppShell', () => {
     expect(
       within(sidebarNav()).getByRole('link', { name: 'Settings' })
     ).toHaveAttribute('aria-current', 'page');
+  });
+
+  it('names Settings › the item in the breadcrumb on a settings page', async () => {
+    await renderAt('/settings/profile');
+    const trail = within(
+      screen.getByRole('navigation', { name: 'Breadcrumb' })
+    );
+    expect(trail.getByText('Settings')).toBeInTheDocument();
+    expect(trail.getByText('School profile')).toHaveAttribute(
+      'aria-current',
+      'page'
+    );
+  });
+
+  it('names Settings › the item for a member who has no Settings link', async () => {
+    await renderAt('/settings/danger', { access: starterAccess('bursar') });
+    const trail = within(
+      screen.getByRole('navigation', { name: 'Breadcrumb' })
+    );
+    expect(await trail.findByText('Danger zone')).toHaveAttribute(
+      'aria-current',
+      'page'
+    );
+    expect(trail.getByText('Settings')).toBeInTheDocument();
+  });
+
+  it('shows the school logo in the side nav crest when there is one', async () => {
+    await renderAt('/', { logoUrl: '/files/abc' });
+    const logo = await within(sidebarNav()).findByRole('img', {
+      name: 'Greenfield College logo',
+    });
+    expect(logo).toHaveAttribute('src', expect.stringMatching(/\/files\/abc$/));
+  });
+
+  it('shows the school’s initials in the crest without a logo', async () => {
+    await renderAt('/');
+    expect(
+      await within(sidebarNav()).findByRole('img', {
+        name: 'Greenfield College crest',
+      })
+    ).toHaveTextContent('GC');
   });
 
   it('collapses a group and remembers it', async () => {
@@ -373,7 +425,7 @@ describe('AppShell access', () => {
     expect(permissions).toHaveBeenCalledTimes(2);
   });
 
-  it('shows an owner Students, Staff and members, Fees and a Settings entry that opens Campuses', async () => {
+  it('shows an owner Students, Staff and members, Fees and a Settings entry that opens School profile', async () => {
     await renderAt('/');
     expect(linkNames()).toEqual([
       'Dashboard',
@@ -385,7 +437,7 @@ describe('AppShell access', () => {
     ]);
     expect(
       within(sidebarNav()).getByRole('link', { name: 'Settings' })
-    ).toHaveAttribute('href', '/campuses');
+    ).toHaveAttribute('href', '/settings/profile');
   });
 
   it('opens Settings on Roles for a member who can see roles but not campuses', async () => {

@@ -2,7 +2,7 @@ import { createFileRoute } from '@tanstack/react-router';
 import { requireGate } from '../access';
 import { SettingsLayout } from '../components/settings-nav';
 import { CampusesPage } from '../pages/campuses-page';
-import { campusesQueryOptions } from '../queries';
+import { campusSummaryQueryOptions } from '../queries';
 
 export const Route = createFileRoute('/campuses')({
   beforeLoad: ({ context }) => {
@@ -10,7 +10,7 @@ export const Route = createFileRoute('/campuses')({
   },
   loader: async ({ context: { queryClient, api } }) => {
     await queryClient.query({
-      ...campusesQueryOptions(api),
+      ...campusSummaryQueryOptions(api),
       staleTime: 'static',
     });
   },
