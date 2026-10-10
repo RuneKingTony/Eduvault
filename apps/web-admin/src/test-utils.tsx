@@ -13,6 +13,7 @@ import {
   fakeAccess,
 } from '@eduvault/auth-client';
 import { ALL_PERMISSIONS, toPermissionMap } from '@eduvault/policy';
+import { TooltipProvider } from '@eduvault/ui';
 import { ApiProvider, type Api } from './api';
 
 export const student = (overrides: Partial<Student> = {}): Student => ({
@@ -99,7 +100,9 @@ export function renderWithApi(
   return render(
     <QueryClientProvider client={queryClient}>
       <ApiProvider api={api as unknown as Api}>
-        <PermissionsProvider value={access}>{ui}</PermissionsProvider>
+        <PermissionsProvider value={access}>
+          <TooltipProvider>{ui}</TooltipProvider>
+        </PermissionsProvider>
       </ApiProvider>
     </QueryClientProvider>
   );

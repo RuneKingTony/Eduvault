@@ -40,6 +40,16 @@ export const CAP_AREAS: readonly CapArea[] = [
     ],
   },
   {
+    id: 'staff',
+    group: 'People and access',
+    label: 'Staff',
+    important: true,
+    see: ['member:read'],
+    change: ['member:create', 'member:update', 'member:delete'],
+    changeDesc: 'Add and remove staff, and give them roles',
+    extras: [],
+  },
+  {
     id: 'school-settings',
     group: 'People and access',
     label: 'School settings',
@@ -105,16 +115,74 @@ function areaLine(area: CapArea, level: CapLevel): string | undefined {
   }
 }
 
+const holdsExtra = (permissions: PermissionMap, extra: CapExtra): boolean =>
+  extra.permissions.every((permission) => holds(permissions, permission));
+
 export function capSummary(permissions: PermissionMap): string[] {
   return CAP_AREAS.flatMap((area) => {
     const lines = [areaLine(area, capLevel(permissions, area))];
     for (const extra of area.extras) {
-      if (
-        extra.permissions.every((permission) => holds(permissions, permission))
-      ) {
+      if (holdsExtra(permissions, extra)) {
         lines.push(extra.label);
       }
     }
     return lines.filter((line): line is string => line !== undefined);
   });
+}
+
+const LEVEL_RANK: Record<CapLevel, number> = {
+  none: 0,
+  custom: 1,
+  see: 2,
+  change: 3,
+};
+
+export interface CapChanges {
+  gained: string[];
+  lost: string[];
+}
+
+function levelChange(
+  area: CapArea,
+  before: PermissionMap,
+  after: PermissionMap
+): CapChanges {
+  const was = capLevel(before, area);
+  const now = capLevel(after, area);
+  const moved = LEVEL_RANK[now] - LEVEL_RANK[was];
+  const line = areaLine(area, moved > 0 ? now : was);
+  return {
+    gained: line !== undefined && moved > 0 ? [line] : [],
+    lost: line !== undefined && moved < 0 ? [line] : [],
+  };
+}
+
+function extraChanges(
+  area: CapArea,
+  before: PermissionMap,
+  after: PermissionMap
+): CapChanges {
+  return {
+    gained: area.extras
+      .filter((extra) => holdsExtra(after, extra) && !holdsExtra(before, extra))
+      .map((extra) => extra.label),
+    lost: area.extras
+      .filter((extra) => holdsExtra(before, extra) && !holdsExtra(after, extra))
+      .map((extra) => extra.label),
+  };
+}
+
+/** An area that moves up is gained at its new level; one that moves down is lost at its old level. */
+export function capChanges(
+  before: PermissionMap,
+  after: PermissionMap
+): CapChanges {
+  const parts = CAP_AREAS.flatMap((area) => [
+    levelChange(area, before, after),
+    extraChanges(area, before, after),
+  ]);
+  return {
+    gained: parts.flatMap((part) => part.gained),
+    lost: parts.flatMap((part) => part.lost),
+  };
 }

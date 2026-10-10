@@ -13,9 +13,11 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApprovalsRouteImport } from './routes/approvals'
 import { Route as CampusesRouteImport } from './routes/campuses'
 import { Route as FeesRouteImport } from './routes/fees'
+import { Route as MembersRouteImport } from './routes/members'
 import { Route as PlatformRouteImport } from './routes/platform'
 import { Route as StudentsRouteImport } from './routes/students'
 import { Route as DevUiRouteImport } from './routes/dev/ui'
+import { Route as MembersMemberIdRouteImport } from './routes/members_.$memberId'
 import { Route as PlatformIndexRouteImport } from './routes/platform.index'
 import { Route as PlatformAuditRouteImport } from './routes/platform.audit'
 import { Route as PlatformSchoolsIndexRouteImport } from './routes/platform.schools.index'
@@ -41,6 +43,11 @@ const FeesRoute = FeesRouteImport.update({
   path: '/fees',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MembersRoute = MembersRouteImport.update({
+  id: '/members',
+  path: '/members',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PlatformRoute = PlatformRouteImport.update({
   id: '/platform',
   path: '/platform',
@@ -54,6 +61,11 @@ const StudentsRoute = StudentsRouteImport.update({
 const DevUiRoute = DevUiRouteImport.update({
   id: '/dev/ui',
   path: '/dev/ui',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MembersMemberIdRoute = MembersMemberIdRouteImport.update({
+  id: '/members_/$memberId',
+  path: '/members/$memberId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PlatformIndexRoute = PlatformIndexRouteImport.update({
@@ -82,9 +94,11 @@ export interface FileRoutesByFullPath {
   '/approvals': typeof ApprovalsRoute
   '/campuses': typeof CampusesRoute
   '/fees': typeof FeesRoute
+  '/members': typeof MembersRoute
   '/platform': typeof PlatformRouteWithChildren
   '/students': typeof StudentsRoute
   '/dev/ui': typeof DevUiRoute
+  '/members/$memberId': typeof MembersMemberIdRoute
   '/platform/audit': typeof PlatformAuditRoute
   '/platform/': typeof PlatformIndexRoute
   '/platform/schools/$schoolId': typeof PlatformSchoolsSchoolIdRoute
@@ -95,8 +109,10 @@ export interface FileRoutesByTo {
   '/approvals': typeof ApprovalsRoute
   '/campuses': typeof CampusesRoute
   '/fees': typeof FeesRoute
+  '/members': typeof MembersRoute
   '/students': typeof StudentsRoute
   '/dev/ui': typeof DevUiRoute
+  '/members/$memberId': typeof MembersMemberIdRoute
   '/platform/audit': typeof PlatformAuditRoute
   '/platform': typeof PlatformIndexRoute
   '/platform/schools/$schoolId': typeof PlatformSchoolsSchoolIdRoute
@@ -108,9 +124,11 @@ export interface FileRoutesById {
   '/approvals': typeof ApprovalsRoute
   '/campuses': typeof CampusesRoute
   '/fees': typeof FeesRoute
+  '/members': typeof MembersRoute
   '/platform': typeof PlatformRouteWithChildren
   '/students': typeof StudentsRoute
   '/dev/ui': typeof DevUiRoute
+  '/members_/$memberId': typeof MembersMemberIdRoute
   '/platform/audit': typeof PlatformAuditRoute
   '/platform/': typeof PlatformIndexRoute
   '/platform/schools/$schoolId': typeof PlatformSchoolsSchoolIdRoute
@@ -123,9 +141,11 @@ export interface FileRouteTypes {
     | '/approvals'
     | '/campuses'
     | '/fees'
+    | '/members'
     | '/platform'
     | '/students'
     | '/dev/ui'
+    | '/members/$memberId'
     | '/platform/audit'
     | '/platform/'
     | '/platform/schools/$schoolId'
@@ -136,8 +156,10 @@ export interface FileRouteTypes {
     | '/approvals'
     | '/campuses'
     | '/fees'
+    | '/members'
     | '/students'
     | '/dev/ui'
+    | '/members/$memberId'
     | '/platform/audit'
     | '/platform'
     | '/platform/schools/$schoolId'
@@ -148,9 +170,11 @@ export interface FileRouteTypes {
     | '/approvals'
     | '/campuses'
     | '/fees'
+    | '/members'
     | '/platform'
     | '/students'
     | '/dev/ui'
+    | '/members_/$memberId'
     | '/platform/audit'
     | '/platform/'
     | '/platform/schools/$schoolId'
@@ -162,9 +186,11 @@ export interface RootRouteChildren {
   ApprovalsRoute: typeof ApprovalsRoute
   CampusesRoute: typeof CampusesRoute
   FeesRoute: typeof FeesRoute
+  MembersRoute: typeof MembersRoute
   PlatformRoute: typeof PlatformRouteWithChildren
   StudentsRoute: typeof StudentsRoute
   DevUiRoute: typeof DevUiRoute
+  MembersMemberIdRoute: typeof MembersMemberIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -197,6 +223,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FeesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/members': {
+      id: '/members'
+      path: '/members'
+      fullPath: '/members'
+      preLoaderRoute: typeof MembersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/platform': {
       id: '/platform'
       path: '/platform'
@@ -216,6 +249,13 @@ declare module '@tanstack/react-router' {
       path: '/dev/ui'
       fullPath: '/dev/ui'
       preLoaderRoute: typeof DevUiRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/members_/$memberId': {
+      id: '/members_/$memberId'
+      path: '/members/$memberId'
+      fullPath: '/members/$memberId'
+      preLoaderRoute: typeof MembersMemberIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/platform/': {
@@ -272,9 +312,11 @@ const rootRouteChildren: RootRouteChildren = {
   ApprovalsRoute: ApprovalsRoute,
   CampusesRoute: CampusesRoute,
   FeesRoute: FeesRoute,
+  MembersRoute: MembersRoute,
   PlatformRoute: PlatformRouteWithChildren,
   StudentsRoute: StudentsRoute,
   DevUiRoute: DevUiRoute,
+  MembersMemberIdRoute: MembersMemberIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

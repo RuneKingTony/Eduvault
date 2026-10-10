@@ -14,6 +14,7 @@ import {
 } from '@tanstack/react-router';
 import type { MePermissions } from '@eduvault/api-contract';
 import { PermissionsProvider } from '@eduvault/auth-client';
+import { canAny } from '@eduvault/policy';
 import {
   Sheet,
   SheetContent,
@@ -68,6 +69,25 @@ const matchesActing = (access: MePermissions, acting: ActingState | null) =>
     : access.acting?.organizationId === acting.organizationId &&
       access.acting.writes === (acting.reason !== null);
 
+const ADD_MEMBER_ACTION: CommandEntry = {
+  id: 'add-member',
+  label: 'Add a staff member',
+  hint: 'People',
+  route: '/members?add=1',
+  icon: 'user-round-plus',
+  keywords: ['new', 'hire', 'invite', 'staff', 'member'],
+};
+
+function commandActions(
+  builtRoutes: ReadonlySet<string>,
+  access: MePermissions
+): CommandEntry[] {
+  return builtRoutes.has('/members') &&
+    canAny(access.permissions, ['member:create'])
+    ? [ADD_MEMBER_ACTION]
+    : [];
+}
+
 function useAccess(): MePermissions {
   const router = useRouter();
   const api = useApi();
@@ -117,6 +137,7 @@ function useShellModel(access: MePermissions) {
     current,
     pages: commandEntries(groups),
     settings,
+    actions: commandActions(builtRoutes, access),
     pageTitle:
       current?.item.pageTitle ?? EXTRA_PAGE_TITLES[pathname] ?? 'Not found',
     open: (route: string) => {
@@ -282,6 +303,7 @@ function ShellFrame({ access }: { access: MePermissions }) {
           onOpenChange={setCommandOpen}
           pages={model.pages}
           settings={model.settings}
+          actions={model.actions}
           onSelect={(route) => {
             setCommandOpen(false);
             model.open(route);

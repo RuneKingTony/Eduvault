@@ -74,6 +74,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         pageTitle: 'Staff and members',
         route: '/members',
         icon: 'users',
+        gate: ['member:read'],
       },
     ],
   },

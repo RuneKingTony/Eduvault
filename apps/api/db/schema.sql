@@ -141,7 +141,8 @@ CREATE TABLE public.member (
     "organizationId" text NOT NULL,
     "userId" text NOT NULL,
     role text NOT NULL,
-    "createdAt" timestamp with time zone NOT NULL
+    "createdAt" timestamp with time zone NOT NULL,
+    title text
 );
 
 --
@@ -762,4 +763,5 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20261009185725'),
     ('20261009190000'),
     ('20261009210000'),
-    ('20261010090000');
+    ('20261010090000'),
+    ('20261010100000');

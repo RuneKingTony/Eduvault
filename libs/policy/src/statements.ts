@@ -4,6 +4,7 @@ export const statements = {
   schoolAccount: ['read', 'update', 'create', 'delete'],
   student: ['create', 'read', 'update'],
   feeSchedule: ['create', 'read', 'update', 'delete'],
+  member: ['create', 'read', 'update', 'delete'],
 } as const;
 
 export type Statements = typeof statements;
@@ -33,11 +34,18 @@ export function splitPermission(permission: Permission): [Resource, Action] {
   return [resource as Resource, action as Action];
 }
 
-export const SENSITIVE: readonly Permission[] = ['campus:readAll'];
+export const SENSITIVE: readonly Permission[] = [
+  'campus:readAll',
+  'member:create',
+  'member:delete',
+];
 
 export const PERM_HELP: Partial<Record<Permission, string>> = {
   'campus:readAll':
     'Sees every campus. Without it a member sees only the campuses they belong to.',
+  'member:create': 'Adds people to the school. Owner-only by default.',
+  'member:update':
+    'Gives people roles, but only roles whose permissions they hold too.',
 };
 
 const RESOURCE_LABELS: Record<Resource, string> = {
@@ -46,6 +54,7 @@ const RESOURCE_LABELS: Record<Resource, string> = {
   schoolAccount: 'School settings',
   student: 'Students',
   feeSchedule: 'Fee schedules',
+  member: 'Staff',
 };
 
 export function permLabel(permission: Permission): string {

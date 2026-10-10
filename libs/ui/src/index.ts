@@ -52,4 +52,5 @@ export * from './components/custom/table-pager';
 export * from './lib/storage';
 export * from './lib/notify';
 export * from './components/custom/error-message';
+export * from './components/custom/toast';
 export * from './components/custom/field-error';

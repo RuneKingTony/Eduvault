@@ -10,6 +10,7 @@ import { OrganizationAuthGuard } from './guards/organization-auth.guard';
 import { PlatformAuthGuard } from './guards/platform-auth.guard';
 import { SessionAuthGuard } from './guards/session-auth.guard';
 import { createAuth } from './better-auth';
+import { MemberAdminService } from './member-admin.service';
 import { OrganizationAdminService } from './organization-admin.service';
 import { syncAllStarterRoles } from './starter-roles';
 
@@ -28,6 +29,7 @@ import { syncAllStarterRoles } from './starter-roles';
     AccountService,
     AuthContextService,
     AuthRequestHooks,
+    MemberAdminService,
     OrganizationAdminService,
     SessionAuthGuard,
     OrganizationAuthGuard,
@@ -36,6 +38,7 @@ import { syncAllStarterRoles } from './starter-roles';
   exports: [
     AccountService,
     AuthContextService,
+    MemberAdminService,
     OrganizationAdminService,
     SessionAuthGuard,
     OrganizationAuthGuard,

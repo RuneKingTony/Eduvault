@@ -11,6 +11,7 @@ import { DatabaseModule } from './common/db/database.module';
 import { CampusModule } from './modules/campus/campus.module';
 import { FeeScheduleModule } from './modules/fee-schedule/fee-schedule.module';
 import { HealthModule } from './modules/health/health.module';
+import { MembersModule } from './modules/members/members.module';
 import { MeModule } from './modules/me/me.module';
 import { PlatformModule } from './modules/platform/platform.module';
 import { SchoolAccountModule } from './modules/school-account/school-account.module';
@@ -24,6 +25,7 @@ import { StudentModule } from './modules/student/student.module';
     AuditModule,
     HealthModule,
     MeModule,
+    MembersModule,
     PlatformModule,
     CampusModule,
     SchoolAccountModule,

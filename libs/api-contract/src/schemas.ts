@@ -19,6 +19,10 @@ export const apiErrorCodeSchema = z.enum([
   'NotFound',
   'Conflict',
   'SelfApproval',
+  'LAST_OWNER',
+  'OWNER_BY_HANDOVER',
+  'ROLE_COMBINATION',
+  'SELF_REMOVAL',
   'ValidationError',
   'InternalError',
   'UnknownError',
@@ -315,3 +319,99 @@ export const auditListSchema = z.object({
   nextCursor: z.string().nullable(),
 });
 export type AuditList = z.infer<typeof auditListSchema>;
+
+export const MEMBER_PAGE_SIZE = 10;
+export const DEFAULT_MEMBER_TITLE = 'New member';
+
+const NAME_REQUIRED = 'Enter their full name.';
+const EMAIL_REQUIRED = 'Enter their email address.';
+export const CAMPUS_REQUIRED = 'Choose at least one campus.';
+
+const campusIdsSchema = z
+  .array(idSchema, { error: CAMPUS_REQUIRED })
+  .min(1, CAMPUS_REQUIRED);
+
+export const memberSummarySchema = z.object({
+  id: idSchema,
+  userId: z.string(),
+  name: z.string(),
+  email: z.string().nullable(),
+  username: z.string().nullable(),
+  title: z.string(),
+  roles: z.array(z.string()),
+  campusIds: z.array(idSchema),
+});
+export type MemberSummary = z.infer<typeof memberSummarySchema>;
+
+export const memberDetailSchema = memberSummarySchema.extend({
+  permissions: permissionMapSchema,
+  campusScope: scopeSchema,
+  classScope: scopeSchema,
+  lastOwner: z.boolean(),
+});
+export type MemberDetail = z.infer<typeof memberDetailSchema>;
+
+export const memberListQuerySchema = z.object({
+  q: z.string().trim().max(120).optional(),
+  role: z.string().trim().max(80).optional(),
+  page: z.coerce.number().int().min(1).default(1),
+});
+
+export const memberListSchema = z.object({
+  items: z.array(memberSummarySchema),
+  total: z.number().int().nonnegative(),
+});
+export type MemberList = z.infer<typeof memberListSchema>;
+
+export const createMemberSchema = z.object({
+  name: z
+    .string({ error: NAME_REQUIRED })
+    .trim()
+    .min(1, NAME_REQUIRED)
+    .max(120),
+  email: z
+    .string({ error: EMAIL_REQUIRED })
+    .trim()
+    .toLowerCase()
+    .pipe(z.email(EMAIL_REQUIRED)),
+  title: z.string().trim().max(80).optional(),
+  campusIds: campusIdsSchema,
+});
+export type CreateMemberInput = z.input<typeof createMemberSchema>;
+
+export const createMemberResultSchema = z.object({
+  member: memberDetailSchema,
+  temporaryPassword: z.string().nullable(),
+});
+export type CreateMemberResult = z.infer<typeof createMemberResultSchema>;
+
+export const updateMemberRolesSchema = z.object({
+  roles: z.array(z.string().trim().min(1).max(80)),
+  campusIds: campusIdsSchema.optional(),
+});
+
+export const updateMemberCampusesSchema = z.object({
+  campusIds: campusIdsSchema,
+});
+
+export const schoolRoleEntrySchema = z.object({
+  slug: z.string(),
+  label: z.string(),
+  description: z.string().nullable(),
+  source: z.enum(['code', 'starter', 'custom']),
+  permissions: permissionMapSchema,
+});
+export type SchoolRoleEntry = z.infer<typeof schoolRoleEntrySchema>;
+
+export const unknownRoleEntry = (slug: string): SchoolRoleEntry => ({
+  slug,
+  label: slug,
+  description: null,
+  source: 'custom',
+  permissions: {},
+});
+
+export const schoolRoleSchema = schoolRoleEntrySchema.extend({
+  grantable: z.boolean(),
+});
+export type SchoolRole = z.infer<typeof schoolRoleSchema>;

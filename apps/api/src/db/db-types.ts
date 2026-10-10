@@ -90,6 +90,7 @@ export interface Member {
   id: Generated<string>;
   organizationId: string;
   role: string;
+  title: string | null;
   userId: string;
 }
 

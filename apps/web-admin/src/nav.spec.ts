@@ -9,7 +9,14 @@ import {
   type NavGroup,
 } from './nav';
 
-const built = new Set(['/', '/approvals', '/students', '/fees', '/campuses']);
+const built = new Set([
+  '/',
+  '/approvals',
+  '/students',
+  '/members',
+  '/fees',
+  '/campuses',
+]);
 const everything = toPermissionMap(ALL_PERMISSIONS);
 const routesFor = (permissions: Parameters<typeof visibleNav>[2]) =>
   visibleNav(NAV_GROUPS, built, permissions).flatMap((group) =>
@@ -48,6 +55,7 @@ describe('nav model', () => {
       '/',
       '/approvals',
       '/students',
+      '/members',
       '/fees',
       '/campuses',
     ]);
@@ -89,6 +97,13 @@ describe('nav gates', () => {
     ]);
   });
 
+  it('hides Staff and members from a bursar and shows it with member:read', () => {
+    expect(routesFor(toPermissionMap(['student:read']))).not.toContain(
+      '/members'
+    );
+    expect(routesFor(toPermissionMap(['member:read']))).toContain('/members');
+  });
+
   it('shows Settings when any section passes and opens its first section', () => {
     const settings = visibleNav(NAV_GROUPS, built, { team: ['read'] })
       .flatMap((group) => group.items)
@@ -123,6 +138,7 @@ describe('nav gates', () => {
 
   it('reads the route gate from the same declaration as the nav', () => {
     expect(routeGate('/students')).toEqual(['student:read']);
+    expect(routeGate('/members')).toEqual(['member:read']);
     expect(routeGate('/fees')).toEqual(['feeSchedule:read']);
     expect(routeGate('/campuses')).toEqual(['team:read']);
     expect(routeGate('/')).toBeUndefined();

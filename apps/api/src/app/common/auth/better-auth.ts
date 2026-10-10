@@ -12,6 +12,28 @@ import {
 const getTrustedOrigins = (env: Env): string[] =>
   env.NODE_ENV === 'test' ? ['*'] : [env.WEB_ADMIN_URL, env.WEB_PORTAL_URL];
 
+// Better Auth's member, seat and invitation routes skip the members module's
+// scope, escalation, last-owner and `member:read` rules.
+const DISABLED_ORGANIZATION_PATHS = [
+  'update-member-role',
+  'add-member',
+  'invite-member',
+  'accept-invitation',
+  'reject-invitation',
+  'cancel-invitation',
+  'get-invitation',
+  'list-invitations',
+  'list-user-invitations',
+  'remove-member',
+  'add-team-member',
+  'remove-team-member',
+  'leave',
+  'list-members',
+  'get-full-organization',
+  'get-active-member-role',
+  'list-user-teams',
+].map((path) => `/organization/${path}`);
+
 export const isSignInLimited = (env: Env): boolean =>
   env.NODE_ENV === 'production' || env.AUTH_RATE_LIMIT;
 
@@ -36,7 +58,8 @@ export function createAuth(pool: Pool, env: Env) {
         secure: env.NODE_ENV === 'production',
       },
     },
-    plugins: getPlugins(pool, { trustInvitees: env.E2E_TRUST_INVITEES }),
+    plugins: getPlugins(pool),
+    disabledPaths: DISABLED_ORGANIZATION_PATHS,
     // AuthModule fills this from @Hook providers and refuses to start without it.
     hooks: {},
   });
