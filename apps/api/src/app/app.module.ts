@@ -13,6 +13,7 @@ import { FeeScheduleModule } from './modules/fee-schedule/fee-schedule.module';
 import { HealthModule } from './modules/health/health.module';
 import { MembersModule } from './modules/members/members.module';
 import { MeModule } from './modules/me/me.module';
+import { RolesModule } from './modules/roles/roles.module';
 import { PlatformModule } from './modules/platform/platform.module';
 import { SchoolAccountModule } from './modules/school-account/school-account.module';
 import { StudentModule } from './modules/student/student.module';
@@ -26,6 +27,7 @@ import { StudentModule } from './modules/student/student.module';
     HealthModule,
     MeModule,
     MembersModule,
+    RolesModule,
     PlatformModule,
     CampusModule,
     SchoolAccountModule,

@@ -12,8 +12,8 @@ import {
 const getTrustedOrigins = (env: Env): string[] =>
   env.NODE_ENV === 'test' ? ['*'] : [env.WEB_ADMIN_URL, env.WEB_PORTAL_URL];
 
-// Better Auth's member, seat and invitation routes skip the members module's
-// scope, escalation, last-owner and `member:read` rules.
+// Better Auth's member, seat, invitation and role routes skip the members and
+// roles modules' scope, escalation, last-owner, in-use and `member:read` rules.
 const DISABLED_ORGANIZATION_PATHS = [
   'update-member-role',
   'add-member',
@@ -32,6 +32,11 @@ const DISABLED_ORGANIZATION_PATHS = [
   'get-full-organization',
   'get-active-member-role',
   'list-user-teams',
+  'create-role',
+  'update-role',
+  'delete-role',
+  'list-roles',
+  'get-role',
 ].map((path) => `/organization/${path}`);
 
 export const isSignInLimited = (env: Env): boolean =>

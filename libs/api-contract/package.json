@@ -5,6 +5,7 @@
   "type": "module",
   "dependencies": {
     "zod": "catalog:",
-    "@eduvault/policy": "workspace:*"
+    "@eduvault/policy": "workspace:*",
+    "@eduvault/shared": "workspace:*"
   }
 }

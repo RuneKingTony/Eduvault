@@ -30,6 +30,20 @@ describe('statements', () => {
     expect(PERM_HELP['member:update']).toBeDefined();
   });
 
+  it('has the ac resource, marks creating, changing and deleting roles sensitive and explains ac:create', () => {
+    expect(ALL_PERMISSIONS).toEqual(
+      expect.arrayContaining(['ac:create', 'ac:read', 'ac:update', 'ac:delete'])
+    );
+    expect(SENSITIVE).toEqual(
+      expect.arrayContaining(['ac:create', 'ac:update', 'ac:delete'])
+    );
+    expect(SENSITIVE).not.toContain('ac:read');
+    expect(PERM_HELP['ac:create']).toBe(
+      'Creates roles, using only what they can do themselves.'
+    );
+    expect(permLabel('ac:update')).toBe('Roles: update');
+  });
+
   it('keeps SENSITIVE and PERM_HELP to listed permissions', () => {
     for (const permission of SENSITIVE) {
       expect(ALL_PERMISSIONS).toContain(permission);

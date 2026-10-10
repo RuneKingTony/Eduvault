@@ -123,6 +123,29 @@ export const schoolRolesQueryOptions = (api: Api) =>
     queryFn: () => api.members.roles({}),
   });
 
+const ROLES_KEY = ['roles'] as const;
+
+export const rolesQueryOptions = (api: Api) =>
+  queryOptions({
+    queryKey: [...ROLES_KEY, 'list'],
+    queryFn: () => api.roles.list({}),
+  });
+
+export const roleQueryOptions = (api: Api, slug: string) =>
+  queryOptions({
+    queryKey: [...ROLES_KEY, 'one', slug],
+    queryFn: () => api.roles.get({ params: { slug } }),
+  });
+
+/** A role write changes the catalogue the members pages read, and can change a holder's own access. */
+export async function invalidateRoles(queryClient: QueryClient): Promise<void> {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: ROLES_KEY }),
+    queryClient.invalidateQueries({ queryKey: [...MEMBERS_KEY, 'roles'] }),
+    queryClient.invalidateQueries({ queryKey: ME_PERMISSIONS_KEY }),
+  ]);
+}
+
 /** The removed member's own query would answer 404 while their page is still open. */
 export async function invalidateAfterRemoval(
   queryClient: QueryClient,

@@ -12,6 +12,7 @@ import { SessionAuthGuard } from './guards/session-auth.guard';
 import { createAuth } from './better-auth';
 import { MemberAdminService } from './member-admin.service';
 import { OrganizationAdminService } from './organization-admin.service';
+import { RoleAdminService } from './role-admin.service';
 import { syncAllStarterRoles } from './starter-roles';
 
 @Module({
@@ -31,6 +32,7 @@ import { syncAllStarterRoles } from './starter-roles';
     AuthRequestHooks,
     MemberAdminService,
     OrganizationAdminService,
+    RoleAdminService,
     SessionAuthGuard,
     OrganizationAuthGuard,
     PlatformAuthGuard,
@@ -40,6 +42,7 @@ import { syncAllStarterRoles } from './starter-roles';
     AuthContextService,
     MemberAdminService,
     OrganizationAdminService,
+    RoleAdminService,
     SessionAuthGuard,
     OrganizationAuthGuard,
     PlatformAuthGuard,

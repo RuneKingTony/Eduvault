@@ -50,6 +50,20 @@ describe('roles', () => {
     expect(can(permissions, 'member', 'delete')).toBe(false);
   });
 
+  it('gives the administrator ac:read and no other ac permission', () => {
+    const permissions = starter('administrator');
+    expect(can(permissions, 'ac', 'read')).toBe(true);
+    expect(permissions.ac).toEqual(['read']);
+  });
+
+  it('keeps ac:create, ac:update and ac:delete out of every starter role', () => {
+    for (const role of STARTER_ROLES) {
+      for (const action of ['ac:create', 'ac:update', 'ac:delete'] as const) {
+        expect(role.permissions).not.toContain(action);
+      }
+    }
+  });
+
   it('has no readOwn in READ_PERMS', () => {
     expect(
       READ_PERMS.filter((permission) => permission.endsWith(':readOwn'))
@@ -62,6 +76,15 @@ describe('roles', () => {
       const [resource, action] = splitPermission(permission);
       expect(permissions[resource]).toContain(action);
     }
+  });
+
+  it('gives the owner every ac permission', () => {
+    expect(resolvePermissions(['owner'], {}).ac).toEqual([
+      'create',
+      'read',
+      'update',
+      'delete',
+    ]);
   });
 
   it('resolves member to nothing', () => {

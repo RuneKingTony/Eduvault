@@ -6,6 +6,7 @@ import {
 } from 'better-auth/plugins';
 import type { Pool } from 'pg';
 import {
+  MAX_ROLES_PER_SCHOOL,
   betterAuthAc,
   betterAuthRoles,
   platformAc,
@@ -54,7 +55,10 @@ export const getOrganizationOptions = (pool: Pool) =>
     ac: betterAuthAc,
     roles: betterAuthRoles,
     creatorRole: 'owner',
-    dynamicAccessControl: { enabled: true },
+    dynamicAccessControl: {
+      enabled: true,
+      maximumRolesPerOrganization: MAX_ROLES_PER_SCHOOL,
+    },
     schema: {
       member: {
         additionalFields: {

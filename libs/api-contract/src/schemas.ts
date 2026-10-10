@@ -1,4 +1,15 @@
-import { ACTIONS, RESOURCES } from '@eduvault/policy';
+import {
+  ACTIONS,
+  ALL_PERMISSIONS,
+  MAX_ROLES_PER_SCHOOL,
+  MEMBER_ROLE,
+  OWNER_ROLE,
+  RESOURCES,
+  ROLE_DESCRIPTION_MAX,
+  ROLE_LABEL_MAX,
+  toPermissionMap,
+} from '@eduvault/policy';
+import { countOf } from '@eduvault/shared';
 import { z } from 'zod';
 
 export const idSchema = z.uuid();
@@ -25,6 +36,12 @@ export const apiErrorCodeSchema = z.enum([
   'SELF_REMOVAL',
   'SELF_RESET',
   'SHARED_ACCOUNT',
+  'ROLE_ESCALATION',
+  'BUILT_IN_ROLE',
+  'ROLE_LABEL_TAKEN',
+  'ROLE_IN_USE',
+  'ROLE_PROTECTED',
+  'TOO_MANY_ROLES',
   'ValidationError',
   'InternalError',
   'UnknownError',
@@ -417,6 +434,23 @@ export const schoolRoleEntrySchema = z.object({
 });
 export type SchoolRoleEntry = z.infer<typeof schoolRoleEntrySchema>;
 
+export const OWNER_ENTRY: SchoolRoleEntry = {
+  slug: OWNER_ROLE,
+  label: 'Owner',
+  description:
+    'Every action, including ones added later. Set only by a super admin or another owner.',
+  source: 'code',
+  permissions: toPermissionMap(ALL_PERMISSIONS),
+};
+
+export const MEMBER_ENTRY: SchoolRoleEntry = {
+  slug: MEMBER_ROLE,
+  label: 'Member',
+  description: 'Everyone added starts here. Being added grants nothing.',
+  source: 'code',
+  permissions: {},
+};
+
 export const unknownRoleEntry = (slug: string): SchoolRoleEntry => ({
   slug,
   label: slug,
@@ -429,3 +463,83 @@ export const schoolRoleSchema = schoolRoleEntrySchema.extend({
   grantable: z.boolean(),
 });
 export type SchoolRole = z.infer<typeof schoolRoleSchema>;
+
+export const ROLE_NAME_REQUIRED = 'Give the role a name first.';
+export const ROLE_ESCALATION_MESSAGE =
+  'You can’t give access you don’t have yourself. Switch those parts off and save again.';
+export const ROLE_PROTECTED_MESSAGE = 'Admissions use this role.';
+export const ROLE_NOT_FOUND_MESSAGE = 'Role not found';
+export const BUILT_IN_ROLE_MESSAGE =
+  'Owner and Member are built in and can’t be changed.';
+export const TOO_MANY_ROLES_MESSAGE = `A school can have at most ${MAX_ROLES_PER_SCHOOL} roles. Delete one you don’t use first.`;
+
+export const roleLabelTakenMessage = (label: string): string =>
+  `A role called ${label} already exists.`;
+
+const listNames = (names: readonly string[]): string =>
+  new Intl.ListFormat('en', { style: 'long', type: 'conjunction' }).format(
+    names
+  );
+
+const describeHolders = (holders: readonly string[] | number): string => {
+  if (typeof holders !== 'number') {
+    return listNames(holders);
+  }
+  return countOf(holders, 'person', 'people');
+};
+
+export function roleInUseMessage(holders: readonly string[] | number): string {
+  const count = typeof holders === 'number' ? holders : holders.length;
+  return `${describeHolders(holders)} still ${count === 1 ? 'has' : 'have'} this role. Take it off them first.`;
+}
+
+export const roleHolderSchema = z.object({
+  memberId: idSchema,
+  name: z.string(),
+  roles: z.array(z.string()),
+});
+export type RoleHolder = z.infer<typeof roleHolderSchema>;
+
+export const roleSchema = schoolRoleEntrySchema.extend({
+  holderCount: z.number().int().nonnegative(),
+  holders: z.array(roleHolderSchema).optional(),
+  editable: z.boolean(),
+});
+export type Role = z.infer<typeof roleSchema>;
+
+export const roleListSchema = z.object({ items: z.array(roleSchema) });
+export type RoleList = z.infer<typeof roleListSchema>;
+
+export const roleSlugParamsSchema = z.object({
+  slug: z.string().trim().min(1).max(80),
+});
+
+const roleLabelSchema = z
+  .string({ error: ROLE_NAME_REQUIRED })
+  .trim()
+  .min(1, ROLE_NAME_REQUIRED)
+  .max(ROLE_LABEL_MAX, `Use ${ROLE_LABEL_MAX} characters or fewer.`);
+
+const roleDescriptionSchema = z
+  .string()
+  .trim()
+  .max(ROLE_DESCRIPTION_MAX, `Use ${ROLE_DESCRIPTION_MAX} characters or fewer.`)
+  .nullable()
+  .transform((text) => (text === '' ? null : text));
+
+export const createRoleSchema = z.object({
+  label: roleLabelSchema,
+  description: roleDescriptionSchema.optional(),
+  permissions: permissionMapSchema,
+  slug: z.string().max(80).optional(),
+});
+export type CreateRoleInput = z.input<typeof createRoleSchema>;
+
+export const updateRoleSchema = z.object({
+  label: roleLabelSchema.optional(),
+  description: roleDescriptionSchema.optional(),
+  permissions: permissionMapSchema.optional(),
+});
+export type UpdateRoleInput = z.input<typeof updateRoleSchema>;
+
+export const removedRoleSchema = z.object({ slug: z.string() });

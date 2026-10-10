@@ -5,3 +5,4 @@ export * from './grants';
 export * from './better-auth-access';
 export * from './platform-access';
 export * from './members';
+export * from './role-editor';

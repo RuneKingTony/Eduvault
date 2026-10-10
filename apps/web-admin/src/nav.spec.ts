@@ -1,4 +1,8 @@
-import { ALL_PERMISSIONS, toPermissionMap } from '@eduvault/policy';
+import {
+  ALL_PERMISSIONS,
+  STARTER_ROLES,
+  toPermissionMap,
+} from '@eduvault/policy';
 import {
   NAV_GROUPS,
   findCurrent,
@@ -16,7 +20,13 @@ const built = new Set([
   '/members',
   '/fees',
   '/campuses',
+  '/roles',
+  '/roles/new',
 ]);
+const starter = (slug: string) =>
+  toPermissionMap(
+    STARTER_ROLES.find((role) => role.slug === slug)?.permissions ?? []
+  );
 const everything = toPermissionMap(ALL_PERMISSIONS);
 const routesFor = (permissions: Parameters<typeof visibleNav>[2]) =>
   visibleNav(NAV_GROUPS, built, permissions).flatMap((group) =>
@@ -77,10 +87,48 @@ describe('nav model', () => {
       visibleSettings(SETTINGS_SECTIONS, built, everything).map(
         (section) => section.label
       )
-    ).toEqual(['Campuses']);
+    ).toEqual(['Campuses', 'Roles and permissions']);
     expect(
       visibleSettings(SETTINGS_SECTIONS, new Set(['/']), everything)
     ).toEqual([]);
+  });
+});
+
+describe('settings sections', () => {
+  it('groups Campuses under School structure and Roles under Access', () => {
+    expect(
+      SETTINGS_SECTIONS.map((section) => [section.label, section.group])
+    ).toEqual([
+      ['Campuses', 'School structure'],
+      ['Roles and permissions', 'Access'],
+    ]);
+  });
+
+  it('shows the administrator Roles and the bursar no Settings at all', () => {
+    expect(
+      visibleSettings(SETTINGS_SECTIONS, built, starter('administrator')).map(
+        (section) => section.id
+      )
+    ).toEqual(['campuses', 'roles']);
+    expect(
+      visibleSettings(SETTINGS_SECTIONS, built, starter('bursar'))
+    ).toEqual([]);
+    const settings = visibleNav(NAV_GROUPS, built, starter('bursar'))
+      .flatMap((group) => group.items)
+      .find((item) => item.id === 'settings');
+    expect(settings).toBeUndefined();
+  });
+
+  it('opens Settings on Roles for someone who can see roles but not campuses', () => {
+    const settings = visibleNav(NAV_GROUPS, built, { ac: ['read'] })
+      .flatMap((group) => group.items)
+      .find((item) => item.id === 'settings');
+    expect(settings?.route).toBe('/roles');
+  });
+
+  it('gates the role routes', () => {
+    expect(routeGate('/roles')).toEqual(['ac:read']);
+    expect(routeGate('/roles/new')).toEqual(['ac:create']);
   });
 });
 

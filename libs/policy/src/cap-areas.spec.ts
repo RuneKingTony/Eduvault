@@ -50,6 +50,25 @@ describe('CAP_AREAS', () => {
   });
 });
 
+describe('the Roles area', () => {
+  const roles = area('roles');
+
+  it('sits in People and access after Staff and is important', () => {
+    const ids = CAP_AREAS.map((candidate) => candidate.id);
+    expect(ids.indexOf('roles')).toBe(ids.indexOf('staff') + 1);
+    expect(roles.group).toBe('People and access');
+    expect(roles.important).toBe(true);
+    expect(roles.see).toEqual(['ac:read']);
+    expect(roles.change).toEqual(['ac:create', 'ac:update', 'ac:delete']);
+    expect(roles.changeDesc).toBe('Create roles and change what they allow');
+  });
+
+  it('is see for ac:read alone and custom for a lone ac:update', () => {
+    expect(capLevel(toPermissionMap(['ac:read']), roles)).toBe('see');
+    expect(capLevel(toPermissionMap(['ac:update']), roles)).toBe('custom');
+  });
+});
+
 describe('capLevel', () => {
   const campuses = area('campuses');
 
@@ -80,6 +99,7 @@ describe('capSummary', () => {
       'Campuses: add and rename campuses',
       'Sees every campus',
       'Staff: add and remove staff, and give them roles',
+      'Roles: create roles and change what they allow',
       'School settings: change the school profile and rules',
       'Students: admit students, update them and put them in classes',
     ]);
@@ -90,6 +110,7 @@ describe('capSummary', () => {
       'Campuses: can see',
       'Sees every campus',
       'Staff: can see',
+      'Roles: can see',
       'School settings: can see',
       'Students: admit students, update them and put them in classes',
     ]);

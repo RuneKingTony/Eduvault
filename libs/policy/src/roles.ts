@@ -32,6 +32,7 @@ export const STARTER_ROLES: readonly StarterRole[] = [
       'schoolAccount:read',
       'member:read',
       'member:update',
+      'ac:read',
       'student:create',
       'student:read',
       'student:update',

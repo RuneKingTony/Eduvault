@@ -12,6 +12,7 @@ import {
   splitRoles,
   PORTAL_SAFE_ROLES,
 } from '@eduvault/policy';
+import { campusIdsByUser } from '../../common/db/campus-ids-by-user';
 import { inCampusScope } from '../../common/db/in-campus-scope';
 import { KYSELY_TOKEN, type Database } from '../../common/db/tokens';
 import {
@@ -136,35 +137,12 @@ export class KyselyMembersRepository extends MembersRepository {
       );
   }
 
-  private async campusIdsByUser(
-    organizationId: string,
-    userIds: string[]
-  ): Promise<Map<string, string[]>> {
-    const byUser = new Map<string, string[]>();
-    if (userIds.length === 0) {
-      return byUser;
-    }
-    const rows = await this.db
-      .selectFrom('teamMember')
-      .innerJoin('campus', 'campus.team_id', 'teamMember.teamId')
-      .innerJoin('team', 'team.id', 'teamMember.teamId')
-      .where('campus.organization_id', '=', organizationId)
-      .where('teamMember.userId', 'in', userIds)
-      .select(['teamMember.userId', 'teamMember.teamId'])
-      .orderBy('team.name')
-      .orderBy('team.id')
-      .execute();
-    for (const row of rows) {
-      byUser.set(row.userId, [...(byUser.get(row.userId) ?? []), row.teamId]);
-    }
-    return byUser;
-  }
-
   private async withCampuses(
     organizationId: string,
     rows: Row[]
   ): Promise<MemberRecord[]> {
-    const campuses = await this.campusIdsByUser(
+    const campuses = await campusIdsByUser(
+      this.db,
       organizationId,
       rows.map((row) => row.userId)
     );

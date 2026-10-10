@@ -19,10 +19,12 @@ export interface NavGroup {
   items: readonly NavItem[];
 }
 
-interface SettingsSection {
+export interface SettingsSection {
   id: string;
   label: string;
   route: string;
+  group: string;
+  icon?: NavIconName;
   gate?: Gate;
 }
 
@@ -181,16 +183,28 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
     id: 'campuses',
     label: 'Campuses',
     route: '/campuses',
+    group: 'School structure',
     gate: ['team:read'],
+  },
+  {
+    id: 'roles',
+    label: 'Roles and permissions',
+    route: '/roles',
+    group: 'Access',
+    icon: 'shield-check',
+    gate: ['ac:read'],
   },
 ];
 
-const ROUTE_GATES = new Map<string, Gate>(
-  [...NAV_GROUPS.flatMap((group) => group.items), ...SETTINGS_SECTIONS].flatMap(
-    (entry): [string, Gate][] =>
-      entry.gate === undefined ? [] : [[entry.route, entry.gate]]
-  )
-);
+const ROUTE_GATES = new Map<string, Gate>([
+  ...[
+    ...NAV_GROUPS.flatMap((group) => group.items),
+    ...SETTINGS_SECTIONS,
+  ].flatMap((entry): [string, Gate][] =>
+    entry.gate === undefined ? [] : [[entry.route, entry.gate]]
+  ),
+  ['/roles/new', ['ac:create']],
+]);
 
 export const routeGate = (route: string): Gate | undefined =>
   ROUTE_GATES.get(route);

@@ -70,6 +70,8 @@ Terms the code and the people using it share. Adapted from the earlier school-ma
 
 **Portal-only member** — a member whose roles are only `member`, `student` and `guardian`, with at least one of the last two. They use the portal, are left out of Staff and members unless the Role filter is Student or Guardian, and cannot be given a staff role. A member with only `member` is not portal-only.
 
+**Role** — a named set of permissions a member holds, stored as a slug on the member. Three kinds: **Built in** (Owner, which can do everything, and Member, which grants nothing; never edited or deleted), **Ready-made** (`source: 'starter'`, inserted with the school and editable) and **Your own** (`source: 'custom'`, created by the school). The slug is fixed at creation, so renaming never detaches **holders**, the members who have the role. A school has at most 50 roles, not counting Owner and Member, and nobody can give a role access they don't hold themselves.
+
 **Leave** — a staff member's request for days off (annual, sick, personal, study, maternity or paternity). Days off count weekdays minus school holidays, and a request can't overlap the requester's own. Approved by someone with leave approval (`leave:approve`, the owner and principal by default), never by the requester.
 
 **Announcement** — news for parents and students in the portal, for everyone or one campus. Drafted, published, pinned or withdrawn; never deleted.
