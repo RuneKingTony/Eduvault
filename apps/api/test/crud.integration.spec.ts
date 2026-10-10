@@ -91,47 +91,45 @@ test.describe('campuses', () => {
 });
 
 test.describe('school account', () => {
-  test('full CRUD, one account per school', async ({
+  test('one account per school, readable and editable, with no create or delete', async ({
     api,
     createUser,
     createOrganization,
   }) => {
     const owner = await createUser();
-    await createOrganization(owner);
+    const org = await createOrganization(owner, 'Fees');
 
-    await api(owner).get('/school-account').expect(404);
-    const created = await api(owner)
-      .post('/school-account')
-      .send({
-        name: 'Fees',
-        currency: 'ngn',
-        admissionPrefix: 'FEE',
-        city: 'Lagos',
-      })
-      .expect(201);
-    expect(created.body).toMatchObject({
+    const read = await api(owner).get('/school-account').expect(200);
+    expect(read.body).toMatchObject({
+      organizationId: org.id,
       name: 'Fees',
       currency: 'NGN',
-      admissionPrefix: 'FEE',
-      city: 'Lagos',
+      admissionPrefix: 'TST',
+      slug: org.slug,
+      city: null,
+      address: null,
+      phone: null,
+      email: null,
+      logoFileId: null,
+      logoUrl: null,
     });
-
-    await api(owner)
-      .post('/school-account')
-      .send({ name: 'Second', currency: 'NGN', admissionPrefix: 'SEC' })
-      .expect(409);
 
     const updated = await api(owner)
       .patch('/school-account')
-      .send({ name: 'Tuition' })
+      .send({ name: 'Tuition', city: 'Lagos', phone: '0801', email: '' })
       .expect(200);
-    expect(updated.body.name).toBe('Tuition');
+    expect(updated.body).toMatchObject({
+      name: 'Tuition',
+      city: 'Lagos',
+      phone: '0801',
+      email: null,
+    });
     expect((await api(owner).get('/school-account').expect(200)).body.id).toBe(
-      created.body.id
+      read.body.id
     );
 
-    await api(owner).delete('/school-account').expect(200);
-    await api(owner).get('/school-account').expect(404);
+    await api(owner).post('/school-account').send({}).expect(404);
+    await api(owner).delete('/school-account').expect(404);
   });
 });
 

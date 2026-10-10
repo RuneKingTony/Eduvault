@@ -79,9 +79,37 @@ test.describe('authentication', () => {
       '/campuses',
       '/fee-schedules',
       '/school-account',
+      '/school-settings',
+      '/campuses/summary',
+      '/school/deletable',
     ]) {
       const res = await api().get(path).expect(401);
       expect(res.body).toMatchObject({ code: 'Unauthorized' });
+    }
+  });
+
+  test('school write and file routes answer 401 without a session', async ({
+    api,
+  }) => {
+    const id = randomUUID();
+    const routes = [
+      ['post', '/campuses'],
+      ['patch', '/school-settings'],
+      ['patch', '/school-account'],
+      ['put', '/school-account/logo'],
+      ['delete', '/school-account/logo'],
+      ['delete', '/school'],
+      ['get', '/school/handover-candidates'],
+      ['post', '/school/handover'],
+      ['post', '/files'],
+      ['get', `/files/${id}`],
+      ['delete', `/files/${id}`],
+    ] as const;
+    for (const [method, path] of routes) {
+      const res = await api()[method](path).expect(401);
+      expect(res.body, `${method} ${path}`).toMatchObject({
+        code: 'Unauthorized',
+      });
     }
   });
 

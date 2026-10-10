@@ -14,7 +14,9 @@ const getTrustedOrigins = (env: Env): string[] =>
 
 // Better Auth's member, seat, invitation and role routes skip the members and
 // roles modules' scope, escalation, last-owner, in-use and `member:read` rules.
+// `update` would skip the school-name sync of PATCH /school-account.
 const DISABLED_ORGANIZATION_PATHS = [
+  'update',
   'update-member-role',
   'add-member',
   'invite-member',

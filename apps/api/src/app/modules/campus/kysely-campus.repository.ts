@@ -1,10 +1,16 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { sql } from 'kysely';
 import type { Campus } from '@eduvault/api-contract';
+import { splitRoles } from '@eduvault/policy';
 import type { CampusScope } from '../../common/campus-scope';
 import { inCampusScope } from '../../common/db/in-campus-scope';
 import { iso } from '../../common/db/rows';
 import { KYSELY_TOKEN, type Database } from '../../common/db/tokens';
-import { CampusRepository, type NewCampus } from './campus.repository';
+import {
+  CampusRepository,
+  type CampusMemberRecord,
+  type NewCampus,
+} from './campus.repository';
 
 interface Row {
   team_id: string;
@@ -59,6 +65,55 @@ export class KyselyCampusRepository extends CampusRepository {
       .where('campus.team_id', '=', id)
       .executeTakeFirst();
     return row && toCampus(row);
+  }
+
+  async nameTaken(
+    organizationId: string,
+    name: string,
+    exceptId?: string
+  ): Promise<boolean> {
+    const row = await this.select(organizationId)
+      .where(sql<boolean>`lower(team.name) = lower(${name})`)
+      .$if(exceptId !== undefined, (qb) =>
+        qb.where('campus.team_id', '<>', exceptId ?? '')
+      )
+      .executeTakeFirst();
+    return row !== undefined;
+  }
+
+  async membersOf(
+    organizationId: string,
+    campusIds: readonly string[]
+  ): Promise<CampusMemberRecord[]> {
+    if (campusIds.length === 0) {
+      return [];
+    }
+    const rows = await this.db
+      .selectFrom('teamMember')
+      .innerJoin('campus', 'campus.team_id', 'teamMember.teamId')
+      .innerJoin('user', 'user.id', 'teamMember.userId')
+      .innerJoin('member', (join) =>
+        join
+          .onRef('member.userId', '=', 'teamMember.userId')
+          .onRef('member.organizationId', '=', 'campus.organization_id')
+      )
+      .where('campus.organization_id', '=', organizationId)
+      .where('teamMember.teamId', 'in', [...campusIds])
+      .select([
+        'teamMember.teamId',
+        'teamMember.userId',
+        'user.name',
+        'member.role',
+      ])
+      .orderBy('user.name')
+      .orderBy('teamMember.userId')
+      .execute();
+    return rows.map((row) => ({
+      campusId: row.teamId,
+      userId: row.userId,
+      name: row.name,
+      roles: splitRoles(row.role),
+    }));
   }
 
   async existsInSchool(organizationId: string, id: string): Promise<boolean> {

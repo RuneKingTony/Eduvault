@@ -73,6 +73,25 @@ export interface FeeSchedule {
   updated_at: Generated<Timestamp>;
 }
 
+export interface FileBlob {
+  bytes: Buffer;
+  file_id: string;
+  organization_id: string;
+}
+
+export interface FileObject {
+  byte_size: number;
+  content_type: string;
+  id: Generated<string>;
+  kind: string;
+  organization_id: string;
+  original_name: string;
+  sha256: string;
+  storage_key: string;
+  uploaded_at: Generated<Timestamp>;
+  uploaded_by: string | null;
+}
+
 export interface Invitation {
   createdAt: Generated<Timestamp>;
   email: string;
@@ -117,16 +136,30 @@ export interface OrganizationRole {
 }
 
 export interface SchoolAccount {
+  address: string | null;
   admission_prefix: string;
   city: string | null;
   created_at: Generated<Timestamp>;
   currency: string;
+  email: string | null;
   id: Generated<string>;
+  logo_file_id: string | null;
   name: string;
   organization_id: string;
+  phone: string | null;
   suspended_at: Timestamp | null;
   suspended_by: string | null;
   updated_at: Generated<Timestamp>;
+  updated_by: string | null;
+}
+
+export interface SchoolSetting {
+  created_at: Generated<Timestamp>;
+  max_guardians: Generated<number>;
+  organization_id: string;
+  require_guardian: Generated<boolean>;
+  updated_at: Generated<Timestamp>;
+  updated_by: string | null;
 }
 
 export interface Session {
@@ -200,11 +233,14 @@ export interface DB {
   campus: Campus;
   class_level: ClassLevel;
   fee_schedule: FeeSchedule;
+  file_blob: FileBlob;
+  file_object: FileObject;
   invitation: Invitation;
   member: Member;
   organization: Organization;
   organizationRole: OrganizationRole;
   school_account: SchoolAccount;
+  school_setting: SchoolSetting;
   session: Session;
   student: Student;
   team: Team;

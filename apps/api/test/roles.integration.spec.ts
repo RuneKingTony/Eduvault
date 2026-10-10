@@ -5,28 +5,13 @@ import {
 } from '@eduvault/policy';
 import type { MemberDetail, Role, RoleList } from '@eduvault/api-contract';
 import { syncAllStarterRoles } from '../src/app/common/auth/starter-roles';
-import { acting, baseTest, expect, type Fixtures } from './support/base-test';
-import { twoSchools, type TwoSchools } from './support/two-schools';
+import { acting, expect, type Fixtures } from './support/base-test';
+import { schoolsTest } from './support/two-schools';
 
 type Actor = NonNullable<Parameters<Fixtures['api']>[0]>;
 type Api = Fixtures['api'];
 
-const test = baseTest.extend<{ schools: TwoSchools }>({
-  schools: async (
-    { app, createUser, createOrganization, createCampus, addMember },
-    use
-  ) => {
-    await use(
-      await twoSchools({
-        app,
-        createUser,
-        createOrganization,
-        createCampus,
-        addMember,
-      })
-    );
-  },
-});
+const test = schoolsTest;
 
 const listRoles = async (api: Api, actor: Actor): Promise<Role[]> => {
   const res = await api(actor).get('/roles').expect(200);
