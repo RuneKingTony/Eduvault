@@ -1,4 +1,19 @@
 import { z } from 'zod';
+import {
+  calendarCurrentSchema,
+  createHolidaySchema,
+  createSchoolYearSchema,
+  createdSchoolYearSchema,
+  dayOffSchema,
+  daysOffQuerySchema,
+  holidayAddedSchema,
+  holidayRemovedSchema,
+  schoolYearListQuerySchema,
+  schoolYearListSchema,
+  schoolYearSchema,
+  termSchema,
+  updateTermSchema,
+} from './calendar';
 import { defineContract, defineRoute } from './route';
 import {
   campusFilterSchema,
@@ -320,6 +335,75 @@ export const contract = defineContract({
       path: '/roles/:slug',
       params: roleSlugParamsSchema,
       response: removedRoleSchema,
+    }),
+  },
+  schoolYears: {
+    list: defineRoute({
+      method: 'GET',
+      path: '/school-years',
+      query: schoolYearListQuerySchema,
+      response: schoolYearListSchema,
+    }),
+    get: defineRoute({
+      method: 'GET',
+      path: '/school-years/:id',
+      params: idParamsSchema,
+      response: schoolYearSchema,
+    }),
+    create: defineRoute({
+      method: 'POST',
+      path: '/school-years',
+      body: createSchoolYearSchema,
+      response: createdSchoolYearSchema,
+    }),
+    remove: defineRoute({
+      method: 'DELETE',
+      path: '/school-years/:id',
+      params: idParamsSchema,
+      response: removed,
+    }),
+  },
+  terms: {
+    update: defineRoute({
+      method: 'PATCH',
+      path: '/terms/:id',
+      params: idParamsSchema,
+      body: updateTermSchema,
+      response: termSchema,
+    }),
+    makeCurrent: defineRoute({
+      method: 'POST',
+      path: '/terms/:id/make-current',
+      params: idParamsSchema,
+      response: termSchema,
+    }),
+  },
+  holidays: {
+    create: defineRoute({
+      method: 'POST',
+      path: '/terms/:id/holidays',
+      params: idParamsSchema,
+      body: createHolidaySchema,
+      response: holidayAddedSchema,
+    }),
+    remove: defineRoute({
+      method: 'DELETE',
+      path: '/holidays/:id',
+      params: idParamsSchema,
+      response: holidayRemovedSchema,
+    }),
+  },
+  calendar: {
+    current: defineRoute({
+      method: 'GET',
+      path: '/calendar/current',
+      response: calendarCurrentSchema,
+    }),
+    daysOff: defineRoute({
+      method: 'GET',
+      path: '/calendar/days-off',
+      query: daysOffQuerySchema,
+      response: z.array(dayOffSchema),
     }),
   },
   schoolAccount: {

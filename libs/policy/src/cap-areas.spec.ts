@@ -69,6 +69,34 @@ describe('the Roles area', () => {
   });
 });
 
+describe('the School years and terms area', () => {
+  const years = area('school-years');
+
+  it('sits in School before Students and splits seeing from changing', () => {
+    const ids = CAP_AREAS.map((candidate) => candidate.id);
+    expect(ids.indexOf('school-years')).toBe(ids.indexOf('students') - 1);
+    expect(years.group).toBe('School');
+    expect(years.label).toBe('School years and terms');
+    expect(years.see).toEqual(['session:read']);
+    expect(years.change).toEqual([
+      'session:create',
+      'session:update',
+      'session:setCurrent',
+    ]);
+    expect(years.changeDesc).toBe(
+      'Add school years, holidays and set the current term'
+    );
+  });
+
+  it('is change for all four, see for session:read and custom for a lone update', () => {
+    expect(
+      capLevel(toPermissionMap([...years.see, ...years.change]), years)
+    ).toBe('change');
+    expect(capLevel(toPermissionMap(['session:read']), years)).toBe('see');
+    expect(capLevel(toPermissionMap(['session:update']), years)).toBe('custom');
+  });
+});
+
 describe('capLevel', () => {
   const campuses = area('campuses');
 
@@ -103,6 +131,7 @@ describe('capSummary', () => {
       'School settings: change the school profile and rules',
       'Hands over the school',
       'Deletes the school',
+      'School years and terms: add school years, holidays and set the current term',
       'Students: admit students, update them and put them in classes',
     ]);
   });
@@ -114,6 +143,7 @@ describe('capSummary', () => {
       'Staff: can see',
       'Roles: can see',
       'School settings: can see',
+      'School years and terms: add school years, holidays and set the current term',
       'Students: admit students, update them and put them in classes',
     ]);
   });

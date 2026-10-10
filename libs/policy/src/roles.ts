@@ -36,6 +36,10 @@ export const STARTER_ROLES: readonly StarterRole[] = [
       'student:create',
       'student:read',
       'student:update',
+      'session:create',
+      'session:read',
+      'session:update',
+      'session:setCurrent',
     ],
   },
   {

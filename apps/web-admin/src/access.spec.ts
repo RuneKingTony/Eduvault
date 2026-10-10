@@ -23,8 +23,18 @@ describe('requireGate', () => {
     expect(thrown.options.to).toBe('/');
   });
 
+  it('keeps the calendar for members who can read school years', () => {
+    expect(
+      redirected(() => requireGate(starterAccess('administrator'), '/calendar'))
+    ).toBeUndefined();
+    const thrown = redirected(() =>
+      requireGate(starterAccess('teacher'), '/calendar')
+    ) as { options: { to: string } };
+    expect(thrown.options.to).toBe('/');
+  });
+
   it('sends a member with no permissions away from every gated route', () => {
-    for (const route of ['/students', '/campuses', '/fees']) {
+    for (const route of ['/students', '/campuses', '/fees', '/calendar']) {
       expect(redirected(() => requireGate(fakeAccess(), route))).toBeDefined();
     }
   });

@@ -196,6 +196,14 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
     gate: ['schoolAccount:read'],
   },
   {
+    id: 'calendar',
+    label: 'School years and terms',
+    route: '/calendar',
+    group: 'School structure',
+    icon: 'calendar-days',
+    gate: ['session:read'],
+  },
+  {
     id: 'campuses',
     label: 'Campuses',
     route: '/campuses',

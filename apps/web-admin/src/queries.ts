@@ -216,3 +216,34 @@ export async function invalidateMembers(
       : undefined,
   ]);
 }
+
+const SCHOOL_YEARS_KEY = ['school-years'] as const;
+const CALENDAR_KEY = ['calendar'] as const;
+
+export const schoolYearsQueryOptions = (api: Api, page: number) =>
+  queryOptions({
+    queryKey: [...SCHOOL_YEARS_KEY, 'list', page],
+    queryFn: () => api.schoolYears.list({ query: { page } }),
+    placeholderData: keepPreviousData,
+  });
+
+export const currentTermQueryOptions = (api: Api) =>
+  queryOptions({
+    queryKey: [...CALENDAR_KEY, 'current'],
+    queryFn: () => api.calendar.current({}),
+  });
+
+export const daysOffQueryOptions = (api: Api, limit: number) =>
+  queryOptions({
+    queryKey: [...CALENDAR_KEY, 'days-off', limit],
+    queryFn: () => api.calendar.daysOff({ query: { limit } }),
+  });
+
+export async function invalidateCalendar(
+  queryClient: QueryClient
+): Promise<void> {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: SCHOOL_YEARS_KEY }),
+    queryClient.invalidateQueries({ queryKey: CALENDAR_KEY }),
+  ]);
+}

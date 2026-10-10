@@ -7,6 +7,7 @@ import {
   type ExceptionFilter,
 } from '@nestjs/common';
 import {
+  YEAR_OVERLAP_MESSAGE,
   apiErrorCodeSchema,
   type ApiErrorBody,
   type ApiErrorCode,
@@ -27,6 +28,7 @@ const codeFor = (status: number): ApiErrorCode =>
 const PG_UNIQUE_VIOLATION = '23505';
 const PG_FOREIGN_KEY_VIOLATION = '23503';
 const PG_CHECK_VIOLATION = '23514';
+const PG_EXCLUSION_VIOLATION = '23P01';
 
 const pgConstraint = (error: unknown): string =>
   typeof error === 'object' && error !== null && 'constraint' in error
@@ -37,6 +39,46 @@ const pgCode = (error: unknown): string | undefined =>
   typeof error === 'object' && error !== null && 'code' in error
     ? String(error.code)
     : undefined;
+
+const conflict = (message: string, code: ApiErrorCode = 'Conflict') => ({
+  status: HttpStatus.CONFLICT,
+  body: { code, message },
+});
+
+const describeCheckViolation = (exception: unknown) =>
+  // Convention: a self-approval CHECK is named `<table>_<action>_not_self`.
+  pgConstraint(exception).includes('not_self')
+    ? conflict(
+        'You created this. Someone else must approve it.',
+        'SelfApproval'
+      )
+    : conflict('The change breaks a rule on this record');
+
+const describeExclusionViolation = (exception: unknown) =>
+  conflict(
+    pgConstraint(exception) === 'academic_session_no_overlap'
+      ? YEAR_OVERLAP_MESSAGE
+      : 'The change overlaps another record'
+  );
+
+const POSTGRES_VIOLATIONS: Partial<
+  Record<string, (exception: unknown) => { status: number; body: ApiErrorBody }>
+> = {
+  [PG_UNIQUE_VIOLATION]: () => conflict('Resource already exists'),
+  [PG_FOREIGN_KEY_VIOLATION]: () =>
+    conflict('Resource is referenced by, or references, other records'),
+  [PG_CHECK_VIOLATION]: describeCheckViolation,
+  [PG_EXCLUSION_VIOLATION]: describeExclusionViolation,
+};
+
+const describePostgres = (
+  exception: unknown
+): { status: number; body: ApiErrorBody } | undefined => {
+  const code = pgCode(exception);
+  return code === undefined
+    ? undefined
+    : POSTGRES_VIOLATIONS[code]?.(exception);
+};
 
 /** Better Auth's server API throws APIError carrying an HTTP status. */
 const betterAuthStatus = (
@@ -104,40 +146,9 @@ export class ErrorFilter implements ExceptionFilter {
       };
     }
 
-    const code = pgCode(exception);
-    if (code === PG_UNIQUE_VIOLATION) {
-      return {
-        status: HttpStatus.CONFLICT,
-        body: { code: 'Conflict', message: 'Resource already exists' },
-      };
-    }
-    if (code === PG_FOREIGN_KEY_VIOLATION) {
-      return {
-        status: HttpStatus.CONFLICT,
-        body: {
-          code: 'Conflict',
-          message: 'Resource is referenced by, or references, other records',
-        },
-      };
-    }
-
-    if (code === PG_CHECK_VIOLATION) {
-      // Convention: a self-approval CHECK is named `<table>_<action>_not_self`.
-      return pgConstraint(exception).includes('not_self')
-        ? {
-            status: HttpStatus.CONFLICT,
-            body: {
-              code: 'SelfApproval',
-              message: 'You created this. Someone else must approve it.',
-            },
-          }
-        : {
-            status: HttpStatus.CONFLICT,
-            body: {
-              code: 'Conflict',
-              message: 'The change breaks a rule on this record',
-            },
-          };
+    const violation = describePostgres(exception);
+    if (violation) {
+      return violation;
     }
 
     this.logger.error(

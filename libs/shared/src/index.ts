@@ -1,3 +1,4 @@
+export * from './calendar';
 export * from './count-of';
 export * from './date';
 export * from './initials';

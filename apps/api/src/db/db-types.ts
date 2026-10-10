@@ -14,6 +14,16 @@ export type Int8 = ColumnType<string, bigint | number | string, bigint | number 
 
 export type Timestamp = ColumnType<Date, Date | string, Date | string>;
 
+export interface AcademicSession {
+  created_at: Generated<Timestamp>;
+  ends_on: Timestamp;
+  id: Generated<string>;
+  name: string;
+  organization_id: string;
+  starts_on: Timestamp;
+  updated_at: Generated<Timestamp>;
+}
+
 export interface Account {
   accessToken: string | null;
   accessTokenExpiresAt: Timestamp | null;
@@ -153,6 +163,16 @@ export interface SchoolAccount {
   updated_by: string | null;
 }
 
+export interface SchoolHoliday {
+  created_at: Generated<Timestamp>;
+  date: Timestamp;
+  id: Generated<string>;
+  name: string;
+  organization_id: string;
+  term_id: string;
+  updated_at: Generated<Timestamp>;
+}
+
 export interface SchoolSetting {
   created_at: Generated<Timestamp>;
   max_guardians: Generated<number>;
@@ -203,6 +223,19 @@ export interface TeamMember {
   userId: string;
 }
 
+export interface Term {
+  created_at: Generated<Timestamp>;
+  ends_on: Timestamp;
+  id: Generated<string>;
+  is_current: Generated<boolean>;
+  name: string;
+  organization_id: string;
+  sequence: number;
+  session_id: string;
+  starts_on: Timestamp;
+  updated_at: Generated<Timestamp>;
+}
+
 export interface User {
   banExpires: Timestamp | null;
   banned: boolean | null;
@@ -228,6 +261,7 @@ export interface Verification {
 }
 
 export interface DB {
+  academic_session: AcademicSession;
   account: Account;
   audit_log: AuditLog;
   campus: Campus;
@@ -240,11 +274,13 @@ export interface DB {
   organization: Organization;
   organizationRole: OrganizationRole;
   school_account: SchoolAccount;
+  school_holiday: SchoolHoliday;
   school_setting: SchoolSetting;
   session: Session;
   student: Student;
   team: Team;
   teamMember: TeamMember;
+  term: Term;
   user: User;
   verification: Verification;
 }

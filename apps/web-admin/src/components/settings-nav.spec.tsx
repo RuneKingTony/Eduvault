@@ -26,6 +26,7 @@ async function renderAt(path: string, access: MePermissions) {
     createRoute({ getParentRoute: () => root, path: to });
   const router = createRouter({
     routeTree: root.addChildren([
+      page('/calendar'),
       page('/campuses'),
       page('/roles'),
       page('/roles/new'),
@@ -83,6 +84,32 @@ describe('SettingsNav', () => {
     ).toBeInTheDocument();
   });
 
+  it('lists School years and terms first and shows it alone to a session:read member', async () => {
+    const nav = within(
+      await renderAt(
+        '/calendar',
+        fakeAccess({ permissions: { session: ['read'] } })
+      )
+    );
+    const links = nav.getAllByRole('link');
+    expect(links.map((link) => link.textContent)).toEqual([
+      'School years and terms',
+    ]);
+    expect(links[0]).toHaveAttribute('aria-current', 'page');
+  });
+
+  it('puts School years and terms before Campuses in the owner list', async () => {
+    const nav = within(await renderAt('/campuses', ownerAccess()));
+    expect(nav.getAllByRole('link').map((link) => link.textContent)).toEqual([
+      'School profile',
+      'Admissions rules',
+      'School years and terms',
+      'Campuses',
+      'Roles and permissions',
+      'Danger zone',
+    ]);
+  });
+
   it('hides a section the member cannot open', async () => {
     const nav = within(
       await renderAt('/roles', fakeAccess({ permissions: { ac: ['read'] } }))
@@ -102,6 +129,7 @@ describe('SettingsNav', () => {
     expect(nav.getAllByRole('link').map((link) => link.textContent)).toEqual([
       'School profile',
       'Admissions rules',
+      'School years and terms',
       'Campuses',
       'Roles and permissions',
       'Danger zone',
@@ -128,6 +156,7 @@ describe('SettingsNav', () => {
     expect(optionLabels(select)).toEqual([
       'School profile',
       'Admissions rules',
+      'School years and terms',
       'Campuses',
       'Roles and permissions',
       'Danger zone',

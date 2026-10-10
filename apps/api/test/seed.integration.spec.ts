@@ -16,7 +16,11 @@ test.describe('dev seed', () => {
         `SELECT (SELECT count(*) FROM organization) AS organization,
                 (SELECT count(*) FROM team) AS team,
                 (SELECT count(*) FROM "user") AS "user",
-                (SELECT count(*) FROM student) AS student`
+                (SELECT count(*) FROM student) AS student,
+                (SELECT count(*) FROM academic_session) AS academic_session,
+                (SELECT count(*) FROM term) AS term,
+                (SELECT count(*) FROM school_holiday) AS school_holiday,
+                (SELECT count(*) FROM term WHERE is_current) AS current_term`
       );
       return rows[0];
     };
@@ -32,6 +36,10 @@ test.describe('dev seed', () => {
       team: '6',
       user: String(personas.length + 1),
       student: '28',
+      academic_session: '2',
+      term: '6',
+      school_holiday: '11',
+      current_term: '1',
     });
 
     const { rows: titled } = await pool.query<{ title: string | null }>(

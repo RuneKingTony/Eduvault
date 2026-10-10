@@ -1,14 +1,29 @@
-import { useAuthClient, usePermissions } from '@eduvault/auth-client';
+import { useQuery } from '@tanstack/react-query';
+import { Link } from '@tanstack/react-router';
+import type { CalendarCurrent } from '@eduvault/api-contract';
+import { useAuthClient, useCan, usePermissions } from '@eduvault/auth-client';
 import { MEMBER_ROLE } from '@eduvault/policy';
+import { fmtDateRange } from '@eduvault/shared';
 import {
   Button,
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
   Empty,
   EmptyContent,
   EmptyDescription,
   EmptyHeader,
   EmptyTitle,
+  ErrorMessage,
+  PageSkeleton,
 } from '@eduvault/ui';
+import { useApi } from '../api';
+import { NoCurrentTermCallout } from '../components/no-current-term-callout';
 import { useMyAccess } from '../components/my-access';
+import { currentTermQueryOptions } from '../queries';
 import { useSchool } from '../use-school';
 
 function NoAccessDashboard({ hasRole }: { hasRole: boolean }) {
@@ -40,6 +55,51 @@ function NoAccessDashboard({ hasRole }: { hasRole: boolean }) {
   );
 }
 
+function TermCard({ current }: { current: CalendarCurrent }) {
+  const canSeeCalendar = useCan('session', 'read');
+  const { term, schoolYear } = current;
+  if (term === null || schoolYear === null) {
+    return null;
+  }
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>
+          {term.name} · {schoolYear.name}
+        </CardTitle>
+        <CardDescription>
+          {fmtDateRange(term.startsOn, term.endsOn)}
+        </CardDescription>
+        {canSeeCalendar ? (
+          <CardAction>
+            <Button asChild variant="outline" size="sm">
+              <Link to="/calendar">Calendar</Link>
+            </Button>
+          </CardAction>
+        ) : null}
+      </CardHeader>
+      <CardContent>
+        {current.schoolDaysSoFar} of {current.schoolDays} school days
+      </CardContent>
+    </Card>
+  );
+}
+
+function CurrentTerm() {
+  const current = useQuery(currentTermQueryOptions(useApi()));
+  if (current.isPending) {
+    return <PageSkeleton rows={1} />;
+  }
+  if (current.data === undefined) {
+    return <ErrorMessage error={current.error} />;
+  }
+  return current.data.term === null ? (
+    <NoCurrentTermCallout />
+  ) : (
+    <TermCard current={current.data} />
+  );
+}
+
 export function DashboardPage() {
   const { permissions, roles } = usePermissions();
   if (Object.keys(permissions).length === 0) {
@@ -50,6 +110,7 @@ export function DashboardPage() {
   return (
     <section className="flex flex-col gap-4">
       <h1>Dashboard</h1>
+      <CurrentTerm />
       <Empty className="border">
         <EmptyHeader>
           <EmptyTitle>Nothing here yet</EmptyTitle>

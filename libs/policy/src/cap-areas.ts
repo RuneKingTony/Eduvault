@@ -84,6 +84,16 @@ export const CAP_AREAS: readonly CapArea[] = [
     ],
   },
   {
+    id: 'school-years',
+    group: 'School',
+    label: 'School years and terms',
+    important: false,
+    see: ['session:read'],
+    change: ['session:create', 'session:update', 'session:setCurrent'],
+    changeDesc: 'Add school years, holidays and set the current term',
+    extras: [],
+  },
+  {
     id: 'students',
     group: 'School',
     label: 'Students',

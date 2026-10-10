@@ -377,6 +377,11 @@ describe('Advanced grid vocabulary', () => {
     }
     expect(ACTION_WORDS.create).toBe('add');
     expect(ACTION_WORDS.readAll).toBe('see all');
+    expect(ACTION_WORDS.setCurrent).toBe('set current');
+  });
+
+  it('puts the calendar under Foundation', () => {
+    expect(RESOURCE_PILLARS.session).toBe('Foundation');
   });
 
   it('puts the access resources under People and access', () => {
@@ -391,6 +396,9 @@ describe('capabilityLabel', () => {
     expect(capabilityLabel('member:update')).toBe('Staff');
     expect(capabilityLabel('ac:read')).toBe('Roles');
     expect(capabilityLabel('campus:readAll')).toBe('Sees every campus');
+    expect(capabilityLabel('session:setCurrent')).toBe(
+      'School years and terms'
+    );
   });
 
   it('falls back to the permission label for a legacy permission', () => {

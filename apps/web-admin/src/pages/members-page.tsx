@@ -21,6 +21,7 @@ import {
   EmptyTitle,
   ErrorMessage,
   Input,
+  NumberedPager,
   Select,
   SelectContent,
   SelectItem,
@@ -230,50 +231,6 @@ function SkeletonRows() {
   );
 }
 
-function Pager({
-  page,
-  total,
-  onPage,
-}: {
-  page: number;
-  total: number;
-  onPage: (page: number) => void;
-}) {
-  const from = (page - 1) * MEMBER_PAGE_SIZE + 1;
-  const to = Math.min(page * MEMBER_PAGE_SIZE, total);
-  return (
-    <div className="flex items-center justify-between gap-3 p-3 text-sm">
-      <span className="text-muted-foreground">
-        Showing {from} to {to} of {total}
-      </span>
-      <div className="flex gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={page <= 1}
-          onClick={() => {
-            onPage(page - 1);
-          }}
-        >
-          Previous
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={to >= total}
-          onClick={() => {
-            onPage(page + 1);
-          }}
-        >
-          Next
-        </Button>
-      </div>
-    </div>
-  );
-}
-
 function MembersTable({
   items,
   roles,
@@ -342,7 +299,12 @@ function MembersBody({
         campuses={campuses}
         onOpen={onOpen}
       />
-      <Pager page={page} total={state.total} onPage={onPage} />
+      <NumberedPager
+        page={page}
+        total={state.total}
+        pageSize={MEMBER_PAGE_SIZE}
+        onPage={onPage}
+      />
     </>
   );
 }

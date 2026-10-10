@@ -15,6 +15,7 @@ import { KYSELY_TOKEN, type Database } from '../../src/app/common/db/tokens';
 import { CampusService } from '../../src/app/modules/campus/campus.service';
 import { PlatformService } from '../../src/app/modules/platform/platform.service';
 import { StudentService } from '../../src/app/modules/student/student.service';
+import { seedCalendar } from './calendar';
 import { orgContextFor } from './actors';
 import { PROTOTYPE_TODAY, seedOffsetDays, shiftDate } from './date-shift';
 import {
@@ -59,6 +60,14 @@ const lookup = (map: Map<string, string>, key: string, what: string) => {
     throw new Error(`Unknown ${what} ${key}`);
   }
   return value;
+};
+
+const lookupOwner = (owners: Map<string, OrgContext>, slug: string) => {
+  const owner = owners.get(slug);
+  if (owner === undefined) {
+    throw new Error(`No owner for ${slug}`);
+  }
+  return owner;
 };
 
 async function createSchools(
@@ -238,6 +247,11 @@ export async function runSeed(
   await backdateSchools(db, created.organizationIds, offsetDays);
   await addMembers(app, created);
   await createStudents(app, created.campusIds);
+  await seedCalendar(app, {
+    owner: lookupOwner(created.owners, GREENFIELD_SLUG),
+    today,
+    offsetDays,
+  });
   await addSupportActivity(app, superAdmin, created.organizationIds);
 
   const failures = await runSeedCheck(app, offsetDays);

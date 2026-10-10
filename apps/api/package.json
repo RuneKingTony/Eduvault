@@ -16,7 +16,8 @@
     "rxjs": "catalog:server",
     "zod": "catalog:",
     "@eduvault/api-contract": "workspace:*",
-    "@eduvault/policy": "workspace:*"
+    "@eduvault/policy": "workspace:*",
+    "@eduvault/shared": "workspace:*"
   },
   "devDependencies": {
     "@nestjs/testing": "catalog:nestjs",
