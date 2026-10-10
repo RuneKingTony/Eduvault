@@ -225,6 +225,20 @@ export class MembersService {
     });
   }
 
+  async updateTitle(
+    ctx: OrgContext,
+    id: string,
+    title: string
+  ): Promise<MemberDetail> {
+    const record = await this.visible(ctx, id);
+    await this.members.updateTitle(
+      ctx.organizationId,
+      record.id,
+      titleOrDefault(title)
+    );
+    return this.reload(ctx, record.id, await this.loadCatalogue(ctx));
+  }
+
   updateCampuses(
     ctx: OrgContext,
     id: string,

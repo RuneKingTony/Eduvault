@@ -207,4 +207,24 @@ describe('MemberPage', () => {
       expect(screen.getByText(/^1\. Roles/)).toBeInTheDocument();
     });
   });
+
+  it('offers Edit job title to an editor and opens its dialog', async () => {
+    setup();
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Edit job title' })
+    );
+    expect(
+      await screen.findByRole('heading', { name: 'Edit Ada Obi’s job title' })
+    ).toBeInTheDocument();
+  });
+
+  it('hides Edit job title without member:update', async () => {
+    setup({
+      access: fakeAccess({ permissions: toPermissionMap(['member:read']) }),
+    });
+    await screen.findByRole('heading', { name: 'Ada Obi' });
+    expect(
+      screen.queryByRole('button', { name: 'Edit job title' })
+    ).not.toBeInTheDocument();
+  });
 });

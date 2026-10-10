@@ -4,6 +4,7 @@ import {
   CheckCircle2Icon,
   KeyRoundIcon,
   MoreHorizontalIcon,
+  PencilIcon,
   SearchXIcon,
   Trash2Icon,
 } from 'lucide-react';
@@ -34,6 +35,7 @@ import {
 } from '@eduvault/ui';
 import { useApi } from '../api';
 import { MemberAccessCard } from '../components/member-access-card';
+import { EditTitleDialog } from '../components/edit-title-dialog';
 import { MemberCampusesCard } from '../components/member-campuses-card';
 import { RemoveMemberDialog } from '../components/remove-member-dialog';
 import { ResetPasswordDialog } from '../components/reset-password-dialog';
@@ -151,24 +153,45 @@ function useMemberPageData(memberId: string) {
 
 function MemberHeader({
   detail,
+  canEditTitle,
   onReset,
   onRemove,
 }: {
   detail: MemberDetail;
+  canEditTitle: boolean;
   onReset: (() => void) | undefined;
   onRemove: (() => void) | undefined;
 }) {
+  const [editing, setEditing] = useState(false);
   return (
     <header className="flex items-start justify-between gap-3">
       <div className="flex flex-col gap-1">
         <h1>{detail.name}</h1>
-        <p className="text-sm text-muted-foreground">
+        <p className="flex items-center gap-1 text-sm text-muted-foreground">
           {detail.title} · {detail.email ?? detail.username}
+          {canEditTitle ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              aria-label="Edit job title"
+              onClick={() => {
+                setEditing(true);
+              }}
+            >
+              <PencilIcon />
+            </Button>
+          ) : null}
         </p>
       </div>
       {onReset === undefined && onRemove === undefined ? null : (
         <MemberMenu onReset={onReset} onRemove={onRemove} />
       )}
+      <EditTitleDialog
+        member={detail}
+        open={editing}
+        onOpenChange={setEditing}
+      />
     </header>
   );
 }
@@ -176,12 +199,14 @@ function MemberHeader({
 function MemberTop({
   detail,
   schoolName,
+  canEditTitle,
   showReset,
   showRemove,
   onRemoved,
 }: {
   detail: MemberDetail;
   schoolName: string;
+  canEditTitle: boolean;
   showReset: boolean;
   showRemove: boolean;
   onRemoved: () => Promise<void>;
@@ -192,6 +217,7 @@ function MemberTop({
     <>
       <MemberHeader
         detail={detail}
+        canEditTitle={canEditTitle}
         onReset={
           showReset
             ? () => {
@@ -280,6 +306,7 @@ function MemberView({
       <MemberTop
         detail={detail}
         schoolName={props.schoolName}
+        canEditTitle={canEdit}
         showReset={showReset}
         showRemove={showRemove}
         onRemoved={props.onRemoved}

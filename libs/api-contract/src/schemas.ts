@@ -399,6 +399,11 @@ export const updateMemberRolesSchema = z.object({
   campusIds: campusIdsSchema.optional(),
 });
 
+export const updateMemberTitleSchema = z.object({
+  title: z.string().trim().max(80),
+});
+export type UpdateMemberTitleInput = z.input<typeof updateMemberTitleSchema>;
+
 export const updateMemberCampusesSchema = z.object({
   campusIds: campusIdsSchema,
 });

@@ -98,6 +98,17 @@ class FakeMembers extends MembersRepository {
     );
   }
 
+  readonly titles: Record<string, string> = {};
+
+  updateTitle(organizationId: string, id: string, title: string) {
+    this.titles[id] = title;
+    const record = this.records.find((candidate) => candidate.id === id);
+    if (record !== undefined) {
+      record.title = title;
+    }
+    return Promise.resolve();
+  }
+
   countOwners() {
     return Promise.resolve(
       this.records.filter((record) => record.roles.includes('owner')).length
@@ -680,5 +691,35 @@ describe('resetPassword', () => {
     ).toBeInstanceOf(ForbiddenException);
     await service.resetPassword(actingContext(true), 'shared');
     expect(admin.resetPassword).toHaveBeenCalledWith('user-shared');
+  });
+});
+
+describe('updateTitle', () => {
+  it('saves the title and answers the member', async () => {
+    const { service, members, writes } = setup([
+      person('t', ['member', 'teacher']),
+    ]);
+    const saved = await service.updateTitle(context(), 't', 'Head of maths');
+    expect(saved.title).toBe('Head of maths');
+    expect(members.titles).toEqual({ t: 'Head of maths' });
+    noWrites(writes);
+  });
+
+  it('falls back to New member for a blank title', async () => {
+    const { service, members } = setup([person('t', ['member'])]);
+    const saved = await service.updateTitle(context(), 't', '');
+    expect(saved.title).toBe('New member');
+    expect(members.titles).toEqual({ t: 'New member' });
+  });
+
+  it('answers 404 for a member on none of the editor’s campuses and writes nothing', async () => {
+    const { service, members } = setup([
+      person('ikeja', ['member', 'teacher'], [IKEJA]),
+    ]);
+    const error = await rejection(
+      service.updateTitle(context({ campusScope: [LEKKI] }), 'ikeja', 'Boss')
+    );
+    expect(error).toBeInstanceOf(NotFoundException);
+    expect(members.titles).toEqual({});
   });
 });
