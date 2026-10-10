@@ -59,6 +59,10 @@ export class MemberAdminService {
     return this.accounts.createAccount(input);
   }
 
+  resetPassword(userId: string): Promise<string> {
+    return this.accounts.resetPassword(userId);
+  }
+
   /** Compensates a failed add: only for an account this request created. */
   deleteAccount(userId: string): Promise<void> {
     return this.accounts.deleteAccount(userId);

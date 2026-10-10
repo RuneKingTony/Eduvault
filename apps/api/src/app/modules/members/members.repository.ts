@@ -29,5 +29,10 @@ export abstract class MembersRepository {
 
   abstract countOwners(organizationId: string): Promise<number>;
 
+  abstract belongsToOtherSchool(
+    userId: string,
+    organizationId: string
+  ): Promise<boolean>;
+
   abstract listRoles(organizationId: string): Promise<SchoolRoleEntry[]>;
 }

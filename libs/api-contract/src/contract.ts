@@ -28,6 +28,7 @@ import {
   platformSchoolOptionsSchema,
   platformSchoolSchema,
   replaceOwnerResultSchema,
+  resetMemberPasswordResultSchema,
   replaceOwnerSchema,
   schoolAccountSchema,
   schoolRoleSchema,
@@ -246,6 +247,12 @@ export const contract = defineContract({
       params: idParamsSchema,
       body: updateMemberCampusesSchema,
       response: memberDetailSchema,
+    }),
+    resetPassword: defineRoute({
+      method: 'POST',
+      path: '/members/:id/reset-password',
+      params: idParamsSchema,
+      response: resetMemberPasswordResultSchema,
     }),
     remove: defineRoute({
       method: 'DELETE',

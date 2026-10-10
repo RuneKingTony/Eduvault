@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import {
   ConflictException,
   ForbiddenException,
@@ -73,8 +74,14 @@ const person = (
 });
 
 class FakeMembers extends MembersRepository {
+  readonly elsewhere = new Set<string>();
+
   constructor(readonly records: MemberRecord[]) {
     super();
+  }
+
+  belongsToOtherSchool(userId: string) {
+    return Promise.resolve(this.elsewhere.has(userId));
   }
 
   list(_query: MemberListQuery) {
@@ -125,6 +132,12 @@ const context = (
   ...overrides,
 });
 
+const actingContext = (writes: boolean) =>
+  context({
+    isOwner: writes,
+    acting: { organizationId: ORG, writes, reason: writes ? 'SUP-1' : null },
+  });
+
 const setup = (records: MemberRecord[]) => {
   const admin = {
     underSchoolLock: vi.fn((_: string, fn: () => Promise<unknown>) => fn()),
@@ -135,6 +148,7 @@ const setup = (records: MemberRecord[]) => {
     setRolesAndCampuses: vi.fn().mockResolvedValue(undefined),
     setCampuses: vi.fn().mockResolvedValue(undefined),
     removeMember: vi.fn().mockResolvedValue(undefined),
+    resetPassword: vi.fn().mockResolvedValue(randomUUID()),
   };
   const campuses = {
     assertInScope: vi.fn((ctx: OrgContext, campusId: string) =>
@@ -143,8 +157,9 @@ const setup = (records: MemberRecord[]) => {
         : Promise.resolve()
     ),
   };
+  const members = new FakeMembers(records);
   const service = new MembersService(
-    new FakeMembers(records),
+    members,
     campuses as unknown as CampusService,
     admin as unknown as MemberAdminService
   );
@@ -153,8 +168,9 @@ const setup = (records: MemberRecord[]) => {
     admin.setRolesAndCampuses,
     admin.setCampuses,
     admin.removeMember,
+    admin.resetPassword,
   ];
-  return { service, admin, campuses, writes };
+  return { service, admin, campuses, members, writes };
 };
 
 const rejection = (promise: Promise<unknown>): Promise<unknown> =>
@@ -580,5 +596,89 @@ describe('get', () => {
       person('o2', ['member', 'owner']),
     ]);
     expect((await pair.service.get(context(), 'o1')).lastOwner).toBe(false);
+  });
+});
+
+describe('resetPassword', () => {
+  it('checks 404, then SELF_RESET, then escalation, then a shared account', async () => {
+    const { service, members, writes } = setup([
+      person('self', ['member', 'administrator']),
+      person('fd', ['member', 'front-desk']),
+      person('o', ['member', 'owner']),
+      person('shared', ['member', 'teacher']),
+    ]);
+    members.elsewhere.add('user-shared');
+    const missing = await rejection(service.resetPassword(context(), 'nope'));
+    expect(missing).toBeInstanceOf(NotFoundException);
+
+    const selfCaller = context({
+      user: { id: 'user-self', email: 's@example.com', name: 'Self' },
+    });
+    const self = await rejection(service.resetPassword(selfCaller, 'self'));
+    expect((self as ConflictException).getResponse()).toMatchObject({
+      code: 'SELF_RESET',
+    });
+
+    const escalation = await rejection(service.resetPassword(context(), 'fd'));
+    expect(escalation).toBeInstanceOf(ForbiddenException);
+    expect((escalation as ForbiddenException).message).toContain('Front desk');
+
+    const owner = await rejection(service.resetPassword(context(), 'o'));
+    expect(owner).toBeInstanceOf(ForbiddenException);
+
+    const shared = await rejection(service.resetPassword(context(), 'shared'));
+    expect((shared as ConflictException).getResponse()).toMatchObject({
+      code: 'SHARED_ACCOUNT',
+    });
+    noWrites(writes);
+  });
+
+  it('hides a member outside the editor’s campuses and refuses one who also works elsewhere', async () => {
+    const { service, writes } = setup([
+      person('ikeja', ['member', 'teacher'], [IKEJA]),
+      person('both', ['member', 'teacher'], [LEKKI, IKEJA]),
+    ]);
+    const scoped = context({ campusScope: [LEKKI] });
+    expect(
+      await rejection(service.resetPassword(scoped, 'ikeja'))
+    ).toBeInstanceOf(NotFoundException);
+    expect(
+      await rejection(service.resetPassword(scoped, 'both'))
+    ).toBeInstanceOf(ForbiddenException);
+    noWrites(writes);
+  });
+
+  it('issues a new temporary password for a member the editor can manage', async () => {
+    const { service, admin } = setup([person('t', ['member', 'teacher'])]);
+    const issued = randomUUID();
+    admin.resetPassword.mockResolvedValue(issued);
+    const result = await service.resetPassword(context(), 't');
+    expect(result).toEqual({ temporaryPassword: issued });
+    expect(admin.resetPassword).toHaveBeenCalledWith('user-t');
+    expect(admin.underSchoolLock).toHaveBeenCalledWith(
+      ORG,
+      expect.any(Function)
+    );
+  });
+
+  it('lets an owner reset a second owner', async () => {
+    const { service, admin } = setup([
+      person('o1', ['member', 'owner']),
+      person('o2', ['member', 'owner']),
+    ]);
+    await service.resetPassword(context({ isOwner: true }), 'o2');
+    expect(admin.resetPassword).toHaveBeenCalledWith('user-o2');
+  });
+
+  it('lets a super admin acting with a reason reset a shared account, but not one without', async () => {
+    const { service, admin, members } = setup([
+      person('shared', ['member', 'owner']),
+    ]);
+    members.elsewhere.add('user-shared');
+    expect(
+      await rejection(service.resetPassword(actingContext(false), 'shared'))
+    ).toBeInstanceOf(ForbiddenException);
+    await service.resetPassword(actingContext(true), 'shared');
+    expect(admin.resetPassword).toHaveBeenCalledWith('user-shared');
   });
 });

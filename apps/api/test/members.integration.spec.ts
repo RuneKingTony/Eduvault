@@ -4,6 +4,7 @@ import {
   type MemberDetail,
   type MemberList,
   type MemberSummary,
+  type ResetMemberPasswordResult,
 } from '@eduvault/api-contract';
 import { STARTER_ROLES, toPermissionMap } from '@eduvault/policy';
 import { syncAllStarterRoles } from '../src/app/common/auth/starter-roles';
@@ -91,6 +92,8 @@ const idOf = async (api: Api, actor: Actor, userId: string) => {
   }
   return found.id;
 };
+
+const resetUrl = (id: string) => `/members/${id}/reset-password`;
 
 const userIds = (list: MemberList) => list.items.map((item) => item.userId);
 
@@ -691,6 +694,143 @@ test.describe('members', () => {
     });
   });
 
+  test.describe('reset password', () => {
+    test('issues a new temporary password, ends sessions and forces a change', async ({
+      api,
+      hire,
+      signIn,
+      schools: { owner, lekki },
+    }) => {
+      const { user, member } = await hire(owner, { campusIds: [lekki.id] });
+      const res = await api(owner).post(resetUrl(member.id)).expect(201);
+      const { temporaryPassword } = res.body as ResetMemberPasswordResult;
+      expect(temporaryPassword).toHaveLength(12);
+      expect(temporaryPassword).not.toBe(user.password);
+
+      await api(user).get('/me').expect(401);
+      await api()
+        .post('/api/auth/sign-in/email')
+        .send({ email: user.email, password: user.password })
+        .expect(401);
+      const next = await signIn({
+        id: user.id,
+        email: user.email,
+        password: temporaryPassword,
+        cookie: '',
+      });
+      const me = await api(next).get('/me').expect(200);
+      expect(me.body.mustChangePassword).toBe(true);
+      await api(next).get('/members').expect(403);
+    });
+
+    test('a new password each time, the older one stops working', async ({
+      api,
+      hire,
+      signIn,
+      schools: { owner, lekki },
+    }) => {
+      const { user, member } = await hire(owner, { campusIds: [lekki.id] });
+      const first = await api(owner).post(resetUrl(member.id)).expect(201);
+      const second = await api(owner).post(resetUrl(member.id)).expect(201);
+      const [one, two] = [first, second].map(
+        (res) => (res.body as ResetMemberPasswordResult).temporaryPassword
+      );
+      expect(one).not.toBe(two);
+      await api()
+        .post('/api/auth/sign-in/email')
+        .send({ email: user.email, password: one })
+        .expect(401);
+      await signIn({
+        id: user.id,
+        email: user.email,
+        password: two ?? '',
+        cookie: '',
+      });
+    });
+
+    test('refuses resetting your own password', async ({
+      api,
+      schools: { owner },
+    }) => {
+      const id = await idOf(api, owner, owner.id);
+      const res = await api(owner).post(resetUrl(id)).expect(409);
+      expect(res.body).toMatchObject({ code: 'SELF_RESET' });
+      await api(owner).get('/me').expect(200);
+    });
+
+    test('refuses a reset that would hand over a role the caller lacks, and an owner’s', async ({
+      api,
+      createRole,
+      hire,
+      withPermissions,
+      schools: { orgA, owner, lekki },
+    }) => {
+      await createRole(orgA, {
+        slug: 'cashier',
+        label: 'Cashier',
+        permissions: ['schoolAccount:update'],
+      });
+      const manager = await withPermissions(orgA, MANAGER);
+      const holder = await hire(owner, { campusIds: [lekki.id] });
+      await putRoles(api, owner, {
+        id: holder.member.id,
+        roles: ['cashier'],
+        campusIds: [lekki.id],
+      }).expect(200);
+      const blocked = await api(manager)
+        .post(resetUrl(holder.member.id))
+        .expect(403);
+      expect(blocked.body.message).toContain('Cashier');
+      await api(holder.user).get('/me').expect(200);
+
+      const ownerId = await idOf(api, owner, owner.id);
+      await api(manager).post(resetUrl(ownerId)).expect(403);
+    });
+
+    test('refuses an account that also belongs to another school', async ({
+      api,
+      addMember,
+      hire,
+      schools: { orgB, owner, lekki },
+    }) => {
+      const { user, member } = await hire(owner, { campusIds: [lekki.id] });
+      await addMember(orgB, user, { roles: ['member'] });
+      const res = await api(owner).post(resetUrl(member.id)).expect(409);
+      expect(res.body).toMatchObject({ code: 'SHARED_ACCOUNT' });
+      await api(user).get('/me').expect(200);
+    });
+
+    test('a super admin acting needs a reason, and then may reset a shared account', async ({
+      api,
+      pool,
+      addMember,
+      createUser,
+      hire,
+      makeSuperAdmin,
+      schools: { orgA, orgB, owner, lekki },
+    }) => {
+      const { user, member } = await hire(owner, { campusIds: [lekki.id] });
+      await addMember(orgB, user, { roles: ['member'] });
+      const admin = await makeSuperAdmin(await createUser());
+      const refused = await api(admin)
+        .post(resetUrl(member.id))
+        .set(acting(orgA.id))
+        .expect(403);
+      expect(refused.body).toMatchObject({ code: 'ActingReadOnly' });
+      await api(admin)
+        .post(resetUrl(member.id))
+        .set(acting(orgA.id, 'SUP-4410 lost password'))
+        .expect(201);
+      await api(user).get('/me').expect(401);
+      const rows = await waitForAuditRows(pool, { kind: 'acting' }, 2);
+      expect(rows.map((row) => [row.method, row.status])).toEqual([
+        ['POST', 403],
+        ['POST', 201],
+      ]);
+      expect(rows.every((row) => !row.path.includes('?'))).toBe(true);
+    });
+  });
+
   test.describe('effect of a change', () => {
     test('shows in the member’s next /me/permissions', async ({
       api,
@@ -870,6 +1010,7 @@ test.describe('members', () => {
         .send({ campusIds: [lekki.id] })
         .expect(404);
       await api(ownerB).delete(`/members/${id}`).expect(404);
+      await api(ownerB).post(`/members/${id}/reset-password`).expect(404);
     });
 
     test('2: a list holds no member of another school', async ({
@@ -903,6 +1044,7 @@ test.describe('members', () => {
         .send({ campusIds: [lekki.id] })
         .expect(404);
       await api(editor).delete(`/members/${id}`).expect(404);
+      await api(editor).post(`/members/${id}/reset-password`).expect(404);
     });
 
     test('4: a Lekki-only viewer lists only members sharing Lekki', async ({
@@ -942,6 +1084,9 @@ test.describe('members', () => {
         .send({ campusIds: [lekki.id] })
         .expect(403);
       await api(noPermission).delete(`/members/${member.id}`).expect(403);
+      await api(noPermission)
+        .post(`/members/${member.id}/reset-password`)
+        .expect(403);
     });
 
     test('6: no session answers 401 on every route', async ({
@@ -962,6 +1107,7 @@ test.describe('members', () => {
         .send({ campusIds: [lekki.id] })
         .expect(401);
       await api().delete(`/members/${id}`).expect(401);
+      await api().post(`/members/${id}/reset-password`).expect(401);
     });
 
     test('the role catalogue and role slugs stay inside their school', async ({

@@ -4,7 +4,13 @@ import {
   type MePermissions,
   type MemberDetail,
 } from '@eduvault/api-contract';
-import { actingAccess, renderWithApi, starterAccess } from '../test-utils';
+import { toPermissionMap } from '@eduvault/policy';
+import {
+  actingAccess,
+  fakeAccess,
+  renderWithApi,
+  starterAccess,
+} from '../test-utils';
 import { CATALOGUE, IKEJA, LEKKI, detail } from '../test-members';
 import { MemberPage, type NewAccountNotice } from './member-page';
 
@@ -40,6 +46,11 @@ function setup({ member = detail(), notice, access }: Options = {}) {
     access
   );
   return { onBack, onRemoved, api };
+}
+
+async function openMenu() {
+  const trigger = await screen.findByRole('button', { name: 'More actions' });
+  fireEvent.keyDown(trigger, { key: 'Enter' });
 }
 
 describe('MemberPage', () => {
@@ -89,9 +100,9 @@ describe('MemberPage', () => {
     setup({
       member: detail({ roles: ['member', 'owner'], lastOwner: true }),
     });
-    await screen.findByRole('heading', { name: 'Ada Obi' });
+    await openMenu();
     expect(
-      screen.queryByRole('button', { name: 'More actions' })
+      screen.queryByRole('menuitem', { name: 'Remove from school…' })
     ).not.toBeInTheDocument();
   });
 
@@ -104,11 +115,49 @@ describe('MemberPage', () => {
     ).toBeInTheDocument();
   });
 
-  it('hides Remove without member:delete', async () => {
+  it('hides Remove without member:delete but still offers a reset', async () => {
     setup({ access: starterAccess('administrator') });
-    await screen.findByRole('heading', { name: 'Ada Obi' });
+    await openMenu();
     expect(
-      screen.queryByRole('button', { name: 'More actions' })
+      screen.getByRole('menuitem', { name: 'Reset password…' })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('menuitem', { name: 'Remove from school…' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('offers a reset to an editor and opens its confirmation', async () => {
+    setup({ member: detail({ roles: ['member', 'teacher'] }) });
+    await openMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Reset password…' }));
+    expect(
+      await screen.findByRole('heading', { name: 'Reset Ada Obi’s password?' })
+    ).toBeInTheDocument();
+  });
+
+  it('offers no reset without member:update', async () => {
+    setup({
+      member: detail({ roles: ['member', 'teacher'] }),
+      access: fakeAccess({
+        permissions: toPermissionMap(['member:read', 'member:delete']),
+      }),
+    });
+    await openMenu();
+    expect(
+      screen.queryByRole('menuitem', { name: 'Reset password…' })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('menuitem', { name: 'Remove from school…' })
+    ).toBeInTheDocument();
+  });
+
+  it('offers no reset for your own page', async () => {
+    setup({
+      member: detail({ roles: ['member', 'teacher'], userId: 'someone-else' }),
+    });
+    await openMenu();
+    expect(
+      screen.queryByRole('menuitem', { name: 'Reset password…' })
     ).not.toBeInTheDocument();
   });
 

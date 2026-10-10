@@ -16,6 +16,7 @@ import {
   type MemberDetail,
   type MemberList,
   type MemberSummary,
+  type ResetMemberPasswordResult,
   type SchoolRole,
   type SchoolRoleEntry,
 } from '@eduvault/api-contract';
@@ -244,6 +245,21 @@ export class MembersService {
     });
   }
 
+  resetPassword(
+    ctx: OrgContext,
+    id: string
+  ): Promise<ResetMemberPasswordResult> {
+    return this.admin.underSchoolLock(ctx.organizationId, async () => {
+      const record = await this.visible(ctx, id);
+      await this.checkReset(ctx, record);
+      const temporaryPassword = await this.admin.resetPassword(record.userId);
+      this.logger.log(
+        `Password reset: member ${record.id} by user ${ctx.user.id} in school ${ctx.organizationId}`
+      );
+      return { temporaryPassword };
+    });
+  }
+
   remove(ctx: OrgContext, id: string): Promise<{ id: string }> {
     return this.admin.underSchoolLock(ctx.organizationId, async () => {
       const record = await this.visible(ctx, id);
@@ -460,13 +476,48 @@ export class MembersService {
         coded('SELF_REMOVAL', 'You can’t remove yourself from the school.')
       );
     }
+    await this.assertReaches(ctx, record, 'remove');
+  }
+
+  private async checkReset(
+    ctx: OrgContext,
+    record: MemberRecord
+  ): Promise<void> {
+    if (record.userId === ctx.user.id) {
+      throw new ConflictException(
+        coded('SELF_RESET', 'You can’t reset your own password here.')
+      );
+    }
+    await this.assertReaches(ctx, record, 'reset the password of');
+    if (
+      ctx.acting?.writes !== true &&
+      (await this.members.belongsToOtherSchool(
+        record.userId,
+        ctx.organizationId
+      ))
+    ) {
+      throw new ConflictException(
+        coded(
+          'SHARED_ACCOUNT',
+          `${record.name} also belongs to another school, so only Eduvault support can reset their password.`
+        )
+      );
+    }
+  }
+
+  /** What the editor needs before acting on a member: their campuses and every role they hold. */
+  private async assertReaches(
+    ctx: OrgContext,
+    record: MemberRecord,
+    verb: string
+  ): Promise<void> {
     if (
       record.campusIds.some(
         (campusId) => !canSeeCampus(ctx.campusScope, campusId)
       )
     ) {
       throw new ForbiddenException(
-        `You can’t remove ${record.name}: they also work on campuses you can’t see.`
+        `You can’t ${verb} ${record.name}: they also work on campuses you can’t see.`
       );
     }
     const entries = await this.loadCatalogue(ctx);
@@ -477,7 +528,7 @@ export class MembersService {
       );
     if (blocked !== undefined) {
       throw new ForbiddenException(
-        `You can’t remove ${record.name}: they hold ${blocked.label}, which allows things you can’t do yourself.`
+        `You can’t ${verb} ${record.name}: they hold ${blocked.label}, which allows things you can’t do yourself.`
       );
     }
   }

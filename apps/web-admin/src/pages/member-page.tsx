@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   CheckCircle2Icon,
+  KeyRoundIcon,
   MoreHorizontalIcon,
   SearchXIcon,
   Trash2Icon,
@@ -35,6 +36,7 @@ import { useApi } from '../api';
 import { MemberAccessCard } from '../components/member-access-card';
 import { MemberCampusesCard } from '../components/member-campuses-card';
 import { RemoveMemberDialog } from '../components/remove-member-dialog';
+import { ResetPasswordDialog } from '../components/reset-password-dialog';
 import { RoleWizard } from '../components/role-wizard';
 import {
   campusesQueryOptions,
@@ -101,7 +103,13 @@ function AccountNotice({
   );
 }
 
-function MemberMenu({ onRemove }: { onRemove: () => void }) {
+function MemberMenu({
+  onReset,
+  onRemove,
+}: {
+  onReset: (() => void) | undefined;
+  onRemove: (() => void) | undefined;
+}) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -115,10 +123,18 @@ function MemberMenu({ onRemove }: { onRemove: () => void }) {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem variant="destructive" onSelect={onRemove}>
-          <Trash2Icon />
-          Remove from school…
-        </DropdownMenuItem>
+        {onReset === undefined ? null : (
+          <DropdownMenuItem onSelect={onReset}>
+            <KeyRoundIcon />
+            Reset password…
+          </DropdownMenuItem>
+        )}
+        {onRemove === undefined ? null : (
+          <DropdownMenuItem variant="destructive" onSelect={onRemove}>
+            <Trash2Icon />
+            Remove from school…
+          </DropdownMenuItem>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -135,12 +151,12 @@ function useMemberPageData(memberId: string) {
 
 function MemberHeader({
   detail,
-  showRemove,
+  onReset,
   onRemove,
 }: {
   detail: MemberDetail;
-  showRemove: boolean;
-  onRemove: () => void;
+  onReset: (() => void) | undefined;
+  onRemove: (() => void) | undefined;
 }) {
   return (
     <header className="flex items-start justify-between gap-3">
@@ -150,8 +166,60 @@ function MemberHeader({
           {detail.title} · {detail.email ?? detail.username}
         </p>
       </div>
-      {showRemove ? <MemberMenu onRemove={onRemove} /> : null}
+      {onReset === undefined && onRemove === undefined ? null : (
+        <MemberMenu onReset={onReset} onRemove={onRemove} />
+      )}
     </header>
+  );
+}
+
+function MemberTop({
+  detail,
+  schoolName,
+  showReset,
+  showRemove,
+  onRemoved,
+}: {
+  detail: MemberDetail;
+  schoolName: string;
+  showReset: boolean;
+  showRemove: boolean;
+  onRemoved: () => Promise<void>;
+}) {
+  const [removing, setRemoving] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  return (
+    <>
+      <MemberHeader
+        detail={detail}
+        onReset={
+          showReset
+            ? () => {
+                setResetting(true);
+              }
+            : undefined
+        }
+        onRemove={
+          showRemove
+            ? () => {
+                setRemoving(true);
+              }
+            : undefined
+        }
+      />
+      <ResetPasswordDialog
+        member={detail}
+        open={resetting}
+        onOpenChange={setResetting}
+      />
+      <RemoveMemberDialog
+        member={detail}
+        schoolName={schoolName}
+        open={removing}
+        onOpenChange={setRemoving}
+        onRemoved={onRemoved}
+      />
+    </>
   );
 }
 
@@ -186,6 +254,7 @@ function useMemberFlags(
   return {
     canEdit,
     showRemove: canDelete && !detail.lastOwner,
+    showReset: canEdit && data.me.data?.user.id !== detail.userId,
     isSelf: data.me.data?.user.id === detail.userId,
   };
 }
@@ -199,19 +268,21 @@ function MemberView({
   data: ReturnType<typeof useMemberPageData>;
   props: MemberPageProps;
 }) {
-  const [removing, setRemoving] = useState(false);
-  const { canEdit, showRemove, isSelf } = useMemberFlags(detail, data);
+  const { canEdit, showRemove, showReset, isSelf } = useMemberFlags(
+    detail,
+    data
+  );
   const campuses = data.campuses.data ?? [];
 
   return (
     <section className="flex flex-col gap-4">
       <MemberCrumbs name={detail.name} onBack={props.onBack} />
-      <MemberHeader
+      <MemberTop
         detail={detail}
+        schoolName={props.schoolName}
+        showReset={showReset}
         showRemove={showRemove}
-        onRemove={() => {
-          setRemoving(true);
-        }}
+        onRemoved={props.onRemoved}
       />
       {props.notice === undefined ? null : (
         <AccountNotice name={detail.name} notice={props.notice} />
@@ -235,13 +306,6 @@ function MemberView({
         </div>
         <MemberAccessCard member={detail} campuses={campuses} />
       </div>
-      <RemoveMemberDialog
-        member={detail}
-        schoolName={props.schoolName}
-        open={removing}
-        onOpenChange={setRemoving}
-        onRemoved={props.onRemoved}
-      />
     </section>
   );
 }
