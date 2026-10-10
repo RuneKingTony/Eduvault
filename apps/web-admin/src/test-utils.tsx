@@ -12,7 +12,7 @@ import {
   accessOfStarter,
   fakeAccess,
 } from '@eduvault/auth-client';
-import { ALL_PERMISSIONS, toPermissionMap } from '@eduvault/policy';
+import { ALL_PERMISSIONS, READ_PERMS, toPermissionMap } from '@eduvault/policy';
 import { TooltipProvider } from '@eduvault/ui';
 import { ApiProvider, type Api } from './api';
 
@@ -84,6 +84,14 @@ export const ownerAccess = (): MePermissions =>
     roles: ['owner'],
     permissions: toPermissionMap(ALL_PERMISSIONS),
     campusScope: 'all',
+  });
+
+export const actingAccess = (writes: boolean): MePermissions =>
+  fakeAccess({
+    roles: [],
+    permissions: toPermissionMap(writes ? ALL_PERMISSIONS : READ_PERMS),
+    campusScope: 'all',
+    acting: { organizationId: 'org-1', writes },
   });
 
 export const starterAccess = (slug: string): MePermissions =>
