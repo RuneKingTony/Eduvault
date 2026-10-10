@@ -334,7 +334,7 @@ Every existing handler keeps `@OrganizationAuth(resource, action)`. `DELETE /stu
 
 - Unit (`nx run policy:test`): rule 1 list shape; `CAP_AREAS` one-slot invariant (AC 1); `capLevel` four outcomes; `capSummary` lines for owner, administrator, teacher, bursar, principal, member; `can()` over unions (a permission in role B but not A passes); `canGrantRole` (owner-only owner, member always, missing list); `READ_PERMS` has 20 entries and no `readOwn`; `permLabel` splitting. `nx run auth-client:test`: `useCan` and `<Can>` with a fake permission map. Each app: nav hides gated links and `beforeLoad` redirects (fake permission map).
 - Integration (`api:test-integration`): a guard spec with custom roles (union across two roles; one extra query); 401/403/404 ordering per rule 23 for one route of each kind; campus scope (cross-campus 404, `campusId` filter 404); class scope once M2.3 lands; null-campus money visibility once M3.1 lands; `/me/permissions` for each persona; acting: read-only, write without reason 403, with reason 200, header ignored for non-super-admin, unknown school 404; `23514` mapped to 409.
-- E2E (opt-in, `eduvault-e2e`): as owner, administrator, bursar, teacher, new hire and a foreign-school owner, `curl` one read and one write per pillar that exists and assert the exact status; browser: the nav each persona sees, and a teacher typing `/finance/school-fees` landing on the Dashboard.
+- E2E (required, `eduvault-e2e`): as owner, administrator, bursar, teacher, new hire and a foreign-school owner, `curl` one read and one write per pillar that exists and assert the exact status; browser: the nav each persona sees, and a teacher typing `/finance/school-fees` landing on the Dashboard.
 
 ## Open decisions
 

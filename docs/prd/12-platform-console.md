@@ -229,7 +229,7 @@ The console uses the `web-admin` shell with the platform head ("Eduvault platfor
   - Replace owner keeps at least one owner; one-senior-role rule.
   - Acting: header ignored for non-super-admins; 404 unknown school; read-only grants reads across campuses; write without reason 403; with reason 200; other school's row 404 while acting; an audit row for each of these, including the 403 and a handler that throws.
   - `audit_log` isolation: no school route returns audit rows; a school member gets 403 on `/platform/audit`.
-- E2E (opt-in, `eduvault-e2e`): super admin creates a school, copies the temporary password, the owner signs in; super admin acts in the school, sees writes hidden, adds a reason, edits a student, leaves; the audit log shows the three requests.
+- E2E (required, `eduvault-e2e`): super admin creates a school, copies the temporary password, the owner signs in; super admin acts in the school, sees writes hidden, adds a reason, edits a student, leaves; the audit log shows the three requests.
 
 ## Open decisions
 

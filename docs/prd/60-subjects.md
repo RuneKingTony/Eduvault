@@ -292,7 +292,7 @@ The candidate list endpoint ships with class-teacher assignment in M2.3; this mo
   - Uniqueness: duplicate code (409, including against a retired subject); duplicate `(arm, subject, term)` resolves to replace.
   - Candidate rule [D-006]: a non-candidate gets 422; a `campus:readAll` holder from another campus is accepted.
   - Class scope effect: after an assignment, the teacher's `GET /students` includes the arm's students [testing-002].
-- E2E (opt-in, `eduvault-e2e`):
+- E2E (required, `eduvault-e2e`):
   - Admin adds a subject and sees it in the Catalogue.
   - Admin assigns a subject teacher; the teacher signs in and sees the class under Classes and the "You" badge.
   - Foreign-school user gets 404 on the assign route.

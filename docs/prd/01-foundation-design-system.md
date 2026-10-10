@@ -313,7 +313,7 @@ None. What the shells read is specified in [10](10-app-shell-and-navigation.md#a
 
 - Unit (`nx run ui:test`, `nx run shared:test`): `naira` (rule 7 cases, kobo, large values to ₦999,999,999.99), naira parsing (rule 8), `fmtDate` (rule 9, timezone-safe), `initials`, avatar hue stability; `StatusBadge` label and tone map covers every status the API contract can return; `DataTable` paging boundaries (10, 11, 70 rows, ellipsis); `ProofInput` accept and reject per use; `BalancePill` three states; `MoneySummary` three- and four-tile layouts; `Callout` roles per tone. Shell behaviour (nav model, rail toggle, command menu) is tested under [10](10-app-shell-and-navigation.md#tests).
 - Integration (`api:test-integration`): none in M0.1 (no API). Formatters used by the API for receipts are unit-tested in `libs/shared`.
-- E2E (opt-in, `eduvault-e2e`, browser): both shells at 1280px and 390px in light and dark, screenshot per state; the `/dev/ui` gallery in light and dark.
+- E2E (required, `eduvault-e2e`, browser): both shells at 1280px and 390px in light and dark, screenshot per state; the `/dev/ui` gallery in light and dark.
 
 ## Open decisions
 

@@ -236,7 +236,7 @@ All writes run in the request's school and campus scope; the student search for 
   - Partial unique index: duplicate live line 409; same combination allowed after retiring.
   - `CHECK (amount_minor > 0)`; fee type outside Fee income rejected.
   - Preview equals the lines the M3.3 prepare writes for the same student and term.
-- E2E (opt-in, `eduvault-e2e`): bursar adds a Lekki Excursion levy for JSS 2 on Other fees (a Lekki line, rule 12), sees it in the grid and the chip filter, changes its amount, retires it; admin sees the screens read-only; teacher is redirected.
+- E2E (required, `eduvault-e2e`): bursar adds a Lekki Excursion levy for JSS 2 on Other fees (a Lekki line, rule 12), sees it in the grid and the chip filter, changes its amount, retires it; admin sees the screens read-only; teacher is redirected.
 
 ## Open decisions
 

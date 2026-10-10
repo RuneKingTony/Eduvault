@@ -206,7 +206,7 @@ Approval rules are read and changed through `GET` and `PATCH /school-settings` (
   - Race: concurrent approves yield one 200 and one 409, one journal entry.
   - Switches: switched-off kinds auto-approve with `approved_by` null; switching off leaves waiting items waiting.
   - Permissions: 403 for each decision route without its permission; acting read-only 403; Approval rules PATCH needs `schoolAccount:update`.
-- E2E (opt-in): bursar requests a void, principal approves from the bell, the receipt shows Cancelled; the bursar cannot approve her own request when given an approver role.
+- E2E (required, `eduvault-e2e`): bursar requests a void, principal approves from the bell, the receipt shows Cancelled; the bursar cannot approve her own request when given an approver role.
 
 ## Open decisions
 

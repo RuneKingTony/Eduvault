@@ -252,7 +252,7 @@ New module `apps/api/src/app/modules/calendar`. Contract in `@eduvault/api-contr
   - Make current of next year's first term is allowed; any other next-year term answers 409.
   - Roll-forward copies placements within the year, skips withdrawn and completed enrolments and enrolments that already have one, and copies nothing into the next year.
   - Delete refused with a referencing enrolment (FK RESTRICT surfaces as 409), and while the year holds the current term.
-- E2E (opt-in, `eduvault-e2e`): owner creates a year, adds and removes a holiday and sees the school-day count change, makes Second term current and sees the dashboard term card change; presses "Make current" on next year's first term and follows "Start {year} first"; teacher persona can't reach `/calendar`.
+- E2E (required, `eduvault-e2e`): owner creates a year, adds and removes a holiday and sees the school-day count change, makes Second term current and sees the dashboard term card change; presses "Make current" on next year's first term and follows "Start {year} first"; teacher persona can't reach `/calendar`.
 
 ## Open decisions
 

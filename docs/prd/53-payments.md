@@ -233,7 +233,7 @@ The print view reads `GET /finance/payments/:id`, `GET /school-account` and `GET
   - Approval: self-approval answers 409 ([D-013](../technical-reference.md#decision-log)) and the DB `CHECK (approved_by <> created_by)` rejects a direct insert; a new request after a decline is accepted; a void request on a store sale's payment answers 409; two approvers racing produce one 200 and one 409; switched-off approval leaves `approved_by` null.
   - Payment rules: a switched-off method answers 400 (switching off the last method is tested with [33](33-school-settings.md)).
   - Permissions: 403 for each route without its permission; acting read-only writes 403.
-- E2E (opt-in): bursar records a split transfer with proof and lands on the receipt; a double submit yields one receipt; bursar requests a void, principal approves it in Approvals, and the receipt shows Cancelled.
+- E2E (required, `eduvault-e2e`): bursar records a split transfer with proof and lands on the receipt; a double submit yields one receipt; bursar requests a void, principal approves it in Approvals, and the receipt shows Cancelled.
 
 ## Open decisions
 

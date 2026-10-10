@@ -197,7 +197,7 @@ New `announcement` module.
   - The `NOT pinned OR status = 'published'` check and the title and body length checks reject bad rows at the database.
   - A campus-scoped writer gets 403 creating, editing, withdrawing or pinning an "Everyone" item.
   - Portal route: a guardian gets 404 for a student not linked to them; a student sees only their campus's items.
-- E2E (opt-in, `eduvault-e2e`): administrator creates a draft, publishes it to one campus, pins it; then the student persona sees it first on portal Home; administrator withdraws it and it disappears.
+- E2E (required, `eduvault-e2e`): administrator creates a draft, publishes it to one campus, pins it; then the student persona sees it first on portal Home; administrator withdraws it and it disappears.
 
 ## Open decisions
 

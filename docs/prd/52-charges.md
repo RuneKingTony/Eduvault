@@ -164,7 +164,7 @@ No write endpoints here: charges are written by [51](51-charge-students.md#api) 
   - 403 without `invoice:read`.
   - Constraints: issued charge must have number, `issued_at`, `journal_entry_id`; line trigger refuses changes after send; partial unique index.
   - Money: the posted entry for a charge mirrors its lines (rule 6), balances, and carries `student_id` on every 1100 line; brought forward equals the balance immediately before the charge's entry, including when a store charge and its payment post in one transaction.
-- E2E (opt-in, `eduvault-e2e`): bursar filters Charges by Store purchase and by Prepared, opens a sent charge and expands For your accountant; Lekki bursar opens an Ikeja charge URL and sees "No charge here".
+- E2E (required, `eduvault-e2e`): bursar filters Charges by Store purchase and by Prepared, opens a sent charge and expands For your accountant; Lekki bursar opens an Ikeja charge URL and sees "No charge here".
 
 ## Open decisions
 

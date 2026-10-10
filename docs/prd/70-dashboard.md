@@ -294,7 +294,7 @@ All under the `dashboard` module unless noted. "Member of the active school" rou
   - T1 excludes the member's own requests.
   - Recent activity: finance events hidden from a member without finance read; another campus's events hidden from a campus-scoped member.
   - `/dashboard/finance` returns `charged*` only with `invoice:read` and `received*` only with `payment:read`; store sales and payments after the term end are excluded.
-- E2E (opt-in, `eduvault-e2e`): sign in as owner, teacher, bursar and a no-role member and screenshot `/`; follow one task from each persona to its target page.
+- E2E (required, `eduvault-e2e`): sign in as owner, teacher, bursar and a no-role member and screenshot `/`; follow one task from each persona to its target page.
 
 ## Open decisions
 

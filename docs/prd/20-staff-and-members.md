@@ -248,7 +248,7 @@ All under the `members` module. Contract types in `@eduvault/api-contract` (`con
   - Remove: `member` and `teamMember` rows gone, `user` row kept.
   - Reset password: sessions ended, old password refused, new one forces a change; 403, 404, 409 `SELF_RESET` and `SHARED_ACCOUNT`; a super admin acting needs a reason.
   - Job title: trimmed and saved, blank falls back, 81 characters answers 400, roles and campuses untouched, 403 without `member:update`, 404 across schools and campuses.
-- **E2E (opt-in, `eduvault-e2e`)**: owner adds a member and assigns Teacher on one campus through the wizard; administrator sees a role locked under "roles you can’t assign"; the new member signs in, changes the temporary password and sees only Students.
+- **E2E (required, `eduvault-e2e`)**: owner adds a member and assigns Teacher on one campus through the wizard; administrator sees a role locked under "roles you can’t assign"; the new member signs in, changes the temporary password and sees only Students.
 
 ## Open decisions
 

@@ -300,7 +300,7 @@ The service wraps Better Auth's `createOrgRole`, `updateOrgRole`, `deleteOrgRole
   - Six starter roles, Principal included, exist on a new school, with the trimmed sets; a slice's backfill updates unedited starter roles only.
   - Deleting `student` or `guardian` answers 409.
   - `/me/permissions` shape for owner, multi-role member and no-role member.
-- **E2E (opt-in, `eduvault-e2e`)**: owner creates Fees approver from the template and assigns it to the no-role persona, who then sees Approvals and not School fees; the administrator persona sees the role editor read-only.
+- **E2E (required, `eduvault-e2e`)**: owner creates Fees approver from the template and assigns it to the no-role persona, who then sees Approvals and not School fees; the administrator persona sees the role editor read-only.
 
 ## Open decisions
 
