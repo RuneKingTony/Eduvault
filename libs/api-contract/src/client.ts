@@ -11,6 +11,14 @@ export class ApiError extends Error {
   }
 }
 
+export function denialMessage(error: Error, denied: string): string {
+  return error instanceof ApiError &&
+    error.status === 403 &&
+    error.message.startsWith('Missing')
+    ? denied
+    : error.message;
+}
+
 export type ApiClient<C extends Contract> = {
   [K in keyof C]: C[K] extends RouteDef
     ? (input: RouteInput<C[K]>) => Promise<RouteOutput<C[K]>>
@@ -48,6 +56,14 @@ const toQuery = (query: Record<string, unknown> | undefined) => {
   return text ? `?${text}` : '';
 };
 
+// A FormData body is sent as is so the browser sets the multipart boundary.
+const encodeBody = (body: unknown): FormData | string | undefined => {
+  if (body === undefined) {
+    return undefined;
+  }
+  return body instanceof FormData ? body : JSON.stringify(body);
+};
+
 async function call(
   route: RouteDef,
   input: {
@@ -58,17 +74,18 @@ async function call(
   options: ClientOptions
 ): Promise<unknown> {
   const doFetch = options.fetch ?? fetch;
+  const isForm = input.body instanceof FormData;
   const url = `${options.baseUrl}${fillPath(route.path, input.params)}${toQuery(input.query)}`;
   const response = await doFetch(url, {
     method: route.method,
     credentials: 'include',
     headers: {
       ...options.headers?.(),
-      ...(input.body === undefined
+      ...(input.body === undefined || isForm
         ? {}
         : { 'content-type': 'application/json' }),
     },
-    body: input.body === undefined ? undefined : JSON.stringify(input.body),
+    body: encodeBody(input.body),
   });
   const payload: unknown = await response.json().catch(() => undefined);
   if (!response.ok) {

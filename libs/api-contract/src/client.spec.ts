@@ -225,4 +225,45 @@ describe('createApiClient', () => {
       expect.objectContaining({ method: 'DELETE' })
     );
   });
+
+  it('sends a FormData body as is, with no JSON content type', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse(200, {
+        id: '5b0f1e1e-6e53-4c52-9f1c-0a1d7a7f9c11',
+        contentType: 'image/png',
+        byteSize: 8,
+        originalName: 'logo.png',
+      })
+    );
+    const client = createApiClient(contract, {
+      baseUrl: 'http://api.test',
+      fetch: fetchMock,
+    });
+    const body = new FormData();
+    body.set('kind', 'school_logo');
+
+    const file = await client.files.upload({ body });
+
+    expect(file.contentType).toBe('image/png');
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://api.test/files',
+      expect.objectContaining({ method: 'POST', body, headers: {} })
+    );
+  });
+
+  it('accepts an empty 204 answer for a void route', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(null, { status: 204 }));
+    const client = createApiClient(contract, {
+      baseUrl: 'http://api.test',
+      fetch: fetchMock,
+    });
+
+    await expect(
+      client.files.remove({
+        params: { id: '5b0f1e1e-6e53-4c52-9f1c-0a1d7a7f9c11' },
+      })
+    ).resolves.toBeUndefined();
+  });
 });
