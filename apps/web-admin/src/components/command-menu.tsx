@@ -26,6 +26,7 @@ interface CommandMenuProps {
   onOpenChange: (open: boolean) => void;
   pages: readonly CommandEntry[];
   settings: readonly CommandEntry[];
+  actions?: readonly CommandEntry[];
   onSelect: (route: string) => void;
 }
 
@@ -93,6 +94,7 @@ export function CommandMenu({
   onOpenChange,
   pages,
   settings,
+  actions = [],
   onSelect,
 }: CommandMenuProps) {
   return (
@@ -112,6 +114,7 @@ export function CommandMenu({
             entries={settings}
             onSelect={onSelect}
           />
+          <EntryGroup heading="Actions" entries={actions} onSelect={onSelect} />
         </CommandList>
         <Hints />
       </Command>

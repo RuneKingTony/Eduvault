@@ -42,6 +42,14 @@ describe('roles', () => {
     }
   });
 
+  it('lets the administrator see and give roles to staff but not add or remove', () => {
+    const permissions = starter('administrator');
+    expect(can(permissions, 'member', 'read')).toBe(true);
+    expect(can(permissions, 'member', 'update')).toBe(true);
+    expect(can(permissions, 'member', 'create')).toBe(false);
+    expect(can(permissions, 'member', 'delete')).toBe(false);
+  });
+
   it('has no readOwn in READ_PERMS', () => {
     expect(
       READ_PERMS.filter((permission) => permission.endsWith(':readOwn'))

@@ -34,6 +34,13 @@ test.describe('dev seed', () => {
       student: '28',
     });
 
+    const { rows: titled } = await pool.query<{ title: string | null }>(
+      `SELECT m.title FROM member m JOIN "user" u ON u.id = m."userId"
+       WHERE u.email = $1`,
+      [emailOf('tunde')]
+    );
+    expect(titled[0]?.title).toBe('School administrator');
+
     for (const [key, expected] of Object.entries(visibleStudents)) {
       const res = await api()
         .post('/api/auth/sign-in/email')

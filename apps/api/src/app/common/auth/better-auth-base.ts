@@ -47,22 +47,20 @@ export const advancedBaseConfig: NonNullable<BetterAuthOptions['advanced']> = {
   defaultCookieAttributes: { httpOnly: true, sameSite: 'lax' },
 };
 
-interface OrganizationFlags {
-  trustInvitees?: boolean;
-}
-
-export const getOrganizationOptions = (
-  pool: Pool,
-  { trustInvitees = false }: OrganizationFlags = {}
-) =>
+export const getOrganizationOptions = (pool: Pool) =>
   ({
     allowUserToCreateOrganization: false,
-    requireEmailVerificationOnInvitation: !trustInvitees,
+    requireEmailVerificationOnInvitation: true,
     ac: betterAuthAc,
     roles: betterAuthRoles,
     creatorRole: 'owner',
     dynamicAccessControl: { enabled: true },
     schema: {
+      member: {
+        additionalFields: {
+          title: { type: 'string', required: false },
+        },
+      },
       organizationRole: {
         additionalFields: {
           label: { type: 'string', required: true },
@@ -86,7 +84,7 @@ export const getOrganizationOptions = (
     },
   }) satisfies OrganizationOptions;
 
-export const getPlugins = (pool: Pool, flags: OrganizationFlags = {}) => [
+export const getPlugins = (pool: Pool) => [
   admin({
     adminRoles: ['superadmin'],
     defaultRole: 'user',
@@ -94,7 +92,7 @@ export const getPlugins = (pool: Pool, flags: OrganizationFlags = {}) => [
     roles: platformRoles,
     bannedUserMessage: BANNED_USER_MESSAGE,
   }),
-  organization(getOrganizationOptions(pool, flags)),
+  organization(getOrganizationOptions(pool)),
 ];
 
 /**

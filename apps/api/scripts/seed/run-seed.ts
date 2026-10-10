@@ -112,13 +112,14 @@ async function addMembers(
   { userIds, organizationIds, campusIds, owners }: Created
 ) {
   const { api } = app.get(AuthService<AppAuth>, { strict: false });
-  for (const { persona, school, roles, campuses } of memberships) {
+  for (const { persona, school, roles, campuses, title } of memberships) {
     const userId = lookup(userIds, persona, 'persona');
     await api.addMember({
       body: {
         userId,
         organizationId: lookup(organizationIds, school, 'school'),
         role: castToBetterAuthRoles(roles),
+        title,
       },
     });
     const owner = owners.get(school);

@@ -30,7 +30,7 @@ ID=$(curl -sS -b "$J" -H "origin: $E2E_ADMIN_URL" -H 'content-type: application/
 jq --arg i "$ID" --arg s "$SCHOOL" --arg e "$OWNER_EMAIL" '. + [{kind:"student",id:$i,schoolId:$s,actor:{email:$e,password:"e2e-password-123"}}]' "$RUN_DIR/ledger.json" > "$RUN_DIR/l.tmp" && mv "$RUN_DIR/l.tmp" "$RUN_DIR/ledger.json"
 ```
 
-Ledger kinds are `student`, `campus` and `school`. Cleanup reverses only campuses with nothing in them: students and money are never deleted, so a run's records stay in its own run-named schools until `pnpm db:reset`. Use unique names and admission numbers (`E2E-<label>-<runId>`); admission numbers are unique within a school, not across schools.
+Ledger kinds are `student`, `campus`, `member` and `school`. Cleanup reverses only campuses with nothing in them: students and money are never deleted, so a run's records stay in its own run-named schools until `pnpm db:reset`. Use unique names and admission numbers (`E2E-<label>-<runId>`); admission numbers are unique within a school, not across schools.
 
 ## Per-slice flow template
 
@@ -44,10 +44,10 @@ A step that needs a blocked persona is listed as blocked, not skipped silently (
 
 ## M1.1 flows: permissions, guard and gating
 
-Run as the staff persona in `personas.json`, or as the seeded persona of the same role when it is blocked (read-only steps only; never write to seed data).
+Run as the staff persona in `personas.json`.
 
-1. **Teacher types a gated URL.** Sign in as `teacher` (seeded: `emeka.obi@greenfield.test`), open `/fees` directly. Expect the Dashboard with no message, and a nav of Dashboard, Approvals and Students only.
-2. **No-roles member.** Sign in as `newhire` (seeded: `kemi.balogun@greenfield.test`). Expect only Dashboard and Approvals in the nav, "No access yet" on the Dashboard, "Member, no roles" in the user menu. "See my access" and the user menu's "My access" open the sheet that reads "Nothing yet. Ask the owner to give you a role."
+1. **Teacher types a gated URL.** Sign in as `teacher` , open `/fees` directly. Expect the Dashboard with no message, and a nav of Dashboard, Approvals and Students only.
+2. **No-roles member.** Sign in as `newhire` . Expect only Dashboard and Approvals in the nav, "No access yet" on the Dashboard, "Member, no roles" in the user menu. "See my access" and the user menu's "My access" open the sheet that reads "Nothing yet. Ask the owner to give you a role."
 3. **Owner and bursar nav.** `owner` sees Students, Fees and a Settings entry that opens Campuses. `bursar` sees Students but no Fees and no Settings.
 4. **Role change on focus.** Change a persona's role row through the owner's session, switch the browser tab away and back: the open app picks up the new access on window focus. A 403 on any call also refetches it.
 5. **403 names the permission.** `curl` as `newhire`: `GET /students` answers 403 `Missing permission student:read`. `GET /me/permissions` without an active school answers 403 `NoSchool`.
@@ -63,7 +63,7 @@ The provisioned `owner` has already changed its temporary password, so this flow
 3. **The new owner chooses a password.** Sign out, sign in as that owner with the temporary password. Expect "Choose your own password" and nothing else. Nine characters shows "Use at least 10 characters."; two different passwords show "The passwords don’t match."; a valid pair reaches the Dashboard.
 4. **Sign-in screen.** Signed out, the staff screen has no sign-up or forgot link and shows "Forgot your password? Ask your school owner to reset it." A wrong password and an unknown email both show "That email and password don’t match."
 5. **Owner and the console.** As the new owner type `/platform/schools`: the app lands on `/`.
-6. **Portal.** Sign in on web-portal as `superadmin` (no school there): "You’re not linked to a school yet" with "Sign out". The web-admin "You’re not in a school yet" screen needs a user with no membership, which no HTTP route makes before M1.3; its copy is proved by the `NoSchoolScreen` and `app.spec.tsx` unit specs.
+6. **Portal.** Sign in on web-portal as `superadmin` (no school there): "You’re not linked to a school yet" with "Sign out". The web-admin "You’re not in a school yet" screen needs a user with no membership, which no HTTP route makes (a removed member keeps the account but loses the school, see the M1.3 flow); its copy is proved by the `NoSchoolScreen` and `app.spec.tsx` unit specs.
 7. **curl.** `POST /api/auth/sign-up/email` answers 400; as `superadmin` `GET /students` answers 403 `NoSchool`; as the new owner before the change `GET /students` answers 403 `MustChangePassword`; `GET /platform/schools` answers 401 without a session, 403 as `owner` and 200 as `superadmin`.
 
 ## M1.5 flow: platform console, acting and suspension
@@ -80,3 +80,17 @@ Needs the super admin, an owner with a school they can sign in to, and a second,
 8. **Suspend.** On the school page, "More actions" then "Suspend school…" and confirm: toast "{name} suspended." and the Suspended badge. As the school's owner on web-admin and on web-portal: "{name} is paused on Eduvault" with "Check again" and "Sign out". `GET /students` as the owner answers 403 `SchoolSuspended`; a second `POST /platform/schools/{id}/suspend` answers 409. Acting still works in the suspended school.
 9. **Reactivate.** "Reactivate…" and confirm: toast "{name} reactivated."; the owner's next load works.
 10. **Replace owner.** "Replace owner…" with "A new person": toast "{name} is now the owner of {school}." and the temporary password dialog, shown once with "Copy" and "Done"; the school page lists the new owner and the old one is a member with no roles. Sign in as the new owner with the password: "Choose your own password".
+
+## M1.3 flow: staff and members
+
+Provisioning has already created every staff persona over HTTP (`POST /members`, `PUT /members/:id/roles`). Better Auth's member and invitation routes are off.
+
+1. **Custom role for the locked check.** Every starter role is a subset of Administrator in M1, so make one that is not. As `owner`: `POST /api/auth/organization/create-role` with `{"organizationId": "<school>", "role": "cashier", "permission": {"schoolAccount": ["update"]}, "additionalFields": {"label": "Cashier", "source": "custom"}}`, answers 200 (D-068: owner only until M1.4). Give it to `newhire` in the browser in step 2.
+2. **Owner opens Staff and members.** Sign in on web-admin as `owner`, open Staff and members: the head reads "{n} people in Greenfield <run>", `newhire` shows the outline "No roles" badge, `teacher` a Teacher badge. Search "e2e chika" finds the bursar; the Role filter "Bursar" leaves `bursar` and `bursar2`. Open `newhire`, tick Cashier, Next through campuses (switch off nothing), review and "Review and save": toast "Saved. E2E Kemi now has N permissions." Screenshot each step.
+3. **Add a member.** "Add member": leave Full name empty and submit, the three inline messages show. Fill a name and a fresh email, tick Lekki, "Create account": the member page opens with the callout "Account created. Temporary password …". Copy the password. Reload: the callout is gone. Append the member to the ledger (kind `member`).
+4. **Give Teacher on one campus.** On the new member's page choose Teacher, Next: the campus step asks "Where will … work?", switch Ikeja off, Next, review lists "Students: can see" under "Will be able to" and "Campuses: Lekki", "Review and save": the toast confirms. The access card shows "Students: can see".
+5. **Administrator sees the custom role locked.** Sign in as `admin`, open `newhire`: Cashier is checked and disabled. Open another member: "1 roles you can’t assign" lists Cashier disabled. `PUT /members/<id>/roles` with `["cashier"]` as `admin` answers 403 "You can’t give out Cashier: …" and the roles do not change.
+6. **Bursar has no Staff and members.** Sign in as `bursar`: no Staff and members link and `/members` redirects to the Dashboard. By API every members route answers 403.
+7. **New member's first sign-in.** Sign in as the member from step 3 with the temporary password: "Choose your own password", then the nav shows Students only.
+8. **Remove.** As `owner` open the step 3 member, "Remove from school…", "Remove member": the toast reads "{name} removed." and the list drops them. That member's next request answers 403 `NoSchool`. The owner's own page has no menu (last owner).
+9. **curl.** `GET /api/auth/organization/update-member-role` (and `add-member`, `invite-member`, `accept-invitation`, `remove-member`, `add-team-member`, `remove-team-member`, `leave`, `list-members`, `get-full-organization`, `get-active-member-role`, `list-user-teams`) answer 404; `foreign` on any of the school's `/members/<id>` routes answers 404; `bursar2` (Ikeja) on any `/members` route answers 403 (no `member:read`).

@@ -1,7 +1,12 @@
-import { queryOptions, type QueryClient } from '@tanstack/react-query';
+import {
+  keepPreviousData,
+  queryOptions,
+  type QueryClient,
+} from '@tanstack/react-query';
 import type { RouteQuery, contract } from '@eduvault/api-contract';
 import type { ActingState } from './acting-store';
 import type { Api } from './api';
+import type { MembersSearch } from './members-search';
 
 export const ME_PERMISSIONS_KEY = ['me', 'permissions'] as const;
 export const PLATFORM_SCHOOLS_KEY = ['platform', 'schools'] as const;
@@ -91,3 +96,56 @@ export const feeSchedulesQueryOptions = (api: Api) =>
     queryKey: ['fee-schedules'],
     queryFn: () => api.feeSchedules.list({ query: {} }),
   });
+
+const MEMBERS_KEY = ['members'] as const;
+
+const memberKey = (id: string) => [...MEMBERS_KEY, id] as const;
+
+export const membersQueryOptions = (
+  api: Api,
+  { q, role, page = 1 }: Pick<MembersSearch, 'q' | 'role' | 'page'>
+) =>
+  queryOptions({
+    queryKey: [...MEMBERS_KEY, 'list', { q, role, page }],
+    queryFn: () => api.members.list({ query: { q, role, page } }),
+    placeholderData: keepPreviousData,
+  });
+
+export const memberQueryOptions = (api: Api, id: string) =>
+  queryOptions({
+    queryKey: memberKey(id),
+    queryFn: () => api.members.get({ params: { id } }),
+  });
+
+export const schoolRolesQueryOptions = (api: Api) =>
+  queryOptions({
+    queryKey: [...MEMBERS_KEY, 'roles'],
+    queryFn: () => api.members.roles({}),
+  });
+
+/** The removed member's own query would answer 404 while their page is still open. */
+export async function invalidateAfterRemoval(
+  queryClient: QueryClient,
+  memberId: string
+): Promise<void> {
+  await queryClient.invalidateQueries({
+    queryKey: MEMBERS_KEY,
+    predicate: (query) => query.queryKey[1] !== memberId,
+  });
+}
+
+export function forgetMember(queryClient: QueryClient, memberId: string): void {
+  queryClient.removeQueries({ queryKey: memberKey(memberId), exact: true });
+}
+
+export async function invalidateMembers(
+  queryClient: QueryClient,
+  editedSelf: boolean
+): Promise<void> {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: MEMBERS_KEY }),
+    editedSelf
+      ? queryClient.invalidateQueries({ queryKey: ME_PERMISSIONS_KEY })
+      : undefined,
+  ]);
+}

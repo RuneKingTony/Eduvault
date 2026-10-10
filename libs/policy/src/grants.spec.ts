@@ -50,6 +50,30 @@ describe('canGrantRole', () => {
   });
 });
 
+describe('removing a role', () => {
+  it('refuses a role the assigner lacks and names what is missing', () => {
+    const check = canGrantRole({
+      slug: 'administrator',
+      rolePermissions: administrator,
+      assignerPermissions: teacher,
+      assignerIsOwner: false,
+    });
+    expect(check.allowed).toBe(false);
+    expect(check.missing).toEqual(['student:create']);
+  });
+
+  it('lets only an owner remove owner', () => {
+    const request = {
+      slug: 'owner',
+      rolePermissions: {},
+      assignerPermissions: administrator,
+    };
+    expect(canGrantRole({ ...request, assignerIsOwner: false }).allowed).toBe(
+      false
+    );
+  });
+});
+
 describe('grantablePermissions', () => {
   it('lists what the assigner holds', () => {
     expect(grantablePermissions(administrator)).toEqual([

@@ -21,8 +21,8 @@ VERDICT: BLOCKED
 cause: environment
 artefacts: /abs/path/tmp/e2e/<run>
 goal: owner signs in on both SPAs; role matrix over HTTP
-blocked: teacher, admin, student could not be created over HTTP (invitation needs a verified email)
-passed 5, failed 0, blocked 3
+blocked: student, guardian could not be created over HTTP (portal accounts come with M2.4 and M2.8)
+passed 5, failed 0, blocked 2
 
 ## Steps
 1. web-admin sign in as owner: ok, web-admin/step-02-signed-in.png

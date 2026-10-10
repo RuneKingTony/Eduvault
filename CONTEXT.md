@@ -66,6 +66,10 @@ Terms the code and the people using it share. Adapted from the earlier school-ma
 
 **Member** — a person in a school with zero or more roles. A member with no roles sees nothing of the school, though they can still request leave.
 
+**Job title** — the free-text line under a member's name ("Mathematics teacher"). It labels the person and grants nothing; a blank one reads "New member".
+
+**Portal-only member** — a member whose roles are only `member`, `student` and `guardian`, with at least one of the last two. They use the portal, are left out of Staff and members unless the Role filter is Student or Guardian, and cannot be given a staff role. A member with only `member` is not portal-only.
+
 **Leave** — a staff member's request for days off (annual, sick, personal, study, maternity or paternity). Days off count weekdays minus school holidays, and a request can't overlap the requester's own. Approved by someone with leave approval (`leave:approve`, the owner and principal by default), never by the requester.
 
 **Announcement** — news for parents and students in the portal, for everyone or one campus. Drafted, published, pinned or withdrawn; never deleted.

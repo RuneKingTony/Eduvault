@@ -673,29 +673,18 @@ consoleTest.describe('platform console', () => {
 
   consoleTest(
     'a suspended school refuses Better Auth organization writes but keeps reads and switching open',
-    async ({ api, createCampus, createUser, kit }) => {
+    async ({ api, createCampus, kit }) => {
       const { id, org, ownerUser } = await kit.school({ name: 'Paused High' });
       const campus = await createCampus(org, 'Main');
-      const hire = await createUser();
-      const invite = () =>
+      const rename = () =>
         api(ownerUser)
-          .post('/api/auth/organization/invite-member')
-          .send({
-            email: hire.email,
-            role: ['bursar'],
-            organizationId: id,
-            teamId: [campus.id],
-          });
+          .post('/api/auth/organization/update-team')
+          .send({ teamId: campus.id, data: { name: 'Renamed' } });
 
       await api(kit.admin).post(`/platform/schools/${id}/suspend`).expect(200);
 
-      const refused = await invite().expect(403);
+      const refused = await rename().expect(403);
       expect(refused.body).toMatchObject({ code: 'SchoolSuspended' });
-      const renamed = await api(ownerUser)
-        .post('/api/auth/organization/update-team')
-        .send({ teamId: campus.id, data: { name: 'Renamed' } })
-        .expect(403);
-      expect(renamed.body).toMatchObject({ code: 'SchoolSuspended' });
 
       await api(ownerUser).get('/api/auth/organization/list').expect(200);
       await api(ownerUser)
@@ -706,7 +695,7 @@ consoleTest.describe('platform console', () => {
       await api(kit.admin)
         .post(`/platform/schools/${id}/reactivate`)
         .expect(200);
-      await invite().expect(200);
+      await rename().expect(200);
     }
   );
 

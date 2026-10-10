@@ -102,6 +102,7 @@ async function renderAt(
       child('/', realDashboard ? DashboardPage : page('Dashboard page')),
       child('/approvals', page('Approvals page')),
       child('/students', page('Students page')),
+      child('/members', page('Members page')),
       child('/fees', page('Fees page')),
       child('/campuses', page('Campuses page')),
       child('/broken', Broken),
@@ -370,12 +371,13 @@ describe('AppShell access', () => {
     expect(permissions).toHaveBeenCalledTimes(2);
   });
 
-  it('shows an owner Students, Fees and a Settings entry that opens Campuses', async () => {
+  it('shows an owner Students, Staff and members, Fees and a Settings entry that opens Campuses', async () => {
     await renderAt('/');
     expect(linkNames()).toEqual([
       'Dashboard',
       'Approvals',
       'Students',
+      'Staff and members',
       'Fees',
       'Settings',
     ]);
@@ -384,7 +386,7 @@ describe('AppShell access', () => {
     ).toHaveAttribute('href', '/campuses');
   });
 
-  it('shows a bursar Students but no Fees or Settings', async () => {
+  it('shows a bursar Students but no Staff and members, Fees or Settings', async () => {
     await renderAt('/', { access: starterAccess('bursar') });
     expect(linkNames()).toEqual(['Dashboard', 'Approvals', 'Students']);
   });
@@ -422,6 +424,36 @@ describe('AppShell access', () => {
     expect(
       screen.getByRole('option', { name: /Students/ })
     ).toBeInTheDocument();
+  });
+
+  it('offers Add a staff member only with member:create and opens the add sheet route', async () => {
+    await renderAt('/');
+    fireEvent.keyDown(globalThis as unknown as Window, {
+      key: 'k',
+      ctrlKey: true,
+    });
+    const input = await screen.findByPlaceholderText(
+      'Search pages and actions…'
+    );
+    fireEvent.change(input, { target: { value: 'add a staff' } });
+    expect(
+      screen.getByRole('option', { name: /Add a staff member/ })
+    ).toBeInTheDocument();
+  });
+
+  it('hides the Add a staff member action from an administrator', async () => {
+    await renderAt('/', { access: starterAccess('administrator') });
+    fireEvent.keyDown(globalThis as unknown as Window, {
+      key: 'k',
+      ctrlKey: true,
+    });
+    const input = await screen.findByPlaceholderText(
+      'Search pages and actions…'
+    );
+    fireEvent.change(input, { target: { value: 'staff' } });
+    expect(
+      screen.queryByRole('option', { name: /Add a staff member/ })
+    ).not.toBeInTheDocument();
   });
 
   it('shows the no-roles Dashboard and opens My access from it', async () => {

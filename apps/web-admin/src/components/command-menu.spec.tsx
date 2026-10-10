@@ -35,7 +35,18 @@ const settings: CommandEntry[] = [
   },
 ];
 
-function setup() {
+const actions: CommandEntry[] = [
+  {
+    id: 'add-member',
+    label: 'Add a staff member',
+    hint: 'People',
+    route: '/members?add=1',
+    icon: 'user-round-plus',
+    keywords: ['new', 'hire'],
+  },
+];
+
+function setup(withActions = false) {
   const onSelect = vi.fn();
   const onOpenChange = vi.fn();
   render(
@@ -44,6 +55,7 @@ function setup() {
       onOpenChange={onOpenChange}
       pages={pages}
       settings={settings}
+      actions={withActions ? actions : undefined}
       onSelect={onSelect}
     />
   );
@@ -67,6 +79,22 @@ describe('CommandMenu', () => {
   it('lists Pages then Settings and hides the empty Actions group', () => {
     setup();
     expect(groupHeadings()).toEqual(['Pages', 'Settings']);
+  });
+
+  it('lists an Actions group last and opens the action’s route', () => {
+    const { onSelect } = setup(true);
+    expect(groupHeadings()).toEqual(['Pages', 'Settings', 'Actions']);
+    fireEvent.click(screen.getByRole('option', { name: /Add a staff member/ }));
+    expect(onSelect).toHaveBeenCalledWith('/members?add=1');
+  });
+
+  it('finds an action by a keyword', () => {
+    const { type } = setup(true);
+    type('hire');
+    expect(
+      screen.getByRole('option', { name: /Add a staff member/ })
+    ).toBeInTheDocument();
+    expect(groupHeadings()).toEqual(['Actions']);
   });
 
   it('finds a page by its nav label', () => {

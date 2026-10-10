@@ -40,6 +40,7 @@ interface Membership {
   school: string;
   roles: string[];
   campuses: string[];
+  title?: string;
 }
 
 export const emailOf = (key: string): string => {
@@ -60,48 +61,56 @@ export const memberships: Membership[] = [
     school: 'greenfield',
     roles: ['administrator'],
     campuses: BOTH,
+    title: 'School administrator',
   },
   {
     persona: 'grace',
     school: 'greenfield',
     roles: ['teacher', 'principal'],
     campuses: BOTH,
+    title: 'Principal',
   },
   {
     persona: 'chika',
     school: 'greenfield',
     roles: ['bursar'],
     campuses: ['Lekki'],
+    title: 'Bursar, Lekki',
   },
   {
     persona: 'yemi',
     school: 'greenfield',
     roles: ['bursar'],
     campuses: ['Ikeja'],
+    title: 'Bursar, Ikeja',
   },
   {
     persona: 'emeka',
     school: 'greenfield',
     roles: ['teacher'],
     campuses: ['Lekki'],
+    title: 'Mathematics teacher',
   },
   {
     persona: 'ayo',
     school: 'greenfield',
     roles: ['teacher'],
     campuses: ['Lekki'],
+    title: 'English teacher',
   },
   {
     persona: 'uche',
     school: 'greenfield',
     roles: ['teacher'],
     campuses: ['Lekki'],
+    title: 'Science teacher',
   },
   {
     persona: 'claire',
     school: 'greenfield',
     roles: ['teacher'],
     campuses: BOTH,
+    title: 'French teacher',
   },
   {
     persona: 'mo',
@@ -120,5 +129,6 @@ export const memberships: Membership[] = [
     school: 'greenfield',
     roles: ['member'],
     campuses: ['Lekki'],
+    title: 'New hire',
   },
 ];

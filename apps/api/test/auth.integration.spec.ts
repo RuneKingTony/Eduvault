@@ -219,7 +219,7 @@ test.describe('authentication', () => {
     expect(rows).toHaveLength(0);
   });
 
-  test('an invitee with an unverified email cannot accept by default', async ({
+  test('member, invitation, campus-seat and member-listing routes answer 404 over HTTP', async ({
     api,
     createUser,
     createOrganization,
@@ -229,22 +229,44 @@ test.describe('authentication', () => {
     const org = await createOrganization(owner);
     const campus = await createCampus(org, 'Lekki');
     const hire = await createUser();
-    const invitation = await api(owner)
-      .post('/api/auth/organization/invite-member')
-      .send({
-        email: hire.email,
-        role: ['bursar'],
-        organizationId: org.id,
-        teamId: [campus.id],
-      })
-      .expect(200);
-    const res = await api(hire)
-      .post('/api/auth/organization/accept-invitation')
-      .send({ invitationId: (invitation.body as { id: string }).id })
-      .expect(403);
-    expect(res.body.code).toBe(
-      'EMAIL_VERIFICATION_REQUIRED_BEFORE_ACCEPTING_OR_REJECTING_INVITATION'
-    );
+    const body = {
+      organizationId: org.id,
+      userId: hire.id,
+      memberId: hire.id,
+      teamId: campus.id,
+      email: hire.email,
+      role: 'bursar',
+      invitationId: randomUUID(),
+    };
+
+    for (const path of [
+      'update-member-role',
+      'add-member',
+      'invite-member',
+      'accept-invitation',
+      'reject-invitation',
+      'cancel-invitation',
+      'remove-member',
+      'add-team-member',
+      'remove-team-member',
+      'leave',
+    ]) {
+      await api(owner)
+        .post(`/api/auth/organization/${path}`)
+        .send(body)
+        .expect(404);
+    }
+    for (const path of [
+      'get-invitation',
+      'list-invitations',
+      'list-user-invitations',
+      'list-members',
+      'get-full-organization',
+      'get-active-member-role',
+      'list-user-teams',
+    ]) {
+      await api(owner).get(`/api/auth/organization/${path}`).expect(404);
+    }
   });
 
   test('banned users are unauthenticated and cannot sign in', async ({

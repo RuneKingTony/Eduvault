@@ -108,4 +108,43 @@ describe('createApiClient', () => {
       })
     );
   });
+
+  it('sends a PUT body with path params', async () => {
+    const memberId = '5b0f1e1e-6e53-4c52-9f1c-0a1d7a7f9c11';
+    const campusId = '7d0f1e1e-6e53-4c52-9f1c-0a1d7a7f9c33';
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse(200, {
+        id: memberId,
+        userId: 'u1',
+        name: 'Ada Obi',
+        email: 'ada@example.com',
+        username: null,
+        title: 'New member',
+        roles: ['member', 'teacher'],
+        campusIds: [campusId],
+        permissions: { student: ['read'] },
+        campusScope: [campusId],
+        classScope: 'all',
+        lastOwner: false,
+      })
+    );
+    const client = createApiClient(contract, {
+      baseUrl: 'http://api.test',
+      fetch: fetchMock,
+    });
+
+    const member = await client.members.updateRoles({
+      params: { id: memberId },
+      body: { roles: ['teacher'], campusIds: [campusId] },
+    });
+
+    expect(member.roles).toEqual(['member', 'teacher']);
+    expect(fetchMock).toHaveBeenCalledWith(
+      `http://api.test/members/${memberId}/roles`,
+      expect.objectContaining({
+        method: 'PUT',
+        body: JSON.stringify({ roles: ['teacher'], campusIds: [campusId] }),
+      })
+    );
+  });
 });

@@ -1,30 +1,21 @@
 import { z } from 'zod';
 
-const envSchema = z
-  .object({
-    NODE_ENV: z
-      .enum(['development', 'test', 'production'])
-      .default('development'),
-    PORT: z.coerce.number().int().positive().default(3000),
-    DATABASE_URL: z.string().min(1),
-    BETTER_AUTH_SECRET: z.string().min(32),
-    BETTER_AUTH_URL: z.url(),
-    WEB_ADMIN_URL: z.url(),
-    WEB_PORTAL_URL: z.url(),
-    SEED_TODAY: z.iso.date().optional(),
-    AUTH_RATE_LIMIT: z
-      .enum(['true', 'false'])
-      .default('false')
-      .transform((value) => value === 'true'),
-    E2E_TRUST_INVITEES: z
-      .enum(['true', 'false'])
-      .default('false')
-      .transform((value) => value === 'true'),
-  })
-  .refine((env) => !(env.NODE_ENV === 'production' && env.E2E_TRUST_INVITEES), {
-    path: ['E2E_TRUST_INVITEES'],
-    message: 'must not be true in production',
-  });
+const envSchema = z.object({
+  NODE_ENV: z
+    .enum(['development', 'test', 'production'])
+    .default('development'),
+  PORT: z.coerce.number().int().positive().default(3000),
+  DATABASE_URL: z.string().min(1),
+  BETTER_AUTH_SECRET: z.string().min(32),
+  BETTER_AUTH_URL: z.url(),
+  WEB_ADMIN_URL: z.url(),
+  WEB_PORTAL_URL: z.url(),
+  SEED_TODAY: z.iso.date().optional(),
+  AUTH_RATE_LIMIT: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((value) => value === 'true'),
+});
 
 export type Env = z.infer<typeof envSchema>;
 

@@ -38,16 +38,6 @@ describe('loadEnv', () => {
     );
   });
 
-  it('keeps invitee trust off by default and refuses it in production', () => {
-    expect(loadEnv(valid).E2E_TRUST_INVITEES).toBe(false);
-    expect(loadEnv({ ...valid, E2E_TRUST_INVITEES: 'true' })).toMatchObject({
-      E2E_TRUST_INVITEES: true,
-    });
-    expect(() =>
-      loadEnv({ ...valid, NODE_ENV: 'production', E2E_TRUST_INVITEES: 'true' })
-    ).toThrow(/E2E_TRUST_INVITEES/);
-  });
-
   it('keeps the sign-in rate limit off unless asked for', () => {
     expect(loadEnv(valid).AUTH_RATE_LIMIT).toBe(false);
     expect(loadEnv({ ...valid, AUTH_RATE_LIMIT: 'true' })).toMatchObject({

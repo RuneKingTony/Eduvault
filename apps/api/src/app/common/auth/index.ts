@@ -7,5 +7,6 @@ export * from './account.service';
 export * from './bootstrap-admin';
 export * from './default-levels';
 export * from './temporary-password';
+export * from './member-admin.service';
 export * from './organization-admin.service';
 export * from './slug-conflict';

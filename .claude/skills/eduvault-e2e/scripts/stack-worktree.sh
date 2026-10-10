@@ -127,7 +127,7 @@ ADMIN_URL="http://localhost:$ADMIN_PORT"; PORTAL_URL="http://localhost:$PORTAL_P
 (cd "$TREE/apps/api" && env NODE_ENV=development DATABASE_URL="$DB_URL" BETTER_AUTH_SECRET="$SECRET" BETTER_AUTH_URL="http://localhost:$API_PORT" \
    WEB_ADMIN_URL="$ADMIN_URL" WEB_PORTAL_URL="$PORTAL_URL" BOOTSTRAP_ADMIN_EMAIL="$E2E_SUPERADMIN_EMAIL" BOOTSTRAP_ADMIN_PASSWORD="$E2E_SUPERADMIN_PASSWORD" \
    node "$TREE/apps/api/dist/bootstrap-admin.cjs") >"$DIR/bootstrap.log" 2>&1 || { tail -5 "$DIR/bootstrap.log" >&2; drop_db; die "bootstrap-admin failed"; }
-(cd "$TREE/apps/api" && exec env NODE_ENV=development PORT="$API_PORT" DATABASE_URL="$DB_URL" BETTER_AUTH_SECRET="$SECRET" E2E_TRUST_INVITEES=true \
+(cd "$TREE/apps/api" && exec env NODE_ENV=development PORT="$API_PORT" DATABASE_URL="$DB_URL" BETTER_AUTH_SECRET="$SECRET" \
    BETTER_AUTH_URL="http://localhost:$API_PORT" WEB_ADMIN_URL="$ADMIN_URL" WEB_PORTAL_URL="$PORTAL_URL" \
    node --enable-source-maps "$TREE/apps/api/dist/main.cjs") >"$DIR/api.log" 2>&1 &
 API_PID=$!
