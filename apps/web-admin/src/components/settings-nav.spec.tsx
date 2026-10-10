@@ -29,6 +29,10 @@ async function renderAt(path: string, access: MePermissions) {
       page('/campuses'),
       page('/roles'),
       page('/roles/new'),
+      page('/settings/profile'),
+      page('/settings/admissions'),
+      page('/settings/danger'),
+      page('/settings'),
     ]),
     history: createMemoryHistory({ initialEntries: [path] }),
   });
@@ -39,6 +43,11 @@ async function renderAt(path: string, access: MePermissions) {
   );
   return screen.findByRole('navigation', { name: 'Settings sections' });
 }
+
+const optionLabels = (select: HTMLElement) =>
+  within(select)
+    .getAllByRole('option')
+    .map((option) => option.textContent);
 
 describe('SettingsNav', () => {
   it('groups the sections the member can open and marks the current one', async () => {
@@ -85,5 +94,56 @@ describe('SettingsNav', () => {
       nav.queryByRole('link', { name: 'Campuses' })
     ).not.toBeInTheDocument();
     expect(nav.queryByText('School structure')).not.toBeInTheDocument();
+  });
+
+  it('lists the General items in order and the Danger zone for an owner', async () => {
+    const nav = within(await renderAt('/settings/profile', ownerAccess()));
+    expect(nav.getByText('General')).toBeInTheDocument();
+    expect(nav.getAllByRole('link').map((link) => link.textContent)).toEqual([
+      'School profile',
+      'Admissions rules',
+      'Campuses',
+      'Roles and permissions',
+      'Danger zone',
+    ]);
+    expect(nav.getByRole('link', { name: 'School profile' })).toHaveAttribute(
+      'aria-current',
+      'page'
+    );
+  });
+
+  it('hides the Danger zone from an administrator', async () => {
+    const nav = within(
+      await renderAt('/settings/profile', starterAccess('administrator'))
+    );
+    expect(
+      nav.queryByRole('link', { name: 'Danger zone' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('offers a phone select with option groups and the current section chosen', async () => {
+    await renderAt('/settings/admissions', ownerAccess());
+    const select = screen.getByRole('combobox', { name: 'Settings section' });
+    expect(select).toHaveValue('/settings/admissions');
+    expect(optionLabels(select)).toEqual([
+      'School profile',
+      'Admissions rules',
+      'Campuses',
+      'Roles and permissions',
+      'Danger zone',
+    ]);
+    expect(
+      within(select).getByRole('group', { name: 'General' })
+    ).toBeInTheDocument();
+    expect(
+      within(select).queryByRole('option', { name: 'Choose a section' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('starts the phone select on "Choose a section" when the page is not an item', async () => {
+    await renderAt('/settings', ownerAccess());
+    const select = screen.getByRole('combobox', { name: 'Settings section' });
+    expect(optionLabels(select)[0]).toBe('Choose a section');
+    expect(select).toHaveValue('');
   });
 });

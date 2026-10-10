@@ -1,4 +1,4 @@
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { ChevronsUpDownIcon } from 'lucide-react';
 import { initials } from '@eduvault/shared';
@@ -18,6 +18,9 @@ import {
   SidebarMenuItem,
 } from '@eduvault/ui';
 import { useActing } from '../acting-store';
+import { useApi } from '../api';
+import { schoolProfileQueryOptions } from '../queries';
+import { logoSrc } from '../school-logo';
 import type { NavGroup } from '../nav';
 import { SidebarNav } from './sidebar-nav';
 
@@ -51,6 +54,12 @@ function SidebarHead() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const acting = useActing();
+  const api = useApi();
+  // An <img> cannot carry the acting headers, so an acted school shows initials.
+  const profile = useQuery({
+    ...schoolProfileQueryOptions(api),
+    enabled: acting === null,
+  });
   return (
     <SidebarHeader className="gap-0 p-2 pb-0">
       <SidebarMenu>
@@ -59,7 +68,11 @@ function SidebarHead() {
             <SchoolSwitcher
               authClient={authClient}
               renderCrest={(name) => (
-                <SchoolCrest name={name} initials={initials(name)} />
+                <SchoolCrest
+                  name={name}
+                  initials={initials(name)}
+                  logoUrl={logoSrc(profile.data?.logoUrl ?? null)}
+                />
               )}
               onSwitched={() => {
                 queryClient.removeQueries();

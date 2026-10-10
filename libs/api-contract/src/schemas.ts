@@ -136,11 +136,32 @@ export const campusSchema = z.object({
   createdAt: timestamp,
 });
 export type Campus = z.infer<typeof campusSchema>;
+export const CAMPUS_NAME_MAX = 60;
+export const CAMPUS_ADDRESS_MAX = 200;
+export const CAMPUS_NAME_REQUIRED = 'Give the campus a name.';
 export const createCampusSchema = z.object({
-  name: z.string().trim().min(1).max(120),
-  address: z.string().trim().max(300).nullish(),
+  name: z
+    .string()
+    .trim()
+    .min(1, CAMPUS_NAME_REQUIRED)
+    .max(CAMPUS_NAME_MAX, `Use ${CAMPUS_NAME_MAX} characters or fewer.`),
+  address: z
+    .string()
+    .trim()
+    .max(CAMPUS_ADDRESS_MAX, `Use ${CAMPUS_ADDRESS_MAX} characters or fewer.`)
+    .nullish(),
 });
 export const updateCampusSchema = createCampusSchema.partial();
+
+export const campusSummarySchema = campusSchema.extend({
+  principals: z.array(z.object({ userId: z.string(), name: z.string() })),
+  counts: z.object({
+    classes: z.number().int().nonnegative(),
+    students: z.number().int().nonnegative(),
+    staff: z.number().int().nonnegative(),
+  }),
+});
+export type CampusSummary = z.infer<typeof campusSummarySchema>;
 
 export const ADMISSION_PREFIX_MAX_LENGTH = 6;
 export const SCHOOL_SLUG_MAX_LENGTH = 40;
@@ -149,23 +170,112 @@ const admissionPrefixSchema = z
   .string()
   .regex(new RegExp(`^[A-Z]{2,${ADMISSION_PREFIX_MAX_LENGTH}}$`));
 
-export const schoolAccountSchema = z.object({
+export const SCHOOL_NAME_MAX = 120;
+export const SCHOOL_CITY_MAX = 80;
+export const SCHOOL_ADDRESS_MAX = 200;
+export const SCHOOL_PHONE_MAX = 30;
+export const SCHOOL_NAME_REQUIRED = 'Give the school a name.';
+export const SCHOOL_EMAIL_INVALID =
+  'Enter an email address like info@school.ng.';
+export const MAX_GUARDIANS_MESSAGE = 'Choose a number from 1 to 6.';
+export const MIN_GUARDIANS = 1;
+export const MAX_GUARDIANS = 6;
+
+export const schoolProfileSchema = z.object({
   id: idSchema,
   organizationId: idSchema,
   name: z.string(),
-  currency: currencySchema,
   admissionPrefix: admissionPrefixSchema,
+  slug: z.string(),
   city: z.string().nullable(),
+  address: z.string().nullable(),
+  phone: z.string().nullable(),
+  email: z.string().nullable(),
+  currency: currencySchema,
+  logoFileId: idSchema.nullable(),
+  logoUrl: z.string().nullable(),
   createdAt: timestamp,
 });
-export type SchoolAccount = z.infer<typeof schoolAccountSchema>;
-export const createSchoolAccountSchema = z.object({
-  name: z.string().trim().min(1).max(120),
-  currency: currencySchema,
-  admissionPrefix: admissionPrefixSchema,
-  city: z.string().trim().max(120).optional(),
+export type SchoolProfile = z.infer<typeof schoolProfileSchema>;
+
+const optionalText = (max: number) =>
+  z
+    .string()
+    .trim()
+    .max(max, `Use ${max} characters or fewer.`)
+    .nullable()
+    .transform((value) => (value === '' ? null : value))
+    .optional();
+
+export const updateSchoolProfileSchema = z.strictObject({
+  name: z
+    .string()
+    .trim()
+    .min(1, SCHOOL_NAME_REQUIRED)
+    .max(SCHOOL_NAME_MAX, `Use ${SCHOOL_NAME_MAX} characters or fewer.`)
+    .optional(),
+  city: optionalText(SCHOOL_CITY_MAX),
+  address: optionalText(SCHOOL_ADDRESS_MAX),
+  phone: optionalText(SCHOOL_PHONE_MAX),
+  email: z
+    .union([z.literal(''), z.email(SCHOOL_EMAIL_INVALID)])
+    .nullable()
+    .transform((value) => (value === '' ? null : value))
+    .optional(),
 });
-export const updateSchoolAccountSchema = createSchoolAccountSchema.partial();
+export type UpdateSchoolProfile = z.output<typeof updateSchoolProfileSchema>;
+
+export const setLogoSchema = z.object({ fileId: idSchema });
+
+export const schoolSettingsSchema = z.object({
+  maxGuardians: z.number().int().min(MIN_GUARDIANS).max(MAX_GUARDIANS),
+  requireGuardian: z.boolean(),
+});
+export type SchoolSettings = z.infer<typeof schoolSettingsSchema>;
+
+export const updateSchoolSettingsSchema = z.strictObject({
+  maxGuardians: z
+    .number({ error: MAX_GUARDIANS_MESSAGE })
+    .int(MAX_GUARDIANS_MESSAGE)
+    .min(MIN_GUARDIANS, MAX_GUARDIANS_MESSAGE)
+    .max(MAX_GUARDIANS, MAX_GUARDIANS_MESSAGE)
+    .optional(),
+  requireGuardian: z.boolean().optional(),
+});
+
+export const FILE_KINDS = ['school_logo'] as const;
+export const fileKindSchema = z.enum(FILE_KINDS);
+export type FileKind = z.infer<typeof fileKindSchema>;
+
+export const fileRefSchema = z.object({
+  id: idSchema,
+  contentType: z.string(),
+  byteSize: z.number().int().positive(),
+  originalName: z.string(),
+});
+export type FileRef = z.infer<typeof fileRefSchema>;
+
+export const uploadFileFieldsSchema = z.object({ kind: fileKindSchema });
+export const uploadFileBodySchema = z.instanceof(FormData);
+
+export const handoverCandidateSchema = z.object({
+  userId: z.string(),
+  name: z.string(),
+  title: z.string().nullable(),
+  heldSenior: z.array(z.string()),
+});
+export type HandoverCandidate = z.infer<typeof handoverCandidateSchema>;
+
+export const handoverSchema = z.object({ userId: z.string().min(1) });
+export const handoverResultSchema = z.object({ ownerUserId: z.string() });
+
+export const deletableSchema = z.object({
+  ok: z.boolean(),
+  reason: z.string().optional(),
+});
+export type Deletable = z.infer<typeof deletableSchema>;
+
+export const deleteSchoolSchema = z.object({ confirmName: z.string() });
 
 export const feeScheduleSchema = z.object({
   id: idSchema,

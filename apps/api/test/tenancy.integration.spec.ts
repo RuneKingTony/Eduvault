@@ -1,22 +1,7 @@
-import { baseTest, expect } from './support/base-test';
-import { twoSchools, type TwoSchools } from './support/two-schools';
+import { expect } from './support/base-test';
+import { schoolsTest } from './support/two-schools';
 
-const test = baseTest.extend<{ schools: TwoSchools }>({
-  schools: async (
-    { app, createUser, createOrganization, createCampus, addMember },
-    use
-  ) => {
-    await use(
-      await twoSchools({
-        app,
-        createUser,
-        createOrganization,
-        createCampus,
-        addMember,
-      })
-    );
-  },
-});
+const test = schoolsTest;
 
 const student = (campusId: string, n: string) => ({
   campusId,
@@ -196,6 +181,41 @@ test.describe('campuses', () => {
       expect(listB.map((c: { id: string }) => c.id)).not.toContain(lekki.id);
     });
 
+    test('1: the summary holds no other school’s campus, and another school’s campus answers 404 on every route', async ({
+      api,
+      schools: { owner, ownerB, campusB, lekki },
+    }) => {
+      const mine = (await api(owner).get('/campuses/summary').expect(200)).body;
+      expect(ids(mine)).not.toContain(campusB.id);
+      const theirs = (await api(ownerB).get('/campuses/summary').expect(200))
+        .body;
+      expect(ids(theirs)).toEqual([campusB.id]);
+
+      await api(owner).get(`/campuses/${campusB.id}`).expect(404);
+      await api(owner)
+        .patch(`/campuses/${campusB.id}`)
+        .send({ name: 'x' })
+        .expect(404);
+      await api(owner).delete(`/campuses/${campusB.id}`).expect(404);
+      await api(ownerB).delete(`/campuses/${lekki.id}`).expect(404);
+    });
+
+    test('3: a campus-scoped team reader’s summary leaves out Ikeja', async ({
+      api,
+      withPermissions,
+      schools: { orgA, lekki, ikeja },
+    }) => {
+      const reader = await withPermissions(orgA, ['team:read'], {
+        campuses: [lekki],
+      });
+
+      const summary = (await api(reader).get('/campuses/summary').expect(200))
+        .body;
+
+      expect(ids(summary)).toEqual([lekki.id]);
+      await api(reader).get(`/campuses/${ikeja.id}`).expect(404);
+    });
+
     test('2: lists hold no other school', async ({
       api,
       schools: { owner, lekki, ikeja },
@@ -333,54 +353,116 @@ test.describe('fee schedules', () => {
 
 test.describe('school account', () => {
   test.describe('isolation', () => {
-    const account = {
-      name: 'A fees',
-      currency: 'NGN',
-      admissionPrefix: 'AAA',
-    };
-
-    test('1: another school sees none of the account and only its own', async ({
+    test('1: every school reads and writes only its own account', async ({
       api,
-      schools: { owner, ownerB, orgB },
+      schools: { owner, ownerB, orgA, orgB },
     }) => {
-      await api(owner).post('/school-account').send(account).expect(201);
-      await api(ownerB).get('/school-account').expect(404);
-      await api(ownerB)
-        .patch('/school-account')
-        .send({ name: 'x' })
-        .expect(404);
-      await api(ownerB).delete('/school-account').expect(404);
-
-      await api(ownerB)
-        .post('/school-account')
-        .send({ name: 'B fees', currency: 'NGN', admissionPrefix: 'BBB' })
-        .expect(201);
       const own = (await api(ownerB).get('/school-account').expect(200)).body;
       expect(own.organizationId).toBe(orgB.id);
-      expect(own.name).toBe('B fees');
+      const before = own.name;
+
+      await api(owner)
+        .patch('/school-account')
+        .send({ name: 'A fees', city: 'Ikeja' })
+        .expect(200);
+
+      const mine = (await api(owner).get('/school-account').expect(200)).body;
+      expect(mine.organizationId).toBe(orgA.id);
+      const other = (await api(ownerB).get('/school-account').expect(200)).body;
+      expect(other).toMatchObject({ name: before, city: null });
     });
 
-    test('5: members without the schoolAccount permission get 403', async ({
+    test('1: school A’s writes leave school B’s profile and rules unchanged', async ({
       api,
-      schools: { owner, noPermission, lekkiOnly },
+      pool,
+      schools: { owner, ownerB, orgB },
     }) => {
-      await api(owner).post('/school-account').send(account).expect(201);
+      const before = await pool.query(
+        `SELECT (SELECT row_to_json(a) FROM school_account a WHERE a.organization_id = $1) AS account,
+                (SELECT row_to_json(s) FROM school_setting s WHERE s.organization_id = $1) AS settings`,
+        [orgB.id]
+      );
+
+      await api(owner)
+        .patch('/school-account')
+        .send({ name: 'Renamed', phone: '1' })
+        .expect(200);
+      await api(owner)
+        .patch('/school-settings')
+        .send({ maxGuardians: 2, requireGuardian: false })
+        .expect(200);
+
+      const after = await pool.query(
+        `SELECT (SELECT row_to_json(a) FROM school_account a WHERE a.organization_id = $1) AS account,
+                (SELECT row_to_json(s) FROM school_setting s WHERE s.organization_id = $1) AS settings`,
+        [orgB.id]
+      );
+      expect(after.rows).toEqual(before.rows);
+      expect(
+        (await api(ownerB).get('/school-settings').expect(200)).body
+      ).toEqual({ maxGuardians: 4, requireGuardian: true });
+    });
+
+    test('5: members without schoolAccount:update read but cannot write', async ({
+      api,
+      schools: { noPermission, lekkiOnly },
+    }) => {
       for (const user of [noPermission, lekkiOnly]) {
-        await api(user).get('/school-account').expect(403);
-        await api(user).post('/school-account').send(account).expect(403);
+        await api(user).get('/school-account').expect(200);
         await api(user)
           .patch('/school-account')
           .send({ name: 'x' })
           .expect(403);
-        await api(user).delete('/school-account').expect(403);
       }
     });
 
     test('6: no session answers 401', async ({ api }) => {
       await api().get('/school-account').expect(401);
-      await api().post('/school-account').send(account).expect(401);
       await api().patch('/school-account').send({ name: 'x' }).expect(401);
-      await api().delete('/school-account').expect(401);
+    });
+  });
+});
+
+test.describe('files', () => {
+  test.describe('isolation', () => {
+    const png = Buffer.concat([
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      Buffer.alloc(32, 1),
+    ]);
+
+    test('1: another school’s file answers 404 on every route, is refused as a logo and is absent from every list', async ({
+      api,
+      pool,
+      schools: { owner, ownerB, orgA, orgB },
+    }) => {
+      const uploaded = await api(ownerB)
+        .post('/files')
+        .field('kind', 'school_logo')
+        .attach('file', png, { filename: 'b.png' })
+        .expect(201);
+      const fileId = uploaded.body.id as string;
+      await api(ownerB)
+        .put('/school-account/logo')
+        .send({ fileId })
+        .expect(200);
+
+      await api(owner).get(`/files/${fileId}`).expect(404);
+      await api(owner).delete(`/files/${fileId}`).expect(404);
+      await api(owner).put('/school-account/logo').send({ fileId }).expect(400);
+
+      expect(
+        (await api(owner).get('/school-account').expect(200)).body.logoFileId
+      ).toBeNull();
+      const { rows } = await pool.query(
+        `SELECT organization_id FROM file_object WHERE id = $1
+         UNION ALL SELECT organization_id FROM file_blob WHERE file_id = $1`,
+        [fileId]
+      );
+      expect(rows.map((row) => row.organization_id)).toEqual([
+        orgB.id,
+        orgB.id,
+      ]);
+      expect(rows.some((row) => row.organization_id === orgA.id)).toBe(false);
     });
   });
 });
@@ -400,14 +482,6 @@ test.describe('role per school', () => {
     const orgB = await createOrganization(ownerB, 'School B');
     const campusA = await createCampus(orgA);
     const campusB = await createCampus(orgB);
-    await api(ownerA)
-      .post('/school-account')
-      .send({ name: 'A', currency: 'NGN', admissionPrefix: 'AAA' })
-      .expect(201);
-    await api(ownerB)
-      .post('/school-account')
-      .send({ name: 'B', currency: 'NGN', admissionPrefix: 'BBB' })
-      .expect(201);
 
     let user = await addMember(orgA, await createUser(), {
       roles: ['teacher'],
@@ -421,14 +495,14 @@ test.describe('role per school', () => {
       .post('/students')
       .send(student(campusA.id, 'T'))
       .expect(403);
-    await api(user).get('/school-account').expect(403);
+    await api(user).get('/campuses/summary').expect(403);
 
     await setActiveOrganization(user, orgB.id);
     await api(user)
       .post('/students')
       .send(student(campusB.id, 'T'))
       .expect(201);
-    await api(user).get('/school-account').expect(200);
+    await api(user).get('/campuses/summary').expect(200);
 
     await setActiveOrganization(user, orgA.id);
     await api(user)
@@ -450,7 +524,7 @@ test.describe('role per school', () => {
     });
     await api(learner).get('/fee-schedules').expect(403);
     await api(learner).get('/students').expect(403);
-    await api(learner).get('/school-account').expect(403);
+    await api(learner).get('/campuses/summary').expect(403);
   });
 });
 

@@ -24,7 +24,7 @@ export interface SettingsSection {
   label: string;
   route: string;
   group: string;
-  icon?: NavIconName;
+  icon: NavIconName;
   gate?: Gate;
 }
 
@@ -143,9 +143,9 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         id: SETTINGS_ITEM_ID,
         label: 'Settings',
         pageTitle: 'Settings',
-        route: '/campuses',
+        route: '/settings',
         icon: 'settings',
-        alsoActiveFor: ['/roles', '/calendar', '/settings'],
+        alsoActiveFor: ['/campuses', '/roles', '/calendar', '/settings'],
       },
     ],
   },
@@ -180,10 +180,27 @@ export const EXTRA_PAGE_TITLES: Readonly<Record<string, string>> = isDev
 
 export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
   {
+    id: 'profile',
+    label: 'School profile',
+    route: '/settings/profile',
+    group: 'General',
+    icon: 'school',
+    gate: ['schoolAccount:read'],
+  },
+  {
+    id: 'admissions',
+    label: 'Admissions rules',
+    route: '/settings/admissions',
+    group: 'General',
+    icon: 'users',
+    gate: ['schoolAccount:read'],
+  },
+  {
     id: 'campuses',
     label: 'Campuses',
     route: '/campuses',
     group: 'School structure',
+    icon: 'building',
     gate: ['team:read'],
   },
   {
@@ -193,6 +210,14 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
     group: 'Access',
     icon: 'shield-check',
     gate: ['ac:read'],
+  },
+  {
+    id: 'danger',
+    label: 'Danger zone',
+    route: '/settings/danger',
+    group: 'Access',
+    icon: 'shield-alert',
+    gate: ['organization:delete', 'organization:update'],
   },
 ];
 
@@ -275,4 +300,39 @@ export function findCurrent(
     }
   }
   return best;
+}
+
+export const underRoute = (route: string, pathname: string) =>
+  pathname === route || pathname.startsWith(`${route}/`);
+
+export function settingsTrail(
+  pathname: string
+): { group: string; title: string } | undefined {
+  if (pathname === '/settings') {
+    return { group: 'Settings', title: 'All sections' };
+  }
+  const section = SETTINGS_SECTIONS.find((entry) =>
+    underRoute(entry.route, pathname)
+  );
+  return section === undefined
+    ? undefined
+    : { group: 'Settings', title: section.label };
+}
+
+type SettingsLanding =
+  | { kind: 'redirect'; to: '/' | '/settings/profile' }
+  | { kind: 'list'; items: SettingsSection[] };
+
+export function settingsLanding(
+  builtRoutes: ReadonlySet<string>,
+  permissions: PermissionMap,
+  sections: readonly SettingsSection[] = SETTINGS_SECTIONS
+): SettingsLanding {
+  const items = visibleSettings(sections, builtRoutes, permissions);
+  if (items.length === 0) {
+    return { kind: 'redirect', to: '/' };
+  }
+  return items.some((item) => item.route === '/settings/profile')
+    ? { kind: 'redirect', to: '/settings/profile' }
+    : { kind: 'list', items };
 }

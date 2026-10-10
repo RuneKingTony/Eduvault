@@ -11,25 +11,10 @@ import {
   syncAllStarterRoles,
   syncStarterRoles,
 } from '../src/app/common/auth/starter-roles';
-import { baseTest, expect } from './support/base-test';
-import { twoSchools, type TwoSchools } from './support/two-schools';
+import { expect } from './support/base-test';
+import { schoolsTest } from './support/two-schools';
 
-const test = baseTest.extend<{ schools: TwoSchools }>({
-  schools: async (
-    { app, createUser, createOrganization, createCampus, addMember },
-    use
-  ) => {
-    await use(
-      await twoSchools({
-        app,
-        createUser,
-        createOrganization,
-        createCampus,
-        addMember,
-      })
-    );
-  },
-});
+const test = schoolsTest;
 
 const student = (campusId: string, n: string) => ({
   campusId,
@@ -63,7 +48,7 @@ test.describe('guard order', () => {
     const routes = [
       { path: '/students', permission: 'student:read' },
       { path: '/fee-schedules', permission: 'feeSchedule:read' },
-      { path: '/school-account', permission: 'schoolAccount:read' },
+      { path: '/campuses/summary', permission: 'team:read' },
     ];
     for (const { path, permission } of routes) {
       const unauthenticated = await api().get(path).expect(401);
@@ -86,7 +71,6 @@ test.describe('guard order', () => {
     await api(owner).get(`/students/${randomUUID()}`).expect(404);
     await api(owner).get(`/campuses/${randomUUID()}`).expect(404);
     await api(owner).get(`/fee-schedules/${randomUUID()}`).expect(404);
-    await api(owner).get('/school-account').expect(404);
     await api(noPermission).get(`/campuses/${lekki.id}`).expect(404);
   });
 
@@ -108,10 +92,11 @@ test.describe('guard order', () => {
       ['post', '/fee-schedules'],
       ['patch', `/fee-schedules/${id}`],
       ['delete', `/fee-schedules/${id}`],
-      ['get', '/school-account'],
-      ['post', '/school-account'],
+      ['get', '/campuses/summary'],
       ['patch', '/school-account'],
-      ['delete', '/school-account'],
+      ['put', '/school-account/logo'],
+      ['delete', '/school-account/logo'],
+      ['patch', '/school-settings'],
     ] as const;
     for (const [method, path] of gated) {
       const res = await api(noPermission)[method](path).send({});
@@ -135,11 +120,16 @@ test.describe('guard order', () => {
     await api(owner).post('/campuses').send({ name: 'Annex' }).expect(201);
     await api(owner).get('/fee-schedules').expect(200);
     await api(owner).post('/fee-schedules').send(FEE).expect(201);
-    await api(owner)
-      .post('/school-account')
-      .send({ name: 'Fees', currency: 'NGN', admissionPrefix: 'FEE' })
-      .expect(201);
+    await api(owner).get('/campuses/summary').expect(200);
     await api(owner).get('/school-account').expect(200);
+    await api(owner)
+      .patch('/school-account')
+      .send({ name: 'Fees' })
+      .expect(200);
+    await api(owner)
+      .patch('/school-settings')
+      .send({ maxGuardians: 3 })
+      .expect(200);
 
     const res = await api(owner).get('/me/permissions').expect(200);
     expect(res.body).toEqual({
@@ -189,13 +179,13 @@ test.describe('role union', () => {
     schools: { lekkiOnly, orgA },
   }) => {
     await api(lekkiOnly).get('/campuses').expect(200);
-    await api(lekkiOnly).get('/school-account').expect(403);
+    await api(lekkiOnly).get('/campuses/summary').expect(403);
     await pool.query(
       `UPDATE "organizationRole" SET permission = $2
        WHERE "organizationId" = $1 AND role = 'bursar'`,
-      [orgA.id, JSON.stringify({ student: ['read'], schoolAccount: ['read'] })]
+      [orgA.id, JSON.stringify({ student: ['read'], team: ['read'] })]
     );
-    await api(lekkiOnly).get('/school-account').expect(404);
+    await api(lekkiOnly).get('/campuses/summary').expect(200);
   });
 });
 

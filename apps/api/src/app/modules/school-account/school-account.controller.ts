@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Patch, Put } from '@nestjs/common';
 import { contract, type RouteOutput } from '@eduvault/api-contract';
 import { Org, OrganizationAuth, type OrgContext } from '../../common/auth';
 import { zod } from '../../common/http/zod.pipe';
@@ -11,19 +11,9 @@ export class SchoolAccountController {
   constructor(private readonly accounts: SchoolAccountService) {}
 
   @Get()
-  @OrganizationAuth('schoolAccount', 'read')
+  @OrganizationAuth()
   get(@Org() org: OrgContext): Promise<RouteOutput<typeof routes.get>> {
     return this.accounts.get(org);
-  }
-
-  @Post()
-  @OrganizationAuth('schoolAccount', 'create')
-  create(
-    @Org() org: OrgContext,
-    @Body(zod(routes.create.body))
-    body: Parameters<SchoolAccountService['create']>[1]
-  ): Promise<RouteOutput<typeof routes.create>> {
-    return this.accounts.create(org, body);
   }
 
   @Patch()
@@ -36,9 +26,20 @@ export class SchoolAccountController {
     return this.accounts.update(org, body);
   }
 
-  @Delete()
-  @OrganizationAuth('schoolAccount', 'delete')
-  remove(@Org() org: OrgContext): Promise<RouteOutput<typeof routes.remove>> {
-    return this.accounts.remove(org);
+  @Put('logo')
+  @OrganizationAuth('schoolAccount', 'update')
+  setLogo(
+    @Org() org: OrgContext,
+    @Body(zod(routes.setLogo.body)) body: { fileId: string }
+  ): Promise<RouteOutput<typeof routes.setLogo>> {
+    return this.accounts.setLogo(org, body.fileId);
+  }
+
+  @Delete('logo')
+  @OrganizationAuth('schoolAccount', 'update')
+  removeLogo(
+    @Org() org: OrgContext
+  ): Promise<RouteOutput<typeof routes.removeLogo>> {
+    return this.accounts.removeLogo(org);
   }
 }

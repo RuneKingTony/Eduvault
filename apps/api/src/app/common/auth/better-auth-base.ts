@@ -17,6 +17,7 @@ import {
   PASSWORD_MIN_LENGTH,
 } from '@eduvault/api-contract';
 import { insertDefaultLevels } from './default-levels';
+import { assertCampusNameFree, ownerRule } from './organization-hooks';
 import { syncStarterRoles } from './starter-roles';
 
 // Shared by the Nest factory (better-auth.ts) and the CLI shim (apps/api/auth.ts).
@@ -48,6 +49,36 @@ export const advancedBaseConfig: NonNullable<BetterAuthOptions['advanced']> = {
   defaultCookieAttributes: { httpOnly: true, sameSite: 'lax' },
 };
 
+const getOrganizationHooks = (pool: Pool) =>
+  ({
+    afterCreateOrganization: async ({ organization: school }) => {
+      await syncStarterRoles(pool, school.id);
+      await insertDefaultLevels(pool, school.id);
+      await pool.query(
+        `INSERT INTO school_setting (organization_id) VALUES ($1)
+         ON CONFLICT DO NOTHING`,
+        [school.id]
+      );
+    },
+    beforeCreateTeam: async ({ team }) => {
+      await assertCampusNameFree(pool, {
+        organizationId: team.organizationId,
+        name: team.name,
+      });
+    },
+    beforeUpdateTeam: async ({ team, updates, organization: school }) => {
+      if (updates.name !== undefined) {
+        await assertCampusNameFree(pool, {
+          organizationId: school.id,
+          name: updates.name,
+          exceptTeamId: team.id,
+        });
+      }
+    },
+    beforeUpdateMemberRole: ({ member, newRole }) =>
+      ownerRule(pool, { member, newRole }),
+  }) satisfies OrganizationOptions['organizationHooks'];
+
 export const getOrganizationOptions = (pool: Pool) =>
   ({
     allowUserToCreateOrganization: false,
@@ -74,12 +105,9 @@ export const getOrganizationOptions = (pool: Pool) =>
         },
       },
     },
-    organizationHooks: {
-      afterCreateOrganization: async ({ organization: school }) => {
-        await syncStarterRoles(pool, school.id);
-        await insertDefaultLevels(pool, school.id);
-      },
-    },
+    // DELETE /school deletes the school through the adapter, not this route.
+    disableOrganizationDeletion: true,
+    organizationHooks: getOrganizationHooks(pool),
     // A campus is a team plus a domain row; an automatic team would have no row.
     teams: {
       enabled: true,

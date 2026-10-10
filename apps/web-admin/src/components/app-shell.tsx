@@ -35,6 +35,7 @@ import {
   NAV_GROUPS,
   SETTINGS_SECTIONS,
   findCurrent,
+  settingsTrail,
   visibleNav,
   visibleSettings,
   type NavGroup,
@@ -123,15 +124,11 @@ function useAccess(): MePermissions {
   return data ?? access;
 }
 
-function useShellModel(access: MePermissions) {
-  const router = useRouter();
-  const pathname = useRouterState({
-    select: (state) => state.location.pathname,
-  });
-  const builtRoutes = new Set(Object.keys(router.routesByPath));
-  const groups = visibleNav(NAV_GROUPS, builtRoutes, access.permissions);
-  const current = findCurrent(groups, pathname);
-  const settings: CommandEntry[] = visibleSettings(
+function settingsEntries(
+  builtRoutes: ReadonlySet<string>,
+  access: MePermissions
+): CommandEntry[] {
+  return visibleSettings(
     SETTINGS_SECTIONS,
     builtRoutes,
     access.permissions
@@ -140,17 +137,40 @@ function useShellModel(access: MePermissions) {
     label: section.label,
     hint: 'Settings',
     route: section.route,
-    icon: section.icon ?? 'settings',
+    icon: section.icon,
   }));
+}
+
+const titleOf = (current: ReturnType<typeof findCurrent>, pathname: string) =>
+  current?.item.pageTitle ?? EXTRA_PAGE_TITLES[pathname] ?? 'Not found';
+
+function crumbs(current: ReturnType<typeof findCurrent>, pathname: string) {
+  const trail = settingsTrail(pathname);
+  if (trail !== undefined) {
+    return { groupLabel: trail.group, pageTitle: trail.title };
+  }
+  return {
+    groupLabel: current?.group.label ?? undefined,
+    pageTitle: titleOf(current, pathname),
+  };
+}
+
+function useShellModel(access: MePermissions) {
+  const router = useRouter();
+  const pathname = useRouterState({
+    select: (state) => state.location.pathname,
+  });
+  const builtRoutes = new Set(Object.keys(router.routesByPath));
+  const groups = visibleNav(NAV_GROUPS, builtRoutes, access.permissions);
+  const current = findCurrent(groups, pathname);
   return {
     groups,
     pathname,
     current,
     pages: commandEntries(groups),
-    settings,
+    settings: settingsEntries(builtRoutes, access),
     actions: commandActions(builtRoutes, access),
-    pageTitle:
-      current?.item.pageTitle ?? EXTRA_PAGE_TITLES[pathname] ?? 'Not found',
+    ...crumbs(current, pathname),
     open: (route: string) => {
       router.history.push(route);
     },
@@ -298,7 +318,7 @@ function ShellFrame({ access }: { access: MePermissions }) {
           <ActingBanner />
           <ShellTopbar
             compact={compact}
-            groupLabel={model.current?.group.label ?? undefined}
+            groupLabel={model.groupLabel}
             pageTitle={model.pageTitle}
             onOpenNavigation={() => {
               setNavOpen(true);

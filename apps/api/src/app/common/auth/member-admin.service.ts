@@ -33,6 +33,11 @@ interface CampusChange {
   removeCampusIds: readonly string[];
 }
 
+interface OwnershipHandover {
+  target: { memberId: string; roles: readonly string[] };
+  caller: { memberId: string; roles: readonly string[] };
+}
+
 interface MemberRemoval {
   memberId: string;
   organizationId: string;
@@ -104,6 +109,13 @@ export class MemberAdminService {
         add: addCampusIds,
         remove: removeCampusIds,
       });
+    });
+  }
+
+  handOverOwnership({ target, caller }: OwnershipHandover): Promise<void> {
+    return this.inTransaction(async (org) => {
+      await org.updateMember(target.memberId, target.roles.join(','));
+      await org.updateMember(caller.memberId, caller.roles.join(','));
     });
   }
 

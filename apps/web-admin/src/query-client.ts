@@ -10,7 +10,10 @@ export const createQueryClient = () =>
       error.status === 403 &&
       !isPermissionsQuery
     ) {
-      void client.invalidateQueries({ queryKey: ME_PERMISSIONS_KEY });
+      void client.invalidateQueries(
+        { queryKey: ME_PERMISSIONS_KEY },
+        { cancelRefetch: false }
+      );
     }
   });
 

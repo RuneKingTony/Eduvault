@@ -67,7 +67,21 @@ export const CAP_AREAS: readonly CapArea[] = [
     see: ['schoolAccount:read'],
     change: ['schoolAccount:update'],
     changeDesc: 'Change the school profile and rules',
-    extras: [],
+    extras: [
+      {
+        label: 'Hands over the school',
+        description: 'Makes someone else the owner. Only an owner can do it.',
+        permissions: ['organization:update'],
+        important: true,
+      },
+      {
+        label: 'Deletes the school',
+        description:
+          'Deletes a school with no students. Only an owner can do it.',
+        permissions: ['organization:delete'],
+        important: true,
+      },
+    ],
   },
   {
     id: 'students',
@@ -86,8 +100,6 @@ export const LEGACY_PERMISSIONS: readonly Permission[] = [
   'feeSchedule:read',
   'feeSchedule:update',
   'feeSchedule:delete',
-  'schoolAccount:create',
-  'schoolAccount:delete',
 ];
 
 export function capLevel(permissions: PermissionMap, area: CapArea): CapLevel {

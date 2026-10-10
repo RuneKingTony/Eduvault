@@ -117,6 +117,35 @@ CREATE TABLE public.fee_schedule (
 );
 
 --
+-- Name: file_blob; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.file_blob (
+    file_id uuid NOT NULL,
+    organization_id text NOT NULL,
+    bytes bytea NOT NULL
+);
+
+--
+-- Name: file_object; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.file_object (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id text NOT NULL,
+    kind text NOT NULL,
+    storage_key text NOT NULL,
+    content_type text NOT NULL,
+    byte_size integer NOT NULL,
+    sha256 text NOT NULL,
+    original_name text NOT NULL,
+    uploaded_by text,
+    uploaded_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT file_object_byte_size_check CHECK ((byte_size > 0)),
+    CONSTRAINT file_object_kind_check CHECK ((kind = 'school_logo'::text))
+);
+
+--
 -- Name: invitation; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -198,8 +227,31 @@ CREATE TABLE public.school_account (
     admission_prefix text NOT NULL,
     suspended_at timestamp with time zone,
     suspended_by text,
+    address text,
+    phone text,
+    email text,
+    logo_file_id uuid,
+    updated_by text,
+    CONSTRAINT school_account_address_check CHECK ((char_length(address) <= 200)),
     CONSTRAINT school_account_admission_prefix_check CHECK ((admission_prefix ~ '^[A-Z]{2,6}$'::text)),
+    CONSTRAINT school_account_city_check CHECK ((char_length(city) <= 80)),
+    CONSTRAINT school_account_name_check CHECK (((char_length(name) >= 1) AND (char_length(name) <= 120))),
+    CONSTRAINT school_account_phone_check CHECK ((char_length(phone) <= 30)),
     CONSTRAINT school_account_suspended_check CHECK (((suspended_at IS NULL) = (suspended_by IS NULL)))
+);
+
+--
+-- Name: school_setting; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.school_setting (
+    organization_id text NOT NULL,
+    max_guardians smallint DEFAULT 4 NOT NULL,
+    require_guardian boolean DEFAULT true NOT NULL,
+    updated_by text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT school_setting_max_guardians_check CHECK (((max_guardians >= 1) AND (max_guardians <= 6)))
 );
 
 --
@@ -355,6 +407,27 @@ ALTER TABLE ONLY public.fee_schedule
     ADD CONSTRAINT fee_schedule_pkey PRIMARY KEY (id);
 
 --
+-- Name: file_blob file_blob_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.file_blob
+    ADD CONSTRAINT file_blob_pkey PRIMARY KEY (file_id);
+
+--
+-- Name: file_object file_object_id_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.file_object
+    ADD CONSTRAINT file_object_id_organization_id_key UNIQUE (id, organization_id);
+
+--
+-- Name: file_object file_object_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.file_object
+    ADD CONSTRAINT file_object_pkey PRIMARY KEY (id);
+
+--
 -- Name: invitation invitation_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -397,6 +470,13 @@ ALTER TABLE ONLY public.schema_migrations
     ADD CONSTRAINT schema_migrations_pkey PRIMARY KEY (version);
 
 --
+-- Name: school_account school_account_logo_file_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.school_account
+    ADD CONSTRAINT school_account_logo_file_id_key UNIQUE (logo_file_id);
+
+--
 -- Name: school_account school_account_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -409,6 +489,13 @@ ALTER TABLE ONLY public.school_account
 
 ALTER TABLE ONLY public.school_account
     ADD CONSTRAINT school_account_pkey PRIMARY KEY (id);
+
+--
+-- Name: school_setting school_setting_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.school_setting
+    ADD CONSTRAINT school_setting_pkey PRIMARY KEY (organization_id);
 
 --
 -- Name: session session_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -511,6 +598,12 @@ CREATE INDEX campus_organization_id_idx ON public.campus USING btree (organizati
 CREATE INDEX fee_schedule_organization_campus_idx ON public.fee_schedule USING btree (organization_id, campus_id);
 
 --
+-- Name: file_object_organization_uploaded_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX file_object_organization_uploaded_idx ON public.file_object USING btree (organization_id, uploaded_at);
+
+--
 -- Name: invitation_email_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -609,13 +702,6 @@ ALTER TABLE ONLY public.audit_log
     ADD CONSTRAINT audit_log_actor_user_id_fkey FOREIGN KEY (actor_user_id) REFERENCES public."user"(id) ON DELETE RESTRICT;
 
 --
--- Name: audit_log audit_log_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.audit_log
-    ADD CONSTRAINT audit_log_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE RESTRICT;
-
---
 -- Name: campus campus_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -658,6 +744,27 @@ ALTER TABLE ONLY public.fee_schedule
     ADD CONSTRAINT fee_schedule_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE CASCADE;
 
 --
+-- Name: file_blob file_blob_file_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.file_blob
+    ADD CONSTRAINT file_blob_file_id_organization_id_fkey FOREIGN KEY (file_id, organization_id) REFERENCES public.file_object(id, organization_id) ON DELETE CASCADE;
+
+--
+-- Name: file_object file_object_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.file_object
+    ADD CONSTRAINT file_object_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE CASCADE;
+
+--
+-- Name: file_object file_object_uploaded_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.file_object
+    ADD CONSTRAINT file_object_uploaded_by_fkey FOREIGN KEY (uploaded_by) REFERENCES public."user"(id) ON DELETE SET NULL;
+
+--
 -- Name: invitation invitation_inviterId_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -693,6 +800,13 @@ ALTER TABLE ONLY public."organizationRole"
     ADD CONSTRAINT "organizationRole_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES public.organization(id) ON DELETE CASCADE;
 
 --
+-- Name: school_account school_account_logo_file_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.school_account
+    ADD CONSTRAINT school_account_logo_file_fkey FOREIGN KEY (logo_file_id, organization_id) REFERENCES public.file_object(id, organization_id) ON DELETE SET NULL (logo_file_id);
+
+--
 -- Name: school_account school_account_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -705,6 +819,27 @@ ALTER TABLE ONLY public.school_account
 
 ALTER TABLE ONLY public.school_account
     ADD CONSTRAINT school_account_suspended_by_fkey FOREIGN KEY (suspended_by) REFERENCES public."user"(id) ON DELETE RESTRICT;
+
+--
+-- Name: school_account school_account_updated_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.school_account
+    ADD CONSTRAINT school_account_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES public."user"(id) ON DELETE SET NULL;
+
+--
+-- Name: school_setting school_setting_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.school_setting
+    ADD CONSTRAINT school_setting_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE CASCADE;
+
+--
+-- Name: school_setting school_setting_updated_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.school_setting
+    ADD CONSTRAINT school_setting_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES public."user"(id) ON DELETE SET NULL;
 
 --
 -- Name: session session_userId_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -764,4 +899,5 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20261009190000'),
     ('20261009210000'),
     ('20261010090000'),
-    ('20261010100000');
+    ('20261010100000'),
+    ('20261010120000');

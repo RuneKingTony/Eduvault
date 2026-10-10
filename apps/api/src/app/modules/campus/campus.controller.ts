@@ -24,6 +24,12 @@ export class CampusController {
     return this.campuses.list(org);
   }
 
+  @Get('summary')
+  @OrganizationAuth('team', 'read')
+  summary(@Org() org: OrgContext): Promise<RouteOutput<typeof routes.summary>> {
+    return this.campuses.summary(org);
+  }
+
   @Get(':id')
   @OrganizationAuth()
   get(

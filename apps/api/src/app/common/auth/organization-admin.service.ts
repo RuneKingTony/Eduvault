@@ -3,6 +3,7 @@ import { AuthService } from '@thallesp/nestjs-better-auth';
 import { getOrgAdapter } from 'better-auth/plugins';
 import type { Pool } from 'pg';
 import { DB_TOKEN } from '../db/tokens';
+import { withSchoolLock } from '../db/with-school-lock';
 import type { AppAuth } from './better-auth';
 import { getOrganizationOptions } from './better-auth-base';
 
@@ -22,6 +23,10 @@ export class OrganizationAdminService {
     private readonly authService: AuthService<AppAuth>,
     @Inject(DB_TOKEN) private readonly pool: Pool
   ) {}
+
+  underSchoolLock<T>(organizationId: string, fn: () => Promise<T>): Promise<T> {
+    return withSchoolLock(this.pool, organizationId, fn);
+  }
 
   async create(input: NewOrganization): Promise<{ id: string }> {
     const { id } = await this.authService.api.createOrganization({
@@ -48,6 +53,15 @@ export class OrganizationAdminService {
     }
   }
 
+  /** The school name lives on `organization` too; the profile route keeps them in step. */
+  async renameOrganization(
+    organizationId: string,
+    name: string
+  ): Promise<void> {
+    const adapter = await this.adapter();
+    await adapter.updateOrganization(organizationId, { name });
+  }
+
   /** For a super admin acting in a school, who has no session membership there. */
   async renameTeam(teamId: string, name: string): Promise<void> {
     const adapter = await this.adapter();
@@ -61,6 +75,11 @@ export class OrganizationAdminService {
   async enrolInCampus(teamId: string, userId: string): Promise<void> {
     const adapter = await this.adapter();
     await adapter.findOrCreateTeamMember({ teamId, userId });
+  }
+
+  async deleteById(organizationId: string): Promise<void> {
+    const adapter = await this.adapter();
+    await adapter.deleteOrganization(organizationId);
   }
 
   async deleteBySlug(slug: string): Promise<void> {

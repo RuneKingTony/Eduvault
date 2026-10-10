@@ -6,6 +6,13 @@ export interface NewCampus {
   address: string | null;
 }
 
+export interface CampusMemberRecord {
+  campusId: string;
+  userId: string;
+  name: string;
+  roles: string[];
+}
+
 export abstract class CampusRepository {
   abstract list(organizationId: string, scope: CampusScope): Promise<Campus[]>;
 
@@ -13,6 +20,17 @@ export abstract class CampusRepository {
     organizationId: string,
     id: string
   ): Promise<Campus | undefined>;
+
+  abstract nameTaken(
+    organizationId: string,
+    name: string,
+    exceptId?: string
+  ): Promise<boolean>;
+
+  abstract membersOf(
+    organizationId: string,
+    campusIds: readonly string[]
+  ): Promise<CampusMemberRecord[]>;
 
   abstract existsInSchool(organizationId: string, id: string): Promise<boolean>;
 

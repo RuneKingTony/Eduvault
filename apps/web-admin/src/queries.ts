@@ -87,9 +87,53 @@ export const studentsQueryOptions = (api: Api) =>
 
 export const campusesQueryOptions = (api: Api) =>
   queryOptions({
-    queryKey: ['campuses'],
+    queryKey: ['campuses', 'list'],
     queryFn: () => api.campuses.list({}),
   });
+
+const CAMPUSES_KEY = ['campuses'] as const;
+
+export const campusSummaryQueryOptions = (api: Api) =>
+  queryOptions({
+    queryKey: [...CAMPUSES_KEY, 'summary'],
+    queryFn: () => api.campuses.summary({}),
+  });
+
+const SCHOOL_KEY = ['school'] as const;
+
+export const schoolProfileQueryOptions = (api: Api) =>
+  queryOptions({
+    queryKey: [...SCHOOL_KEY, 'profile'],
+    queryFn: () => api.schoolAccount.get({}),
+  });
+
+export const schoolSettingsQueryOptions = (api: Api) =>
+  queryOptions({
+    queryKey: [...SCHOOL_KEY, 'settings'],
+    queryFn: () => api.schoolSettings.get({}),
+  });
+
+export const handoverCandidatesQueryOptions = (api: Api) =>
+  queryOptions({
+    queryKey: [...SCHOOL_KEY, 'handover-candidates'],
+    queryFn: () => api.school.handoverCandidates({}),
+  });
+
+export const deletableQueryOptions = (api: Api) =>
+  queryOptions({
+    queryKey: [...SCHOOL_KEY, 'deletable'],
+    queryFn: () => api.school.deletable({}),
+  });
+
+export const invalidateSchool = (queryClient: QueryClient) =>
+  queryClient.invalidateQueries({ queryKey: SCHOOL_KEY });
+
+/** The campuses a member belongs to are part of their access, so a new campus refreshes it too. */
+export const invalidateCampuses = (queryClient: QueryClient) =>
+  Promise.all([
+    queryClient.invalidateQueries({ queryKey: CAMPUSES_KEY }),
+    queryClient.invalidateQueries({ queryKey: ME_PERMISSIONS_KEY }),
+  ]);
 
 export const feeSchedulesQueryOptions = (api: Api) =>
   queryOptions({

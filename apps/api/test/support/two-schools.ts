@@ -1,4 +1,4 @@
-import type { Fixtures } from './base-test';
+import { baseTest, type Fixtures } from './base-test';
 import { createStudent } from './factories/students';
 
 type SchoolFixtures = Pick<
@@ -54,3 +54,20 @@ export async function twoSchools({
 }
 
 export type TwoSchools = Awaited<ReturnType<typeof twoSchools>>;
+
+export const schoolsTest = baseTest.extend<{ schools: TwoSchools }>({
+  schools: async (
+    { app, createUser, createOrganization, createCampus, addMember },
+    use
+  ) => {
+    await use(
+      await twoSchools({
+        app,
+        createUser,
+        createOrganization,
+        createCampus,
+        addMember,
+      })
+    );
+  },
+});

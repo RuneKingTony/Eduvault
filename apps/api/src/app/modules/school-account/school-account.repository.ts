@@ -1,27 +1,34 @@
-import type { SchoolAccount } from '@eduvault/api-contract';
+import type { SchoolProfile } from '@eduvault/api-contract';
 
-export interface NewSchoolAccount {
-  name: string;
-  currency: string;
-  admissionPrefix: string;
-  city?: string;
+export interface SchoolProfilePatch {
+  name?: string;
+  city?: string | null;
+  address?: string | null;
+  phone?: string | null;
+  email?: string | null;
 }
 
-export type SchoolAccountPatch = Partial<NewSchoolAccount>;
+export interface LogoChange {
+  fileId: string | null;
+  updatedBy: string;
+}
+
+export type LogoChangeResult =
+  | { status: 'changed'; previousFileId: string | null }
+  | { status: 'no-account' }
+  | { status: 'unusable' };
 
 export abstract class SchoolAccountRepository {
-  abstract find(organizationId: string): Promise<SchoolAccount | undefined>;
-
-  abstract create(
-    organizationId: string,
-    input: NewSchoolAccount
-  ): Promise<SchoolAccount>;
+  abstract find(organizationId: string): Promise<SchoolProfile | undefined>;
 
   abstract update(
     organizationId: string,
-    patch: SchoolAccountPatch
-  ): Promise<SchoolAccount | undefined>;
+    patch: SchoolProfilePatch,
+    updatedBy: string
+  ): Promise<SchoolProfile | undefined>;
 
-  /** Resolves to the removed account's id, or undefined when none existed. */
-  abstract remove(organizationId: string): Promise<string | undefined>;
+  abstract setLogo(
+    organizationId: string,
+    change: LogoChange
+  ): Promise<LogoChangeResult>;
 }

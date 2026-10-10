@@ -18,6 +18,7 @@ import { AppModule } from '../../src/app/app.module';
 import { AccountService, type AppAuth } from '../../src/app/common/auth';
 import { castToBetterAuthRoles } from '../../src/app/common/auth/better-auth-roles';
 import { loadEnv } from '../../src/app/common/config/env';
+import { PlatformRepository } from '../../src/app/modules/platform/platform.repository';
 import { configureApp } from '../../src/app/configure-app';
 
 const ORIGIN = 'http://localhost:4200';
@@ -296,6 +297,13 @@ export const baseTest = vitestTest.extend<Fixtures>({
       const slug = `${name.toLowerCase().replaceAll(/[^a-z0-9]+/g, '-')}-${randomUUID().slice(0, 6)}`;
       const org = await api.createOrganization({
         body: { name, slug, userId: owner.id },
+      });
+      await app.get(PlatformRepository, { strict: false }).insertSchoolAccount({
+        organizationId: org.id,
+        name,
+        city: null,
+        admissionPrefix: 'TST',
+        currency: 'NGN',
       });
       await signIn(owner);
       return { id: org.id, name, slug, owner };

@@ -208,6 +208,7 @@ export const RESOURCE_PILLARS: Record<Resource, Pillar> = {
   campus: 'People and access',
   member: 'People and access',
   ac: 'People and access',
+  organization: 'People and access',
   schoolAccount: 'Foundation',
   student: 'Foundation',
   feeSchedule: 'Finance',

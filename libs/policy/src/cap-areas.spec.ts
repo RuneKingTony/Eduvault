@@ -101,6 +101,8 @@ describe('capSummary', () => {
       'Staff: add and remove staff, and give them roles',
       'Roles: create roles and change what they allow',
       'School settings: change the school profile and rules',
+      'Hands over the school',
+      'Deletes the school',
       'Students: admit students, update them and put them in classes',
     ]);
   });

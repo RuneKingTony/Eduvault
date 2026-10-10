@@ -50,13 +50,11 @@ test.describe('platform schools', () => {
   test('answers 401 without a session, 403 for an owner and 200 for a super admin', async ({
     api,
     createUser,
-    createOrganization,
     makeSuperAdmin,
   }) => {
     await api().get('/platform/schools').expect(401);
 
     const owner = await createUser();
-    await createOrganization(owner);
     const refused = await api(owner).get('/platform/schools').expect(403);
     expect(refused.body).toMatchObject({
       code: 'Forbidden',
