@@ -333,6 +333,23 @@ ok "finish closes the issue (dry under fixtures)" '{"merged":"https://github.com
 ok "finish records the close" yes "$([ -n "$(S get $KF .finish.issue_closed)" ] && echo yes)"
 : > "$GH_LOG"; view MERGED false MERGEABLE '[]' "$GREEN"
 ok "an already merged PR still closes the issue, no second merge" "" "$(F $KF --yes >/dev/null; grep -E '^pr (ready|merge)' "$GH_LOG")"
+ok "finish by --finish records it as such" "--finish" "$(S get $KF .finish.via)"
+KA=EDU-41
+S set $KA '.pr_url = "https://github.com/o/r/pull/8" | .auto_decide = true' >/dev/null
+S stage $KA merge-gate pass >/dev/null
+: > "$GH_LOG"; view OPEN true MERGEABLE '[]' "$GREEN"
+ok "an unknown finish argument refuses with 2" 2 "$(rc F $KA --nope)"
+ok "the unknown argument merged nothing" "" "$(grep -E '^pr (ready|merge)' "$GH_LOG")"
+view OPEN true MERGEABLE '[{"name":"hold-merge"}]' "$GREEN"
+ok "an auto-decide finish still stops at hold-merge with 23" 23 "$(rc F $KA --yes --via=auto-decide)"
+ok "the held auto-decide finish merged nothing" "" "$(grep -E '^pr (ready|merge)' "$GH_LOG")"
+view OPEN true MERGEABLE '[]' '[{"conclusion":"FAILURE"}]'
+ok "an auto-decide finish still refuses a red check" 1 "$(rc F $KA --yes --via=auto-decide)"
+view OPEN true MERGEABLE '[]' "$GREEN"
+F $KA --yes --via=auto-decide >/dev/null; ok "auto-decide finish: exit 0" 0 "$?"
+has "auto-decide finish squash-merges at the gate's head" "pr merge https://github.com/o/r/pull/8 --squash --match-head-commit abc123" "$(cat "$GH_LOG")"
+ok "auto-decide finish never uses --admin" "" "$(grep -- --admin "$GH_LOG")"
+ok "auto-decide finish records its via" "--auto-decide" "$(S get $KA .finish.via)"
 
 echo "== Herdr guard (HERDR_ENV unset)"
 for c in "setup.sh EDU-1" "worker.sh status EDU-1" "worker.sh dispatch EDU-1 implement" "wait-worker.sh EDU-1 5" "ready.sh nobody 0"; do

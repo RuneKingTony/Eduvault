@@ -18,13 +18,15 @@ fetch -> branch (haiku) + propose (opus/high)
       -> implement -> security-gate -> simplify
       -> review, with security (gated) beside it -> fix-blockers (blockers, majors or unmet criteria)
       -> e2e (required) -> push -> pr (draft)
-      -> merge-gate (waits for CI) -> HUMAN merges -> cleanup
+      -> merge-gate (waits for CI) -> finish (--auto-decide, or the human's --finish; else a HUMAN merges) -> cleanup
 ```
 
-Merge and closing the issue stay human. The merge gate only waits for CI through `gh pr checks`; it
-never merges and never uses `--admin`. `/ship <KEY> --finish` is the person's request to mark the green PR
-ready, merge it and close the issue, through `scripts/finish.sh` only. Workers run with `EDU_ORCHESTRATED=1`, so `gh-issues.sh
-close-issue` refuses.
+The merge gate only waits for CI through `gh pr checks`; it never merges and never uses `--admin`. Merging
+and closing the issue go only through `scripts/finish.sh`, which marks the green PR ready, squash-merges it and
+closes the issue. An `--auto-decide` run does that itself once the gate passes (autonomous, no human gate);
+otherwise it waits for a human merge, or for the person's `/ship <KEY> --finish`. `finish.sh` refuses a red,
+pending, conflicting or `hold-merge` PR, so `hold-merge` is the brake. Workers run with `EDU_ORCHESTRATED=1`, so
+`gh-issues.sh close-issue` refuses.
 
 ## Stages
 

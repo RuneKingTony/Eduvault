@@ -1,6 +1,6 @@
 ---
 name: ship
-description: Drives one GitHub issue (EDU-<n>) from fetch to a green draft PR inside Herdr. Fetches the issue, creates a worktree, proposes (halting on a not-shippable or silently descoped issue), implements, simplifies, reviews, runs a gated security review, fixes blockers, optionally checks the change in the browser on a local stack, pushes, opens the draft PR and waits for CI. Each heavy stage is a fresh Claude in one worker pane, verified from JSON handoffs and resumable from status.json after any death. Merge and closing the issue stay human; `--finish` is the human's request to do both through the guard. Use when asked to ship, drive, resume or run the full pipeline for an issue, or to finish a green PR. Takes EDU-<n> [--auto-decide|--unattended|--finish].
+description: Drives one GitHub issue (EDU-<n>) from fetch to a green draft PR inside Herdr. Fetches the issue, creates a worktree, proposes (halting on a not-shippable or silently descoped issue), implements, simplifies, reviews, runs a gated security review, fixes blockers, optionally checks the change in the browser on a local stack, pushes, opens the draft PR and waits for CI. Each heavy stage is a fresh Claude in one worker pane, verified from JSON handoffs and resumable from status.json after any death. Merge and closing the issue are human unless the run is `--auto-decide`/`--unattended` (autonomous: it finishes by itself) or the person types `--finish`; both go through the finish guard. Use when asked to ship, drive, resume or run the full pipeline for an issue, or to finish a green PR. Takes EDU-<n> [--auto-decide|--unattended|--finish].
 argument-hint: EDU-<n> [--auto-decide] [--unattended] [--finish]
 allowed-tools: Bash, Read, Write, Grep, Skill, Agent, SendMessage, advisor
 model: sonnet
@@ -22,9 +22,11 @@ exactly (`EDU-12` is not `EDU-123`). `parent_spike` set: a `/spike` started this
 `.spike-lock` is your parent, never a rival.
 
 **Flags.** `--unattended` = `--auto-decide`. Sticky: on first use `bash $W/state.sh set <KEY> '.auto_decide
-= true'`. With it nothing asks a human; without it `/propose` runs here and may ask you. Worker and
-subagent stages never ask, in either mode. `--finish` is not sticky: it means the person typing it wants
-the green PR merged and the issue closed now (`$R/stages.md`, finish); without it nothing here merges or closes.
+= true'`. With it nothing asks a human and the run is autonomous: once the merge gate passes it also does the
+**finish** step (`$R/stages.md`) by itself, so the green PR is merged and the issue closed with no human gate.
+Without it `/propose` runs here and may ask you, and nothing here merges or closes. Worker and subagent stages
+never ask, in either mode. `--finish` is not sticky: it is the person asking for that finish step now, on a
+run that is not `--auto-decide`.
 
 **Models.** Every stage's model and effort come from `bash $W/effort.sh <KEY> <stage>` -> `<model> <effort>
 <reason>`. Use it for each subagent's `model`; `worker.sh dispatch` reads it itself. Never hardcode one.
@@ -69,7 +71,7 @@ $LOCK $RUN_ID`; one line naming the stage and reason. `/ship <KEY>` resumes late
 
 Order: `fetch`, `branch` beside `propose`, `implement`, `security-gate`, `simplify`, `review` beside `security`
 (only if the gate fired; it starts after simplify, on the tree simplify leaves), `fix-blockers` (only if
-blockers, majors or unmet criteria), `e2e` (required), `push`, `pr`,
+any review or security finding or unmet criterion), `e2e` (required), `push`, `pr`,
 `merge-gate`, `cleanup`. The table in `README.md` says which run in the pane, as a subagent or here.
 `bash $W/stack.sh up <KEY> $RUN_ID` is started in the background only when the e2e stage will run; it
 boots the worktree's own stack on free ports and exits.
@@ -95,13 +97,15 @@ halt on a stage, record it: `bash $W/state.sh halt <KEY> <stage> "<reason>"`, ne
 
 - The worker runs `bypassPermissions` inside the worktree sandbox; under `/spike` this orchestrator does
   too, which makes these rules its only guard.
-- **Merge and Done are human.** Never `gh pr merge`, never `--admin`, never `gh pr ready`, never `gh-issues.sh
-close-issue`. The one exception is `bash $W/finish.sh <KEY> --yes`, when the person typed `--finish`: it
-  refuses a red, pending, conflicting or held PR and merges at the head the gate saw. `EDU_ORCHESTRATED=1` is
-  exported by every script and into the worker, and close-issue refuses under it (finish.sh alone unsets it).
-  The merge gate only waits for CI. A request to merge or close without `--finish`: tell the human to do it,
-  or to run `/ship <KEY> --finish`.
-- The PR stays a draft until the human marks it ready, or `--finish` does.
+- **Merge and Done go only through `bash $W/finish.sh <KEY> --yes`.** Never `gh pr merge`, never `--admin`, never
+  `gh pr ready`, never `gh-issues.sh close-issue` by hand. Run finish.sh when the person typed `--finish`, or
+  when the run is `--auto-decide` and `state.sh next` reports `awaiting_merge` (pass `--via=auto-decide`). It
+  refuses a red, pending, conflicting or held PR (`hold-merge` is the brake: the run parks at `held`) and merges
+  at the head the gate saw. `EDU_ORCHESTRATED=1` is exported by every script and into the worker, and
+  close-issue refuses under it (finish.sh alone unsets it). The merge gate itself only waits for CI. Without
+  `--auto-decide` or `--finish`, a request to merge or close: tell the human to do it, or to run
+  `/ship <KEY> --finish`.
+- The PR stays a draft until finish.sh marks it ready (or the human does).
 - A `running` stage restarts only through `$R/reattach.md`; dispatch only onto an idle or gone worker;
   close only panes this run created.
 - `status.json` only through `state.sh`; `$LOCK` only through `lock.sh`.

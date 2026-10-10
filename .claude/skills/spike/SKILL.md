@@ -39,7 +39,7 @@ own; no `sleep` or polling loops. A script that may run minutes (`dispatch.sh`) 
 | `--concurrency N` | tickets running at once. Default 3, hard cap 10 (a larger N is clamped)                                                                                                                                                                                                                                                                                                                                                                        |
 | `--only SPEC`     | dispatch only these tickets; the rest still gate through their edges. SPEC is a comma list of keys, bare numbers and ranges: `EDU-401,EDU-404`, `401-432`, `401-410,415,420-425`. Ranges expand and dedupe. A ticket that is not a child of the epic halts the run (walk exits 3 with `ERROR: --only EDU-411 is not a child of EDU-400`); a malformed or reversed range halts at `init.sh` (exit 2). `--only +SPEC` appends to the stored list |
 | `--max-tickets N` | stop dispatching after N tickets have started **in this run**                                                                                                                                                                                                                                                                                                                                                                                  |
-| `--auto-decide`   | forwarded to every `/ship`                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `--auto-decide`   | forwarded to every `/ship`: no questions, and each green PR is merged and its issue closed by ship (no human gate)                                                                                                                                                                                                                                                                                                                             |
 
 Flags are **sticky**: `init.sh` stores them in `$D/status.json`; a resume without flags keeps them (losing
 `.only` would widen the run to the whole epic), a flag passed again overrides.
@@ -109,7 +109,7 @@ Only on the user's explicit ask in this session:
 - **Diagnose**: `diagnose.sh <EPIC> <KEY>` (read-only: ship's stage and lock, panes, the e2e stack's ports and
   who holds them). Run it on the first `waiting-user` for a ticket and on any in-flight line labelled
   "waiting on a background task", before telling the user anything about why it is idle.
-- **Close issues**: spike never does. Closing is the human's, one ticket at a time.
+- **Close issues**: spike never does. Under `--auto-decide` ship's `finish.sh` closes the issue it merged; otherwise closing is the human's, one ticket at a time.
 
 ## Outcomes, from ship's files only
 
@@ -129,8 +129,10 @@ Never judge a ticket by its pane's chat.
 | `merged-outside-ship` | PR `MERGED` but merge-gate never passed                                                                    | counts as `done`, flagged on the board                                                                                     |
 | `none`                | not started (partial ship state is adopted; `/ship` resumes)                                               | eligible when its blockers are done                                                                                        |
 
-Because merging is human, a normal run parks every finished ticket at `held` until you merge its PR; its
-dependents start on the next walk after the merge. Merge, then `/ship <KEY>` in its pane runs cleanup.
+Without `--auto-decide`, merging is human: a run parks every finished ticket at `held` until you merge its PR;
+its dependents start on the next walk after the merge. Merge, then `/ship <KEY>` in its pane runs cleanup. With
+`--auto-decide` each `/ship` merges and closes its own green PR (ship's `finish.sh`), so tickets go straight to
+`done` and dependents start as soon as it merges; `held` then means a `hold-merge` label (or a red PR ship halted on).
 
 ## Panes
 
@@ -145,7 +147,7 @@ panes closed or kept (`reap.sh <EPIC> --all-done`); the board and the path to `$
 ticket with its PR and "merge it, then `/ship <KEY>`"; each halted ticket with its stage and "fix with
 `/ship <KEY>`, then re-run `/spike <EPIC>`"; each died-again ticket with `dispatch.sh … --resume`; each
 `waiting-user` pane with its last line; each stalled blocker and exactly which keys it waits on; wall-clock
-since `.started`. Merged issues stay open: closing them is yours. Then `bash $W/lock.sh release $D/.spike-lock $RUN_ID`.
+since `.started`. Merged issues stay open unless the run was `--auto-decide` (ship closes those): closing them is yours otherwise. Then `bash $W/lock.sh release $D/.spike-lock $RUN_ID`.
 
 ## Rules
 
