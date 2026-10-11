@@ -18,9 +18,12 @@ import {
 } from './support/base-test';
 import { assignClassTeacher, createClass } from './support/factories/classes';
 import { createSchoolYear } from './support/factories/calendar';
-import { schoolsTest, type TwoSchools } from './support/two-schools';
+import {
+  bareSchoolsTest,
+  type TwoSchoolsWithoutStudents as TwoSchools,
+} from './support/two-schools';
 
-const test = schoolsTest;
+const test = bareSchoolsTest;
 
 type Api = Fixtures['api'];
 

@@ -36,9 +36,22 @@ campus_in() { # jar schoolId key name -> campus id
   id=$(call "$1" POST /campuses "$(jq -nc --arg n "$4" '{name:$n}')" | jq -r .id)
   record campus "$id" "$2" "$3"; echo "$id"
 }
-student_in() { # jar campusId school key label -> student id
+# year_in <jar>: a school year around today; the first one makes its first term current, which admission needs.
+year_in() {
+  local y m
+  y=$(date +%Y); m=$(date +%m)
+  [ "$((10#$m))" -ge 9 ] || y=$((y - 1))
+  call "$1" POST /school-years "$(jq -nc --arg n "$y/$((y + 1))" --arg s "$y-09-07" --arg e "$((y + 1))-07-23" '{name:$n,startsOn:$s,endsOn:$e}')" >/dev/null
+}
+class_in() { # jar campusId -> class id (a JSS1 class on the campus)
+  local level
+  level=$(call "$1" GET /class-levels | jq -r '[.[]|select(.code=="JSS1")][0].id')
+  call "$1" POST /classes "$(jq -nc --arg l "$level" --arg c "$2" --arg n "A $RUN" '{levelId:$l,campusId:$c,name:$n}')" | jq -r .id
+}
+student_in() { # jar classId school key label -> student id (admitted with one new username guardian)
   local id
-  id=$(call "$1" POST /students "$(jq -nc --arg c "$2" --arg n "E2E $5 $RUN" --arg a "E2E-$5-$RUN" '{campusId:$c,fullName:$n,admissionNumber:$a}')" | jq -r .id)
+  id=$(call "$1" POST /students "$(jq -nc --arg c "$2" --arg f "E2E$5" --arg l "$RUN" \
+    '{firstName:$f,lastName:$l,gender:"F",dateOfBirth:"2014-03-03",classArmId:$c,guardians:[{new:{fullName:("Guardian "+$f+" "+$l),phone:"08012345678",address:"1 Test Street",relationship:"mother",paysFees:true,login:{kind:"username"}}}]}')" | jq -r .student.id)
   record student "$id" "$3" "$4"; echo "$id"
 }
 # school_for <key> <label> -> prints "<userId> <schoolId>". The owner signs in with the temporary
@@ -98,11 +111,15 @@ read -r OWNER_UID SCHOOL < <(school_for owner Greenfield)
 OJAR="$DIR/owner.jar"
 LEKKI=$(campus_in "$OJAR" "$SCHOOL" owner Lekki)
 IKEJA=$(campus_in "$OJAR" "$SCHOOL" owner Ikeja)
-OSTUDENT=$(student_in "$OJAR" "$LEKKI" "$SCHOOL" owner owner-student)
+year_in "$OJAR"
+LEKKI_CLASS=$(class_in "$OJAR" "$LEKKI")
+OSTUDENT=$(student_in "$OJAR" "$LEKKI_CLASS" "$SCHOOL" owner owner-student)
 
 read -r FOREIGN_UID FSCHOOL < <(school_for foreign Hilltop)
 FMAIN=$(campus_in "$DIR/foreign.jar" "$FSCHOOL" foreign Main)
-FSTUDENT=$(student_in "$DIR/foreign.jar" "$FMAIN" "$FSCHOOL" foreign foreign-student)
+year_in "$DIR/foreign.jar"
+FCLASS=$(class_in "$DIR/foreign.jar" "$FMAIN")
+FSTUDENT=$(student_in "$DIR/foreign.jar" "$FCLASS" "$FSCHOOL" foreign foreign-student)
 
 BOTH=$(jq -nc --arg a "$LEKKI" --arg b "$IKEJA" '[$a,$b]'); LEKKI_ONLY=$(jq -nc --arg a "$LEKKI" '[$a]'); IKEJA_ONLY=$(jq -nc --arg a "$IKEJA" '[$a]')
 ADMIN_UID=$(staff_in admin 'E2E Tunde' "$SCHOOL" '["administrator"]' "$BOTH")
@@ -121,8 +138,8 @@ add_persona teacher "$TEACHER_UID" "$SCHOOL" "$LEKKI"
 add_persona newhire "$NEWHIRE_UID" "$SCHOOL" "$LEKKI"
 add_persona foreign "$FOREIGN_UID" "$FSCHOOL" "$FMAIN"
 add_superadmin
-block_persona student 'M2.4 + M2.8'
-block_persona guardian 'M2.4 + M2.8'
+block_persona student 'M2.8'
+block_persona guardian 'M2.8'
 
 jq --arg os "$OSTUDENT" --arg fs "$FSTUDENT" --arg ik "$IKEJA" --arg r "$RUN" \
   '. + {ownerStudentId:$os,foreignStudentId:$fs,ikejaCampusId:$ik,runId:$r}' "$PERSONAS" >"$PERSONAS.tmp" && mv "$PERSONAS.tmp" "$PERSONAS"

@@ -38,11 +38,11 @@ test.describe('campus summary', () => {
     expect(names(body)).toEqual(['Ikeja', 'Lekki']);
     const [ikeja, lekkiCard] = body;
     expect(ikeja.principals).toEqual([]);
-    expect(ikeja.counts).toEqual({ classes: 0, students: 0, staff: 1 });
+    expect(ikeja.counts).toEqual({ classes: 1, students: 1, staff: 1 });
     expect(lekkiCard.principals).toEqual([
       { userId: principal.id, name: 'Test User' },
     ]);
-    expect(lekkiCard.counts).toEqual({ classes: 0, students: 0, staff: 3 });
+    expect(lekkiCard.counts).toEqual({ classes: 1, students: 1, staff: 3 });
   });
 
   test('counts only the active classes of each campus', async ({
@@ -66,8 +66,8 @@ test.describe('campus summary', () => {
         card.counts.classes,
       ])
     ).toEqual([
-      ['Ikeja', 1],
-      ['Lekki', 1],
+      ['Ikeja', 2],
+      ['Lekki', 2],
     ]);
   });
 

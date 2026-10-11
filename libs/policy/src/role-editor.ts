@@ -211,6 +211,8 @@ export const RESOURCE_PILLARS: Record<Resource, Pillar> = {
   organization: 'People and access',
   schoolAccount: 'Foundation',
   student: 'Foundation',
+  enrollment: 'Foundation',
+  guardian: 'Foundation',
   session: 'Foundation',
   class: 'Foundation',
   feeSchedule: 'Finance',
@@ -224,6 +226,8 @@ export const ACTION_WORDS: Record<Action, string> = {
   delete: 'remove',
   setCurrent: 'set current',
   assignTeacher: 'assign teachers',
+  place: 'place in classes',
+  link: 'link to students',
 };
 
 export function capabilityLabel(permission: Permission): string {

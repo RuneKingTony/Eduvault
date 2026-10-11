@@ -29,7 +29,31 @@ import {
   updateClassLevelSchema,
   updateClassSchema,
 } from './classes';
+import {
+  editGuardianSchema,
+  guardianDetailSchema,
+  guardianLinkParamsSchema,
+  guardianLinkSchema,
+  guardianListQuerySchema,
+  guardianDraftSchema,
+  guardianSummarySchema,
+  guardianUnlinkedSchema,
+  linkGuardianResultSchema,
+  resetLoginSchema,
+  updateGuardianLinkSchema,
+} from './guardians';
 import { defineContract, defineRoute } from './route';
+import {
+  admissionDuplicatesQuerySchema,
+  admissionDuplicatesSchema,
+  admissionPreviewSchema,
+  admitStudentResultSchema,
+  admitStudentSchema,
+  studentDetailSchema,
+  studentListQuerySchema,
+  studentListSchema,
+  updateStudentSchema,
+} from './students';
 import {
   campusFilterSchema,
   campusSchema,
@@ -41,7 +65,6 @@ import {
   createRoleSchema,
   createSchoolResultSchema,
   createSchoolSchema,
-  createStudentSchema,
   deletableSchema,
   deleteSchoolSchema,
   fileRefSchema,
@@ -79,14 +102,12 @@ import {
   roleSlugParamsSchema,
   schoolRoleSchema,
   setPasswordSchema,
-  studentSchema,
   updateCampusSchema,
   updateFeeScheduleSchema,
   updateMemberCampusesSchema,
   updateMemberRolesSchema,
   updateMemberTitleSchema,
   updateRoleSchema,
-  updateStudentSchema,
 } from './schemas';
 
 const removed = z.object({ id: z.uuid() });
@@ -256,12 +277,99 @@ export const contract = defineContract({
     create: createFeeScheduleSchema,
     update: updateFeeScheduleSchema,
   }),
-  students: crudWithoutRemove({
-    base: '/students',
-    item: studentSchema,
-    create: createStudentSchema,
-    update: updateStudentSchema,
-  }),
+  students: {
+    list: defineRoute({
+      method: 'GET',
+      path: '/students',
+      query: studentListQuerySchema,
+      response: studentListSchema,
+    }),
+    get: defineRoute({
+      method: 'GET',
+      path: '/students/:id',
+      params: idParamsSchema,
+      response: studentDetailSchema,
+    }),
+    create: defineRoute({
+      method: 'POST',
+      path: '/students',
+      body: admitStudentSchema,
+      response: admitStudentResultSchema,
+    }),
+    update: defineRoute({
+      method: 'PATCH',
+      path: '/students/:id',
+      params: idParamsSchema,
+      body: updateStudentSchema,
+      response: studentDetailSchema,
+    }),
+    guardians: defineRoute({
+      method: 'GET',
+      path: '/students/:id/guardians',
+      params: idParamsSchema,
+      response: z.array(guardianLinkSchema),
+    }),
+    linkGuardian: defineRoute({
+      method: 'POST',
+      path: '/students/:id/guardians',
+      params: idParamsSchema,
+      body: guardianDraftSchema,
+      response: linkGuardianResultSchema,
+    }),
+    updateGuardianLink: defineRoute({
+      method: 'PATCH',
+      path: '/students/:id/guardians/:guardianId',
+      params: guardianLinkParamsSchema,
+      body: updateGuardianLinkSchema,
+      response: guardianLinkSchema,
+    }),
+    unlinkGuardian: defineRoute({
+      method: 'DELETE',
+      path: '/students/:id/guardians/:guardianId',
+      params: guardianLinkParamsSchema,
+      response: guardianUnlinkedSchema,
+    }),
+  },
+  admissions: {
+    preview: defineRoute({
+      method: 'GET',
+      path: '/admissions/preview',
+      response: admissionPreviewSchema,
+    }),
+    duplicates: defineRoute({
+      method: 'GET',
+      path: '/admissions/duplicates',
+      query: admissionDuplicatesQuerySchema,
+      response: admissionDuplicatesSchema,
+    }),
+  },
+  guardians: {
+    list: defineRoute({
+      method: 'GET',
+      path: '/guardians',
+      query: guardianListQuerySchema,
+      response: z.array(guardianSummarySchema),
+    }),
+    get: defineRoute({
+      method: 'GET',
+      path: '/guardians/:id',
+      params: idParamsSchema,
+      response: guardianDetailSchema,
+    }),
+    update: defineRoute({
+      method: 'PATCH',
+      path: '/guardians/:id',
+      params: idParamsSchema,
+      body: editGuardianSchema,
+      response: guardianDetailSchema,
+    }),
+    resetLogin: defineRoute({
+      method: 'POST',
+      path: '/guardians/:id/reset-login',
+      params: idParamsSchema,
+      response: resetLoginSchema,
+    }),
+  },
   members: {
     list: defineRoute({
       method: 'GET',

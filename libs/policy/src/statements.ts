@@ -4,6 +4,8 @@ export const statements = {
   schoolAccount: ['read', 'update'],
   organization: ['update', 'delete'],
   student: ['create', 'read', 'update'],
+  enrollment: ['create', 'read', 'place'],
+  guardian: ['create', 'read', 'update', 'link'],
   session: ['create', 'read', 'update', 'setCurrent'],
   class: ['create', 'read', 'readAll', 'update', 'assignTeacher'],
   feeSchedule: ['create', 'read', 'update', 'delete'],
@@ -64,6 +66,8 @@ export const PERM_HELP: Partial<Record<Permission, string>> = {
   'class:readAll':
     'Sees every class. Without it a member with class access sees only the classes they teach.',
   'class:assignTeacher': 'Names the class teachers of a class.',
+  'guardian:create': 'Adds new guardians, with a portal login for each.',
+  'guardian:link': 'Links guardians to students and changes who pays the fees.',
 };
 
 const RESOURCE_LABELS: Record<Resource, string> = {
@@ -72,6 +76,8 @@ const RESOURCE_LABELS: Record<Resource, string> = {
   schoolAccount: 'School settings',
   organization: 'School',
   student: 'Students',
+  enrollment: 'Enrolment',
+  guardian: 'Guardians',
   session: 'School years and terms',
   class: 'Classes',
   feeSchedule: 'Fee schedules',

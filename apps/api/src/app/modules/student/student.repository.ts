@@ -1,32 +1,44 @@
-import type { Student } from '@eduvault/api-contract';
-import type { CampusScope } from '../../common/campus-scope';
+import type {
+  StudentCounts,
+  StudentDetail,
+  StudentRow,
+  StudentTab,
+  UpdateStudentInput,
+} from '@eduvault/api-contract';
+import type { StudentScope } from './visibility';
 
-export interface NewStudent {
-  campusId: string;
-  fullName: string;
-  admissionNumber: string;
+export interface StudentListParams {
+  tab: StudentTab;
+  q?: string;
+  campusId?: string;
+  levelId?: string;
+  page: number;
+  pageSize: number;
+  withGuardians: boolean;
 }
 
-export type StudentPatch = Partial<NewStudent>;
+export interface StudentListResult {
+  items: StudentRow[];
+  total: number;
+  counts: StudentCounts;
+}
 
 export abstract class StudentRepository {
   abstract list(
     organizationId: string,
-    scope: CampusScope,
-    campusId?: string
-  ): Promise<Student[]>;
+    scope: StudentScope,
+    params: StudentListParams
+  ): Promise<StudentListResult>;
 
-  abstract findById(
+  abstract findDetail(
     organizationId: string,
-    scope: CampusScope,
+    scope: StudentScope,
     id: string
-  ): Promise<Student | undefined>;
-
-  abstract create(organizationId: string, input: NewStudent): Promise<Student>;
+  ): Promise<StudentDetail | undefined>;
 
   abstract update(
     organizationId: string,
     id: string,
-    patch: StudentPatch
-  ): Promise<Student | undefined>;
+    patch: UpdateStudentInput
+  ): Promise<void>;
 }

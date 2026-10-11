@@ -96,7 +96,7 @@ Screenshots are `tmp/e2e/<run>/<project>/step-NN-<name>.png`, numbered in the or
 | `FAIL`    | an assertion failed, or the run broke for a reason in the product or the spec              | Name the failing step and the expected and actual status or text.                     |
 | `BLOCKED` | the run could not test what it was asked to: stack down, or a persona could not be created | Give `cause: environment\|persona\|product`. Never rounded up to PASS, never to FAIL. |
 
-A test skipped because its persona is blocked is BLOCKED, not "skipped, so fine". Student and guardian personas wait for M2.4 and M2.8 (see [personas](references/personas.md)), so any run that needs a persona recorded as blocked in `personas.json` is BLOCKED until that slice lands; say so plainly and report the tests that did pass separately. Plan each run around the personas the code under test can already create (the roadmap's M2.4 slice adds the portal ones); a flow that needs a persona that cannot exist yet belongs to the slice that adds it.
+A test skipped because its persona is blocked is BLOCKED, not "skipped, so fine". Student and guardian personas wait for M2.8 (see [personas](references/personas.md)), so any run that needs a persona recorded as blocked in `personas.json` is BLOCKED until that slice lands; say so plainly and report the tests that did pass separately. Plan each run around the personas the code under test can already create (the roadmap's M2.8 slice adds the portal ones); a flow that needs a persona that cannot exist yet belongs to the slice that adds it.
 
 ## Assertions
 

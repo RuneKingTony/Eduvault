@@ -6,12 +6,12 @@ import {
 import type { MemberDetail, Role, RoleList } from '@eduvault/api-contract';
 import { syncAllStarterRoles } from '../src/app/common/auth/starter-roles';
 import { acting, expect, type Fixtures } from './support/base-test';
-import { schoolsTest } from './support/two-schools';
+import { bareSchoolsTest } from './support/two-schools';
 
 type Actor = NonNullable<Parameters<Fixtures['api']>[0]>;
 type Api = Fixtures['api'];
 
-const test = schoolsTest;
+const test = bareSchoolsTest;
 
 const listRoles = async (api: Api, actor: Actor): Promise<Role[]> => {
   const res = await api(actor).get('/roles').expect(200);
@@ -746,7 +746,13 @@ test.describe('roles', () => {
     }) => {
       const deleter = await withPermissions(
         orgA,
-        ['ac:delete', 'member:read', 'student:read'],
+        [
+          'ac:delete',
+          'member:read',
+          'student:read',
+          'guardian:read',
+          'enrollment:read',
+        ],
         { campuses: [lekki] }
       );
       await addMember(orgA, await createUser({ name: 'Ike Jaiyeola' }), {
@@ -768,6 +774,8 @@ test.describe('roles', () => {
       const deleter = await withPermissions(orgA, [
         'ac:delete',
         'student:read',
+        'guardian:read',
+        'enrollment:read',
       ]);
       const res = await api(deleter).delete('/roles/bursar').expect(409);
       expect(res.body.message).toBe(

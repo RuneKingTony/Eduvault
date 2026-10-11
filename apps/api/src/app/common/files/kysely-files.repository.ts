@@ -35,6 +35,13 @@ const OWNED_BY: Record<FileKind, (eb: FileEntry) => Expression<SqlBool>> = {
         .select('school_account.id')
         .whereRef('school_account.logo_file_id', '=', 'file_object.id')
     ),
+  guardian_photo: (eb) =>
+    eb.exists(
+      eb
+        .selectFrom('guardian')
+        .select('guardian.id')
+        .whereRef('guardian.photo_file_id', '=', 'file_object.id')
+    ),
 };
 
 @Injectable()

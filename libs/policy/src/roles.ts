@@ -36,6 +36,13 @@ export const STARTER_ROLES: readonly StarterRole[] = [
       'student:create',
       'student:read',
       'student:update',
+      'enrollment:create',
+      'enrollment:read',
+      'enrollment:place',
+      'guardian:create',
+      'guardian:read',
+      'guardian:update',
+      'guardian:link',
       'session:create',
       'session:read',
       'session:update',
@@ -58,7 +65,7 @@ export const STARTER_ROLES: readonly StarterRole[] = [
     label: 'Bursar',
     description:
       'Charges fees, records payments and asks for corrections. Cannot approve them.',
-    permissions: ['student:read'],
+    permissions: ['student:read', 'guardian:read', 'enrollment:read'],
   },
   {
     slug: 'principal',

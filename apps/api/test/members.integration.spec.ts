@@ -15,7 +15,10 @@ import {
   waitForAuditRows,
   type Fixtures,
 } from './support/base-test';
-import { twoSchools, type TwoSchools } from './support/two-schools';
+import {
+  twoSchoolsWithoutStudents,
+  type TwoSchoolsWithoutStudents,
+} from './support/two-schools';
 
 type Actor = NonNullable<Parameters<Fixtures['api']>[0]>;
 type Api = Fixtures['api'];
@@ -32,16 +35,15 @@ interface HireOptions {
 }
 
 const test = baseTest.extend<{
-  schools: TwoSchools;
+  schools: TwoSchoolsWithoutStudents;
   hire: (actor: Actor, options: HireOptions) => Promise<Hired>;
 }>({
   schools: async (
-    { app, createUser, createOrganization, createCampus, addMember },
+    { createUser, createOrganization, createCampus, addMember },
     use
   ) => {
     await use(
-      await twoSchools({
-        app,
+      await twoSchoolsWithoutStudents({
         createUser,
         createOrganization,
         createCampus,

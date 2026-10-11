@@ -230,3 +230,69 @@ describe('FilesService.remove', () => {
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 });
+
+const uploadPhoto = (ctx: OrgContext, buffer = PNG) => {
+  const { service, files } = setup();
+  return {
+    files,
+    service,
+    result: service.upload(ctx, {
+      kind: 'guardian_photo',
+      file: { originalname: 'mum.png', buffer },
+    }),
+  };
+};
+
+describe('FilesService guardian photos', () => {
+  const uploader = context('guardian:create');
+  const updater = context('guardian:update');
+  const guardianReader = context('guardian:read');
+
+  it('lets either guardian:create or guardian:update upload', async () => {
+    for (const ctx of [uploader, updater]) {
+      const { result } = uploadPhoto(ctx);
+      await expect(result).resolves.toMatchObject({ contentType: 'image/png' });
+    }
+  });
+
+  it('answers 403 to a member who may only read guardians', async () => {
+    const { result } = uploadPhoto(guardianReader);
+    await expect(result).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('refuses a photo over 1 MB and a file that is not an image with the PRD copy', async () => {
+    const big = uploadPhoto(
+      uploader,
+      Buffer.concat([PNG, Buffer.alloc(1_048_576)])
+    );
+    await expect(big.result).rejects.toThrow(
+      'That photo is over 1 MB. Please choose a smaller one.'
+    );
+    const text = uploadPhoto(uploader, Buffer.from('not an image'));
+    await expect(text.result).rejects.toThrow(
+      'Choose a PNG, JPG or WebP photo.'
+    );
+  });
+
+  it('serves an attached photo only to a member with guardian:read', async () => {
+    const { files, service, result } = uploadPhoto(uploader);
+    const { id } = await result;
+    files.attached.add(id);
+
+    await expect(service.read(guardianReader, id)).resolves.toMatchObject({
+      contentType: 'image/png',
+    });
+    await expect(service.read(reader, id)).rejects.toBeInstanceOf(
+      NotFoundException
+    );
+  });
+
+  it('lets a guardian:update holder remove one', async () => {
+    const { files, service, result } = uploadPhoto(uploader);
+    const { id } = await result;
+
+    await service.remove(updater, id);
+
+    expect(files.rows.size).toBe(0);
+  });
+});

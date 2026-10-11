@@ -96,7 +96,14 @@ async function renderAt(path: string, answer: Me) {
           .mockResolvedValue({ items: [auditRow()], nextCursor: null }),
       },
     },
-    students: { list: vi.fn().mockResolvedValue([]) },
+    students: {
+      list: vi.fn().mockResolvedValue({
+        items: [],
+        total: 0,
+        counts: { active: 0, new: 0, inactive: 0, left: 0, graduated: 0 },
+        startYear: null,
+      }),
+    },
     campuses: { list: vi.fn().mockResolvedValue([]) },
   } as unknown as Api;
   const queryClient = new QueryClient({
@@ -204,7 +211,7 @@ describe('platform console', () => {
       expect(screen.getByText('Acting · read-only')).toBeInTheDocument();
       expect(screen.queryByText('Super admin console')).not.toBeInTheDocument();
       expect(
-        screen.queryByRole('button', { name: 'Add student' })
+        screen.queryByRole('button', { name: 'Admit student' })
       ).not.toBeInTheDocument();
     });
 
@@ -295,7 +302,7 @@ describe('platform console', () => {
       );
       expect(permissions.mock.calls.length).toBeGreaterThan(1);
       expect(
-        await screen.findByRole('button', { name: 'Add student' })
+        await screen.findByRole('button', { name: 'Admit student' })
       ).toBeInTheDocument();
 
       fireEvent.click(
@@ -304,7 +311,7 @@ describe('platform console', () => {
       expect(await screen.findByText('Acting · read-only')).toBeInTheDocument();
       await waitFor(() => {
         expect(
-          screen.queryByRole('button', { name: 'Add student' })
+          screen.queryByRole('button', { name: 'Admit student' })
         ).not.toBeInTheDocument();
       });
 

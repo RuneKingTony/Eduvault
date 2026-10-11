@@ -225,7 +225,10 @@ describe('RolePage levels', () => {
     await waitFor(() => {
       expect(create).toHaveBeenCalledWith({
         body: expect.objectContaining({
-          permissions: { student: ['read', 'create', 'update'] },
+          permissions: {
+            student: ['read', 'create', 'update'],
+            enrollment: ['read', 'create', 'place'],
+          },
         }),
       });
     });

@@ -13,6 +13,7 @@ import {
   PORTAL_SAFE_ROLES,
 } from '@eduvault/policy';
 import { campusIdsByUser } from '../../common/db/campus-ids-by-user';
+import { escapeLike } from '../../common/db/escape-like';
 import { inCampusScope } from '../../common/db/in-campus-scope';
 import { KYSELY_TOKEN, type Database } from '../../common/db/tokens';
 import {
@@ -56,9 +57,6 @@ const toSchoolRoleEntry = (row: RoleRow): SchoolRoleEntry => ({
   source: row.source === 'starter' ? 'starter' : 'custom',
   permissions: parsePermissionMap(row.permission),
 });
-
-const escapeLike = (text: string): string =>
-  text.replaceAll(/[\\%_]/g, String.raw`\$&`);
 
 const roleList = (): RawBuilder<string[]> =>
   sql<string[]>`string_to_array(member.role, ',')`;

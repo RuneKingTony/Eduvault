@@ -565,7 +565,7 @@ consoleTest.describe('platform console', () => {
       await createStudent(app, ownerUser, { campusId: campus.id });
       const studentRows = () =>
         pool.query(
-          `SELECT id, full_name FROM student WHERE organization_id = $1`,
+          `SELECT id, first_name FROM student WHERE organization_id = $1`,
           [id]
         );
       const before = await studentRows();
@@ -630,7 +630,7 @@ consoleTest.describe('platform console', () => {
 
       await api(paused.ownerUser).get('/students').expect(403);
       expect(
-        (await api(open.ownerUser).get('/students').expect(200)).body
+        (await api(open.ownerUser).get('/students').expect(200)).body.items
       ).toHaveLength(1);
       const me = await api(open.ownerUser).get('/me').expect(200);
       expect(me.body.suspendedSchool).toBeNull();

@@ -1,20 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { SchoolSettings } from '@eduvault/api-contract';
 import { KYSELY_TOKEN, type Database } from '../../common/db/tokens';
+import { findSchoolRules } from '../../common/people';
 import {
   SchoolSettingsRepository,
   type SchoolSettingsPatch,
 } from './school-settings.repository';
-
-interface Row {
-  max_guardians: number;
-  require_guardian: boolean;
-}
-
-const toSettings = (row: Row): SchoolSettings => ({
-  maxGuardians: row.max_guardians,
-  requireGuardian: row.require_guardian,
-});
 
 @Injectable()
 export class KyselySchoolSettingsRepository extends SchoolSettingsRepository {
@@ -22,13 +13,8 @@ export class KyselySchoolSettingsRepository extends SchoolSettingsRepository {
     super();
   }
 
-  async find(organizationId: string): Promise<SchoolSettings | undefined> {
-    const row = await this.db
-      .selectFrom('school_setting')
-      .select(['max_guardians', 'require_guardian'])
-      .where('organization_id', '=', organizationId)
-      .executeTakeFirst();
-    return row && toSettings(row);
+  find(organizationId: string): Promise<SchoolSettings | undefined> {
+    return findSchoolRules(this.db, organizationId);
   }
 
   async update(
@@ -51,6 +37,11 @@ export class KyselySchoolSettingsRepository extends SchoolSettingsRepository {
       .where('organization_id', '=', organizationId)
       .returning(['max_guardians', 'require_guardian'])
       .executeTakeFirst();
-    return row && toSettings(row);
+    return (
+      row && {
+        maxGuardians: row.max_guardians,
+        requireGuardian: row.require_guardian,
+      }
+    );
   }
 }

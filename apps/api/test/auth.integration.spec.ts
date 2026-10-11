@@ -332,11 +332,11 @@ test.describe('validation and not found', () => {
 
     const res = await api(owner)
       .post('/students')
-      .send({ fullName: '', admissionNumber: 42 })
+      .send({ firstName: '', lastName: 42 })
       .expect(400);
     expect(res.body.code).toBe('ValidationError');
     expect(res.body.issues.map((i: { path: string }) => i.path)).toEqual(
-      expect.arrayContaining(['fullName', 'admissionNumber'])
+      expect.arrayContaining(['firstName', 'lastName'])
     );
   });
 

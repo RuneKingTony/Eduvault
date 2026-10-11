@@ -1,3 +1,4 @@
+import { createStudent } from './support/factories/students';
 import { baseTest as test, expect } from './support/base-test';
 
 test.describe('campuses', () => {
@@ -43,6 +44,7 @@ test.describe('campuses', () => {
 
   test('refuses to delete a campus that still has students', async ({
     api,
+    app,
     createUser,
     createOrganization,
     createCampus,
@@ -50,10 +52,7 @@ test.describe('campuses', () => {
     const owner = await createUser();
     const org = await createOrganization(owner);
     const campus = await createCampus(org);
-    await api(owner)
-      .post('/students')
-      .send({ campusId: campus.id, fullName: 'Ada', admissionNumber: 'A1' })
-      .expect(201);
+    await createStudent(app, owner, { campusId: campus.id });
 
     const res = await api(owner).delete(`/campuses/${campus.id}`).expect(409);
     expect(res.body.code).toBe('Conflict');
@@ -204,63 +203,54 @@ test.describe('fee schedules', () => {
 });
 
 test.describe('students', () => {
-  test('full CRUD; the active campus is the default for new students', async ({
+  test('admit, read and correct a student; there is no delete', async ({
     api,
+    app,
     createUser,
     createOrganization,
     createCampus,
-    setActiveCampus,
   }) => {
     const owner = await createUser();
     const org = await createOrganization(owner);
     const campus = await createCampus(org);
-    const other = await createCampus(org, 'Annex');
 
+    const student = await createStudent(app, owner, {
+      campusId: campus.id,
+      firstName: 'Ada',
+      lastName: 'Obi',
+    });
+    expect(student).toMatchObject({
+      firstName: 'Ada',
+      lastName: 'Obi',
+      admissionNumber: 'TST-0001',
+      homeCampus: { id: campus.id },
+      effectiveCampus: { id: campus.id },
+    });
+    const second = await createStudent(app, owner, { campusId: campus.id });
+    expect(second.admissionNumber).toBe('TST-0002');
+
+    const listed = await api(owner).get('/students').expect(200);
+    expect(listed.body.items).toHaveLength(2);
+    expect(listed.body.total).toBe(2);
+    expect(
+      (await api(owner).get(`/students/${student.id}`).expect(200)).body.id
+    ).toBe(student.id);
+
+    const changed = await api(owner)
+      .patch(`/students/${student.id}`)
+      .send({ firstName: 'Adaeze', lastName: 'Okafor' })
+      .expect(200);
+    expect(changed.body).toMatchObject({
+      firstName: 'Adaeze',
+      lastName: 'Okafor',
+      admissionNumber: 'TST-0001',
+    });
     await api(owner)
-      .post('/students')
-      .send({ fullName: 'No Campus', admissionNumber: 'N0' })
+      .patch(`/students/${student.id}`)
+      .send({ campusId: campus.id })
       .expect(400);
 
-    await setActiveCampus(owner, campus.id);
-    const defaulted = await api(owner)
-      .post('/students')
-      .send({ fullName: 'Default Campus', admissionNumber: 'D1' })
-      .expect(201);
-    expect(defaulted.body.campusId).toBe(campus.id);
-
-    const created = await api(owner)
-      .post('/students')
-      .send({ campusId: campus.id, fullName: 'Ada Obi', admissionNumber: 'A1' })
-      .expect(201);
-    expect(created.body).toMatchObject({
-      fullName: 'Ada Obi',
-      campusId: campus.id,
-      organizationId: org.id,
-    });
-    const id = created.body.id as string;
-
-    await api(owner)
-      .post('/students')
-      .send({ campusId: campus.id, fullName: 'Dup', admissionNumber: 'A1' })
-      .expect(409);
-
-    expect((await api(owner).get('/students').expect(200)).body).toHaveLength(
-      2
-    );
-    expect((await api(owner).get(`/students/${id}`).expect(200)).body.id).toBe(
-      id
-    );
-
-    const moved = await api(owner)
-      .patch(`/students/${id}`)
-      .send({ campusId: other.id, fullName: 'Ada Okafor' })
-      .expect(200);
-    expect(moved.body).toMatchObject({
-      campusId: other.id,
-      fullName: 'Ada Okafor',
-    });
-
-    await api(owner).delete(`/students/${id}`).expect(404);
-    await api(owner).get(`/students/${id}`).expect(200);
+    await api(owner).delete(`/students/${student.id}`).expect(404);
+    await api(owner).get(`/students/${student.id}`).expect(200);
   });
 });

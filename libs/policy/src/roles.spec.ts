@@ -85,6 +85,32 @@ describe('roles', () => {
     expect(starter('guardian').class).toBeUndefined();
   });
 
+  it('gives the administrator every enrollment and guardian permission and the bursar the two read ones', () => {
+    expect(starter('administrator').enrollment).toEqual([
+      'create',
+      'read',
+      'place',
+    ]);
+    expect(starter('administrator').guardian).toEqual([
+      'create',
+      'read',
+      'update',
+      'link',
+    ]);
+    expect(starter('bursar').guardian).toEqual(['read']);
+    expect(starter('bursar').enrollment).toEqual(['read']);
+    for (const slug of ['teacher', 'principal', 'student', 'guardian']) {
+      expect(starter(slug).guardian).toBeUndefined();
+      expect(starter(slug).enrollment).toBeUndefined();
+    }
+  });
+
+  it('counts the new read permissions in READ_PERMS', () => {
+    expect(READ_PERMS).toEqual(
+      expect.arrayContaining(['enrollment:read', 'guardian:read'])
+    );
+  });
+
   it('keeps ac:create, ac:update and ac:delete out of every starter role', () => {
     for (const role of STARTER_ROLES) {
       for (const action of ['ac:create', 'ac:update', 'ac:delete'] as const) {

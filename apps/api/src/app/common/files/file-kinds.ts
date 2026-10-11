@@ -1,11 +1,16 @@
-import type { FileKind } from '@eduvault/api-contract';
+import {
+  GUARDIAN_PHOTO_INVALID_MESSAGE,
+  GUARDIAN_PHOTO_SIZE_MESSAGE,
+  GUARDIAN_PHOTO_TYPE_MESSAGE,
+  type FileKind,
+} from '@eduvault/api-contract';
 import type { Permission } from '@eduvault/policy';
 import type { ImageType } from './sniff-image';
 
 export interface FileKindRule {
   maxBytes: number;
   types: readonly ImageType[];
-  write: Permission;
+  write: readonly Permission[];
   /** Who may read an attached file; undefined means any member of the school. */
   read: Permission | undefined;
   denied: string;
@@ -20,12 +25,22 @@ export const FILE_KIND_RULES: Record<FileKind, FileKindRule> = {
   school_logo: {
     maxBytes: MEGABYTE,
     types: ['image/png', 'image/jpeg', 'image/webp'],
-    write: 'schoolAccount:update',
+    write: ['schoolAccount:update'],
     read: undefined,
     denied: 'You need permission to change school settings.',
     tooLarge: 'That logo is over 1 MB. Please choose a smaller one.',
     wrongType: 'Choose a PNG, JPG or WebP logo.',
     unusable: 'That logo can’t be used. Please upload it again.',
+  },
+  guardian_photo: {
+    maxBytes: MEGABYTE,
+    types: ['image/png', 'image/jpeg', 'image/webp'],
+    write: ['guardian:create', 'guardian:update'],
+    read: 'guardian:read',
+    denied: 'You need permission to add or change guardians.',
+    tooLarge: GUARDIAN_PHOTO_SIZE_MESSAGE,
+    wrongType: GUARDIAN_PHOTO_TYPE_MESSAGE,
+    unusable: GUARDIAN_PHOTO_INVALID_MESSAGE,
   },
 };
 

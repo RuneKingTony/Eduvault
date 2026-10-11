@@ -1,3 +1,4 @@
+import type { RosterRow } from '@eduvault/api-contract';
 import type { PermissionMap } from '@eduvault/policy';
 import {
   ClassRepository,
@@ -39,6 +40,8 @@ export class FakeClassRepository extends ClassRepository {
   campusNames: Record<string, string> = {};
   custom: Record<string, PermissionMap> = {};
   placements = false;
+  counts: Record<string, number> = {};
+  rosters: Record<string, RosterRow[]> = {};
   sessionId: string | null = 'year-1';
   appliedOrders: string[][] = [];
   private counter = 0;
@@ -197,6 +200,19 @@ export class FakeClassRepository extends ClassRepository {
 
   hasPlacementsFromCurrentTerm(): Promise<boolean> {
     return Promise.resolve(this.placements);
+  }
+
+  studentCounts(
+    _org: string,
+    classIds: readonly string[]
+  ): Promise<Record<string, number>> {
+    return Promise.resolve(
+      Object.fromEntries(classIds.map((id) => [id, this.counts[id] ?? 0]))
+    );
+  }
+
+  roster(_org: string, classId: string): Promise<RosterRow[]> {
+    return Promise.resolve(this.rosters[classId] ?? []);
   }
 
   currentSessionId(): Promise<string | null> {

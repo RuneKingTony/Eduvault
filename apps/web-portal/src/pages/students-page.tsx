@@ -16,15 +16,16 @@ export function StudentsPage() {
       <h1>Students</h1>
       <ErrorMessage error={students.error} />
       <ul className="divide-y rounded-md border">
-        {students.data?.map((student) => (
+        {students.data?.items.map((student) => (
           <li key={student.id} className="p-3">
-            {student.fullName}{' '}
+            {student.firstName} {student.lastName}{' '}
             <span className="text-sm text-muted-foreground">
-              {student.admissionNumber} · {campusName(student.campusId)}
+              {student.admissionNumber} ·{' '}
+              {campusName(student.effectiveCampus.id)}
             </span>
           </li>
         ))}
-        {students.data?.length === 0 ? (
+        {students.data?.items.length === 0 ? (
           <li className="p-3 text-muted-foreground">
             No students on your campuses.
           </li>

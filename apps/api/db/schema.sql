@@ -27,6 +27,18 @@ CREATE EXTENSION IF NOT EXISTS btree_gist WITH SCHEMA public;
 COMMENT ON EXTENSION btree_gist IS 'support for indexing common datatypes in GiST';
 
 --
+-- Name: activity_event_refuse_change(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.activity_event_refuse_change() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  RAISE EXCEPTION 'activity_event is append-only';
+END;
+$$;
+
+--
 -- Name: audit_log_refuse_change(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -76,6 +88,25 @@ CREATE TABLE public.account (
     password text,
     "createdAt" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     "updatedAt" timestamp with time zone NOT NULL
+);
+
+--
+-- Name: activity_event; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.activity_event (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id text NOT NULL,
+    campus_id text,
+    pillar text NOT NULL,
+    kind text NOT NULL,
+    actor_user_id text NOT NULL,
+    subject_type text NOT NULL,
+    subject_id text NOT NULL,
+    text text NOT NULL,
+    data jsonb DEFAULT '{}'::jsonb NOT NULL,
+    occurred_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT activity_event_pillar_check CHECK ((pillar = ANY (ARRAY['foundation'::text, 'finance'::text, 'access'::text, 'platform'::text])))
 );
 
 --
@@ -162,6 +193,35 @@ CREATE TABLE public.class_level (
 );
 
 --
+-- Name: document_sequence; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.document_sequence (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id text NOT NULL,
+    kind text NOT NULL,
+    year smallint,
+    next_value integer NOT NULL,
+    CONSTRAINT document_sequence_kind_check CHECK ((kind = 'admission'::text)),
+    CONSTRAINT document_sequence_next_value_check CHECK ((next_value > 0))
+);
+
+--
+-- Name: enrollment_placement; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.enrollment_placement (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id text NOT NULL,
+    enrollment_id uuid NOT NULL,
+    term_id uuid NOT NULL,
+    class_arm_id uuid NOT NULL,
+    campus_id text NOT NULL,
+    created_by text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+--
 -- Name: fee_schedule; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -203,7 +263,44 @@ CREATE TABLE public.file_object (
     uploaded_by text,
     uploaded_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT file_object_byte_size_check CHECK ((byte_size > 0)),
-    CONSTRAINT file_object_kind_check CHECK ((kind = 'school_logo'::text))
+    CONSTRAINT file_object_kind_check CHECK ((kind = ANY (ARRAY['school_logo'::text, 'guardian_photo'::text])))
+);
+
+--
+-- Name: guardian; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.guardian (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id text NOT NULL,
+    full_name text NOT NULL,
+    phone text NOT NULL,
+    email text,
+    address text,
+    photo_file_id uuid,
+    user_id text NOT NULL,
+    created_by text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT guardian_address_check CHECK ((char_length(address) <= 200)),
+    CONSTRAINT guardian_full_name_check CHECK (((char_length(btrim(full_name)) >= 1) AND (char_length(btrim(full_name)) <= 120))),
+    CONSTRAINT guardian_phone_check CHECK (((char_length(phone) >= 7) AND (char_length(phone) <= 20)))
+);
+
+--
+-- Name: guardian_student; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.guardian_student (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id text NOT NULL,
+    guardian_id uuid NOT NULL,
+    student_id uuid NOT NULL,
+    relationship text NOT NULL,
+    pays_fees boolean DEFAULT false NOT NULL,
+    created_by text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT guardian_student_relationship_check CHECK ((relationship = ANY (ARRAY['mother'::text, 'father'::text, 'guardian'::text])))
 );
 
 --
@@ -356,10 +453,55 @@ CREATE TABLE public.student (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     organization_id text NOT NULL,
     campus_id text NOT NULL,
-    full_name text NOT NULL,
+    first_name text NOT NULL,
+    last_name text NOT NULL,
+    gender text NOT NULL,
+    date_of_birth date NOT NULL,
     admission_number text NOT NULL,
+    admitted_on date NOT NULL,
+    user_id text,
+    created_by text,
+    not_seen_since date,
+    not_seen_by text,
+    not_seen_note text,
+    exit_kind text,
+    exit_reason text,
+    exit_note text,
+    last_day date,
+    graduated_session_id uuid,
+    archived_at timestamp with time zone,
+    archived_by text,
+    archived_term_id uuid,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT student_exit_completed_check CHECK (((exit_kind IS NULL) OR ((exit_kind = 'graduated'::text) = (exit_reason = 'completed'::text)))),
+    CONSTRAINT student_exit_kind_check CHECK ((exit_kind = ANY (ARRAY['left'::text, 'graduated'::text]))),
+    CONSTRAINT student_exit_note_check CHECK ((char_length(exit_note) <= 500)),
+    CONSTRAINT student_exit_reason_check CHECK ((exit_reason = ANY (ARRAY['did_not_return'::text, 'relocated'::text, 'transferred'::text, 'fees'::text, 'expelled'::text, 'other'::text, 'completed'::text]))),
+    CONSTRAINT student_exit_together CHECK ((((exit_kind IS NULL) AND (exit_reason IS NULL) AND (exit_note IS NULL) AND (last_day IS NULL) AND (graduated_session_id IS NULL) AND (archived_at IS NULL) AND (archived_by IS NULL) AND (archived_term_id IS NULL)) OR ((exit_kind IS NOT NULL) AND (exit_reason IS NOT NULL) AND (archived_at IS NOT NULL) AND (archived_term_id IS NOT NULL)))),
+    CONSTRAINT student_first_name_check CHECK (((char_length(btrim(first_name)) >= 1) AND (char_length(btrim(first_name)) <= 80))),
+    CONSTRAINT student_gender_check CHECK ((gender = ANY (ARRAY['F'::text, 'M'::text]))),
+    CONSTRAINT student_last_name_check CHECK (((char_length(btrim(last_name)) >= 1) AND (char_length(btrim(last_name)) <= 80))),
+    CONSTRAINT student_not_seen_note_check CHECK ((char_length(not_seen_note) <= 500)),
+    CONSTRAINT student_not_seen_together CHECK (((not_seen_since IS NOT NULL) OR ((not_seen_by IS NULL) AND (not_seen_note IS NULL))))
+);
+
+--
+-- Name: student_enrollment; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.student_enrollment (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id text NOT NULL,
+    student_id uuid NOT NULL,
+    session_id uuid NOT NULL,
+    class_level_id uuid NOT NULL,
+    status text DEFAULT 'active'::text NOT NULL,
+    is_new_student boolean DEFAULT false NOT NULL,
+    created_by text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT student_enrollment_status_check CHECK ((status = ANY (ARRAY['active'::text, 'withdrawn'::text, 'completed'::text])))
 );
 
 --
@@ -422,7 +564,9 @@ CREATE TABLE public."user" (
     banned boolean,
     "banReason" text,
     "banExpires" timestamp with time zone,
-    "mustChangePassword" boolean DEFAULT false NOT NULL
+    "mustChangePassword" boolean DEFAULT false NOT NULL,
+    username text,
+    "displayUsername" text
 );
 
 --
@@ -472,6 +616,13 @@ ALTER TABLE ONLY public.academic_session
 
 ALTER TABLE ONLY public.account
     ADD CONSTRAINT account_pkey PRIMARY KEY (id);
+
+--
+-- Name: activity_event activity_event_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.activity_event
+    ADD CONSTRAINT activity_event_pkey PRIMARY KEY (id);
 
 --
 -- Name: audit_log audit_log_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -558,6 +709,34 @@ ALTER TABLE ONLY public.class_level
     ADD CONSTRAINT class_level_pkey PRIMARY KEY (id);
 
 --
+-- Name: document_sequence document_sequence_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.document_sequence
+    ADD CONSTRAINT document_sequence_key UNIQUE NULLS NOT DISTINCT (organization_id, kind, year);
+
+--
+-- Name: document_sequence document_sequence_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.document_sequence
+    ADD CONSTRAINT document_sequence_pkey PRIMARY KEY (id);
+
+--
+-- Name: enrollment_placement enrollment_placement_enrollment_term_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.enrollment_placement
+    ADD CONSTRAINT enrollment_placement_enrollment_term_key UNIQUE (enrollment_id, term_id);
+
+--
+-- Name: enrollment_placement enrollment_placement_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.enrollment_placement
+    ADD CONSTRAINT enrollment_placement_pkey PRIMARY KEY (id);
+
+--
 -- Name: fee_schedule fee_schedule_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -584,6 +763,48 @@ ALTER TABLE ONLY public.file_object
 
 ALTER TABLE ONLY public.file_object
     ADD CONSTRAINT file_object_pkey PRIMARY KEY (id);
+
+--
+-- Name: guardian guardian_id_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.guardian
+    ADD CONSTRAINT guardian_id_organization_id_key UNIQUE (id, organization_id);
+
+--
+-- Name: guardian guardian_organization_id_user_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.guardian
+    ADD CONSTRAINT guardian_organization_id_user_id_key UNIQUE (organization_id, user_id);
+
+--
+-- Name: guardian guardian_photo_file_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.guardian
+    ADD CONSTRAINT guardian_photo_file_id_key UNIQUE (photo_file_id);
+
+--
+-- Name: guardian guardian_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.guardian
+    ADD CONSTRAINT guardian_pkey PRIMARY KEY (id);
+
+--
+-- Name: guardian_student guardian_student_guardian_student_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.guardian_student
+    ADD CONSTRAINT guardian_student_guardian_student_key UNIQUE (guardian_id, student_id);
+
+--
+-- Name: guardian_student guardian_student_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.guardian_student
+    ADD CONSTRAINT guardian_student_pkey PRIMARY KEY (id);
 
 --
 -- Name: invitation invitation_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -684,11 +905,46 @@ ALTER TABLE ONLY public.session
     ADD CONSTRAINT session_token_key UNIQUE (token);
 
 --
+-- Name: student_enrollment student_enrollment_id_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.student_enrollment
+    ADD CONSTRAINT student_enrollment_id_organization_id_key UNIQUE (id, organization_id);
+
+--
+-- Name: student_enrollment student_enrollment_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.student_enrollment
+    ADD CONSTRAINT student_enrollment_pkey PRIMARY KEY (id);
+
+--
+-- Name: student_enrollment student_enrollment_student_session_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.student_enrollment
+    ADD CONSTRAINT student_enrollment_student_session_key UNIQUE (student_id, session_id);
+
+--
+-- Name: student student_id_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.student
+    ADD CONSTRAINT student_id_organization_id_key UNIQUE (id, organization_id);
+
+--
 -- Name: student student_organization_id_admission_number_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.student
     ADD CONSTRAINT student_organization_id_admission_number_key UNIQUE (organization_id, admission_number);
+
+--
+-- Name: student student_organization_id_user_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.student
+    ADD CONSTRAINT student_organization_id_user_id_key UNIQUE (organization_id, user_id);
 
 --
 -- Name: student student_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -767,6 +1023,18 @@ ALTER TABLE ONLY public.verification
 CREATE INDEX "account_userId_idx" ON public.account USING btree ("userId");
 
 --
+-- Name: activity_event_subject_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX activity_event_subject_idx ON public.activity_event USING btree (organization_id, subject_type, subject_id);
+
+--
+-- Name: activity_event_time_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX activity_event_time_idx ON public.activity_event USING btree (organization_id, occurred_at DESC);
+
+--
 -- Name: audit_log_created_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -803,6 +1071,18 @@ CREATE UNIQUE INDEX class_arm_teacher_one_lead ON public.class_arm_teacher USING
 CREATE INDEX class_arm_teacher_scope_idx ON public.class_arm_teacher USING btree (organization_id, session_id, user_id);
 
 --
+-- Name: enrollment_placement_arm_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX enrollment_placement_arm_idx ON public.enrollment_placement USING btree (organization_id, term_id, class_arm_id);
+
+--
+-- Name: enrollment_placement_campus_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX enrollment_placement_campus_idx ON public.enrollment_placement USING btree (organization_id, term_id, campus_id);
+
+--
 -- Name: fee_schedule_organization_campus_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -813,6 +1093,24 @@ CREATE INDEX fee_schedule_organization_campus_idx ON public.fee_schedule USING b
 --
 
 CREATE INDEX file_object_organization_uploaded_idx ON public.file_object USING btree (organization_id, uploaded_at);
+
+--
+-- Name: guardian_email_unique; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX guardian_email_unique ON public.guardian USING btree (organization_id, lower(email)) WHERE (email IS NOT NULL);
+
+--
+-- Name: guardian_student_student_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX guardian_student_student_idx ON public.guardian_student USING btree (organization_id, student_id);
+
+--
+-- Name: guardian_user_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX guardian_user_idx ON public.guardian USING btree (user_id);
 
 --
 -- Name: invitation_email_idx; Type: INDEX; Schema: public; Owner: -
@@ -863,10 +1161,28 @@ CREATE INDEX "organizationRole_role_idx" ON public."organizationRole" USING btre
 CREATE INDEX "session_userId_idx" ON public.session USING btree ("userId");
 
 --
+-- Name: student_duplicate_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX student_duplicate_idx ON public.student USING btree (organization_id, lower(last_name), lower(first_name), date_of_birth);
+
+--
+-- Name: student_enrollment_session_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX student_enrollment_session_idx ON public.student_enrollment USING btree (organization_id, session_id);
+
+--
 -- Name: student_organization_campus_idx; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX student_organization_campus_idx ON public.student USING btree (organization_id, campus_id);
+
+--
+-- Name: student_organization_name_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX student_organization_name_idx ON public.student USING btree (organization_id, last_name, first_name);
 
 --
 -- Name: teamMember_teamId_idx; Type: INDEX; Schema: public; Owner: -
@@ -893,10 +1209,22 @@ CREATE INDEX "team_organizationId_idx" ON public.team USING btree ("organization
 CREATE UNIQUE INDEX term_one_current ON public.term USING btree (organization_id) WHERE is_current;
 
 --
+-- Name: user_username_uidx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX user_username_uidx ON public."user" USING btree (username);
+
+--
 -- Name: verification_identifier_idx; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX verification_identifier_idx ON public.verification USING btree (identifier);
+
+--
+-- Name: activity_event activity_event_append_only; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER activity_event_append_only BEFORE DELETE OR UPDATE ON public.activity_event FOR EACH ROW EXECUTE FUNCTION public.activity_event_refuse_change();
 
 --
 -- Name: audit_log audit_log_append_only; Type: TRIGGER; Schema: public; Owner: -
@@ -917,6 +1245,20 @@ ALTER TABLE ONLY public.academic_session
 
 ALTER TABLE ONLY public.account
     ADD CONSTRAINT "account_userId_fkey" FOREIGN KEY ("userId") REFERENCES public."user"(id) ON DELETE CASCADE;
+
+--
+-- Name: activity_event activity_event_campus_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.activity_event
+    ADD CONSTRAINT activity_event_campus_id_organization_id_fkey FOREIGN KEY (campus_id, organization_id) REFERENCES public.campus(team_id, organization_id);
+
+--
+-- Name: activity_event activity_event_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.activity_event
+    ADD CONSTRAINT activity_event_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE RESTRICT;
 
 --
 -- Name: audit_log audit_log_actor_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -1017,6 +1359,55 @@ ALTER TABLE ONLY public.class_level
     ADD CONSTRAINT class_level_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE CASCADE;
 
 --
+-- Name: document_sequence document_sequence_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.document_sequence
+    ADD CONSTRAINT document_sequence_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE CASCADE;
+
+--
+-- Name: enrollment_placement enrollment_placement_campus_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.enrollment_placement
+    ADD CONSTRAINT enrollment_placement_campus_id_organization_id_fkey FOREIGN KEY (campus_id, organization_id) REFERENCES public.campus(team_id, organization_id);
+
+--
+-- Name: enrollment_placement enrollment_placement_class_arm_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.enrollment_placement
+    ADD CONSTRAINT enrollment_placement_class_arm_id_organization_id_fkey FOREIGN KEY (class_arm_id, organization_id) REFERENCES public.class_arm(id, organization_id);
+
+--
+-- Name: enrollment_placement enrollment_placement_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.enrollment_placement
+    ADD CONSTRAINT enrollment_placement_created_by_fkey FOREIGN KEY (created_by) REFERENCES public."user"(id) ON DELETE SET NULL;
+
+--
+-- Name: enrollment_placement enrollment_placement_enrollment_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.enrollment_placement
+    ADD CONSTRAINT enrollment_placement_enrollment_id_organization_id_fkey FOREIGN KEY (enrollment_id, organization_id) REFERENCES public.student_enrollment(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: enrollment_placement enrollment_placement_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.enrollment_placement
+    ADD CONSTRAINT enrollment_placement_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE RESTRICT;
+
+--
+-- Name: enrollment_placement enrollment_placement_term_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.enrollment_placement
+    ADD CONSTRAINT enrollment_placement_term_id_organization_id_fkey FOREIGN KEY (term_id, organization_id) REFERENCES public.term(id, organization_id);
+
+--
 -- Name: fee_schedule fee_schedule_campus_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1050,6 +1441,62 @@ ALTER TABLE ONLY public.file_object
 
 ALTER TABLE ONLY public.file_object
     ADD CONSTRAINT file_object_uploaded_by_fkey FOREIGN KEY (uploaded_by) REFERENCES public."user"(id) ON DELETE SET NULL;
+
+--
+-- Name: guardian guardian_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.guardian
+    ADD CONSTRAINT guardian_created_by_fkey FOREIGN KEY (created_by) REFERENCES public."user"(id) ON DELETE SET NULL;
+
+--
+-- Name: guardian guardian_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.guardian
+    ADD CONSTRAINT guardian_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE RESTRICT;
+
+--
+-- Name: guardian guardian_photo_file_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.guardian
+    ADD CONSTRAINT guardian_photo_file_fkey FOREIGN KEY (photo_file_id, organization_id) REFERENCES public.file_object(id, organization_id) ON DELETE SET NULL (photo_file_id);
+
+--
+-- Name: guardian_student guardian_student_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.guardian_student
+    ADD CONSTRAINT guardian_student_created_by_fkey FOREIGN KEY (created_by) REFERENCES public."user"(id) ON DELETE SET NULL;
+
+--
+-- Name: guardian_student guardian_student_guardian_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.guardian_student
+    ADD CONSTRAINT guardian_student_guardian_id_organization_id_fkey FOREIGN KEY (guardian_id, organization_id) REFERENCES public.guardian(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: guardian_student guardian_student_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.guardian_student
+    ADD CONSTRAINT guardian_student_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE RESTRICT;
+
+--
+-- Name: guardian_student guardian_student_student_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.guardian_student
+    ADD CONSTRAINT guardian_student_student_id_organization_id_fkey FOREIGN KEY (student_id, organization_id) REFERENCES public.student(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: guardian guardian_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.guardian
+    ADD CONSTRAINT guardian_user_id_fkey FOREIGN KEY (user_id) REFERENCES public."user"(id) ON DELETE RESTRICT;
 
 --
 -- Name: invitation invitation_inviterId_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -1150,6 +1597,20 @@ ALTER TABLE ONLY public.session
     ADD CONSTRAINT "session_userId_fkey" FOREIGN KEY ("userId") REFERENCES public."user"(id) ON DELETE CASCADE;
 
 --
+-- Name: student student_archived_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.student
+    ADD CONSTRAINT student_archived_by_fkey FOREIGN KEY (archived_by) REFERENCES public."user"(id) ON DELETE SET NULL;
+
+--
+-- Name: student student_archived_term_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.student
+    ADD CONSTRAINT student_archived_term_id_organization_id_fkey FOREIGN KEY (archived_term_id, organization_id) REFERENCES public.term(id, organization_id);
+
+--
 -- Name: student student_campus_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1157,11 +1618,74 @@ ALTER TABLE ONLY public.student
     ADD CONSTRAINT student_campus_id_organization_id_fkey FOREIGN KEY (campus_id, organization_id) REFERENCES public.campus(team_id, organization_id);
 
 --
+-- Name: student student_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.student
+    ADD CONSTRAINT student_created_by_fkey FOREIGN KEY (created_by) REFERENCES public."user"(id) ON DELETE SET NULL;
+
+--
+-- Name: student_enrollment student_enrollment_class_level_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.student_enrollment
+    ADD CONSTRAINT student_enrollment_class_level_id_organization_id_fkey FOREIGN KEY (class_level_id, organization_id) REFERENCES public.class_level(id, organization_id);
+
+--
+-- Name: student_enrollment student_enrollment_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.student_enrollment
+    ADD CONSTRAINT student_enrollment_created_by_fkey FOREIGN KEY (created_by) REFERENCES public."user"(id) ON DELETE SET NULL;
+
+--
+-- Name: student_enrollment student_enrollment_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.student_enrollment
+    ADD CONSTRAINT student_enrollment_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE RESTRICT;
+
+--
+-- Name: student_enrollment student_enrollment_session_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.student_enrollment
+    ADD CONSTRAINT student_enrollment_session_id_organization_id_fkey FOREIGN KEY (session_id, organization_id) REFERENCES public.academic_session(id, organization_id);
+
+--
+-- Name: student_enrollment student_enrollment_student_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.student_enrollment
+    ADD CONSTRAINT student_enrollment_student_id_organization_id_fkey FOREIGN KEY (student_id, organization_id) REFERENCES public.student(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: student student_graduated_session_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.student
+    ADD CONSTRAINT student_graduated_session_id_organization_id_fkey FOREIGN KEY (graduated_session_id, organization_id) REFERENCES public.academic_session(id, organization_id);
+
+--
+-- Name: student student_not_seen_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.student
+    ADD CONSTRAINT student_not_seen_by_fkey FOREIGN KEY (not_seen_by) REFERENCES public."user"(id) ON DELETE SET NULL;
+
+--
 -- Name: student student_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.student
-    ADD CONSTRAINT student_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE CASCADE;
+    ADD CONSTRAINT student_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE RESTRICT;
+
+--
+-- Name: student student_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.student
+    ADD CONSTRAINT student_user_id_fkey FOREIGN KEY (user_id) REFERENCES public."user"(id) ON DELETE SET NULL;
 
 --
 -- Name: teamMember teamMember_teamId_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -1217,4 +1741,6 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20261010100000'),
     ('20261010120000'),
     ('20261010130000'),
-    ('20261010140000');
+    ('20261010140000'),
+    ('20261011060008'),
+    ('20261011090000');

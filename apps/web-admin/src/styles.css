@@ -1,1 +1,7 @@
 @import '../../../libs/ui/src/styles/theme.css';
+
+@media print {
+  body > *:not([data-print-slips]) {
+    display: none !important;
+  }
+}

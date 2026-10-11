@@ -3,6 +3,7 @@ import {
   QueryClientProvider,
   focusManager,
 } from '@tanstack/react-query';
+import { toPermissionMap } from '@eduvault/policy';
 import { ErrorMessage } from '@eduvault/ui';
 import {
   RouterProvider,
@@ -13,6 +14,7 @@ import {
 } from '@tanstack/react-router';
 import {
   act,
+  cleanup,
   fireEvent,
   render,
   screen,
@@ -77,6 +79,7 @@ interface RenderOptions {
   realDashboard?: boolean;
   logoUrl?: string | null;
   calendar?: CalendarCurrent;
+  requireGuardian?: boolean;
 }
 
 async function renderAt(
@@ -87,6 +90,7 @@ async function renderAt(
     realDashboard = false,
     logoUrl = null,
     calendar = noCalendar(),
+    requireGuardian = false,
   }: RenderOptions = {}
 ) {
   let current = access;
@@ -95,6 +99,9 @@ async function renderAt(
     me: { permissions },
     schoolAccount: { get: vi.fn().mockResolvedValue(profile({ logoUrl })) },
     calendar: { current: vi.fn().mockResolvedValue(calendar) },
+    admissions: {
+      preview: vi.fn().mockResolvedValue({ maxGuardians: 4, requireGuardian }),
+    },
   } as unknown as Api;
   const root = createRootRoute({
     component: AppShell,
@@ -565,6 +572,55 @@ describe('AppShell access', () => {
     expect(
       screen.getByRole('option', { name: /Add a staff member/ })
     ).toBeInTheDocument();
+  });
+
+  it('offers Admit a student with student:create and hides it from a bursar', async () => {
+    await renderAt('/');
+    fireEvent.keyDown(globalThis as unknown as Window, {
+      key: 'k',
+      ctrlKey: true,
+    });
+    const input = await screen.findByPlaceholderText(
+      'Search pages and actions…'
+    );
+    fireEvent.change(input, { target: { value: 'admit' } });
+    expect(
+      screen.getByRole('option', { name: /Admit a student/ })
+    ).toBeInTheDocument();
+    cleanup();
+
+    await renderAt('/', { access: starterAccess('bursar') });
+    fireEvent.keyDown(globalThis as unknown as Window, {
+      key: 'k',
+      ctrlKey: true,
+    });
+    fireEvent.change(
+      await screen.findByPlaceholderText('Search pages and actions…'),
+      { target: { value: 'admit' } }
+    );
+    expect(
+      screen.queryByRole('option', { name: /Admit a student/ })
+    ).not.toBeInTheDocument();
+  });
+
+  it('hides Admit a student without guardian:link while a guardian is required', async () => {
+    const access = fakeAccess({
+      roles: ['custom'],
+      permissions: toPermissionMap(['student:read', 'student:create']),
+      campusScope: 'all',
+    });
+    await renderAt('/', { access, requireGuardian: true });
+    fireEvent.keyDown(globalThis as unknown as Window, {
+      key: 'k',
+      ctrlKey: true,
+    });
+    fireEvent.change(
+      await screen.findByPlaceholderText('Search pages and actions…'),
+      { target: { value: 'admit' } }
+    );
+    expect(
+      screen.queryByRole('option', { name: /Admit a student/ })
+    ).not.toBeInTheDocument();
   });
 
   it('offers Create a custom role only with ac:create', async () => {

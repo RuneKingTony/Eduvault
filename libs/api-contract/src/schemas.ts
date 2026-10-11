@@ -243,7 +243,7 @@ export const updateSchoolSettingsSchema = z.strictObject({
   requireGuardian: z.boolean().optional(),
 });
 
-export const FILE_KINDS = ['school_logo'] as const;
+export const FILE_KINDS = ['school_logo', 'guardian_photo'] as const;
 export const fileKindSchema = z.enum(FILE_KINDS);
 export type FileKind = z.infer<typeof fileKindSchema>;
 
@@ -294,22 +294,6 @@ export const createFeeScheduleSchema = z.object({
   currency: currencySchema,
 });
 export const updateFeeScheduleSchema = createFeeScheduleSchema.partial();
-
-export const studentSchema = z.object({
-  id: idSchema,
-  organizationId: idSchema,
-  campusId: idSchema,
-  fullName: z.string(),
-  admissionNumber: z.string(),
-  createdAt: timestamp,
-});
-export type Student = z.infer<typeof studentSchema>;
-export const createStudentSchema = z.object({
-  campusId: idSchema.optional(),
-  fullName: z.string().trim().min(1).max(160),
-  admissionNumber: z.string().trim().min(1).max(40),
-});
-export const updateStudentSchema = createStudentSchema.partial();
 
 export const campusFilterSchema = z.object({ campusId: idSchema.optional() });
 

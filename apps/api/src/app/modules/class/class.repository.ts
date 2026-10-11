@@ -1,4 +1,8 @@
-import type { ClassStatus, ClassTeacherRole } from '@eduvault/api-contract';
+import type {
+  ClassStatus,
+  ClassTeacherRole,
+  RosterRow,
+} from '@eduvault/api-contract';
 import type { PermissionMap } from '@eduvault/policy';
 import type { ClassScope } from '../../common/class-scope';
 import type { CampusScope } from '../../common/campus-scope';
@@ -140,6 +144,16 @@ export abstract class ClassRepository {
     organizationId: string,
     classId: string
   ): Promise<boolean>;
+
+  abstract studentCounts(
+    organizationId: string,
+    classIds: readonly string[]
+  ): Promise<Record<string, number>>;
+
+  abstract roster(
+    organizationId: string,
+    classId: string
+  ): Promise<RosterRow[]>;
 
   abstract currentSessionId(organizationId: string): Promise<string | null>;
 

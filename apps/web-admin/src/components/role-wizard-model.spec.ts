@@ -18,7 +18,14 @@ const catalogue = [
   role('administrator', ['campus:readAll', 'student:read', 'student:create']),
   role('teacher', ['student:read']),
   role('principal', ['campus:readAll', 'student:read']),
-  role('registrar', ['student:read', 'student:create', 'student:update']),
+  role('registrar', [
+    'student:read',
+    'student:create',
+    'student:update',
+    'enrollment:read',
+    'enrollment:create',
+    'enrollment:place',
+  ]),
 ];
 
 const member = (roles: string[]): MemberDetail => ({

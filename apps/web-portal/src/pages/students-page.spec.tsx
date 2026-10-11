@@ -1,5 +1,5 @@
 import { screen } from '@testing-library/react';
-import { renderWithApi, student } from '../test-utils';
+import { renderWithApi, student, studentList } from '../test-utils';
 import { StudentsPage } from './students-page';
 
 const campus = {
@@ -13,7 +13,9 @@ const campus = {
 describe('StudentsPage', () => {
   it('lists students with their campus name', async () => {
     renderWithApi(<StudentsPage />, {
-      students: { list: vi.fn().mockResolvedValue([student()]) },
+      students: {
+        list: vi.fn().mockResolvedValue(studentList([student()])),
+      },
       campuses: { list: vi.fn().mockResolvedValue([campus]) },
     });
 
