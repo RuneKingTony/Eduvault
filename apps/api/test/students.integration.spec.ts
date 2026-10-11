@@ -567,4 +567,73 @@ test.describe('student detail', () => {
 
     expect(refused.body.message).toContain('is no longer on the roll');
   });
+  test('refuses a date of birth after today, keeps the record and answers 404 first for another school', async ({
+    api,
+    schools: { owner, ownerB, studentLekki },
+  }) => {
+    const refused = await api(owner)
+      .patch(`/students/${studentLekki.id}`)
+      .send({ dateOfBirth: '2999-01-01' })
+      .expect(400);
+
+    expect(refused.body.message).toBe(
+      'Choose a date of birth on or before today.'
+    );
+    const kept = await api(owner)
+      .get(`/students/${studentLekki.id}`)
+      .expect(200);
+    expect(kept.body.dateOfBirth).toBe('2014-03-03');
+    await api(ownerB)
+      .patch(`/students/${studentLekki.id}`)
+      .send({ dateOfBirth: '2999-01-01' })
+      .expect(404);
+  });
+
+  test('answers 404 for another school’s student and 403 without student:update on a PATCH', async ({
+    api,
+    withPermissions,
+    schools: { owner, ownerB, orgA, studentLekki, studentB },
+  }) => {
+    const reader = await withPermissions(orgA, ['student:read']);
+
+    await api(owner)
+      .patch(`/students/${studentB.id}`)
+      .send({ firstName: 'Nope' })
+      .expect(404);
+    await api(ownerB)
+      .patch(`/students/${studentLekki.id}`)
+      .send({ firstName: 'Nope' })
+      .expect(404);
+    await api(reader)
+      .patch(`/students/${studentLekki.id}`)
+      .send({ firstName: 'Nope' })
+      .expect(403);
+    const unchanged = await api(owner)
+      .get(`/students/${studentLekki.id}`)
+      .expect(200);
+    expect(unchanged.body.firstName).toBe(studentLekki.firstName);
+  });
+
+  test('renames the student’s portal login with them, and only theirs', async ({
+    api,
+    pool,
+    schools: { owner, studentLekki, studentIkeja },
+  }) => {
+    await api(owner)
+      .patch(`/students/${studentLekki.id}`)
+      .send({ firstName: 'Adaeze', lastName: 'Nwosu' })
+      .expect(200);
+
+    const portalName = async (id: string) =>
+      (
+        await pool.query<{ name: string }>(
+          `SELECT u.name FROM "user" u JOIN student s ON s.user_id = u.id WHERE s.id = $1`,
+          [id]
+        )
+      ).rows[0]?.name;
+    expect(await portalName(studentLekki.id)).toBe('Adaeze Nwosu');
+    expect(await portalName(studentIkeja.id)).toBe(
+      `${studentIkeja.firstName} ${studentIkeja.lastName}`
+    );
+  });
 });

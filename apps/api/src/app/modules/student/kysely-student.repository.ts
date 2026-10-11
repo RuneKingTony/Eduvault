@@ -433,27 +433,44 @@ export class KyselyStudentRepository extends StudentRepository {
     return rows.length > 0;
   }
 
+  today(organizationId: string): string {
+    return schoolToday({ organizationId }, this.clock);
+  }
+
   async update(
     organizationId: string,
     id: string,
     patch: UpdateStudentInput
   ): Promise<void> {
-    await this.db
-      .updateTable('student')
-      .set({
-        ...(patch.firstName === undefined
-          ? {}
-          : { first_name: patch.firstName }),
-        ...(patch.lastName === undefined ? {} : { last_name: patch.lastName }),
-        ...(patch.gender === undefined ? {} : { gender: patch.gender }),
-        ...(patch.dateOfBirth === undefined
-          ? {}
-          : { date_of_birth: patch.dateOfBirth }),
-        updated_at: new Date(),
-      })
-      .where('id', '=', id)
-      .where('organization_id', '=', organizationId)
-      .execute();
+    await this.db.transaction().execute(async (trx) => {
+      const row = await trx
+        .updateTable('student')
+        .set({
+          ...(patch.firstName === undefined
+            ? {}
+            : { first_name: patch.firstName }),
+          ...(patch.lastName === undefined
+            ? {}
+            : { last_name: patch.lastName }),
+          ...(patch.gender === undefined ? {} : { gender: patch.gender }),
+          ...(patch.dateOfBirth === undefined
+            ? {}
+            : { date_of_birth: patch.dateOfBirth }),
+          updated_at: new Date(),
+        })
+        .where('id', '=', id)
+        .where('organization_id', '=', organizationId)
+        .returning(['user_id', 'first_name', 'last_name'])
+        .executeTakeFirst();
+      const userId = row?.user_id ?? null;
+      if (row !== undefined && userId !== null) {
+        await trx
+          .updateTable('user')
+          .set({ name: `${row.first_name} ${row.last_name}` })
+          .where('id', '=', userId)
+          .execute();
+      }
+    });
   }
 
   private async termFacts(

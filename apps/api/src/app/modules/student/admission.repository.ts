@@ -54,6 +54,7 @@ export interface AdmissionWrite {
   };
   arm: AdmissionClass;
   term: CurrentTerm;
+  startsLater: boolean;
   school: SchoolNaming;
   studentPasswordHash: string;
   guardians: readonly AdmissionGuardian[];
@@ -82,6 +83,11 @@ export abstract class AdmissionRepository {
   abstract currentTerm(
     organizationId: string
   ): Promise<CurrentTerm | undefined>;
+
+  abstract nextTerm(
+    organizationId: string,
+    termId: string
+  ): Promise<{ id: string; name: string } | undefined>;
 
   abstract rules(organizationId: string): Promise<SchoolRules>;
 

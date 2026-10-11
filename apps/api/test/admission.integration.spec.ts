@@ -3,6 +3,7 @@ import type { Pool } from 'pg';
 import { expect } from './support/base-test';
 import { admissionBody, ensureClass } from './support/factories/students';
 import { createClass } from './support/factories/classes';
+import { makeCurrent, termOf } from './support/factories/terms';
 import { schoolsTest } from './support/two-schools';
 
 const test = schoolsTest;
@@ -650,5 +651,151 @@ test.describe('isolation', () => {
     expect(await numbers(orgA.id)).toEqual([
       { kind: 'admission', next_value: 5 },
     ]);
+  });
+});
+
+test.describe('admission for the next term', () => {
+  test('offers the next term in the preview and places the student there, with no class this term', async ({
+    api,
+    app,
+    pool,
+    schools: { owner, orgA, lekki },
+  }) => {
+    const arm = await ensureClass(app, owner, lekki.id);
+    const next = await termOf(api, owner, { year: '2026/2027', sequence: 2 });
+    const preview = await api(owner).get('/admissions/preview').expect(200);
+    expect(preview.body.nextTerm).toEqual({ id: next.id, name: 'Second term' });
+
+    const res = await api(owner)
+      .post('/students')
+      .send(body(arm, { termId: next.id }))
+      .expect(201);
+
+    const { student } = res.body;
+    expect(student.currentPlacement).toBeNull();
+    expect(student.history).toHaveLength(1);
+    expect(student.history[0]).toMatchObject({
+      sessionName: '2026/2027',
+      isNew: true,
+      placements: [{ termName: 'Second term' }],
+    });
+    expect(student.canMoveForNextTerm).toBe(false);
+    const placements = await pool.query(
+      `SELECT p.term_id, p.class_arm_id, p.campus_id
+       FROM enrollment_placement p
+       JOIN student_enrollment e ON e.id = p.enrollment_id
+       WHERE e.student_id = $1`,
+      [student.id]
+    );
+    expect(placements.rows).toEqual([
+      { term_id: next.id, class_arm_id: arm, campus_id: lekki.id },
+    ]);
+    const activity = await pool.query(
+      `SELECT text FROM activity_event WHERE organization_id = $1 AND subject_id = $2`,
+      [orgA.id, student.id]
+    );
+    expect(activity.rows[0].text).toContain('from Second term');
+  });
+
+  test('keeps the placement when that term is made current, and adds none', async ({
+    api,
+    app,
+    pool,
+    schools: { owner, lekki },
+  }) => {
+    const arm = await ensureClass(app, owner, lekki.id);
+    const next = await termOf(api, owner, { year: '2026/2027', sequence: 2 });
+    const res = await api(owner)
+      .post('/students')
+      .send(body(arm, { termId: next.id }))
+      .expect(201);
+
+    await makeCurrent(api, owner, { year: '2026/2027', sequence: 2 });
+
+    const placements = await pool.query(
+      `SELECT p.term_id FROM enrollment_placement p
+       JOIN student_enrollment e ON e.id = p.enrollment_id
+       WHERE e.student_id = $1`,
+      [res.body.student.id]
+    );
+    expect(placements.rows).toEqual([{ term_id: next.id }]);
+    const detail = await api(owner)
+      .get(`/students/${res.body.student.id}`)
+      .expect(200);
+    expect(detail.body.currentPlacement).toMatchObject({ armId: arm });
+  });
+
+  test('treats the current term id like no term at all', async ({
+    api,
+    app,
+    schools: { owner, lekki },
+  }) => {
+    const arm = await ensureClass(app, owner, lekki.id);
+    const current = await termOf(api, owner, {
+      year: '2026/2027',
+      sequence: 1,
+    });
+
+    const res = await api(owner)
+      .post('/students')
+      .send(body(arm, { termId: current.id }))
+      .expect(201);
+
+    expect(res.body.student.currentPlacement).toMatchObject({ armId: arm });
+  });
+
+  test('answers 400 for the term after next, a past term, another school’s term and a made-up one, and writes nothing', async ({
+    api,
+    app,
+    pool,
+    schools: { owner, ownerB, orgA, lekki, campusB },
+  }) => {
+    const arm = await ensureClass(app, owner, lekki.id);
+    await ensureClass(app, ownerB, campusB.id);
+    const third = await termOf(api, owner, { year: '2026/2027', sequence: 3 });
+    const theirs = await termOf(api, ownerB, {
+      year: '2026/2027',
+      sequence: 2,
+    });
+    const before = await count(pool, 'student', orgA.id);
+
+    for (const termId of [third.id, theirs.id, randomUUID()]) {
+      const res = await api(owner)
+        .post('/students')
+        .send(body(arm, { termId }))
+        .expect(400);
+      expect(res.body.message).toBe(
+        'Choose the current term or the next term.'
+      );
+    }
+    await makeCurrent(api, owner, { year: '2026/2027', sequence: 2 });
+    const first = await termOf(api, owner, { year: '2026/2027', sequence: 1 });
+    await api(owner)
+      .post('/students')
+      .send(body(arm, { termId: first.id }))
+      .expect(400);
+    expect(await count(pool, 'student', orgA.id)).toBe(before);
+  });
+
+  test('has no next term in the last term of the year, so the preview says null and a term id is refused', async ({
+    api,
+    app,
+    schools: { owner, lekki },
+  }) => {
+    const arm = await ensureClass(app, owner, lekki.id);
+    const third = await termOf(api, owner, { year: '2026/2027', sequence: 3 });
+    await makeCurrent(api, owner, { year: '2026/2027', sequence: 3 });
+
+    const preview = await api(owner).get('/admissions/preview').expect(200);
+
+    expect(preview.body.nextTerm).toBeNull();
+    await api(owner)
+      .post('/students')
+      .send(body(arm, { termId: randomUUID() }))
+      .expect(400);
+    await api(owner)
+      .post('/students')
+      .send(body(arm, { termId: third.id }))
+      .expect(201);
   });
 });

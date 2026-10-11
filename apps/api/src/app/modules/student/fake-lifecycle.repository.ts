@@ -89,6 +89,13 @@ class FakeLifecycleTx implements LifecycleTx {
     return Promise.resolve(input.students.length);
   }
 
+  loginOutcome: 'reset' | 'shared' | 'missing' = 'reset';
+
+  resetLogin(input: unknown): Promise<'reset' | 'shared' | 'missing'> {
+    this.writes.push(['resetLogin', input]);
+    return Promise.resolve(this.loginOutcome);
+  }
+
   record(input: ActivityInput): Promise<void> {
     this.activities.push(input);
     return Promise.resolve();

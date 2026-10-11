@@ -113,6 +113,18 @@ describe('admitStudentSchema', () => {
     ).toBe('Choose a date of birth on or before today.');
   });
 
+  it('takes an optional term id and refuses one that is not an id', () => {
+    expect(
+      admitStudentSchema.safeParse(admission).data?.termId
+    ).toBeUndefined();
+    expect(
+      admitStudentSchema.safeParse({ ...admission, termId: id }).data?.termId
+    ).toBe(id);
+    expect(
+      admitStudentSchema.safeParse({ ...admission, termId: 'next' }).success
+    ).toBe(false);
+  });
+
   it('takes guardians as existing or new and no more than six', () => {
     const existing = { existingGuardianId: id, relationship: 'father' };
     expect(
@@ -160,6 +172,11 @@ describe('other student schemas', () => {
   it('has no delete route for students', () => {
     expect(Object.keys(contract.students)).not.toContain('remove');
     expect(Object.keys(contract.guardians)).toHaveLength(4);
+  });
+
+  it('has a reset-login route for a student, answering the shared login shape', () => {
+    expect(contract.students.resetLogin.method).toBe('POST');
+    expect(contract.students.resetLogin.path).toBe('/students/:id/reset-login');
   });
 
   it('has the lifecycle and Start new school year routes', () => {

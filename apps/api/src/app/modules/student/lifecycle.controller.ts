@@ -3,12 +3,16 @@ import { contract, type RouteOutput } from '@eduvault/api-contract';
 import { Org, OrganizationAuth, type OrgContext } from '../../common/auth';
 import { zod } from '../../common/http/zod.pipe';
 import { LifecycleService } from './lifecycle.service';
+import { StudentLoginService } from './student-login.service';
 
 const routes = contract.students;
 
 @Controller('students')
 export class LifecycleController {
-  constructor(private readonly lifecycle: LifecycleService) {}
+  constructor(
+    private readonly lifecycle: LifecycleService,
+    private readonly logins: StudentLoginService
+  ) {}
 
   @Post(':id/not-seen')
   @OrganizationAuth('student', 'markAway')
@@ -68,5 +72,14 @@ export class LifecycleController {
     body: Parameters<LifecycleService['place']>[2]
   ): Promise<RouteOutput<typeof routes.place>> {
     return this.lifecycle.place(org, params.id, body);
+  }
+
+  @Post(':id/reset-login')
+  @OrganizationAuth('student', 'update')
+  resetLogin(
+    @Org() org: OrgContext,
+    @Param(zod(routes.resetLogin.params)) params: { id: string }
+  ): Promise<RouteOutput<typeof routes.resetLogin>> {
+    return this.logins.resetLogin(org, params.id);
   }
 }

@@ -114,6 +114,12 @@ export interface LifecycleTx {
     students: readonly GraduatingStudent[];
   }): Promise<number>;
 
+  resetLogin(input: {
+    organizationId: string;
+    userId: string;
+    passwordHash: string;
+  }): Promise<'reset' | 'shared' | 'missing'>;
+
   record(input: ActivityInput): Promise<void>;
 }
 

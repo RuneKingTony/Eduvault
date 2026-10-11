@@ -70,7 +70,8 @@ const activityText = (
   guardians: readonly AdmittedGuardian[]
 ): string => {
   const { firstName, lastName } = write.student;
-  const placed = `placed in ${write.arm.levelName} ${write.arm.name}`;
+  const from = write.startsLater ? ` from ${write.term.termName}` : '';
+  const placed = `placed in ${write.arm.levelName} ${write.arm.name}${from}`;
   const names = guardians.map((guardian) => guardian.name).join(' and ');
   const noun = guardians.length === 1 ? 'guardian' : 'guardians';
   const people =
@@ -251,6 +252,23 @@ export class KyselyAdmissionRepository extends AdmissionRepository {
         sessionName: row.session_name,
       }
     );
+  }
+
+  async nextTerm(
+    organizationId: string,
+    termId: string
+  ): Promise<{ id: string; name: string } | undefined> {
+    const { rows } = await sql<{ id: string; name: string }>`
+      SELECT nxt.id, nxt.name
+      FROM term cur
+      JOIN term nxt
+        ON nxt.organization_id = cur.organization_id
+        AND nxt.session_id = cur.session_id
+        AND nxt.sequence = cur.sequence + 1
+      WHERE cur.id = ${termId}::uuid AND cur.organization_id = ${organizationId}`.execute(
+      this.db
+    );
+    return rows[0];
   }
 
   rules(organizationId: string): Promise<SchoolRules> {

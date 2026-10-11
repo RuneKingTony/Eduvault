@@ -22,6 +22,7 @@ import { NewSchoolYearRepository } from './new-school-year.repository';
 import { NewSchoolYearService } from './new-school-year.service';
 import { StudentController } from './student.controller';
 import { StudentListService } from './student-list.service';
+import { StudentLoginService } from './student-login.service';
 import { StudentRepository } from './student.repository';
 import { StudentService } from './student.service';
 
@@ -43,6 +44,7 @@ import { StudentService } from './student.service';
   providers: [
     StudentService,
     StudentListService,
+    StudentLoginService,
     AdmissionService,
     LifecycleRunner,
     LifecycleService,

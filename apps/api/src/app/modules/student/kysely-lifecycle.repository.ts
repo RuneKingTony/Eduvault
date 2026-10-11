@@ -1,8 +1,13 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { sql, type Kysely } from 'kysely';
+import { splitRoles } from '@eduvault/policy';
 import type { DB } from '../../../db/db-types';
 import { ActivityWriter, type ActivityInput } from '../../common/activity';
-import { addMemberRole, stripMemberRole } from '../../common/auth/portal-login';
+import {
+  addMemberRole,
+  resetPortalPassword,
+  stripMemberRole,
+} from '../../common/auth/portal-login';
 import { KYSELY_TOKEN, type Database } from '../../common/db/tokens';
 import {
   archiveGraduates,
@@ -370,6 +375,40 @@ class KyselyLifecycleTx implements LifecycleTx {
     students: readonly GraduatingStudent[];
   }): Promise<number> {
     return archiveGraduates(this.db, this.activity, input);
+  }
+
+  async resetLogin(input: {
+    organizationId: string;
+    userId: string;
+    passwordHash: string;
+  }): Promise<'reset' | 'shared' | 'missing'> {
+    const user = await this.db
+      .selectFrom('user')
+      .select('role')
+      .where('id', '=', input.userId)
+      .forUpdate()
+      .executeTakeFirst();
+    if (user === undefined) {
+      return 'missing';
+    }
+    const members = await this.db
+      .selectFrom('member')
+      .select(['organizationId', 'role'])
+      .where('userId', '=', input.userId)
+      .execute();
+    const ownRoleOnly = members.every(
+      (member) =>
+        member.organizationId === input.organizationId &&
+        splitRoles(member.role).every((role) => role === 'student')
+    );
+    if (!ownRoleOnly || splitRoles(user.role).length > 0) {
+      return 'shared';
+    }
+    await resetPortalPassword(this.db, {
+      userId: input.userId,
+      passwordHash: input.passwordHash,
+    });
+    return 'reset';
   }
 
   record(input: ActivityInput): Promise<void> {
