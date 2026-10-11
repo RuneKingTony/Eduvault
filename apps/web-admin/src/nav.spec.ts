@@ -18,6 +18,7 @@ import {
 const built = new Set([
   '/',
   '/approvals',
+  '/announcements',
   '/students',
   '/members',
   '/fees',
@@ -72,6 +73,7 @@ describe('nav model', () => {
     expect(routesFor(everything)).toEqual([
       '/',
       '/approvals',
+      '/announcements',
       '/students',
       '/members',
       '/classes',
@@ -233,6 +235,20 @@ describe('nav gates', () => {
     expect(routesFor({})).toEqual(['/', '/approvals']);
   });
 
+  it('shows Announcements only with announcement:read', () => {
+    expect(routesFor({})).not.toContain('/announcements');
+    expect(routesFor(starter('bursar'))).not.toContain('/announcements');
+    expect(routesFor(starter('teacher'))).not.toContain('/announcements');
+    expect(routesFor(starter('administrator'))).toContain('/announcements');
+    expect(routesFor(starter('principal'))).toContain('/announcements');
+    expect(routesFor(toPermissionMap(['announcement:read']))).toContain(
+      '/announcements'
+    );
+    expect(routesFor(toPermissionMap(['announcement:update']))).not.toContain(
+      '/announcements'
+    );
+  });
+
   it('shows a bursar Students but no Fees or Settings', () => {
     expect(routesFor({ student: ['read'] })).toEqual([
       '/',
@@ -287,6 +303,7 @@ describe('nav gates', () => {
     expect(routeGate('/campuses')).toEqual(['team:read']);
     expect(routeGate('/')).toBeUndefined();
     expect(routeGate('/approvals')).toBeUndefined();
+    expect(routeGate('/announcements')).toEqual(['announcement:read']);
   });
 });
 

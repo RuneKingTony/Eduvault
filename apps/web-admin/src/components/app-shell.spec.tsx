@@ -124,6 +124,7 @@ async function renderAt(
     routeTree: root.addChildren([
       child('/', realDashboard ? DashboardPage : page('Dashboard page')),
       child('/approvals', page('Approvals page')),
+      child('/announcements', page('Announcements page')),
       child('/students', page('Students page')),
       child('/members', page('Members page')),
       child('/fees', page('Fees page')),
@@ -189,9 +190,10 @@ describe('AppShell', () => {
     expect(nav.getByRole('link', { name: 'Students' })).not.toHaveAttribute(
       'aria-current'
     );
-    expect(
-      nav.queryByRole('link', { name: 'Announcements' })
-    ).not.toBeInTheDocument();
+    expect(nav.getByRole('link', { name: 'Announcements' })).toHaveAttribute(
+      'href',
+      '/announcements'
+    );
     const links = nav.getAllByRole('link').map((link) => link.textContent);
     expect(links.at(-1)).toBe('Settings');
   });
@@ -484,6 +486,7 @@ describe('AppShell access', () => {
     expect(linkNames()).toEqual([
       'Dashboard',
       'Approvals',
+      'Announcements',
       'Students',
       'Staff and members',
       'Fees',
@@ -530,6 +533,27 @@ describe('AppShell access', () => {
     expect(
       within(sidebarNav()).queryByRole('link', { name: 'Settings' })
     ).not.toBeInTheDocument();
+  });
+
+  it('shows Announcements to an administrator and hides it from a bursar', async () => {
+    await renderAt('/', { access: starterAccess('administrator') });
+    expect(linkNames()).toContain('Announcements');
+  });
+
+  it('sends a bursar who types /announcements to the Dashboard with no message', async () => {
+    await renderAt('/announcements', { access: starterAccess('bursar') });
+    expect(await screen.findByText('Dashboard page')).toBeInTheDocument();
+    expect(screen.queryByText('Announcements page')).not.toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(linkNames()).not.toContain('Announcements');
+  });
+
+  it('opens /announcements for a member with announcement:read', async () => {
+    await renderAt('/announcements', {
+      access: fakeAccess({ permissions: { announcement: ['read'] } }),
+    });
+    expect(await screen.findByText('Announcements page')).toBeInTheDocument();
+    expect(linkNames()).toEqual(['Dashboard', 'Approvals', 'Announcements']);
   });
 
   it('sends a teacher who types /fees to the Dashboard with no message', async () => {

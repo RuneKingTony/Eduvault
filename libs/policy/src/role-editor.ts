@@ -215,6 +215,7 @@ export const RESOURCE_PILLARS: Record<Resource, Pillar> = {
   guardian: 'Foundation',
   session: 'Foundation',
   class: 'Foundation',
+  announcement: 'Foundation',
   feeSchedule: 'Finance',
 };
 

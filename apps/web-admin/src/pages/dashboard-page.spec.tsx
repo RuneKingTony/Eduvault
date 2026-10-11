@@ -3,6 +3,7 @@ import { toPermissionMap } from '@eduvault/policy';
 import type { DashboardTask } from '@eduvault/api-contract';
 import { currentCalendar, noCalendar } from '../test-calendar';
 import {
+  announcementSummary,
   dashboardApi,
   dayOff,
   myClass,
@@ -91,6 +92,28 @@ describe('DashboardPage views', () => {
     expect(screen.getByText('All caught up.')).toBeInTheDocument();
     expect(screen.queryByText('Students by status')).not.toBeInTheDocument();
     expect(api.dashboard.roll).not.toHaveBeenCalled();
+  });
+
+  it('shows the Announcements card in the teacher view from the feed', async () => {
+    const api = dashboardApi({
+      myClasses: [myClass()],
+      announcements: [announcementSummary({ pinned: true })],
+    });
+    render({ ...starterAccess('teacher'), classScope: ['a1'] }, api);
+    expect(await screen.findByText('Announcements')).toBeInTheDocument();
+    expect(
+      await screen.findByText('9 Oct 2026 · Event · Pinned')
+    ).toBeInTheDocument();
+    expect(api.announcements.feed).toHaveBeenCalledWith({
+      query: { limit: 4 },
+    });
+  });
+
+  it('keeps the Announcements card out of the staff view', async () => {
+    const api = dashboardApi();
+    render(ownerAccess(), api);
+    await screen.findByText('Students by status');
+    expect(api.announcements.feed).not.toHaveBeenCalled();
   });
 
   it('shows a teacher with no classes the empty state', async () => {

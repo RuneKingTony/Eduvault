@@ -120,6 +120,15 @@ describe('roles', () => {
     }
   });
 
+  it('gives the administrator and principal every announcement permission and nobody else any', () => {
+    for (const slug of ['administrator', 'principal']) {
+      expect(starter(slug).announcement).toEqual(['create', 'read', 'update']);
+    }
+    for (const slug of ['teacher', 'bursar', 'student', 'guardian']) {
+      expect(starter(slug).announcement).toBeUndefined();
+    }
+  });
+
   it('counts the new read permissions in READ_PERMS', () => {
     expect(READ_PERMS).toEqual(
       expect.arrayContaining(['enrollment:read', 'guardian:read'])
@@ -191,6 +200,7 @@ describe('roles', () => {
       class: ['read', 'readAll'],
       team: ['read'],
       campus: ['readAll'],
+      announcement: ['create', 'read', 'update'],
     });
   });
 

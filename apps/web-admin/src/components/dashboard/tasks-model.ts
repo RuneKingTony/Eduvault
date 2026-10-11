@@ -118,6 +118,16 @@ const noClassTeacher = (task: Counted<'noClassTeacher'>): TaskRow => {
   };
 };
 
+const announcementDrafts = (task: Counted<'announcementDrafts'>): TaskRow => ({
+  key: task.kind,
+  kind: task.kind,
+  tone: 'default',
+  title: `${countOf(task.count, 'announcement draft', 'announcement drafts')} not published`,
+  subline: listed(task.titles, task.count),
+  action: { label: 'Open', target: { to: '/announcements' } },
+  extra: null,
+});
+
 const noRole = (task: Counted<'noRole'>): TaskRow => ({
   key: `${task.kind}-${task.memberId}`,
   kind: task.kind,
@@ -145,6 +155,9 @@ export function taskRow(task: DashboardTask): TaskRow {
     }
     case 'noClassTeacher': {
       return noClassTeacher(task);
+    }
+    case 'announcementDrafts': {
+      return announcementDrafts(task);
     }
     case 'noRole': {
       return noRole(task);

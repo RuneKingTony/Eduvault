@@ -9,6 +9,7 @@ export const statements = {
   session: ['create', 'read', 'update', 'setCurrent'],
   class: ['create', 'read', 'readAll', 'update', 'assignTeacher'],
   feeSchedule: ['create', 'read', 'update', 'delete'],
+  announcement: ['create', 'read', 'update'],
   member: ['create', 'read', 'update', 'delete'],
   ac: ['create', 'read', 'update', 'delete'],
 } as const;
@@ -85,6 +86,7 @@ const RESOURCE_LABELS: Record<Resource, string> = {
   session: 'School years and terms',
   class: 'Classes',
   feeSchedule: 'Fee schedules',
+  announcement: 'Announcements',
   member: 'Staff',
   ac: 'Roles',
 };

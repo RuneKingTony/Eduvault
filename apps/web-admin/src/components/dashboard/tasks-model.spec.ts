@@ -78,3 +78,34 @@ describe('taskRow', () => {
     ).toBe('noRole-m9');
   });
 });
+
+describe('taskRow announcement drafts', () => {
+  it('counts the drafts, lists their titles and opens Announcements', () => {
+    const row = taskRow({
+      kind: 'announcementDrafts',
+      count: 2,
+      titles: ['PTA meeting', 'Sports day'],
+    });
+    expect(row).toMatchObject({
+      key: 'announcementDrafts',
+      tone: 'default',
+      title: '2 announcement drafts not published',
+      subline: 'PTA meeting, Sports day',
+      action: { label: 'Open', target: { to: '/announcements' } },
+      extra: null,
+    });
+  });
+
+  it('uses the singular for one draft and says how many the sample leaves out', () => {
+    expect(
+      taskRow({ kind: 'announcementDrafts', count: 1, titles: ['PTA'] }).title
+    ).toBe('1 announcement draft not published');
+    expect(
+      taskRow({
+        kind: 'announcementDrafts',
+        count: 8,
+        titles: ['A', 'B', 'C', 'D', 'E'],
+      }).subline
+    ).toBe('A, B, C, D, E and 3 more');
+  });
+});

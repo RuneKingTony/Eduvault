@@ -15,6 +15,16 @@ import {
   updateTermSchema,
 } from './calendar';
 import {
+  announcementFeedQuerySchema,
+  announcementListQuerySchema,
+  announcementListSchema,
+  announcementSchema,
+  announcementSummarySchema,
+  createAnnouncementSchema,
+  pinAnnouncementSchema,
+  updateAnnouncementSchema,
+} from './announcements';
+import {
   assignClassTeacherSchema,
   classDetailSchema,
   classGraduatedSchema,
@@ -610,6 +620,58 @@ export const contract = defineContract({
       method: 'GET',
       path: '/dashboard/my-classes',
       response: z.array(myClassSchema),
+    }),
+  },
+  announcements: {
+    list: defineRoute({
+      method: 'GET',
+      path: '/announcements',
+      query: announcementListQuerySchema,
+      response: announcementListSchema,
+    }),
+    feed: defineRoute({
+      method: 'GET',
+      path: '/announcements/feed',
+      query: announcementFeedQuerySchema,
+      response: z.array(announcementSummarySchema),
+    }),
+    get: defineRoute({
+      method: 'GET',
+      path: '/announcements/:id',
+      params: idParamsSchema,
+      response: announcementSchema,
+    }),
+    create: defineRoute({
+      method: 'POST',
+      path: '/announcements',
+      body: createAnnouncementSchema,
+      response: announcementSchema,
+    }),
+    update: defineRoute({
+      method: 'PATCH',
+      path: '/announcements/:id',
+      params: idParamsSchema,
+      body: updateAnnouncementSchema,
+      response: announcementSchema,
+    }),
+    publish: defineRoute({
+      method: 'POST',
+      path: '/announcements/:id/publish',
+      params: idParamsSchema,
+      response: announcementSchema,
+    }),
+    withdraw: defineRoute({
+      method: 'POST',
+      path: '/announcements/:id/withdraw',
+      params: idParamsSchema,
+      response: announcementSchema,
+    }),
+    pin: defineRoute({
+      method: 'PUT',
+      path: '/announcements/:id/pin',
+      params: idParamsSchema,
+      body: pinAnnouncementSchema,
+      response: announcementSchema,
     }),
   },
   activity: {

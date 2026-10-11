@@ -1,4 +1,5 @@
 import { expect } from './support/base-test';
+import { createAnnouncement } from './support/factories/announcements';
 import { createClass } from './support/factories/classes';
 import { schoolsTest } from './support/two-schools';
 
@@ -196,6 +197,26 @@ test.describe('deleting a campus', () => {
       'This campus still has classes, students or money records, so it can’t be deleted.'
     );
     await api(owner).get(`/campuses/${lekki.id}`).expect(200);
+  });
+
+  test('answers the in-use message while an announcement references it, even a withdrawn one', async ({
+    api,
+    app,
+    createCampus,
+    schools: { owner, orgA },
+  }) => {
+    const annex = await createCampus(orgA, 'Annex');
+    const item = await createAnnouncement(app, owner, { campusId: annex.id });
+    const blocked = await api(owner)
+      .delete(`/campuses/${annex.id}`)
+      .expect(409);
+    expect(blocked.body.message).toBe(
+      'This campus still has classes, students or money records, so it can’t be deleted.'
+    );
+
+    await api(owner).post(`/announcements/${item.id}/withdraw`).expect(201);
+    await api(owner).delete(`/campuses/${annex.id}`).expect(409);
+    await api(owner).get(`/campuses/${annex.id}`).expect(200);
   });
 
   test('answers 409 while a class references it, even an archived one, and keeps the team', async ({

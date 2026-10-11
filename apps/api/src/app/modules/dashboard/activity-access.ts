@@ -1,7 +1,7 @@
 import type { ActivityPillarName } from '@eduvault/api-contract';
 import { can, type PermissionMap } from '@eduvault/policy';
 
-export type FoundationSubject = 'student' | 'school_year';
+export type FoundationSubject = 'student' | 'school_year' | 'announcement';
 
 export interface ActivityAccess {
   pillars: ActivityPillarName[];
@@ -16,6 +16,9 @@ export function activityAccess(permissions: PermissionMap): ActivityAccess {
   }
   if (can(permissions, 'session', 'read')) {
     foundationSubjects.push('school_year');
+  }
+  if (can(permissions, 'announcement', 'read')) {
+    foundationSubjects.push('announcement');
   }
   const pillars: ActivityPillarName[] = ['platform'];
   if (can(permissions, 'member', 'read')) {

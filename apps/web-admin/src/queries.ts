@@ -3,7 +3,12 @@ import {
   queryOptions,
   type QueryClient,
 } from '@tanstack/react-query';
-import type { ClassStatus, RouteQuery, contract } from '@eduvault/api-contract';
+import type {
+  AnnouncementStatus,
+  ClassStatus,
+  RouteQuery,
+  contract,
+} from '@eduvault/api-contract';
 import type { ActingState } from './acting-store';
 import type { Api } from './api';
 import type { MembersSearch } from './members-search';
@@ -339,6 +344,35 @@ export async function invalidateCalendar(
   await Promise.all([
     queryClient.invalidateQueries({ queryKey: SCHOOL_YEARS_KEY }),
     queryClient.invalidateQueries({ queryKey: CALENDAR_KEY }),
+  ]);
+}
+
+const ANNOUNCEMENTS_KEY = ['announcements'] as const;
+
+export const announcementsQueryOptions = (
+  api: Api,
+  status: AnnouncementStatus,
+  page: number
+) =>
+  queryOptions({
+    queryKey: [...ANNOUNCEMENTS_KEY, 'list', status, page],
+    queryFn: () => api.announcements.list({ query: { status, page } }),
+    placeholderData: keepPreviousData,
+  });
+
+export const announcementFeedQueryOptions = (api: Api, limit: number) =>
+  queryOptions({
+    queryKey: [...ANNOUNCEMENTS_KEY, 'feed', limit],
+    queryFn: () => api.announcements.feed({ query: { limit } }),
+  });
+
+export async function invalidateAnnouncements(
+  queryClient: QueryClient
+): Promise<void> {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: ANNOUNCEMENTS_KEY }),
+    queryClient.invalidateQueries({ queryKey: [...DASHBOARD_KEY, 'tasks'] }),
+    queryClient.invalidateQueries({ queryKey: ACTIVITY_KEY }),
   ]);
 }
 

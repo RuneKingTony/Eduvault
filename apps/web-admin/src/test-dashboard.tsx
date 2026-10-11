@@ -8,6 +8,7 @@ import {
 } from '@tanstack/react-router';
 import type {
   ActivityPage,
+  AnnouncementSummary,
   DashboardRoll,
   DashboardTask,
   MePermissions,
@@ -70,6 +71,18 @@ export const dayOff = (overrides: Partial<DayOff> = {}): DayOff => ({
   ...overrides,
 });
 
+export const announcementSummary = (
+  overrides: Partial<AnnouncementSummary> = {}
+): AnnouncementSummary => ({
+  id: 'n1',
+  title: 'PTA meeting',
+  body: 'Saturday at ten.',
+  tag: 'event',
+  pinned: false,
+  publishedOn: '2026-10-09',
+  ...overrides,
+});
+
 const emptyActivity = (): ActivityPage => ({ items: [], total: 0 });
 
 export function dashboardApi(
@@ -80,6 +93,7 @@ export function dashboardApi(
     roll?: unknown;
     myClasses?: MyClass[];
     activity?: ActivityPage;
+    announcements?: AnnouncementSummary[];
   } = {}
 ) {
   return {
@@ -97,6 +111,9 @@ export function dashboardApi(
     activity: {
       list: vi.fn().mockResolvedValue(overrides.activity ?? emptyActivity()),
     },
+    announcements: {
+      feed: vi.fn().mockResolvedValue(overrides.announcements ?? []),
+    },
   };
 }
 
@@ -109,6 +126,7 @@ export function renderInRouter(
     component: () => <MyAccessProvider>{ui}</MyAccessProvider>,
   });
   const paths = [
+    '/announcements',
     '/calendar',
     '/students',
     '/students/$studentId',

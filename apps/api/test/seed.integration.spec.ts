@@ -29,7 +29,11 @@ test.describe('dev seed', () => {
                 (SELECT count(*) FROM enrollment_placement) AS enrollment_placement,
                 (SELECT count(*) FROM guardian) AS guardian,
                 (SELECT count(*) FROM guardian_student) AS guardian_student,
-                (SELECT count(*) FROM activity_event) AS activity_event`
+                (SELECT count(*) FROM activity_event) AS activity_event,
+                (SELECT count(*) FROM announcement) AS announcement,
+                (SELECT count(*) FROM announcement WHERE status = 'published') AS published_announcement,
+                (SELECT count(*) FROM announcement WHERE pinned) AS pinned_announcement,
+                (SELECT count(*) FROM announcement WHERE campus_id IS NULL) AS everyone_announcement`
       );
       return rows[0];
     };
@@ -57,7 +61,11 @@ test.describe('dev seed', () => {
       enrollment_placement: '68',
       guardian: '6',
       guardian_student: '8',
-      activity_event: '33',
+      activity_event: '43',
+      announcement: '8',
+      published_announcement: '4',
+      pinned_announcement: '1',
+      everyone_announcement: '4',
     });
 
     const scopeOf = async (key: string) => {

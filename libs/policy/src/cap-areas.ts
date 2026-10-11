@@ -151,6 +151,16 @@ export const CAP_AREAS: readonly CapArea[] = [
     changeDesc: 'Add guardians and link them to students',
     extras: [],
   },
+  {
+    id: 'announcements',
+    group: 'School',
+    label: 'Announcements',
+    important: false,
+    see: ['announcement:read'],
+    change: ['announcement:create', 'announcement:update'],
+    changeDesc: 'Write, publish, pin and withdraw announcements',
+    extras: [],
+  },
 ];
 
 export const LEGACY_PERMISSIONS: readonly Permission[] = [

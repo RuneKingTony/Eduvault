@@ -5,6 +5,7 @@ import type { StudentsSearch } from '../../students-search';
 export type TaskTarget =
   | { to: '/students'; search?: StudentsSearch }
   | { to: '/students/$studentId'; params: { studentId: string } }
+  | { to: '/announcements' }
   | { to: '/classes' }
   | { to: '/classes/$classId'; params: { classId: string } }
   | { to: '/members/$memberId'; params: { memberId: string } };
@@ -21,6 +22,9 @@ export function TargetLink({
     }
     case '/students/$studentId': {
       return <Link to="/students/$studentId" params={dest.params} {...props} />;
+    }
+    case '/announcements': {
+      return <Link to="/announcements" {...props} />;
     }
     case '/classes': {
       return <Link to="/classes" {...props} />;

@@ -7,4 +7,6 @@ export interface RequiredPermission<R extends Resource = Resource> {
   action: ActionOf<R>;
 }
 
+export const STAFF_ONLY_KEY = 'eduvault:staff-only';
+
 export const ALLOW_TEMPORARY_PASSWORD_KEY = 'eduvault:allow-temporary-password';

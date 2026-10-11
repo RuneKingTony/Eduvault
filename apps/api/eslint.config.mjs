@@ -2,16 +2,16 @@ import base, { noDefaultExport, noEnum } from '../../eslint.config.mjs';
 
 const classLevelAuth = {
   selector:
-    'ClassDeclaration > Decorator > CallExpression[callee.name=/^(OrganizationAuth|SessionAuth|PlatformAuth)$/]',
+    'ClassDeclaration > Decorator > CallExpression[callee.name=/^(OrganizationAuth|StaffOnlyAuth|SessionAuth|PlatformAuth)$/]',
   message:
     'Put the auth decorator on each handler, not the class, so the guard runs once.',
 };
 
 const handlerWithoutAuth = {
   selector:
-    'MethodDefinition:has(Decorator > CallExpression[callee.name=/^(Get|Post|Put|Patch|Delete|All)$/]):not(:has(Decorator > CallExpression[callee.name=/^(OrganizationAuth|SessionAuth|PlatformAuth)$/]))',
+    'MethodDefinition:has(Decorator > CallExpression[callee.name=/^(Get|Post|Put|Patch|Delete|All)$/]):not(:has(Decorator > CallExpression[callee.name=/^(OrganizationAuth|StaffOnlyAuth|SessionAuth|PlatformAuth)$/]))',
   message:
-    'Every HTTP handler needs @OrganizationAuth, @SessionAuth or @PlatformAuth; an unguarded route skips tenancy.',
+    'Every HTTP handler needs @OrganizationAuth, @StaffOnlyAuth, @SessionAuth or @PlatformAuth; an unguarded route skips tenancy.',
 };
 
 const processEnv = {

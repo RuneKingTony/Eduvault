@@ -23,6 +23,15 @@ describe('Clock', () => {
     expect(clock.today()).toBe('2026-10-07');
   });
 
+  it('reads midday of the pinned date as the instant, else the real one', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-07T09:00:00Z'));
+    const clock = new Clock();
+    expect(clock.now()).toBe('2026-10-07T09:00:00.000Z');
+    clock.set('2027-01-04');
+    expect(clock.now()).toBe('2027-01-04T12:00:00.000Z');
+  });
+
   it('refuses to be pinned in production', () => {
     expect(() =>
       new Clock({ NODE_ENV: 'production' }).set('2027-01-04')

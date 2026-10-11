@@ -13,6 +13,7 @@ import {
   ErrorMessage,
 } from '@eduvault/ui';
 import { useApi } from '../api';
+import { AnnouncementsCard } from '../components/dashboard/announcements-card';
 import { ActivityCard } from '../components/dashboard/activity-card';
 import { CardSkeleton } from '../components/dashboard/card-states';
 import { DashboardHeader } from '../components/dashboard/dashboard-header';
@@ -132,6 +133,7 @@ function TeacherDashboard() {
         </div>
         <div className="flex flex-col gap-4">
           <TasksCard variant="teacher" />
+          <AnnouncementsCard />
         </div>
       </div>
       <ActivityCard />

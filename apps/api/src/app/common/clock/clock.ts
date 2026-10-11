@@ -16,6 +16,12 @@ export class Clock {
     return this.pinned ?? lagosDateOf(new Date());
   }
 
+  now(): string {
+    return this.pinned === null
+      ? new Date().toISOString()
+      : `${this.pinned}T12:00:00.000Z`;
+  }
+
   set(date: string | null): void {
     // The pin is process-wide, so production must never be able to move "today".
     if (this.env.NODE_ENV === 'production') {

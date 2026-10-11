@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AnnouncementsRouteImport } from './routes/announcements'
 import { Route as ApprovalsRouteImport } from './routes/approvals'
 import { Route as CalendarRouteImport } from './routes/calendar'
 import { Route as CampusesRouteImport } from './routes/campuses'
@@ -39,6 +40,11 @@ import { Route as PlatformSchoolsSchoolIdRouteImport } from './routes/platform.s
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AnnouncementsRoute = AnnouncementsRouteImport.update({
+  id: '/announcements',
+  path: '/announcements',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApprovalsRoute = ApprovalsRouteImport.update({
@@ -169,6 +175,7 @@ const PlatformSchoolsSchoolIdRoute = PlatformSchoolsSchoolIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/announcements': typeof AnnouncementsRoute
   '/approvals': typeof ApprovalsRoute
   '/calendar': typeof CalendarRoute
   '/campuses': typeof CampusesRoute
@@ -197,6 +204,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/announcements': typeof AnnouncementsRoute
   '/approvals': typeof ApprovalsRoute
   '/calendar': typeof CalendarRoute
   '/campuses': typeof CampusesRoute
@@ -224,6 +232,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/announcements': typeof AnnouncementsRoute
   '/approvals': typeof ApprovalsRoute
   '/calendar': typeof CalendarRoute
   '/campuses': typeof CampusesRoute
@@ -254,6 +263,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/announcements'
     | '/approvals'
     | '/calendar'
     | '/campuses'
@@ -282,6 +292,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/announcements'
     | '/approvals'
     | '/calendar'
     | '/campuses'
@@ -308,6 +319,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/announcements'
     | '/approvals'
     | '/calendar'
     | '/campuses'
@@ -337,6 +349,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AnnouncementsRoute: typeof AnnouncementsRoute
   ApprovalsRoute: typeof ApprovalsRoute
   CalendarRoute: typeof CalendarRoute
   CampusesRoute: typeof CampusesRoute
@@ -362,6 +375,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/announcements': {
+      id: '/announcements'
+      path: '/announcements'
+      fullPath: '/announcements'
+      preLoaderRoute: typeof AnnouncementsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/approvals': {
@@ -582,6 +602,7 @@ const SettingsRouteWithChildren = SettingsRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AnnouncementsRoute: AnnouncementsRoute,
   ApprovalsRoute: ApprovalsRoute,
   CalendarRoute: CalendarRoute,
   CampusesRoute: CampusesRoute,

@@ -55,6 +55,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         pageTitle: 'Announcements',
         route: '/announcements',
         icon: 'megaphone',
+        gate: ['announcement:read'],
       },
     ],
   },

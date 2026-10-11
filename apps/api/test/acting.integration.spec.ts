@@ -5,6 +5,7 @@ import {
   expect,
   waitForAuditRows,
 } from './support/base-test';
+import { createAnnouncement } from './support/factories/announcements';
 import { createStudent, ensureClass } from './support/factories/students';
 import { twoSchools } from './support/two-schools';
 
@@ -605,13 +606,14 @@ test.describe('acting in a school', () => {
       addMember,
       makeSuperAdmin,
     }) => {
-      const { orgA, studentLekki } = await twoSchools({
+      const schools = await twoSchools({
         app,
         createUser,
         createOrganization,
         createCampus,
         addMember,
       });
+      const { orgA, studentLekki } = schools;
       const admin = await makeSuperAdmin(await createUser());
       const student = `/students/${studentLekki.id}`;
       const guardianId = studentLekki.guardians?.[0]?.guardianId ?? '';
@@ -653,6 +655,42 @@ test.describe('acting in a school', () => {
         const refused = await write().expect(403);
         expect(refused.body).toMatchObject({ code: 'ActingReadOnly' });
       }
+      const item = await createAnnouncement(app, schools.owner, {
+        campusId: schools.lekki.id,
+      });
+      const announcementWrites = [
+        () =>
+          withActing().post('/announcements').set(acting(orgA.id)).send({
+            title: 'No reason',
+            body: 'Blocked.',
+            tag: 'general',
+            campusId: null,
+            status: 'draft',
+          }),
+        () =>
+          withActing()
+            .patch(`/announcements/${item.id}`)
+            .set(acting(orgA.id))
+            .send({ title: 'Blocked' }),
+        () =>
+          withActing()
+            .post(`/announcements/${item.id}/publish`)
+            .set(acting(orgA.id)),
+        () =>
+          withActing()
+            .post(`/announcements/${item.id}/withdraw`)
+            .set(acting(orgA.id)),
+        () =>
+          withActing()
+            .put(`/announcements/${item.id}/pin`)
+            .set(acting(orgA.id))
+            .send({ pinned: true }),
+      ];
+      for (const write of announcementWrites) {
+        const refused = await write().expect(403);
+        expect(refused.body).toMatchObject({ code: 'ActingReadOnly' });
+      }
+      await api(admin).get('/announcements').set(acting(orgA.id)).expect(200);
       const res = await api(admin)
         .post('/students')
         .set(acting(orgA.id))

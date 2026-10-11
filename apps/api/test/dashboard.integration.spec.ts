@@ -9,6 +9,7 @@ import type {
 import { expect, type Fixtures } from './support/base-test';
 import { YEAR_2027, createSchoolYear } from './support/factories/calendar';
 import { assignClassTeacher, createClass } from './support/factories/classes';
+import { createAnnouncement } from './support/factories/announcements';
 import { createStudent } from './support/factories/students';
 import { makeCurrent } from './support/factories/terms';
 import { schoolsTest } from './support/two-schools';
@@ -632,6 +633,67 @@ test.describe('tasks', () => {
     expect(await tasksOf(api, ikejaAdmin)).toEqual([]);
   });
 
+  test('T10 counts the drafts of everyone and the caller’s campuses for announcement:update only', async ({
+    api,
+    app,
+    withPermissions,
+    schools: { orgA, owner, lekki, ikeja },
+  }) => {
+    await createAnnouncement(app, owner, {
+      campusId: lekki.id,
+      status: 'draft',
+      title: 'Lekki draft',
+    });
+    await createAnnouncement(app, owner, {
+      campusId: ikeja.id,
+      status: 'draft',
+      title: 'Ikeja draft',
+    });
+    await createAnnouncement(app, owner, {
+      campusId: null,
+      status: 'draft',
+      title: 'School draft',
+    });
+    await createAnnouncement(app, owner, { campusId: lekki.id });
+    const lekkiWriter = await withPermissions(
+      orgA,
+      ['announcement:update', 'announcement:read'],
+      { campuses: [lekki] }
+    );
+    const reader = await withPermissions(orgA, ['announcement:read'], {
+      campuses: [lekki],
+    });
+
+    const mine = taskOf(await tasksOf(api, lekkiWriter), 'announcementDrafts');
+    expect(mine?.count).toBe(2);
+    expect(mine?.titles.toSorted(byText)).toEqual([
+      'Lekki draft',
+      'School draft',
+    ]);
+    const all = taskOf(await tasksOf(api, owner), 'announcementDrafts');
+    expect(all?.count).toBe(3);
+    expect(
+      taskOf(await tasksOf(api, reader), 'announcementDrafts')
+    ).toBeUndefined();
+  });
+
+  test('T10 holds no draft of another school', async ({
+    api,
+    app,
+    schools: { owner, ownerB, campusB },
+  }) => {
+    await createAnnouncement(app, ownerB, {
+      campusId: campusB.id,
+      status: 'draft',
+    });
+    expect(
+      taskOf(await tasksOf(api, owner), 'announcementDrafts')
+    ).toBeUndefined();
+    expect(
+      taskOf(await tasksOf(api, ownerB), 'announcementDrafts')?.count
+    ).toBe(1);
+  });
+
   test('T6 and T7 are skipped without a current term while T5 still shows', async ({
     api,
     pool,
@@ -725,6 +787,47 @@ test.describe('recent activity', () => {
       expect.arrayContaining([
         'Login reset for a guardian.',
         'Started 2027/2028.',
+      ])
+    );
+  });
+
+  test('shows announcement events only with announcement:read and keeps the campus filter', async ({
+    api,
+    app,
+    withPermissions,
+    schools: { orgA, owner, lekki, ikeja },
+  }) => {
+    await createAnnouncement(app, owner, {
+      campusId: lekki.id,
+      title: 'Lekki sports day',
+    });
+    await createAnnouncement(app, owner, {
+      campusId: ikeja.id,
+      title: 'Ikeja fair',
+    });
+    await createAnnouncement(app, owner, {
+      campusId: null,
+      title: 'For everyone',
+    });
+    const reader = await withPermissions(orgA, ['announcement:read'], {
+      campuses: [lekki],
+    });
+    const writerOnly = await withPermissions(orgA, ['announcement:create'], {
+      campuses: [lekki],
+    });
+    const texts = async (actor: Actor) =>
+      (await activityOf(api, actor)).items.map((item) => item.text);
+
+    expect((await texts(reader)).toSorted(byText)).toEqual([
+      'Announcement “For everyone” published by Test User.',
+      'Announcement “Lekki sports day” published by Test User.',
+    ]);
+    expect(await texts(writerOnly)).toEqual([]);
+    expect(await texts(owner)).toEqual(
+      expect.arrayContaining([
+        'Announcement “Lekki sports day” published by Test User.',
+        'Announcement “Ikeja fair” published by Test User.',
+        'Announcement “For everyone” published by Test User.',
       ])
     );
   });

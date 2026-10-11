@@ -1,11 +1,13 @@
 import type { INestApplicationContext } from '@nestjs/common';
 import { KYSELY_TOKEN, type Database } from '../../src/app/common/db/tokens';
+import { AnnouncementService } from '../../src/app/modules/announcement/announcement.service';
 import { CalendarService } from '../../src/app/modules/calendar/calendar.service';
 import { CampusService } from '../../src/app/modules/campus/campus.service';
 import { ClassService } from '../../src/app/modules/class/class.service';
 import { StudentService } from '../../src/app/modules/student/student.service';
 import { orgContextFor } from './actors';
 import { SEEDED_ACTING_REASON } from './acting-requests';
+import { SEED_ANNOUNCEMENTS } from './announcements';
 import { CURRENT_CLASS_TEACHERS, SEED_CLASSES } from './classes';
 import { shiftDate } from './date-shift';
 import { emailOf, SUPER_ADMIN_EMAIL } from './members';
@@ -340,6 +342,34 @@ async function checkPlatform(db: Database, check: Check, offsetDays: number) {
   await checkSupportActivity(db, check);
 }
 
+async function checkAnnouncements(app: INestApplicationContext, check: Check) {
+  const funmi = await orgContextFor(app, emailOf('funmi'));
+  const service = app.get(AnnouncementService, { strict: false });
+  const count = (status: string) =>
+    SEED_ANNOUNCEMENTS.filter((item) => item.status === status).length;
+  for (const status of ['published', 'draft', 'withdrawn'] as const) {
+    const listed = await service.list(funmi, { status, page: 1, pageSize: 50 });
+    check(`${status} announcements`, listed.total, count(status));
+  }
+  const published = await service.list(funmi, {
+    status: 'published',
+    page: 1,
+    pageSize: 50,
+  });
+  check(
+    'pinned announcements',
+    published.items.filter((item) => item.pinned).length,
+    SEED_ANNOUNCEMENTS.filter((item) => item.pinned).length
+  );
+  check(
+    'announcement audiences',
+    published.items.filter((item) => item.campusId === null).length,
+    SEED_ANNOUNCEMENTS.filter(
+      (item) => item.status === 'published' && item.campus === null
+    ).length
+  );
+}
+
 export async function runSeedCheck(
   app: INestApplicationContext,
   offsetDays: number
@@ -381,6 +411,7 @@ export async function runSeedCheck(
   await checkCalendar(app, db, check);
   await checkClasses(app, db, check);
   await checkStudents(app, db, check);
+  await checkAnnouncements(app, check);
 
   for (const [key, expected] of Object.entries(visibleStudents)) {
     const ctx = await orgContextFor(app, emailOf(key));
