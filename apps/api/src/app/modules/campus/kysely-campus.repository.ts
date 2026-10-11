@@ -168,7 +168,7 @@ export class KyselyCampusRepository extends CampusRepository {
   }
 
   async hasDependents(organizationId: string, id: string): Promise<boolean> {
-    const [arm, student, placement, fee] = await Promise.all([
+    const [arm, student, placement, fee, announcement] = await Promise.all([
       this.db
         .selectFrom('class_arm')
         .select('id')
@@ -193,12 +193,19 @@ export class KyselyCampusRepository extends CampusRepository {
         .where('campus_id', '=', id)
         .where('organization_id', '=', organizationId)
         .executeTakeFirst(),
+      this.db
+        .selectFrom('announcement')
+        .select('id')
+        .where('campus_id', '=', id)
+        .where('organization_id', '=', organizationId)
+        .executeTakeFirst(),
     ]);
     return (
       arm !== undefined ||
       student !== undefined ||
       placement !== undefined ||
-      fee !== undefined
+      fee !== undefined ||
+      announcement !== undefined
     );
   }
 

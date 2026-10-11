@@ -7,11 +7,15 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { ApiErrorCode } from '@eduvault/api-contract';
-import { can } from '@eduvault/policy';
+import { can, isPortalOnly } from '@eduvault/policy';
 import { isWriteMethod } from '../acting';
 import { AuthContextService } from '../auth-context.service';
 import type { AuthedRequest, OrgContext, SessionContext } from '../auth.types';
-import { PERMISSION_KEY, type RequiredPermission } from '../decorators/tokens';
+import {
+  PERMISSION_KEY,
+  STAFF_ONLY_KEY,
+  type RequiredPermission,
+} from '../decorators/tokens';
 import { assertPasswordSettled } from './password-rule';
 
 @Injectable()
@@ -32,6 +36,14 @@ export class OrganizationAuthGuard implements CanActivate {
 
     const org = await this.resolveOrg(request, session);
     assertWritable(org, request.method);
+
+    const staffOnly = this.reflector.get<string | undefined>(
+      STAFF_ONLY_KEY,
+      context.getHandler()
+    );
+    if (staffOnly !== undefined && isPortalOnly(org.roles)) {
+      throw new ForbiddenException(staffOnly);
+    }
 
     const required = this.reflector.get<RequiredPermission | undefined>(
       PERMISSION_KEY,

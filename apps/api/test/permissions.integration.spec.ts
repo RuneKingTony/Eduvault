@@ -360,6 +360,7 @@ test.describe('/me/permissions', () => {
         class: ['read', 'readAll'],
         team: ['read'],
         campus: ['readAll'],
+        announcement: ['create', 'read', 'update'],
       },
       campusScope: 'all',
       classScope: 'all',

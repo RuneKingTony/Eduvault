@@ -226,6 +226,18 @@ export class KyselyDashboardRepository extends DashboardRepository {
     return rows.map((row) => ({ memberId: row.id, name: row.name }));
   }
 
+  async announcementDrafts(scope: DashboardScope): Promise<Sampled<string>> {
+    const { rows } = await sql<{ title: string; total: number }>`
+      SELECT a.title, count(*) OVER ()::int AS total
+      FROM announcement a
+      WHERE a.organization_id = ${scope.organizationId}
+        AND a.status = 'draft'
+        AND (a.campus_id IS NULL OR ${inScope(sql`a.campus_id`, scope.campusScope)})
+      ORDER BY a.updated_at DESC, a.id
+      LIMIT ${DASHBOARD_SAMPLE_SIZE}`.execute(this.db);
+    return { count: countOf(rows), samples: rows.map((row) => row.title) };
+  }
+
   async roll(scope: DashboardScope): Promise<DashboardRoll> {
     const { rows } = await sql<RollRow>`
       WITH ${visibleStudentsCte(scope)},

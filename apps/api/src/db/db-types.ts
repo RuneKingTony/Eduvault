@@ -66,6 +66,23 @@ export interface ActivityEvent {
   text: string;
 }
 
+export interface Announcement {
+  body: string;
+  campus_id: string | null;
+  created_at: Generated<Timestamp>;
+  created_by: string;
+  id: Generated<string>;
+  organization_id: string;
+  pinned: Generated<boolean>;
+  published_on: Timestamp | null;
+  status: string;
+  tag: string;
+  title: string;
+  updated_at: Generated<Timestamp>;
+  updated_by: string | null;
+  withdrawn_at: Timestamp | null;
+}
+
 export interface AuditLog {
   action: string | null;
   actor_user_id: string;
@@ -389,6 +406,7 @@ export interface DB {
   academic_session: AcademicSession;
   account: Account;
   activity_event: ActivityEvent;
+  announcement: Announcement;
   audit_log: AuditLog;
   campus: Campus;
   class_arm: ClassArm;

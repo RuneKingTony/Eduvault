@@ -32,6 +32,11 @@ export const dashboardTaskSchema = z.discriminatedUnion('kind', [
     classes: samples(nameSchema),
   }),
   z.object({
+    kind: z.literal('announcementDrafts'),
+    count: countSchema,
+    titles: samples(z.string()),
+  }),
+  z.object({
     kind: z.literal('noRole'),
     memberId: idSchema,
     name: z.string(),

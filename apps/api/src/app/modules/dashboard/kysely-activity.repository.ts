@@ -42,6 +42,11 @@ const rowAccess = (access: ActivityAccess): RawBuilder<boolean> => {
       sql<boolean>`(e.pillar = 'foundation' AND e.subject_type = 'school_year')`
     );
   }
+  if (access.foundationSubjects.includes('announcement')) {
+    parts.push(
+      sql<boolean>`(e.pillar = 'foundation' AND e.subject_type = 'announcement')`
+    );
+  }
   if (access.foundationSubjects.includes('student')) {
     parts.push(sql<boolean>`(
       e.pillar = 'foundation'

@@ -24,6 +24,7 @@ describe('dashboardTaskSchema', () => {
     },
     { kind: 'notInClass', count: 1, students: [], startYear: null },
     { kind: 'noClassTeacher', count: 1, classes: [person(1)] },
+    { kind: 'announcementDrafts', count: 2, titles: ['PTA', 'Sports day'] },
     { kind: 'noRole', memberId: id(1), name: 'Ada Obi' },
   ])('parses a $kind task', (task) => {
     expect(dashboardTaskSchema.parse(task)).toEqual(task);

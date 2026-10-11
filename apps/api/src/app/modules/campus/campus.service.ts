@@ -19,6 +19,8 @@ interface CreateInput {
   address?: string | null;
 }
 
+export const CAMPUS_NOT_FOUND_MESSAGE = 'Campus not found';
+
 const CAMPUS_IN_USE_MESSAGE =
   'This campus still has classes, students or money records, so it can’t be deleted.';
 
@@ -43,7 +45,7 @@ export class CampusService {
       !canSeeCampus(ctx.campusScope, campusId) ||
       !(await this.campuses.existsInSchool(ctx.organizationId, campusId))
     ) {
-      throw new NotFoundException('Campus not found');
+      throw new NotFoundException(CAMPUS_NOT_FOUND_MESSAGE);
     }
   }
 
@@ -53,11 +55,11 @@ export class CampusService {
 
   async get(ctx: OrgContext, id: string): Promise<Campus> {
     if (!canSeeCampus(ctx.campusScope, id)) {
-      throw new NotFoundException('Campus not found');
+      throw new NotFoundException(CAMPUS_NOT_FOUND_MESSAGE);
     }
     const campus = await this.campuses.findById(ctx.organizationId, id);
     if (!campus) {
-      throw new NotFoundException('Campus not found');
+      throw new NotFoundException(CAMPUS_NOT_FOUND_MESSAGE);
     }
     return campus;
   }

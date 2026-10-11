@@ -11,6 +11,7 @@ const ALL: Permission[] = [
   'student:markAway',
   'enrollment:place',
   'class:assignTeacher',
+  'announcement:update',
   'member:update',
 ];
 
@@ -38,6 +39,7 @@ const setup = (offer: { targetYearId: string; name: string } | null = null) => {
     withoutCurrentYearEnrolment: 0,
   };
   repository.unled = { count: 1, samples: [person(4)] };
+  repository.drafts = { count: 2, samples: ['PTA meeting', 'Sports day'] };
   repository.roleless = [{ memberId: 'm1', name: 'Ada Obi' }];
   const offerYear = vi.fn(() => Promise.resolve(offer));
   const clock = new Clock();
@@ -76,6 +78,7 @@ describe('DashboardService.tasks', () => {
 
   it.each([
     ['class:assignTeacher', 'noClassTeacher'],
+    ['announcement:update', 'announcementDrafts'],
     ['member:update', 'noRole'],
   ] as [Permission, string][])(
     'shows %s tasks only with the permission: %s',
@@ -85,13 +88,14 @@ describe('DashboardService.tasks', () => {
     }
   );
 
-  it('keeps the order dueLeft, notSeen, notInClass, noClassTeacher, noRole', async () => {
+  it('keeps the order dueLeft, notSeen, notInClass, noClassTeacher, announcementDrafts, noRole', async () => {
     const { service } = setup();
     expect(kinds(await service.tasks(ctxFor(ALL.toReversed())))).toEqual([
       'dueLeft',
       'notSeen',
       'notInClass',
       'noClassTeacher',
+      'announcementDrafts',
       'noRole',
     ]);
   });
@@ -104,6 +108,7 @@ describe('DashboardService.tasks', () => {
       'notSeen',
       'notInClass',
       'noClassTeacher',
+      'announcementDrafts',
     ]);
   });
 
@@ -119,12 +124,32 @@ describe('DashboardService.tasks', () => {
     ]);
   });
 
+  it('counts announcement drafts with their titles for announcement:update', async () => {
+    const { repository, service } = setup();
+    expect(await service.tasks(ctxFor(['announcement:update']))).toEqual([
+      {
+        kind: 'announcementDrafts',
+        count: 2,
+        titles: ['PTA meeting', 'Sports day'],
+      },
+    ]);
+    expect(repository.calls).toEqual(['announcementDrafts']);
+  });
+
+  it('shows no announcement task to a reader or with no drafts', async () => {
+    const { repository, service } = setup();
+    expect(await service.tasks(ctxFor(['announcement:read']))).toEqual([]);
+    repository.drafts = { count: 0, samples: [] };
+    expect(await service.tasks(ctxFor(['announcement:update']))).toEqual([]);
+  });
+
   it('skips the class tasks with no current term', async () => {
     const { repository, service } = setup();
     repository.currentTerm = false;
     expect(kinds(await service.tasks(ctxFor(ALL)))).toEqual([
       'dueLeft',
       'notSeen',
+      'announcementDrafts',
       'noRole',
     ]);
     expect(repository.calls).not.toContain('notInClass');

@@ -107,6 +107,14 @@ export class DashboardService {
         },
       },
       {
+        needs: [['announcement', 'update']],
+        build: async (scope) => {
+          const { count, samples } =
+            await this.repository.announcementDrafts(scope);
+          return [{ kind: 'announcementDrafts', count, titles: samples }];
+        },
+      },
+      {
         needs: [['member', 'update']],
         build: async (scope) => {
           const members = await this.repository.rolelessMembers(

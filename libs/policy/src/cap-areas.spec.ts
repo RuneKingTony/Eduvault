@@ -220,6 +220,7 @@ describe('capSummary', () => {
       'Records leavers and graduates',
       'Marks students away',
       'Parents and guardians: add guardians and link them to students',
+      'Announcements: write, publish, pin and withdraw announcements',
     ]);
   });
 
@@ -237,6 +238,7 @@ describe('capSummary', () => {
       'Records leavers and graduates',
       'Marks students away',
       'Parents and guardians: add guardians and link them to students',
+      'Announcements: write, publish, pin and withdraw announcements',
     ]);
   });
 
@@ -259,6 +261,7 @@ describe('capSummary', () => {
       'Classes: can see',
       'Sees every class',
       'Students: can see',
+      'Announcements: write, publish, pin and withdraw announcements',
     ]);
   });
 
@@ -298,5 +301,20 @@ describe('capChanges', () => {
       'Students: admit students, update them and put them in classes';
     expect(capChanges(see, change)).toEqual({ gained: [changeLine], lost: [] });
     expect(capChanges(change, see)).toEqual({ gained: [], lost: [changeLine] });
+  });
+});
+
+describe('the Announcements area', () => {
+  const announcements = area('announcements');
+
+  it('puts read under see and create and update under change, in School', () => {
+    expect(announcements.group).toBe('School');
+    expect(announcements.label).toBe('Announcements');
+    expect(announcements.see).toEqual(['announcement:read']);
+    expect(announcements.change).toEqual([
+      'announcement:create',
+      'announcement:update',
+    ]);
+    expect(announcements.extras).toEqual([]);
   });
 });

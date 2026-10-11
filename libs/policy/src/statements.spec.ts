@@ -28,6 +28,19 @@ describe('statements', () => {
     );
   });
 
+  it('has announcement create, read and update, with no delete and none sensitive', () => {
+    expect(ALL_PERMISSIONS).toEqual(
+      expect.arrayContaining([
+        'announcement:create',
+        'announcement:read',
+        'announcement:update',
+      ])
+    );
+    expect(ALL_PERMISSIONS).not.toContain('announcement:delete');
+    expect(SENSITIVE).not.toContain('announcement:update');
+    expect(permLabel('announcement:update')).toBe('Announcements: update');
+  });
+
   it('has the member resource and marks adding and removing sensitive', () => {
     expect(ALL_PERMISSIONS).toEqual(
       expect.arrayContaining([

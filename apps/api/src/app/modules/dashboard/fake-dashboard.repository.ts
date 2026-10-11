@@ -17,6 +17,7 @@ export class FakeDashboardRepository extends DashboardRepository {
   unplaced: NotInClass = { ...none, withoutCurrentYearEnrolment: 0 };
   unled: Sampled<Named> = none;
   roleless: RolelessMember[] = [];
+  drafts: Sampled<string> = none;
   rollCounts: DashboardRoll = {
     active: 0,
     newIntakes: 0,
@@ -67,6 +68,11 @@ export class FakeDashboardRepository extends DashboardRepository {
   rolelessMembers(): Promise<RolelessMember[]> {
     this.seen('rolelessMembers');
     return Promise.resolve(this.roleless);
+  }
+
+  announcementDrafts(scope: DashboardScope): Promise<Sampled<string>> {
+    this.seen('announcementDrafts', scope);
+    return Promise.resolve(this.drafts);
   }
 
   roll(scope: DashboardScope): Promise<DashboardRoll> {

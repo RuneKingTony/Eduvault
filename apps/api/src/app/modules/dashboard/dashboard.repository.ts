@@ -44,6 +44,8 @@ export abstract class DashboardRepository {
     campusScope: Scope
   ): Promise<RolelessMember[]>;
 
+  abstract announcementDrafts(scope: DashboardScope): Promise<Sampled<string>>;
+
   abstract roll(scope: DashboardScope): Promise<DashboardRoll>;
 
   abstract myClasses(scope: DashboardScope, userId: string): Promise<MyClass[]>;

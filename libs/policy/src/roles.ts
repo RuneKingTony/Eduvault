@@ -54,6 +54,9 @@ export const STARTER_ROLES: readonly StarterRole[] = [
       'class:readAll',
       'class:update',
       'class:assignTeacher',
+      'announcement:create',
+      'announcement:read',
+      'announcement:update',
     ],
   },
   {
@@ -79,6 +82,9 @@ export const STARTER_ROLES: readonly StarterRole[] = [
       'student:read',
       'class:read',
       'class:readAll',
+      'announcement:create',
+      'announcement:read',
+      'announcement:update',
     ],
   },
   {

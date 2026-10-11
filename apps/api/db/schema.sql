@@ -110,6 +110,33 @@ CREATE TABLE public.activity_event (
 );
 
 --
+-- Name: announcement; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.announcement (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id text NOT NULL,
+    campus_id text,
+    title text NOT NULL,
+    body text NOT NULL,
+    tag text NOT NULL,
+    status text NOT NULL,
+    pinned boolean DEFAULT false NOT NULL,
+    published_on date,
+    withdrawn_at timestamp with time zone,
+    created_by text NOT NULL,
+    updated_by text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT announcement_body_check CHECK (((char_length(body) >= 1) AND (char_length(body) <= 2000))),
+    CONSTRAINT announcement_check CHECK (((NOT pinned) OR (status = 'published'::text))),
+    CONSTRAINT announcement_check1 CHECK (((status <> 'published'::text) OR (published_on IS NOT NULL))),
+    CONSTRAINT announcement_status_check CHECK ((status = ANY (ARRAY['draft'::text, 'published'::text, 'withdrawn'::text]))),
+    CONSTRAINT announcement_tag_check CHECK ((tag = ANY (ARRAY['general'::text, 'academics'::text, 'event'::text, 'fees'::text]))),
+    CONSTRAINT announcement_title_check CHECK (((char_length(title) >= 1) AND (char_length(title) <= 80)))
+);
+
+--
 -- Name: audit_log; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -625,6 +652,13 @@ ALTER TABLE ONLY public.activity_event
     ADD CONSTRAINT activity_event_pkey PRIMARY KEY (id);
 
 --
+-- Name: announcement announcement_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.announcement
+    ADD CONSTRAINT announcement_pkey PRIMARY KEY (id);
+
+--
 -- Name: audit_log audit_log_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1035,6 +1069,12 @@ CREATE INDEX activity_event_subject_idx ON public.activity_event USING btree (or
 CREATE INDEX activity_event_time_idx ON public.activity_event USING btree (organization_id, occurred_at DESC);
 
 --
+-- Name: announcement_status_published_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX announcement_status_published_idx ON public.announcement USING btree (organization_id, status, published_on DESC);
+
+--
 -- Name: audit_log_created_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1259,6 +1299,34 @@ ALTER TABLE ONLY public.activity_event
 
 ALTER TABLE ONLY public.activity_event
     ADD CONSTRAINT activity_event_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE RESTRICT;
+
+--
+-- Name: announcement announcement_campus_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.announcement
+    ADD CONSTRAINT announcement_campus_id_organization_id_fkey FOREIGN KEY (campus_id, organization_id) REFERENCES public.campus(team_id, organization_id);
+
+--
+-- Name: announcement announcement_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.announcement
+    ADD CONSTRAINT announcement_created_by_fkey FOREIGN KEY (created_by) REFERENCES public."user"(id);
+
+--
+-- Name: announcement announcement_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.announcement
+    ADD CONSTRAINT announcement_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE RESTRICT;
+
+--
+-- Name: announcement announcement_updated_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.announcement
+    ADD CONSTRAINT announcement_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES public."user"(id);
 
 --
 -- Name: audit_log audit_log_actor_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -1743,4 +1811,5 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20261010130000'),
     ('20261010140000'),
     ('20261011060008'),
-    ('20261011090000');
+    ('20261011090000'),
+    ('20261011100000');

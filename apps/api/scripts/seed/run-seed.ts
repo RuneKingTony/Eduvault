@@ -14,6 +14,7 @@ import { AuditRepository } from '../../src/app/common/audit';
 import { KYSELY_TOKEN, type Database } from '../../src/app/common/db/tokens';
 import { CampusService } from '../../src/app/modules/campus/campus.service';
 import { PlatformService } from '../../src/app/modules/platform/platform.service';
+import { seedAnnouncements } from './announcements';
 import { seedCalendar } from './calendar';
 import { seedClasses } from './classes';
 import { seedStudents } from './student-seed';
@@ -240,6 +241,11 @@ export async function runSeed(
     owner: await orgContextFor(app, emailOf('tunde')),
     today,
     offsetDays,
+  });
+  await seedAnnouncements(app, {
+    author: await orgContextFor(app, emailOf('tunde')),
+    campusIds: created.campusIds,
+    today,
   });
   await addSupportActivity(app, superAdmin, created.organizationIds);
 

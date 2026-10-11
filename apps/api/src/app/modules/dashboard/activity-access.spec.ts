@@ -23,6 +23,17 @@ describe('activityAccess', () => {
     });
   });
 
+  it('opens announcement rows with announcement:read', () => {
+    expect(access('announcement:read')).toEqual({
+      pillars: ['platform', 'foundation'],
+      foundationSubjects: ['announcement'],
+    });
+  });
+
+  it('keeps announcement rows hidden from announcement:create alone', () => {
+    expect(access('announcement:create').foundationSubjects).toEqual([]);
+  });
+
   it('opens access rows with member:read', () => {
     expect(access('member:read')).toEqual({
       pillars: ['platform', 'access'],

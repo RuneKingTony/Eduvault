@@ -14,6 +14,7 @@ import { SessionAuthGuard } from '../guards/session-auth.guard';
 import {
   ALLOW_TEMPORARY_PASSWORD_KEY,
   PERMISSION_KEY,
+  STAFF_ONLY_KEY,
   type RequiredPermission,
 } from './tokens';
 
@@ -49,6 +50,9 @@ export const OrganizationAuth = <R extends Resource>(
     ),
     UseGuards(OrganizationAuthGuard)
   );
+
+export const StaffOnlyAuth = (message: string) =>
+  applyDecorators(SetMetadata(STAFF_ONLY_KEY, message), OrganizationAuth());
 
 export const CurrentSession = createParamDecorator(
   (_data: unknown, context: ExecutionContext): SessionContext => {
