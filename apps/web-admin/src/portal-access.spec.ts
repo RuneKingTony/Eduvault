@@ -40,6 +40,15 @@ describe('isPortalOnlyAccount', () => {
     ).toBe(false);
   });
 
+  it('is false for an acting super admin, who has no roles', () => {
+    expect(
+      isPortalOnlyAccount({
+        roles: [],
+        permissions: toPermissionMap(ALL_PERMISSIONS),
+      })
+    ).toBe(false);
+  });
+
   it('is false for a portal role that lost student:readOwn, so the portal never sends it back', () => {
     expect(isPortalOnlyAccount({ roles: ['guardian'], permissions: {} })).toBe(
       false
