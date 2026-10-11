@@ -38,6 +38,40 @@ describe('canGrantRole', () => {
     ).toEqual({ allowed: true, missing: [] });
   });
 
+  it('lets an assigner without the permissions grant a portal role', () => {
+    for (const slug of ['student', 'guardian']) {
+      expect(
+        canGrantRole({
+          slug,
+          rolePermissions: toPermissionMap(['student:readOwn']),
+          assignerPermissions: teacher,
+          assignerIsOwner: false,
+        })
+      ).toEqual({ allowed: true, missing: [] });
+    }
+  });
+
+  it('still names any other permission added to a portal role', () => {
+    for (const slug of ['student', 'guardian']) {
+      expect(
+        canGrantRole({
+          slug,
+          rolePermissions: toPermissionMap(['student:readOwn', 'student:read']),
+          assignerPermissions: toPermissionMap(['student:create']),
+          assignerIsOwner: false,
+        })
+      ).toEqual({ allowed: false, missing: ['student:read'] });
+      expect(
+        canGrantRole({
+          slug,
+          rolePermissions: toPermissionMap(['student:readOwn', 'student:read']),
+          assignerPermissions: teacher,
+          assignerIsOwner: false,
+        })
+      ).toEqual({ allowed: true, missing: [] });
+    }
+  });
+
   it('names the permissions the assigner lacks', () => {
     expect(
       canGrantRole({

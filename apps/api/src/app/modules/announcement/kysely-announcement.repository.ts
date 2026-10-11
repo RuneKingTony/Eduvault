@@ -207,6 +207,18 @@ export class KyselyAnnouncementRepository extends AnnouncementRepository {
     );
   }
 
+  async countPublishedSince(
+    scope: AnnouncementScope,
+    since: string
+  ): Promise<number> {
+    const row = await this.visible(this.db, scope)
+      .where('announcement.status', '=', 'published')
+      .where('announcement.published_on', '>=', sql<Date>`${since}::date`)
+      .select(sql<number>`count(*)::int`.as('total'))
+      .executeTakeFirstOrThrow();
+    return row.total;
+  }
+
   create(
     write: AnnouncementWrite,
     activity: ActivityInput

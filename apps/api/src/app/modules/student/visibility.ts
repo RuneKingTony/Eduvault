@@ -13,12 +13,12 @@ export interface VisibilityFacts {
   currentPlacement: PlacementFacts | null;
 }
 
-export interface StudentScope {
+export interface StudentVisibility {
   campusScope: CampusScope;
   classScope: ClassScope;
 }
 
-export const scopeOf = (ctx: OrgContext): StudentScope => ({
+export const scopeOf = (ctx: OrgContext): StudentVisibility => ({
   campusScope: ctx.campusScope,
   classScope: ctx.classScope,
 });
@@ -28,7 +28,7 @@ export const effectiveCampusId = (facts: VisibilityFacts): string =>
 
 export function isStudentVisible(
   facts: VisibilityFacts,
-  scope: StudentScope
+  scope: StudentVisibility
 ): boolean {
   const campusOk =
     scope.campusScope === 'all' ||

@@ -69,6 +69,9 @@ function LevelPicker({
   onChange,
 }: RoleAreasProps & { area: CapArea }) {
   const level = capLevel(permissions, area);
+  const levels = LEVELS.filter(
+    (entry) => entry.level !== 'change' || area.change.length > 0
+  );
   return (
     <RadioGroup
       aria-label={`${area.label} access`}
@@ -76,7 +79,7 @@ function LevelPicker({
       value={level === 'custom' ? '' : level}
       disabled={readOnly}
       onValueChange={(next) => {
-        const picked = LEVELS.find((entry) => entry.level === next)?.level;
+        const picked = levels.find((entry) => entry.level === next)?.level;
         if (picked === undefined) {
           return;
         }
@@ -89,7 +92,7 @@ function LevelPicker({
         onChange({ permissions: applied.map, leftOut: applied.leftOut });
       }}
     >
-      {LEVELS.map((entry) => {
+      {levels.map((entry) => {
         const unheld =
           applyAreaLevel({
             map: permissions,

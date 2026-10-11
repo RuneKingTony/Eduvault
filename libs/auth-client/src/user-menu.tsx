@@ -6,7 +6,7 @@ import {
   SunMoonIcon,
 } from 'lucide-react';
 import { splitRoles } from '@eduvault/policy';
-import { initials } from '@eduvault/shared';
+import { initials, isPlaceholderEmail } from '@eduvault/shared';
 import {
   Avatar,
   AvatarFallback,
@@ -26,10 +26,12 @@ import {
 import type { EduvaultAuthClient } from './auth-client';
 import { useOptionalPermissions } from './permissions';
 import { rolesLabel } from './role-labels';
+import { SchoolMenuItems } from './school-menu-items';
 
 export interface UserMenuUser {
   name: string;
-  email: string;
+  /** What identifies the login: the email, or the username when the email is a placeholder. */
+  login: string;
   image: string | null;
   roles: string;
 }
@@ -42,6 +44,7 @@ export interface UserMenuProps {
   onOpenCommandMenu?: () => void;
   onOpenMyAccess?: () => void;
   onSignedOut?: () => void;
+  onSchoolChanged?: () => void;
 }
 
 export function UserAvatar({
@@ -87,9 +90,63 @@ function UserMenuHeader({ user }: { user: UserMenuUser }) {
         <span className="truncate font-medium text-foreground">
           {user.name}
         </span>
-        <span className="truncate text-xs font-normal">{user.email}</span>
+        <span className="truncate text-xs font-normal">{user.login}</span>
       </span>
     </DropdownMenuLabel>
+  );
+}
+
+function SchoolSection({
+  authClient,
+  onChanged,
+}: {
+  authClient: EduvaultAuthClient;
+  onChanged: () => void;
+}) {
+  const schools = authClient.useListOrganizations();
+  if ((schools.data?.length ?? 0) < 2) {
+    return null;
+  }
+  return (
+    <>
+      <SchoolMenuItems authClient={authClient} onSwitched={onChanged} />
+      <DropdownMenuSeparator />
+    </>
+  );
+}
+
+function loginOf(user: {
+  email: string;
+  username?: string | null;
+  displayUsername?: string | null;
+}): string {
+  const username = user.displayUsername ?? user.username ?? null;
+  return isPlaceholderEmail(user.email) && username !== null
+    ? username
+    : user.email;
+}
+
+function MenuActions({
+  onOpenMyAccess,
+  onOpenCommandMenu,
+}: Pick<UserMenuProps, 'onOpenCommandMenu' | 'onOpenMyAccess'>) {
+  return (
+    <>
+      {onOpenMyAccess === undefined ? null : (
+        <DropdownMenuItem onSelect={onOpenMyAccess}>
+          <KeyRoundIcon />
+          My access
+        </DropdownMenuItem>
+      )}
+      {onOpenCommandMenu === undefined ? null : (
+        <DropdownMenuItem onSelect={onOpenCommandMenu}>
+          <SearchIcon />
+          Command menu
+          <DropdownMenuShortcut>⌘K</DropdownMenuShortcut>
+        </DropdownMenuItem>
+      )}
+      <ThemeItem />
+    </>
   );
 }
 
@@ -100,6 +157,7 @@ export function UserMenu({
   onOpenCommandMenu,
   onOpenMyAccess,
   onSignedOut,
+  onSchoolChanged,
 }: UserMenuProps) {
   const session = authClient.useSession();
   const member = authClient.useActiveMember();
@@ -110,8 +168,8 @@ export function UserMenu({
   }
   const user: UserMenuUser = {
     name: sessionUser.name,
-    email: sessionUser.email,
     image: sessionUser.image ?? null,
+    login: loginOf(sessionUser),
     roles: rolesLabel(access?.roles ?? splitRoles(member.data?.role)),
   };
 
@@ -121,20 +179,13 @@ export function UserMenu({
       <DropdownMenuContent side={side} align="end" className="min-w-60">
         <UserMenuHeader user={user} />
         <DropdownMenuSeparator />
-        {onOpenMyAccess === undefined ? null : (
-          <DropdownMenuItem onSelect={onOpenMyAccess}>
-            <KeyRoundIcon />
-            My access
-          </DropdownMenuItem>
+        {onSchoolChanged === undefined ? null : (
+          <SchoolSection authClient={authClient} onChanged={onSchoolChanged} />
         )}
-        {onOpenCommandMenu === undefined ? null : (
-          <DropdownMenuItem onSelect={onOpenCommandMenu}>
-            <SearchIcon />
-            Command menu
-            <DropdownMenuShortcut>⌘K</DropdownMenuShortcut>
-          </DropdownMenuItem>
-        )}
-        <ThemeItem />
+        <MenuActions
+          onOpenMyAccess={onOpenMyAccess}
+          onOpenCommandMenu={onOpenCommandMenu}
+        />
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onSelect={() => {

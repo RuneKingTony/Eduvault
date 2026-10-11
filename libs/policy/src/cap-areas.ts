@@ -161,6 +161,16 @@ export const CAP_AREAS: readonly CapArea[] = [
     changeDesc: 'Write, publish, pin and withdraw announcements',
     extras: [],
   },
+  {
+    id: 'portal',
+    group: 'Portal',
+    label: 'Own records',
+    important: false,
+    see: ['student:readOwn'],
+    change: [],
+    changeDesc: '',
+    extras: [],
+  },
 ];
 
 export const LEGACY_PERMISSIONS: readonly Permission[] = [

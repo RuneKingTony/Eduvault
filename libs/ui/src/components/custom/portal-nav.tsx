@@ -4,6 +4,7 @@ import { cn } from '../../lib/utils';
 export interface PortalNavItem {
   id: string;
   label: string;
+  shortLabel?: string;
   href: string;
   icon: ReactNode;
   current: boolean;

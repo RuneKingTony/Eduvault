@@ -70,6 +70,7 @@ describe('RolesPage', () => {
         label: 'Cashier',
         held: ['student:read', 'team:read'],
       }),
+      role('hall', { label: 'Hall monitor' }),
     ]);
     const cashier = await screen.findByRole('button', { name: 'Cashier' });
     expect(
@@ -81,8 +82,10 @@ describe('RolesPage', () => {
     ).toBeInTheDocument();
     const guardian = screen.getByRole('button', { name: 'Guardian' });
     expect(
-      within(guardian).getByText('Nothing switched on')
+      within(guardian).getByText('1 thing switched on')
     ).toBeInTheDocument();
+    const hall = screen.getByRole('button', { name: 'Hall monitor' });
+    expect(within(hall).getByText('Nothing switched on')).toBeInTheDocument();
   });
 
   it('shows holder avatars with initials and +n past four', async () => {

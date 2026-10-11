@@ -91,13 +91,13 @@ export const STARTER_ROLES: readonly StarterRole[] = [
     slug: 'student',
     label: 'Student',
     description: 'Portal only. Sees their own records.',
-    permissions: [],
+    permissions: ['student:readOwn'],
   },
   {
     slug: 'guardian',
     label: 'Guardian',
     description: 'Portal only. Sees their linked children.',
-    permissions: [],
+    permissions: ['student:readOwn'],
   },
 ];
 

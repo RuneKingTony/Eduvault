@@ -146,6 +146,7 @@ const context = (...permissions: Permission[]): OrgContext => ({
   activeCampusId: null,
   campusScope: 'all',
   classScope: 'all',
+  studentScope: [],
   acting: null,
   headers: new Headers(),
 });

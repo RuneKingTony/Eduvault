@@ -1,7 +1,7 @@
 import type { NewGuardian, GuardianRelationship } from '@eduvault/api-contract';
 import type { CampusScope } from '../../common/campus-scope';
 import type { SchoolRules } from '../../common/people';
-import type { StudentScope } from './visibility';
+import type { StudentVisibility } from './visibility';
 
 export interface CurrentTerm {
   termId: string;
@@ -106,7 +106,7 @@ export abstract class AdmissionRepository {
 
   abstract duplicates(
     organizationId: string,
-    scope: StudentScope,
+    scope: StudentVisibility,
     input: {
       firstName: string;
       lastName: string;

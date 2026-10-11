@@ -25,6 +25,7 @@ import {
   UserPlusIcon,
   UserRoundPlusIcon,
   UsersIcon,
+  UsersRoundIcon,
   WalletIcon,
   type LucideIcon,
 } from 'lucide-react';
@@ -35,6 +36,7 @@ const NAV_ICONS = {
   megaphone: MegaphoneIcon,
   'graduation-cap': GraduationCapIcon,
   users: UsersIcon,
+  'users-round': UsersRoundIcon,
   'user-plus': UserPlusIcon,
   'user-round-plus': UserRoundPlusIcon,
   school: SchoolIcon,

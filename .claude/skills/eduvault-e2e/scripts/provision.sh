@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Creates the e2e personas through the real API and records every school, campus and student in a ledger.
-# The super admin creates each school and its owner (POST /platform/schools); the owner creates the staff (POST /members).
+# The super admin creates each school and its owner (POST /platform/schools); the owner creates the staff (POST /members)
+# and admits the students, whose admission creates the student and guardian portal logins.
 # Usage: provision.sh   prints the run directory (tmp/e2e/<run>) on stdout; personas.json and ledger.json are inside.
 set -eu
 ROOT="$(git rev-parse --show-toplevel)"
@@ -48,11 +49,26 @@ class_in() { # jar campusId -> class id (a JSS1 class on the campus)
   level=$(call "$1" GET /class-levels | jq -r '[.[]|select(.code=="JSS1")][0].id')
   call "$1" POST /classes "$(jq -nc --arg l "$level" --arg c "$2" --arg n "A $RUN" '{levelId:$l,campusId:$c,name:$n}')" | jq -r .id
 }
+new_guardian() {
+  jq -nc --arg n "Guardian $1 $RUN" \
+    '[{new:{fullName:$n,phone:"08012345678",address:"1 Test Street",relationship:"mother",paysFees:true,login:{kind:"username"}}}]'
+}
+admit_in() {
+  local res id
+  res=$(call "$1" POST /students "$(jq -nc --arg c "$2" --arg f "E2E$5" --arg l "$RUN" --argjson g "$6" \
+    '{firstName:$f,lastName:$l,gender:"F",dateOfBirth:"2014-03-03",classArmId:$c,guardians:$g}')") || return 1
+  id=$(jq -r .student.id <<<"$res")
+  record student "$id" "$3" "$4"; echo "$res"
+}
 student_in() { # jar classId school key label -> student id (admitted with one new username guardian)
-  local id
-  id=$(call "$1" POST /students "$(jq -nc --arg c "$2" --arg f "E2E$5" --arg l "$RUN" \
-    '{firstName:$f,lastName:$l,gender:"F",dateOfBirth:"2014-03-03",classArmId:$c,guardians:[{new:{fullName:("Guardian "+$f+" "+$l),phone:"08012345678",address:"1 Test Street",relationship:"mother",paysFees:true,login:{kind:"username"}}}]}')" | jq -r .student.id)
-  record student "$id" "$3" "$4"; echo "$id"
+  admit_in "$1" "$2" "$3" "$4" "$5" "$(new_guardian "$5")" | jq -r .student.id
+}
+login_of() { jq -r --arg w "$2" --arg f "$3" '[.logins[]|select(.who==$w)][0][$f] // empty' <<<"$1"; }
+portal_in() {
+  call "$DIR/$1.jar" POST /api/auth/sign-in/username "$(jq -nc --arg u "$2" --arg p "$3" '{username:$u,password:$p}')" >/dev/null || return 1
+  call "$DIR/$1.jar" POST /me/password "$(jq -nc --arg p "$PASSWORD" '{newPassword:$p}')" >/dev/null || return 1
+  : >"$DIR/$1.jar"
+  call "$DIR/$1.jar" POST /api/auth/sign-in/username "$(jq -nc --arg u "$2" --arg p "$PASSWORD" '{username:$u,password:$p}')" >/dev/null
 }
 # school_for <key> <label> -> prints "<userId> <schoolId>". The owner signs in with the temporary
 # password and chooses e2e-password-123 (POST /me/password).
@@ -92,9 +108,9 @@ add_persona() { # key userId schoolId campusId
   jq --arg k "$1" --arg e "$(email "$1")" --arg p "$PASSWORD" --arg u "$2" --arg s "$3" --arg c "$4" \
     '. + {($k):{email:$e,password:$p,userId:$u,schoolId:$s,campusId:$c,blocked:null,unblocked_by:null}}' "$PERSONAS" >"$PERSONAS.tmp" && mv "$PERSONAS.tmp" "$PERSONAS"
 }
-block_persona() { # key slice [reason]
-  jq --arg k "$1" --arg e "$(email "$1")" --arg p "$PASSWORD" --arg b "$2" --arg r "${3:-no HTTP endpoint provisions this persona yet}" \
-    '. + {($k):{email:$e,password:$p,userId:"",schoolId:"",campusId:"",blocked:$r,unblocked_by:$b}}' "$PERSONAS" >"$PERSONAS.tmp" && mv "$PERSONAS.tmp" "$PERSONAS"
+add_portal_persona() {
+  jq --arg k "$1" --arg u "$2" --arg p "$PASSWORD" --arg s "$3" --arg c "$4" \
+    '. + {($k):{email:"",username:$u,password:$p,userId:"",schoolId:$s,campusId:$c,blocked:null,unblocked_by:null}}' "$PERSONAS" >"$PERSONAS.tmp" && mv "$PERSONAS.tmp" "$PERSONAS"
 }
 add_superadmin() {
   jq --arg e "$E2E_SUPERADMIN_EMAIL" --arg p "$E2E_SUPERADMIN_PASSWORD" \
@@ -114,6 +130,16 @@ IKEJA=$(campus_in "$OJAR" "$SCHOOL" owner Ikeja)
 year_in "$OJAR"
 LEKKI_CLASS=$(class_in "$OJAR" "$LEKKI")
 OSTUDENT=$(student_in "$OJAR" "$LEKKI_CLASS" "$SCHOOL" owner owner-student)
+IKEJA_CLASS=$(class_in "$OJAR" "$IKEJA")
+ADA_RES=$(admit_in "$OJAR" "$LEKKI_CLASS" "$SCHOOL" owner Ada "$(new_guardian Ada)")
+ADA=$(jq -r .student.id <<<"$ADA_RES")
+GUARDIAN_ID=$(login_of "$ADA_RES" guardian guardianId)
+TOBI_RES=$(admit_in "$OJAR" "$IKEJA_CLASS" "$SCHOOL" owner Tobi \
+  "$(jq -nc --arg g "$GUARDIAN_ID" '[{existingGuardianId:$g,relationship:"mother",paysFees:true}]')")
+TOBI=$(jq -r .student.id <<<"$TOBI_RES")
+portal_in student "$(login_of "$ADA_RES" student username)" "$(login_of "$ADA_RES" student temporaryPassword)"
+portal_in guardian "$(login_of "$ADA_RES" guardian username)" "$(login_of "$ADA_RES" guardian temporaryPassword)"
+portal_in tobistudent "$(login_of "$TOBI_RES" student username)" "$(login_of "$TOBI_RES" student temporaryPassword)"
 
 read -r FOREIGN_UID FSCHOOL < <(school_for foreign Hilltop)
 FMAIN=$(campus_in "$DIR/foreign.jar" "$FSCHOOL" foreign Main)
@@ -138,9 +164,10 @@ add_persona teacher "$TEACHER_UID" "$SCHOOL" "$LEKKI"
 add_persona newhire "$NEWHIRE_UID" "$SCHOOL" "$LEKKI"
 add_persona foreign "$FOREIGN_UID" "$FSCHOOL" "$FMAIN"
 add_superadmin
-block_persona student 'M2.8'
-block_persona guardian 'M2.8'
+add_portal_persona student "$(login_of "$ADA_RES" student username)" "$SCHOOL" "$LEKKI"
+add_portal_persona guardian "$(login_of "$ADA_RES" guardian username)" "$SCHOOL" "$LEKKI"
+add_portal_persona tobistudent "$(login_of "$TOBI_RES" student username)" "$SCHOOL" "$IKEJA"
 
-jq --arg os "$OSTUDENT" --arg fs "$FSTUDENT" --arg ik "$IKEJA" --arg r "$RUN" \
-  '. + {ownerStudentId:$os,foreignStudentId:$fs,ikejaCampusId:$ik,runId:$r}' "$PERSONAS" >"$PERSONAS.tmp" && mv "$PERSONAS.tmp" "$PERSONAS"
+jq --arg os "$OSTUDENT" --arg fs "$FSTUDENT" --arg ik "$IKEJA" --arg r "$RUN" --arg ada "$ADA" --arg tobi "$TOBI" \
+  '. + {ownerStudentId:$os,foreignStudentId:$fs,ikejaCampusId:$ik,runId:$r,adaStudentId:$ada,tobiStudentId:$tobi}' "$PERSONAS" >"$PERSONAS.tmp" && mv "$PERSONAS.tmp" "$PERSONAS"
 echo "$DIR"

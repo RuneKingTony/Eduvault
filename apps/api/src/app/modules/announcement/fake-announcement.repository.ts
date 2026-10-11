@@ -87,6 +87,20 @@ export class FakeAnnouncementRepository extends AnnouncementRepository {
     );
   }
 
+  countPublishedSince(
+    scope: AnnouncementScope,
+    since: string
+  ): Promise<number> {
+    return Promise.resolve(
+      this.visible(scope).filter(
+        (row) =>
+          row.status === 'published' &&
+          row.publishedOn !== null &&
+          row.publishedOn >= since
+      ).length
+    );
+  }
+
   private store(
     write: AnnouncementWrite,
     activity: ActivityInput

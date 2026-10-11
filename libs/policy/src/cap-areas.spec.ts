@@ -221,6 +221,7 @@ describe('capSummary', () => {
       'Marks students away',
       'Parents and guardians: add guardians and link them to students',
       'Announcements: write, publish, pin and withdraw announcements',
+      'Own records: can see',
     ]);
   });
 
@@ -316,5 +317,24 @@ describe('the Announcements area', () => {
       'announcement:update',
     ]);
     expect(announcements.extras).toEqual([]);
+  });
+});
+
+describe('the Portal area', () => {
+  const portal = area('portal');
+
+  it('holds student:readOwn under see, with no change set', () => {
+    expect(portal.group).toBe('Portal');
+    expect(portal.label).toBe('Own records');
+    expect(portal.see).toEqual(['student:readOwn']);
+    expect(portal.change).toEqual([]);
+    expect(portal.extras).toEqual([]);
+  });
+
+  it('summarises the student and guardian roles as own records', () => {
+    for (const slug of ['student', 'guardian']) {
+      expect(summaryFor(slug)).toEqual(['Own records: can see']);
+    }
+    expect(summaryFor('teacher')).not.toContain('Own records: can see');
   });
 });

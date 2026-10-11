@@ -549,6 +549,9 @@ importers:
       '@eduvault/auth-client':
         specifier: workspace:*
         version: link:../../libs/auth-client
+      '@eduvault/policy':
+        specifier: workspace:*
+        version: link:../../libs/policy
       '@eduvault/shared':
         specifier: workspace:*
         version: link:../../libs/shared

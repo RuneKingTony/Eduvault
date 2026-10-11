@@ -570,6 +570,27 @@ test.describe('starter roles', () => {
     }
   });
 
+  test('syncAllStarterRoles gives a school seeded before the portal the readOwn grant on student and guardian', async ({
+    pool,
+    schools: { orgA },
+  }) => {
+    await pool.query(
+      `UPDATE "organizationRole" SET permission = '{}'
+       WHERE "organizationId" = $1 AND role IN ('student', 'guardian')`,
+      [orgA.id]
+    );
+
+    await syncAllStarterRoles(pool);
+
+    const rows = await rolesOf(pool, orgA.id);
+    for (const slug of ['student', 'guardian']) {
+      const row = rows.find((candidate) => candidate.role === slug);
+      expect(parsePermissionMap(row?.permission ?? '')).toEqual({
+        student: ['readOwn'],
+      });
+    }
+  });
+
   test('a school cannot hold two rows for one role slug', async ({
     pool,
     schools: { orgA },

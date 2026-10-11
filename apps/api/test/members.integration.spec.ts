@@ -239,6 +239,33 @@ test.describe('members', () => {
         true
       );
     });
+
+    test('lets a manager grant the portal roles until an owner widens one beyond what the manager holds', async ({
+      api,
+      withPermissions,
+      schools: { orgA, owner },
+    }) => {
+      const manager = await withPermissions(orgA, MANAGER);
+      const grantableOf = async (slug: string) =>
+        (
+          (await api(manager).get('/members/roles').expect(200)).body as {
+            slug: string;
+            grantable: boolean;
+          }[]
+        ).find((role) => role.slug === slug)?.grantable;
+      expect(await grantableOf('guardian')).toBe(true);
+      expect(await grantableOf('student')).toBe(true);
+
+      await api(owner)
+        .patch('/roles/guardian')
+        .send({
+          permissions: { student: ['readOwn'], schoolAccount: ['update'] },
+        })
+        .expect(200);
+
+      expect(await grantableOf('guardian')).toBe(false);
+      expect(await grantableOf('student')).toBe(true);
+    });
   });
 
   test.describe('create', () => {

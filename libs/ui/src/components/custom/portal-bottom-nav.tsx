@@ -19,7 +19,7 @@ export function PortalBottomNav({ items, renderLink }: PortalNavProps) {
               children: (
                 <>
                   {item.icon}
-                  {item.label}
+                  {item.shortLabel ?? item.label}
                 </>
               ),
             })}

@@ -1,6 +1,7 @@
 import { CheckIcon, ClockIcon } from 'lucide-react';
 import type { GuardianLink, StudentRow } from '@eduvault/api-contract';
-import { fmtDate, inactiveFrom, initials } from '@eduvault/shared';
+import { fmtDate, inactiveFrom, initials, logoSrc } from '@eduvault/shared';
+import { API_URL } from '../env';
 import {
   Avatar,
   AvatarFallback,
@@ -12,7 +13,6 @@ import {
   avatarHueClass,
   cn,
 } from '@eduvault/ui';
-import { logoSrc } from '../school-logo';
 
 export const nameOf = (person: { firstName: string; lastName: string }) =>
   `${person.firstName} ${person.lastName}`;
@@ -29,7 +29,7 @@ export function PersonAvatar({
   return (
     <Avatar className={className}>
       {photoUrl === null ? null : (
-        <AvatarImage src={logoSrc(photoUrl)} alt="" />
+        <AvatarImage src={logoSrc(API_URL, photoUrl)} alt="" />
       )}
       <AvatarFallback className={cn('text-xs', avatarHueClass(name))}>
         {initials(name)}

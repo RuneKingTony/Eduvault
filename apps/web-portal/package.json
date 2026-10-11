@@ -10,6 +10,7 @@
     "react-dom": "catalog:react",
     "@eduvault/api-contract": "workspace:*",
     "@eduvault/auth-client": "workspace:*",
+    "@eduvault/policy": "workspace:*",
     "@eduvault/shared": "workspace:*",
     "@eduvault/ui": "workspace:*",
     "lucide-react": "catalog:ui"

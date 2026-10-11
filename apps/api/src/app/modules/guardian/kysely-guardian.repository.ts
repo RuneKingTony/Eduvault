@@ -15,7 +15,7 @@ import {
   type StudentFacts,
 } from '../../common/people';
 import { visibleStudentsCte } from '../../common/students';
-import type { StudentScope } from '../student/visibility';
+import type { StudentVisibility } from '../student/visibility';
 import {
   GuardianRepository,
   type GuardianPickerQuery,
@@ -98,7 +98,7 @@ export class KyselyGuardianRepository extends GuardianRepository {
 
   async list(
     organizationId: string,
-    scope: StudentScope,
+    scope: StudentVisibility,
     query: GuardianPickerQuery
   ): Promise<GuardianSummary[]> {
     const q = query.q ?? '';
@@ -147,7 +147,7 @@ export class KyselyGuardianRepository extends GuardianRepository {
 
   async findDetail(
     organizationId: string,
-    scope: StudentScope,
+    scope: StudentVisibility,
     input: { id: string }
   ): Promise<GuardianDetail | undefined> {
     const { rows } = await sql<DetailRow>`
@@ -192,7 +192,7 @@ export class KyselyGuardianRepository extends GuardianRepository {
 
   async findVisible(
     organizationId: string,
-    scope: StudentScope,
+    scope: StudentVisibility,
     input: { id: string }
   ): Promise<VisibleGuardian | undefined> {
     const { rows } = await sql<{
@@ -225,7 +225,7 @@ export class KyselyGuardianRepository extends GuardianRepository {
 
   async linksOf(
     organizationId: string,
-    scope: StudentScope,
+    scope: StudentVisibility,
     input: { studentId: string }
   ): Promise<GuardianLink[] | undefined> {
     const student = await this.findStudent(organizationId, scope, input);
@@ -245,7 +245,7 @@ export class KyselyGuardianRepository extends GuardianRepository {
 
   async findStudent(
     organizationId: string,
-    scope: StudentScope,
+    scope: StudentVisibility,
     input: { studentId: string }
   ): Promise<StudentFacts | undefined> {
     const { rows } = await sql<{
