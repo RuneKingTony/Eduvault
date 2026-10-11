@@ -49,6 +49,11 @@ export abstract class AnnouncementRepository {
     limit: number
   ): Promise<AnnouncementSummary[]>;
 
+  abstract publishedPage(
+    scope: AnnouncementScope,
+    paging: { page: number; pageSize: number }
+  ): Promise<{ items: AnnouncementSummary[]; total: number }>;
+
   abstract countPublishedSince(
     scope: AnnouncementScope,
     since: string

@@ -1,6 +1,9 @@
 import { z } from 'zod';
 import { addDays } from '@eduvault/shared';
-import { announcementSummarySchema } from './announcements';
+import {
+  ANNOUNCEMENT_PAGE_SIZE,
+  announcementSummarySchema,
+} from './announcements';
 import { idSchema } from './schemas';
 
 export const PORTAL_STUDENT_NOT_FOUND_MESSAGE = 'Student not found';
@@ -78,3 +81,24 @@ export const portalAnnouncementsSchema = z.object({
   newThisWeek: z.number().int().nonnegative(),
 });
 export type PortalAnnouncements = z.infer<typeof portalAnnouncementsSchema>;
+
+export const portalAnnouncementListQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(50)
+    .default(ANNOUNCEMENT_PAGE_SIZE),
+});
+export type PortalAnnouncementListQuery = z.output<
+  typeof portalAnnouncementListQuerySchema
+>;
+
+export const portalAnnouncementListSchema = z.object({
+  items: z.array(announcementSummarySchema),
+  total: z.number().int().nonnegative(),
+});
+export type PortalAnnouncementList = z.infer<
+  typeof portalAnnouncementListSchema
+>;

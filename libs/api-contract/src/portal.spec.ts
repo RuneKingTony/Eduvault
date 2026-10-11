@@ -2,6 +2,7 @@ import { contract } from './contract';
 import {
   isNewAnnouncement,
   newAnnouncementsSince,
+  portalAnnouncementListQuerySchema,
   portalAnnouncementsQuerySchema,
   portalChildSchema,
   portalMeSchema,
@@ -77,6 +78,27 @@ describe('portal schemas', () => {
   });
 });
 
+describe('the full announcement list query', () => {
+  it('pages ten at a time from the first page and caps a page at fifty', () => {
+    expect(portalAnnouncementListQuerySchema.parse({})).toEqual({
+      page: 1,
+      pageSize: 10,
+    });
+    expect(
+      portalAnnouncementListQuerySchema.parse({ page: '2', pageSize: '50' })
+    ).toEqual({ page: 2, pageSize: 50 });
+    for (const query of [
+      { page: '0' },
+      { pageSize: '51' },
+      { pageSize: '0' },
+    ]) {
+      expect(portalAnnouncementListQuerySchema.safeParse(query).success).toBe(
+        false
+      );
+    }
+  });
+});
+
 describe('the new-this-week window', () => {
   it('starts seven days before today', () => {
     expect(newAnnouncementsSince('2026-10-11')).toBe('2026-10-04');
@@ -98,6 +120,12 @@ describe('the portal routes', () => {
     }
     expect(
       Object.keys(contract.portal).toSorted((a, b) => a.localeCompare(b))
-    ).toEqual(['announcements', 'children', 'me', 'student']);
+    ).toEqual([
+      'announcementList',
+      'announcements',
+      'children',
+      'me',
+      'student',
+    ]);
   });
 });

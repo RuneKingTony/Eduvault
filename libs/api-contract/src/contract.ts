@@ -62,6 +62,8 @@ import {
   updateGuardianLinkSchema,
 } from './guardians';
 import {
+  portalAnnouncementListQuerySchema,
+  portalAnnouncementListSchema,
   portalAnnouncementsQuerySchema,
   portalAnnouncementsSchema,
   portalChildSchema,
@@ -653,6 +655,13 @@ export const contract = defineContract({
       params: portalStudentParamsSchema,
       query: portalAnnouncementsQuerySchema,
       response: portalAnnouncementsSchema,
+    }),
+    announcementList: defineRoute({
+      method: 'GET',
+      path: '/portal/students/:studentId/announcements/all',
+      params: portalStudentParamsSchema,
+      query: portalAnnouncementListQuerySchema,
+      response: portalAnnouncementListSchema,
     }),
   },
   announcements: {

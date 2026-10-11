@@ -1,6 +1,7 @@
 import { Controller, Get, Param, Query } from '@nestjs/common';
 import {
   contract,
+  type PortalAnnouncementListQuery,
   type PortalAnnouncementsQuery,
   type RouteOutput,
 } from '@eduvault/api-contract';
@@ -45,5 +46,16 @@ export class PortalController {
     @Query(zod(routes.announcements.query)) query: PortalAnnouncementsQuery
   ): Promise<RouteOutput<typeof routes.announcements>> {
     return this.portal.announcementsFor(org, params.studentId, query);
+  }
+
+  @Get('students/:studentId/announcements/all')
+  @OrganizationAuth('student', 'readOwn')
+  announcementList(
+    @Org() org: OrgContext,
+    @Param(zod(routes.announcementList.params)) params: { studentId: string },
+    @Query(zod(routes.announcementList.query))
+    query: PortalAnnouncementListQuery
+  ): Promise<RouteOutput<typeof routes.announcementList>> {
+    return this.portal.announcementListFor(org, params.studentId, query);
   }
 }
