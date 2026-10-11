@@ -123,7 +123,7 @@ Scopes:
 
 - Title "What they can do" (icon key-round).
 - One line per capability from the plain-language summary of their combined permissions (see [21](21-roles-and-permissions.md#plain-language-areas)), each with a check icon. Empty: "Nothing yet. Give them a role to get started."
-- Then a key–value list: **Campuses**: "Every campus" or the campus names; **Classes**: "Every class", "{class names} (classes they teach)", or "No classes assigned yet". Classes needs the class model ([M2.3]); until it lands the row reads "Every class" for anyone with `class:readAll` and is hidden otherwise.
+- Then a key–value list: **Campuses**: "Every campus" or the campus names; **Classes**: "Every class", "{class names} (classes they teach)", or "No classes assigned yet". The row is hidden for a member with no `class:read`. `MemberDetail.classes` (`{ id, displayName }`) carries the names, limited to the viewer's campus and class scope ([D-202](../technical-reference.md#decision-log)).
 
 #### Reset password dialog
 
