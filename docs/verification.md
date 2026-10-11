@@ -45,7 +45,7 @@ Required for every change that touches product code ([ADR 0004, amended](adr/000
 | Create personas             | `bash .claude/skills/eduvault-e2e/scripts/provision.sh`                                |
 | Reverse a run's data        | `bash .claude/skills/eduvault-e2e/scripts/cleanup.sh "$PWD/tmp/e2e/<run>/ledger.json"` |
 
-The browser is driven through the `playwright-cli` skill and the API through `curl`; there is no Playwright project in the workspace. Personas are provisioned through the real API, screenshots go to `tmp/e2e/<run>/`, and a run's schools, students and user accounts stay until `pnpm db:reset`, because students and money are never deleted (cleanup reverses only empty campuses and closes sessions). If the stack is down the run stops with `BLOCKED (environment)`, which is not a pass.
+The browser is driven through the `playwright-cli` skill and the API through `curl`; there is no Playwright project in the workspace. Personas are provisioned through the real API, screenshots go to `tmp/e2e/<run>/` (never one showing a password or other credential: `/ship` publishes them on the PR, and the repo is public), and a run's schools, students and user accounts stay until `pnpm db:reset`, because students and money are never deleted (cleanup reverses only empty campuses and closes sessions). If the stack is down the run stops with `BLOCKED (environment)`, which is not a pass.
 
 ## Not verified by any gate
 

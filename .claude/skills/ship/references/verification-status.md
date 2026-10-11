@@ -8,7 +8,7 @@ stage table and README; state.sh stage transitions, `next` (including `run`, `st
 stale propagation, `halt`, `note`, `ran`, `skip-e2e`, `accept-descope`, restated-descope detection,
 `followup`, `fetch-ticket` against gh-issues fixtures; verify.sh stale, fresh and failing handoffs, the
 review count check, the review fan-out handoffs, simplify deferral and the required-specs list; lock.sh
-`steal`; security-gate.sh path scoping; prompt.sh note rendering; finish.sh refusals and its dry run; the
+`steal`; security-gate.sh path scoping; prompt.sh note rendering; evidence.sh selection (credential, age, size, count and run-directory filters), the dry-run comment, the evidence-branch commit and push to a local bare remote, and comment create-or-edit against a stub gh; finish.sh refusals and its dry run; the
 Herdr guard on setup.sh, worker.sh, ready.sh and wait-worker.sh; the ScheduleWakeup guard.
 
 **Verified in real runs (EDU-18 and EDU-19 under `/spike`, 2026-10-09):** the pane worker for implement,

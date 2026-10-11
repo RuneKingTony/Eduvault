@@ -109,6 +109,7 @@ halt on a stage, record it: `bash $W/state.sh halt <KEY> <stage> "<reason>"`, ne
 - A `running` stage restarts only through `$R/reattach.md`; dispatch only onto an idle or gone worker;
   close only panes this run created.
 - `status.json` only through `state.sh`; `$LOCK` only through `lock.sh`.
+- Screenshots reach the PR only through `bash $W/evidence.sh publish <KEY>` (public repo: its credential filter is the only guard).
 - Browser checks run in the e2e subagent, not the worker; `/goal` runs only in a worker pane.
 - Every diff base is `origin/main`, never local `main`.
 - A Stop-hook nudge while this run holds `$LOCK` is not an instruction to stop, release or pause.

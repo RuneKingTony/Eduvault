@@ -66,7 +66,7 @@ goes to the PR body under "Unresolved review findings"; a fixed finding never do
 5. `bash $W/stack.sh down <KEY> $RUN_ID`, whatever happened. Exit 4 (the run's browser session is still open
    and `e2e.json` is unwritten): `bash $ROOT/.claude/skills/eduvault-e2e/scripts/close-sessions.sh
 --run=$(cat $D/e2e.run)`, then `down` again, or `down --force`.
-6. `verify.sh <KEY> e2e` -> 0 `pass`. Anything else, BLOCKED with `cause: environment` included, halts with
+6. `verify.sh <KEY> e2e` -> 0 `pass`; if `.pr_url` is already set (a merge-sync rerun), `bash $W/evidence.sh publish <KEY>` again so the PR shows this run's screenshots. Anything else, BLOCKED with `cause: environment` included, halts with
    the reason: the run is required, so a change whose stack can't run never reaches `push`. Fix the
    environment and `/ship <KEY>` resumes at e2e. `state.sh skip-e2e` is for a person overriding by hand, never
    for this stage. `e2e.json`'s `partial` is a pass the PR lists as "Not verified locally".
@@ -75,7 +75,12 @@ goes to the PR body under "Unresolved review findings"; a fixed finding never do
 
 **pr.** Worker stage (haiku): the draft PR. After verify: `state.sh set <KEY> '.pr_url = $u' --arg u <pr_url>`,
 `state.sh stage <KEY> pr pass`, `bash $W/issue-sync.sh <KEY>` (label `in-review`; a failure is reported, not a
-halt). The PR stays a draft.
+halt), then `bash $W/evidence.sh publish <KEY>` (also reported, never a halt; exit 0 and nothing posted when the run
+has no screenshots). It commits the e2e run's `step-NN-*.png` to the `e2e-evidence` branch and posts or updates one
+"Visual evidence" comment on the PR, at most 12 files, 1.5 MB each and 12 MB in all, and **leaves out any file whose
+name, caption or criterion mentions a password, credential, secret, token, cookie or temporary login, or that its
+evidence entry marks `"secret": true`**. The repo is public, so that filter is the only guard: never attach a
+screenshot by hand. `evidence.sh select <KEY>` lists what would go. The PR stays a draft.
 
 **merge-gate.** `$R/merge-gate.md`.
 

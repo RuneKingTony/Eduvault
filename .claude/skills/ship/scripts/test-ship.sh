@@ -351,6 +351,81 @@ has "auto-decide finish squash-merges at the gate's head" "pr merge https://gith
 ok "auto-decide finish never uses --admin" "" "$(grep -- --admin "$GH_LOG")"
 ok "auto-decide finish records its via" "--auto-decide" "$(S get $KA .finish.via)"
 
+echo "== evidence.sh (screenshots on the PR)"
+EK=EDU-77; ED=$SHIP_OPSX/$EK; ER=$T/erepo; EO=$T/eorigin.git; RUN=$T/erun/9001
+git init -q "$ER"; git init -q --bare "$EO"; git -C "$ER" remote add origin "$EO"
+mkdir -p "$RUN/web-admin" "$ED" "$T/eelse"
+for f in step-01-students-list step-02-admit-form step-03-reset-login-new-password step-04-review step-05-profile step-06-old; do
+  printf 'png-%s' "$f" > "$RUN/web-admin/$f.png"
+done
+printf 'x' > "$RUN/web-admin/notes.txt"; printf 'png' > "$T/eelse/step-09-elsewhere.png"
+printf 'png-%0200d' 0 > "$RUN/web-admin/step-07-too-big.png"
+touch -t 200001010000 "$RUN/web-admin/step-06-old.png"
+echo "$RUN" > "$ED/e2e.run"
+jq -n --arg r "$RUN/web-admin" --arg e "$T/eelse" '{verdict: "PASS", report: ($r + "/../report.md"), evidence: [
+  {path: ($r + "/step-01-students-list.png"), caption: "Students list with counts", ac: "Students tabs show counts"},
+  {path: ($r + "/step-04-review.png"), caption: "Dialog shows passwords once", ac: "Temporary passwords appear once"},
+  {path: ($r + "/step-05-profile.png"), caption: "Profile page", ac: "Profile shows the portal login", secret: true},
+  {path: ($e + "/step-09-elsewhere.png"), caption: "Not from this run"}]}' > "$ED/e2e.json"
+S set $EK '.pr_url = "https://github.com/o/r/pull/9" | .stages.e2e = {result: "pass", started_epoch: 1000000000}' >/dev/null
+export SHIP_ROOT=$ER EVIDENCE_SLUG=o/r EVIDENCE_MAX_FILE_BYTES=100
+SEL=$(bash "$W/evidence.sh" select $EK 2>"$T/eskips"); ok "select: exit 0" 0 "$?"
+ok "select keeps only the clean screenshots of this attempt, in step order" "step-01-students-list.png step-02-admit-form.png" "$(jq -r '[.[].name] | join(" ")' <<<"$SEL")"
+ok "select: a listed caption is used" "Students list with counts" "$(jq -r '.[0].caption' <<<"$SEL")"
+ok "select: an unlisted file gets a caption from its name" "Admit form" "$(jq -r '.[1].caption' <<<"$SEL")"
+SK=$(cat "$T/eskips")
+has "a password in the file name is left out" "step-03-reset-login-new-password.png: may show a credential" "$SK"
+has "a password in the caption is left out" "step-04-review.png: may show a credential" "$SK"
+has "an entry marked secret is left out" "step-05-profile.png: may show a credential" "$SK"
+has "a screenshot from before the attempt is left out" "step-06-old.png: older than the e2e attempt" "$SK"
+has "an oversize file is left out" "step-07-too-big.png: empty or over 100 bytes" "$SK"
+has "a listed file outside the run directory is left out" "step-09-elsewhere.png: not under this run's directory" "$SK"
+ok "select: the count cap keeps the listed, earliest step" "step-01-students-list.png" "$(EVIDENCE_MAX_COUNT=1 bash "$W/evidence.sh" select $EK 2>/dev/null | jq -r '[.[].name] | join(" ")')"
+ok "select: the total size cap" 1 "$(EVIDENCE_MAX_TOTAL_BYTES=25 bash "$W/evidence.sh" select $EK 2>/dev/null | jq 'length')"
+OUT=$(bash "$W/evidence.sh" publish $EK --dry-run 2>/dev/null); ok "publish --dry-run: exit 0" 0 "$?"
+has "the comment opens with the marker" "<!-- ship:evidence:start -->" "$OUT"
+has "the comment shows the verdict" "**PASS**" "$OUT"
+has "the comment embeds the image by commit SHA on the evidence branch" '<img src="https://github.com/o/r/blob/' "$OUT"
+has "the image path is KEY/run/name" "/$EK/9001/step-01-students-list.png?raw=true" "$OUT"
+has "the comment carries the caption and its criterion" "**Students list with counts** (Students tabs show counts)" "$OUT"
+has "the comment counts what was left out" "6 screenshot(s) left out" "$OUT"
+ok "the comment embeds no credential screenshot" "" "$(grep -E 'reset-login|step-04' <<<"$OUT")"
+SHA=$(sed -n 's|.*blob/\([0-9a-f]*\)/.*|\1|p' <<<"$OUT" | head -1)
+ok "the dry run committed the file under KEY/run/ in a temporary index" "blob" "$(git -C "$ER" cat-file -t "$SHA:$EK/9001/step-01-students-list.png")"
+ok "the dry run pushed nothing" "" "$(git -C "$EO" branch --list e2e-evidence)"
+ok "upload with no file is usage (2)" 2 "$(rc bash "$W/evidence.sh" upload prefix)"
+ok "an unknown subcommand is usage (2)" 2 "$(rc bash "$W/evidence.sh" nope)"
+
+mkdir -p "$T/ebin"
+cat > "$T/ebin/gh" <<'GH_EOF'
+#!/bin/sh
+echo "$*" >> "$GH_LOG"
+case "$1" in api) case "$*" in *PATCH*) ;; *) [ -n "${EXISTING_COMMENT:-}" ] && echo "$EXISTING_COMMENT" ;; esac ;; esac
+exit 0
+GH_EOF
+chmod +x "$T/ebin/gh"; GH_LOG=$T/egh.log; export GH_LOG; : > "$GH_LOG"
+OUT=$(PATH="$T/ebin:$PATH" bash "$W/evidence.sh" publish $EK 2>/dev/null); ok "publish: exit 0" 0 "$?"
+has "publish says how many it attached" "attached 2 screenshot(s)" "$OUT"
+ok "publish pushed the evidence branch" "blob" "$(git -C "$EO" cat-file -t "e2e-evidence:$EK/9001/step-02-admit-form.png")"
+has "publish opens a PR comment from a file" "pr comment https://github.com/o/r/pull/9 --body-file" "$(cat "$GH_LOG")"
+ok "publish records what it attached" "2 6" "$(S get $EK '.evidence | "\(.count) \(.omitted)"')"
+: > "$GH_LOG"
+EXISTING_COMMENT=555 PATH="$T/ebin:$PATH" bash "$W/evidence.sh" publish $EK >/dev/null 2>&1
+has "a re-run edits the existing evidence comment" "api -X PATCH repos/o/r/issues/comments/555" "$(cat "$GH_LOG")"
+ok "a re-run opens no second comment" "" "$(grep '^pr comment' "$GH_LOG")"
+ok "a second upload adds a commit on the evidence branch" 2 "$(git -C "$EO" rev-list --count e2e-evidence)"
+
+rm -f "$ED/e2e.json"
+ok "no e2e.json: publish exits 0" 0 "$(rc bash "$W/evidence.sh" publish $EK)"
+jq -n --arg r "$RUN" '{verdict: "PASS", report: ($r + "/report.md"), evidence: []}' > "$ED/e2e.json"
+rm -f "$RUN"/web-admin/*.png
+: > "$GH_LOG"; OUT=$(PATH="$T/ebin:$PATH" bash "$W/evidence.sh" publish $EK 2>&1); ok "no screenshots: publish exits 0" 0 "$?"
+has "no screenshots: says so" "no screenshots to attach" "$OUT"
+ok "no screenshots: nothing posted" "" "$(cat "$GH_LOG")"
+S set $EK 'del(.pr_url)' >/dev/null
+ok "no PR yet: publish fails (1), it is not a halt" 1 "$(rc bash "$W/evidence.sh" publish $EK)"
+unset SHIP_ROOT EVIDENCE_SLUG EVIDENCE_MAX_FILE_BYTES GH_LOG
+
 echo "== Herdr guard (HERDR_ENV unset)"
 for c in "setup.sh EDU-1" "worker.sh status EDU-1" "worker.sh dispatch EDU-1 implement" "wait-worker.sh EDU-1 5" "ready.sh nobody 0"; do
   OUT=$(bash "$W/${c%% *}" ${c#* } 2>&1); R=$?
