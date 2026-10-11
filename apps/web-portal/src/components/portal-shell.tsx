@@ -1,12 +1,16 @@
 import {
   Link,
   Outlet,
+  useNavigate,
   useRouter,
   useRouterState,
+  useSearch,
 } from '@tanstack/react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { ChevronDownIcon } from 'lucide-react';
-import { initials } from '@eduvault/shared';
+import type { MePermissions, PortalMe } from '@eduvault/api-contract';
+import { initials, logoSrc } from '@eduvault/shared';
+import { API_URL } from '../env';
 import { UserAvatar, UserMenu, useAuthClient } from '@eduvault/auth-client';
 import {
   Button,
@@ -18,29 +22,45 @@ import {
   cn,
   useIsCompact,
   type PortalNavItem,
+  type PortalNavLinkProps,
   type RenderPortalNavLink,
 } from '@eduvault/ui';
 import { PORTAL_NAV, isCurrent, visiblePortalNav } from '../nav';
+import { childParam, selectChild } from '../selected-child';
+import { ChildSwitcher } from './child-switcher';
 
-const renderLink: RenderPortalNavLink = ({ item, className, children }) => (
-  <Link
-    to={item.href}
-    className={className}
-    aria-current={item.current ? 'page' : undefined}
-  >
-    {children}
-  </Link>
-);
+function PortalLink({
+  item,
+  className,
+  children,
+  child,
+}: PortalNavLinkProps & { child: string | undefined }) {
+  return (
+    <Link
+      to={item.href}
+      search={child === undefined ? {} : { child }}
+      className={className}
+      aria-current={item.current ? 'page' : undefined}
+    >
+      {children}
+    </Link>
+  );
+}
 
-function usePortalNavItems(): PortalNavItem[] {
+function usePortalNavItems({ me, access }: ShellData): PortalNavItem[] {
   const router = useRouter();
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
   });
   const built = new Set(Object.keys(router.routesByPath));
-  return visiblePortalNav(PORTAL_NAV, built).map((entry) => ({
+  return visiblePortalNav(PORTAL_NAV, {
+    builtRoutes: built,
+    permissions: access.permissions,
+    kind: me.kind,
+  }).map((entry) => ({
     id: entry.id,
     label: entry.label,
+    ...(entry.shortLabel === undefined ? {} : { shortLabel: entry.shortLabel }),
     href: entry.route,
     icon: <NavIcon name={entry.icon} />,
     current: isCurrent(entry, pathname),
@@ -50,11 +70,18 @@ function usePortalNavItems(): PortalNavItem[] {
 function PortalAccount({ compact }: { compact: boolean }) {
   const authClient = useAuthClient();
   const queryClient = useQueryClient();
+  const router = useRouter();
   return (
     <UserMenu
       authClient={authClient}
       onSignedOut={() => {
         queryClient.clear();
+      }}
+      onSchoolChanged={() => {
+        queryClient.removeQueries();
+        void router
+          .navigate({ to: '/', search: { child: undefined } })
+          .then(() => router.invalidate());
       }}
       renderTrigger={(user) => (
         <Button
@@ -72,30 +99,57 @@ function PortalAccount({ compact }: { compact: boolean }) {
   );
 }
 
-function SchoolHeader({ compact }: { compact: boolean }) {
-  const authClient = useAuthClient();
-  const session = authClient.useSession();
-  const schools = authClient.useListOrganizations();
-  const activeId = session.data?.session.activeOrganizationId ?? null;
-  const name =
-    schools.data?.find((school) => school.id === activeId)?.name ?? 'School';
-  return (
-    <PortalTopbar schoolName={name} schoolInitials={initials(name)}>
-      <PortalAccount compact={compact} />
-    </PortalTopbar>
-  );
+interface ShellData {
+  me: PortalMe;
+  access: Pick<MePermissions, 'permissions'>;
 }
 
-export function PortalShell() {
+function useChildSwitcher(me: PortalMe) {
+  const navigate = useNavigate();
+  const search = useSearch({ strict: false });
+  const selected = selectChild(me.children, childParam(search.child));
+  const switcher =
+    me.kind === 'guardian' && me.children.length > 0 ? (
+      <ChildSwitcher
+        linked={me.children}
+        selectedId={selected?.id}
+        onSelect={(child) => {
+          void navigate({
+            to: '.',
+            search: (previous) => ({ ...previous, child }),
+          });
+        }}
+      />
+    ) : null;
+  return {
+    switcher,
+    childId: me.kind === 'guardian' ? selected?.id : undefined,
+  };
+}
+
+export function PortalShell({ me, access }: ShellData) {
   const compact = useIsCompact();
-  const items = usePortalNavItems();
+  const items = usePortalNavItems({ me, access });
+  const { switcher, childId } = useChildSwitcher(me);
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
   });
+  const renderLink: RenderPortalNavLink = (link) => (
+    <PortalLink {...link} child={childId} />
+  );
   return (
     <TooltipProvider>
       <div className="flex min-h-svh flex-col">
-        <SchoolHeader compact={compact} />
+        <PortalTopbar
+          schoolName={me.school.name}
+          schoolInitials={initials(me.school.name)}
+          logoUrl={logoSrc(API_URL, me.school.logoUrl)}
+        >
+          <div className="flex min-w-0 items-center gap-3">
+            {compact ? null : switcher}
+            <PortalAccount compact={compact} />
+          </div>
+        </PortalTopbar>
         {compact ? null : <PortalNav items={items} renderLink={renderLink} />}
         <main
           className={cn(
@@ -104,6 +158,7 @@ export function PortalShell() {
           )}
         >
           <div key={pathname} className="flex page-reveal flex-col gap-5">
+            {compact && pathname !== '/children' ? switcher : null}
             <Outlet />
           </div>
         </main>

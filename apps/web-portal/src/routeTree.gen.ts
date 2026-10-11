@@ -10,43 +10,43 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as FeesRouteImport } from './routes/fees'
+import { Route as ChildrenRouteImport } from './routes/children'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const FeesRoute = FeesRouteImport.update({
-  id: '/fees',
-  path: '/fees',
+const ChildrenRoute = ChildrenRouteImport.update({
+  id: '/children',
+  path: '/children',
   getParentRoute: () => rootRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/fees': typeof FeesRoute
+  '/children': typeof ChildrenRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/fees': typeof FeesRoute
+  '/children': typeof ChildrenRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/fees': typeof FeesRoute
+  '/children': typeof ChildrenRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/fees'
+  fullPaths: '/' | '/children'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/fees'
-  id: '__root__' | '/' | '/fees'
+  to: '/' | '/children'
+  id: '__root__' | '/' | '/children'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  FeesRoute: typeof FeesRoute
+  ChildrenRoute: typeof ChildrenRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -58,11 +58,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/fees': {
-      id: '/fees'
-      path: '/fees'
-      fullPath: '/fees'
-      preLoaderRoute: typeof FeesRouteImport
+    '/children': {
+      id: '/children'
+      path: '/children'
+      fullPath: '/children'
+      preLoaderRoute: typeof ChildrenRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -70,7 +70,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  FeesRoute: FeesRoute,
+  ChildrenRoute: ChildrenRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

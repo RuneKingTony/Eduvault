@@ -340,3 +340,49 @@ describe('feed', () => {
     expect(feed.map((item) => item.id)).toEqual(['l']);
   });
 });
+
+const at = (id: string, publishedOn: string, campusId: string | null) =>
+  row({ id, status: 'published', publishedOn, campusId });
+
+describe('forPortal', () => {
+  it('shows everyone and the campus’s items, and counts the last seven days with pinned included', async () => {
+    const { service } = setup(
+      at('new-lekki', '2026-10-04', 'lekki'),
+      at('new-all', '2026-10-11', null),
+      row({
+        ...published,
+        id: 'pinned-old',
+        pinned: true,
+        publishedOn: '2026-09-01',
+      }),
+      at('old', '2026-10-03', 'lekki'),
+      at('ikeja', '2026-10-10', 'ikeja'),
+      row({ id: 'draft', status: 'draft' })
+    );
+    const result = await service.forPortal(everyone, {
+      campusId: 'lekki',
+      limit: 5,
+    });
+    expect(result.items.map((item) => item.id).toSorted(byId)).toEqual([
+      'new-all',
+      'new-lekki',
+      'old',
+      'pinned-old',
+    ]);
+    expect(result.newThisWeek).toBe(2);
+  });
+
+  it('limits the items but counts them all', async () => {
+    const { service } = setup(
+      at('a', '2026-10-10', null),
+      at('b', '2026-10-09', null),
+      at('c', '2026-10-08', null)
+    );
+    const result = await service.forPortal(everyone, {
+      campusId: 'lekki',
+      limit: 2,
+    });
+    expect(result.items).toHaveLength(2);
+    expect(result.newThisWeek).toBe(3);
+  });
+});

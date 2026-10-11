@@ -387,6 +387,7 @@ describe('Advanced grid vocabulary', () => {
     expect(ACTION_WORDS.create).toBe('add');
     expect(ACTION_WORDS.readAll).toBe('see all');
     expect(ACTION_WORDS.setCurrent).toBe('set current');
+    expect(ACTION_WORDS.readOwn).toBe('see their own');
   });
 
   it('puts the calendar under Foundation', () => {

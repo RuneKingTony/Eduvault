@@ -223,6 +223,7 @@ export const ACTION_WORDS: Record<Action, string> = {
   create: 'add',
   read: 'see',
   readAll: 'see all',
+  readOwn: 'see their own',
   update: 'change',
   delete: 'remove',
   setCurrent: 'set current',

@@ -6,17 +6,18 @@ const OK = { error: null };
 
 function setup(result: { error: unknown } = OK, variant?: 'staff' | 'portal') {
   const email = vi.fn().mockResolvedValue(result);
+  const username = vi.fn().mockResolvedValue(result);
   render(
     <SignInForm
-      authClient={fakeClient({ signIn: { email } })}
+      authClient={fakeClient({ signIn: { email, username } })}
       variant={variant}
     />
   );
-  return { email };
+  return { email, username };
 }
 
-const fill = (email: string, password: string) => {
-  fireEvent.change(screen.getByLabelText('Email'), {
+const fill = (email: string, password: string, label = 'Email') => {
+  fireEvent.change(screen.getByLabelText(label), {
     target: { value: email },
   });
   fireEvent.change(screen.getByLabelText('Password'), {
@@ -95,5 +96,78 @@ describe('SignInForm', () => {
 
   it('maps failures to copy', () => {
     expect(signInErrorMessage({})).toBe('That email and password don’t match.');
+  });
+
+  it('keeps the staff form email-only', async () => {
+    const { email, username } = setup();
+    fill('ada', 'long-enough-password');
+    await waitFor(() => {
+      expect(email).toHaveBeenCalledWith({
+        email: 'ada',
+        password: 'long-enough-password',
+      });
+    });
+    expect(username).not.toHaveBeenCalled();
+  });
+});
+
+describe('SignInForm in the portal', () => {
+  const LABEL = 'Username or email';
+
+  it('asks for a username or email', () => {
+    setup(OK, 'portal');
+    expect(screen.getByLabelText(LABEL)).toHaveAttribute('type', 'text');
+    expect(screen.queryByLabelText('Email')).not.toBeInTheDocument();
+  });
+
+  it('signs in by username when the input has no @', async () => {
+    const { email, username } = setup(OK, 'portal');
+    fill(' greenfield-0123 ', 'long-enough-password', LABEL);
+    await waitFor(() => {
+      expect(username).toHaveBeenCalledWith({
+        username: 'greenfield-0123',
+        password: 'long-enough-password',
+      });
+    });
+    expect(email).not.toHaveBeenCalled();
+  });
+
+  it('signs in by email when the input has an @', async () => {
+    const { email, username } = setup(OK, 'portal');
+    fill('ngozi@example.com', 'long-enough-password', LABEL);
+    await waitFor(() => {
+      expect(email).toHaveBeenCalledWith({
+        email: 'ngozi@example.com',
+        password: 'long-enough-password',
+      });
+    });
+    expect(username).not.toHaveBeenCalled();
+  });
+
+  it('asks for the missing identifier in its own words', () => {
+    const { email, username } = setup(OK, 'portal');
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+    expect(screen.getByText('Enter your username or email.')).toBeVisible();
+    expect(email).not.toHaveBeenCalled();
+    expect(username).not.toHaveBeenCalled();
+  });
+
+  it('says a failed username sign-in does not match', async () => {
+    setup({ error: { status: 401 } }, 'portal');
+    fill('greenfield-0123', 'wrong-password-123', LABEL);
+    expect(
+      await screen.findByText(
+        'That username or email and password don’t match.'
+      )
+    ).toBeInTheDocument();
+  });
+
+  it('keeps the shared messages for a rate limit', () => {
+    expect(signInErrorMessage({ status: 429 }, 'portal')).toBe(
+      'Too many attempts. Wait a minute and try again.'
+    );
+    expect(signInErrorMessage({}, 'portal')).toBe(
+      'That username or email and password don’t match.'
+    );
   });
 });

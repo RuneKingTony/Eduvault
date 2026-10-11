@@ -61,6 +61,14 @@ import {
   resetLoginSchema,
   updateGuardianLinkSchema,
 } from './guardians';
+import {
+  portalAnnouncementsQuerySchema,
+  portalAnnouncementsSchema,
+  portalChildSchema,
+  portalMeSchema,
+  portalStudentParamsSchema,
+  portalStudentSchema,
+} from './portal';
 import { defineContract, defineRoute } from './route';
 import {
   admissionDuplicatesQuerySchema,
@@ -620,6 +628,31 @@ export const contract = defineContract({
       method: 'GET',
       path: '/dashboard/my-classes',
       response: z.array(myClassSchema),
+    }),
+  },
+  portal: {
+    me: defineRoute({
+      method: 'GET',
+      path: '/portal/me',
+      response: portalMeSchema,
+    }),
+    children: defineRoute({
+      method: 'GET',
+      path: '/portal/children',
+      response: z.array(portalChildSchema),
+    }),
+    student: defineRoute({
+      method: 'GET',
+      path: '/portal/students/:studentId',
+      params: portalStudentParamsSchema,
+      response: portalStudentSchema,
+    }),
+    announcements: defineRoute({
+      method: 'GET',
+      path: '/portal/students/:studentId/announcements',
+      params: portalStudentParamsSchema,
+      query: portalAnnouncementsQuerySchema,
+      response: portalAnnouncementsSchema,
     }),
   },
   announcements: {

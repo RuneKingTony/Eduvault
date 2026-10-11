@@ -16,9 +16,9 @@ import type { OrgContext } from '../../common/auth';
 import { CampusService } from '../campus/campus.service';
 import { GuardianService } from '../guardian/guardian.service';
 import { StudentRepository } from './student.repository';
-import { scopeOf, type StudentScope } from './visibility';
+import { scopeOf, type StudentVisibility } from './visibility';
 
-const ALL_SCOPE: StudentScope = { campusScope: 'all', classScope: 'all' };
+const ALL_SCOPE: StudentVisibility = { campusScope: 'all', classScope: 'all' };
 
 const notFound = () => new NotFoundException(STUDENT_NOT_FOUND_MESSAGE);
 
@@ -89,7 +89,7 @@ export class StudentService {
 
   private async read(
     ctx: OrgContext,
-    scope: StudentScope,
+    scope: StudentVisibility,
     id: string
   ): Promise<StudentDetail> {
     const detail = await this.students.findDetail(

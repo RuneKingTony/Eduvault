@@ -42,6 +42,8 @@ export interface OrgContext {
   activeCampusId: string | null;
   campusScope: Scope;
   classScope: Scope;
+  /** Own student plus linked children (archived included); `[]` unless the member holds a portal role. */
+  studentScope: string[];
   acting: ActingContext | null;
   headers: Headers;
 }

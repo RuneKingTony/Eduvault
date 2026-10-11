@@ -20,14 +20,33 @@ interface SignInFailure {
   code?: string;
 }
 
-export function signInErrorMessage({ status, code }: SignInFailure): string {
+const IDENTIFIERS: Record<
+  AuthVariant,
+  { label: string; missing: string; mismatch: string }
+> = {
+  staff: {
+    label: 'Email',
+    missing: 'Enter your email.',
+    mismatch: 'That email and password don’t match.',
+  },
+  portal: {
+    label: 'Username or email',
+    missing: 'Enter your username or email.',
+    mismatch: 'That username or email and password don’t match.',
+  },
+};
+
+export function signInErrorMessage(
+  { status, code }: SignInFailure,
+  variant: AuthVariant = 'staff'
+): string {
   if (status === 429) {
     return TOO_MANY_ATTEMPTS_MESSAGE;
   }
   if (code === 'BANNED_USER') {
     return BANNED_USER_MESSAGE;
   }
-  return 'That email and password don’t match.';
+  return IDENTIFIERS[variant].mismatch;
 }
 
 interface FieldErrors {
@@ -35,14 +54,18 @@ interface FieldErrors {
   password?: string;
 }
 
-function validate(email: string, password: string): FieldErrors {
+function validate(
+  email: string,
+  password: string,
+  variant: AuthVariant
+): FieldErrors {
   return {
-    ...(email === '' ? { email: 'Enter your email.' } : {}),
+    ...(email === '' ? { email: IDENTIFIERS[variant].missing } : {}),
     ...(password === '' ? { password: 'Enter your password.' } : {}),
   };
 }
 
-function useSignIn(authClient: EduvaultAuthClient) {
+function useSignIn(authClient: EduvaultAuthClient, variant: AuthVariant) {
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -52,17 +75,20 @@ function useSignIn(authClient: EduvaultAuthClient) {
     const form = new FormData(event.currentTarget);
     const email = fieldValue(form, 'email').trim();
     const password = fieldValue(form, 'password');
-    const problems = validate(email, password);
+    const problems = validate(email, password, variant);
     setFieldErrors(problems);
     setError(null);
     if (Object.keys(problems).length > 0) {
       return;
     }
     setPending(true);
-    const result = await authClient.signIn.email({ email, password });
+    const byUsername = variant === 'portal' && !email.includes('@');
+    const result = byUsername
+      ? await authClient.signIn.username({ username: email, password })
+      : await authClient.signIn.email({ email, password });
     setPending(false);
     if (result.error) {
-      setError(signInErrorMessage(result.error));
+      setError(signInErrorMessage(result.error, variant));
     }
   }
 
@@ -76,7 +102,10 @@ export function SignInForm({
   authClient: EduvaultAuthClient;
   variant?: AuthVariant;
 }) {
-  const { fieldErrors, error, pending, submit } = useSignIn(authClient);
+  const { fieldErrors, error, pending, submit } = useSignIn(
+    authClient,
+    variant
+  );
   const { heading, intro } = HEADINGS[variant];
 
   return (
@@ -89,9 +118,9 @@ export function SignInForm({
           )}
         </div>
         <TextField
-          label="Email"
+          label={IDENTIFIERS[variant].label}
           name="email"
-          type="email"
+          type={variant === 'portal' ? 'text' : 'email'}
           autoComplete="username"
           aria-invalid={fieldErrors.email === undefined ? undefined : true}
         />

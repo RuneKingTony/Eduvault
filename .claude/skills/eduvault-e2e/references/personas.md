@@ -2,21 +2,22 @@
 
 Created fresh each run by `scripts/provision.sh` and written to `tmp/e2e/<run>/personas.json`. Password for all: `e2e-password-123`. Email: `e2e-<run>-<key>@eduvault.test`.
 
-| Key          | Prototype persona | School, campus                      | Roles                 | Created through                                                                                                                    | Status                  |
-| ------------ | ----------------- | ----------------------------------- | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
-| `owner`      | Funmi             | Greenfield `<run>`, Lekki and Ikeja | owner                 | `POST /platform/schools` as the super admin, then sign-in with the temporary password and `POST /me/password`; `POST /campuses` x2 | works                   |
-| `foreign`    | Kola Ajayi        | Hilltop `<run>`, Main               | owner                 | the same calls in a second school                                                                                                  | works                   |
-| `superadmin` | Jude              | platform                            | `superadmin`          | `bootstrap-admin` (a worktree stack runs it on `up`; the shared stack needs it done once)                                          | works                   |
-| `admin`      | Tunde             | Greenfield, both                    | administrator         | `POST /members` as the owner, then `PUT /members/:id/roles`; sign-in with the temporary password and `POST /me/password`           | works                   |
-| `bursar`     | Chika             | Greenfield, Lekki                   | bursar                | as `admin`                                                                                                                         | works                   |
-| `bursar2`    | Yemi              | Greenfield, Ikeja                   | bursar                | as `admin`                                                                                                                         | works                   |
-| `principal`  | Grace             | Greenfield, both                    | teacher, principal    | as `admin`                                                                                                                         | works                   |
-| `newhire`    | Kemi              | Greenfield, Lekki                   | member only, no roles | `POST /members` as the owner, no roles added                                                                                       | works                   |
-| `teacher`    | Mr Obi            | Greenfield, Lekki                   | teacher               | as `admin`; class scope comes with M2.3                                                                                            | works                   |
-| `student`    | Ada               | Greenfield, Lekki                   | student               | the owner admits a student; the portal login comes from admission                                                                  | **blocked**, needs M2.8 |
-| `guardian`   | Ngozi             | Greenfield                          | guardian              | added as the paying guardian at admission, with email                                                                              | **blocked**, needs M2.8 |
+| Key           | Prototype persona | School, campus                      | Roles                 | Created through                                                                                                                    | Status |
+| ------------- | ----------------- | ----------------------------------- | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| `owner`       | Funmi             | Greenfield `<run>`, Lekki and Ikeja | owner                 | `POST /platform/schools` as the super admin, then sign-in with the temporary password and `POST /me/password`; `POST /campuses` x2 | works  |
+| `foreign`     | Kola Ajayi        | Hilltop `<run>`, Main               | owner                 | the same calls in a second school                                                                                                  | works  |
+| `superadmin`  | Jude              | platform                            | `superadmin`          | `bootstrap-admin` (a worktree stack runs it on `up`; the shared stack needs it done once)                                          | works  |
+| `admin`       | Tunde             | Greenfield, both                    | administrator         | `POST /members` as the owner, then `PUT /members/:id/roles`; sign-in with the temporary password and `POST /me/password`           | works  |
+| `bursar`      | Chika             | Greenfield, Lekki                   | bursar                | as `admin`                                                                                                                         | works  |
+| `bursar2`     | Yemi              | Greenfield, Ikeja                   | bursar                | as `admin`                                                                                                                         | works  |
+| `principal`   | Grace             | Greenfield, both                    | teacher, principal    | as `admin`                                                                                                                         | works  |
+| `newhire`     | Kemi              | Greenfield, Lekki                   | member only, no roles | `POST /members` as the owner, no roles added                                                                                       | works  |
+| `teacher`     | Mr Obi            | Greenfield, Lekki                   | teacher               | as `admin`; class scope comes with M2.3                                                                                            | works  |
+| `student`     | Ada               | Greenfield, Lekki                   | student               | the owner admits Ada; her login comes from admission, signs in by username and chooses a password through `POST /me/password`      | works  |
+| `guardian`    | Ngozi             | Greenfield                          | guardian              | the username guardian added at Ada's admission, then linked to a sibling by id; signs in by username like `student`                | works  |
+| `tobistudent` | Tobi              | Greenfield, Ikeja                   | student               | Tobi's own login from his admission, signed in and settled like `student`; used to check that a child who left loses the school    | works  |
 
-`owner` and `foreign` each get a school year (the first term is current) and a JSS1 class; the owner's class is on Lekki. Both students are admitted with `POST /students` (a new username guardian), so the guardian's portal login exists but is not a persona yet. The fixture also holds `ownerStudentId` (a student in Lekki), `foreignStudentId` and `ikejaCampusId`. A blocked persona has an empty `userId`, a `blocked` reason and an `unblocked_by` slice in `personas.json`.
+`owner` and `foreign` each get a school year (the first term is current) and a JSS1 class; the owner's class is on Lekki. `owner` and `foreign` each get a student admitted with `POST /students` and a new username guardian. The fixture also holds `ownerStudentId` (another family's child in Greenfield, Lekki), `foreignStudentId`, `adaStudentId`, `tobiStudentId` and `ikejaCampusId`. A blocked persona would have an empty `userId`, a `blocked` reason and an `unblocked_by` slice in `personas.json`; none is blocked now.
 
 ## The super admin and the owners
 
@@ -28,10 +29,11 @@ For each school the super admin posts `POST /platform/schools` with the school, 
 
 The owner creates `admin`, `bursar`, `bursar2`, `principal`, `teacher` and `newhire` over HTTP: `POST /members` (name, email, job title, campuses) answers the temporary password once, `PUT /members/:id/roles` gives the roles (`newhire` gets none), and each persona signs in with the temporary password and chooses `e2e-password-123` through `POST /me/password`. `provision.sh` records every member in the ledger (kind `member`, the owner as actor). Better Auth's own member and invitation routes are switched off (D-094), so nothing else creates them.
 
-Only `student` and `guardian` stay blocked, with `unblocked_by: M2.8`:
+## Portal personas
 
-- Steps that need a blocked persona are not run and are listed as blocked in the report. The verdict is BLOCKED, cause persona. Check `personas.json` before planning a flow.
-- Do not "fix" a blocked persona by writing SQL, by calling the server API from a script that bypasses HTTP, or by turning sign-up back on. Any of those changes what is under test.
+`provision.sh` admits two siblings in Greenfield: Ada in a Lekki class and Tobi in an Ikeja class, who share one username guardian (Tobi's admission links the existing guardian by id). `student` is Ada's own login and `guardian` is the shared guardian's. Both sign in by username (`personas.json` holds `username` and an empty `email`), choose `e2e-password-123` through `POST /me/password`, and get a cookie jar like the staff. In the browser, type the username into "Username or email" on `:4201`. `ownerStudentId` is another family's child in the same school and `foreignStudentId` is a child of the other school, so the isolation checks have a target of each kind; `adaStudentId` and `tobiStudentId` are the siblings' ids. A flow that needs a guardian at two schools or an email guardian creates its own through the API (an email guardian admitted in both schools shares one login).
+
+- A persona that cannot be created is still BLOCKED, cause persona; never "fix" one by writing SQL, by calling the server API from a script that bypasses HTTP, or by turning sign-up back on. Any of those changes what is under test.
 
 ## Seeded personas (read-only)
 

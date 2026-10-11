@@ -1,6 +1,7 @@
 export * from './calendar';
 export * from './count-of';
 export * from './date';
+export * from './days-off';
 export * from './initials';
 export * from './naira';
 export * from './slug';
@@ -9,3 +10,5 @@ export * from './time';
 export * from './toggled';
 export * from './guardian-username';
 export * from './student-lifecycle';
+export * from './placeholder-email';
+export * from './logo-src';

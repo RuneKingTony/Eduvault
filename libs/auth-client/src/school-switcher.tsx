@@ -1,16 +1,15 @@
 import type { ComponentProps, ReactNode } from 'react';
-import { CheckIcon, ChevronsUpDownIcon } from 'lucide-react';
+import { ChevronsUpDownIcon } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   Button,
   SidebarMenuButton,
 } from '@eduvault/ui';
 import type { EduvaultAuthClient } from './auth-client';
+import { SchoolMenuItems } from './school-menu-items';
 
 export interface SchoolSwitcherProps {
   authClient: EduvaultAuthClient;
@@ -71,18 +70,6 @@ export function SchoolSwitcher({
   const activeName =
     schools.data?.find((school) => school.id === activeId)?.name ?? 'School';
 
-  function choose(organizationId: string) {
-    if (organizationId !== activeId) {
-      void authClient.organization
-        .setActive({ organizationId })
-        .then((result) => {
-          if (result.error === null) {
-            onSwitched();
-          }
-        });
-    }
-  }
-
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -94,18 +81,7 @@ export function SchoolSwitcher({
         />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="min-w-56">
-        <DropdownMenuLabel>School</DropdownMenuLabel>
-        {schools.data?.map((school) => (
-          <DropdownMenuItem
-            key={school.id}
-            onSelect={() => {
-              choose(school.id);
-            }}
-          >
-            <span className="flex-1 truncate">{school.name}</span>
-            {school.id === activeId ? <CheckIcon aria-label="Current" /> : null}
-          </DropdownMenuItem>
-        ))}
+        <SchoolMenuItems authClient={authClient} onSwitched={onSwitched} />
         {menuExtra === undefined ? null : (
           <>
             <DropdownMenuSeparator />

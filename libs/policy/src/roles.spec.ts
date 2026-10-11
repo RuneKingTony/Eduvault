@@ -120,6 +120,15 @@ describe('roles', () => {
     }
   });
 
+  it('gives only the student and guardian roles student:readOwn', () => {
+    for (const slug of ['student', 'guardian']) {
+      expect(starter(slug).student).toEqual(['readOwn']);
+    }
+    for (const slug of ['administrator', 'teacher', 'bursar', 'principal']) {
+      expect(starter(slug).student ?? []).not.toContain('readOwn');
+    }
+  });
+
   it('gives the administrator and principal every announcement permission and nobody else any', () => {
     for (const slug of ['administrator', 'principal']) {
       expect(starter(slug).announcement).toEqual(['create', 'read', 'update']);

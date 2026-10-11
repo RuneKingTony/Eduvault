@@ -1,0 +1,49 @@
+import { Controller, Get, Param, Query } from '@nestjs/common';
+import {
+  contract,
+  type PortalAnnouncementsQuery,
+  type RouteOutput,
+} from '@eduvault/api-contract';
+import { Org, OrganizationAuth, type OrgContext } from '../../common/auth';
+import { zod } from '../../common/http/zod.pipe';
+import { PortalService } from './portal.service';
+
+const routes = contract.portal;
+
+@Controller('portal')
+export class PortalController {
+  constructor(private readonly portal: PortalService) {}
+
+  @Get('me')
+  @OrganizationAuth('student', 'readOwn')
+  me(@Org() org: OrgContext): Promise<RouteOutput<typeof routes.me>> {
+    return this.portal.me(org);
+  }
+
+  @Get('children')
+  @OrganizationAuth('student', 'readOwn')
+  children(
+    @Org() org: OrgContext
+  ): Promise<RouteOutput<typeof routes.children>> {
+    return this.portal.children(org);
+  }
+
+  @Get('students/:studentId')
+  @OrganizationAuth('student', 'readOwn')
+  student(
+    @Org() org: OrgContext,
+    @Param(zod(routes.student.params)) params: { studentId: string }
+  ): Promise<RouteOutput<typeof routes.student>> {
+    return this.portal.student(org, params.studentId);
+  }
+
+  @Get('students/:studentId/announcements')
+  @OrganizationAuth('student', 'readOwn')
+  announcements(
+    @Org() org: OrgContext,
+    @Param(zod(routes.announcements.params)) params: { studentId: string },
+    @Query(zod(routes.announcements.query)) query: PortalAnnouncementsQuery
+  ): Promise<RouteOutput<typeof routes.announcements>> {
+    return this.portal.announcementsFor(org, params.studentId, query);
+  }
+}

@@ -7,12 +7,14 @@ import {
 import {
   ANNOUNCEMENT_EVERYONE_MESSAGE,
   ANNOUNCEMENT_NOT_FOUND_MESSAGE,
+  newAnnouncementsSince,
   type Announcement,
   type AnnouncementFeedQuery,
   type AnnouncementList,
   type AnnouncementListQuery,
   type AnnouncementSummary,
   type CreateAnnouncementInput,
+  type PortalAnnouncements,
   type UpdateAnnouncementInput,
 } from '@eduvault/api-contract';
 import type { ActivityInput } from '../../common/activity';
@@ -167,6 +169,24 @@ export class AnnouncementService {
     query: AnnouncementFeedQuery
   ): Promise<AnnouncementSummary[]> {
     return this.announcements.feed(scopeOf(ctx), query.limit);
+  }
+
+  async forPortal(
+    ctx: Pick<OrgContext, 'organizationId'>,
+    options: { campusId: string; limit: number }
+  ): Promise<PortalAnnouncements> {
+    const scope: AnnouncementScope = {
+      organizationId: ctx.organizationId,
+      campusScope: [options.campusId],
+    };
+    const [items, newThisWeek] = await Promise.all([
+      this.announcements.feed(scope, options.limit),
+      this.announcements.countPublishedSince(
+        scope,
+        newAnnouncementsSince(this.clock.today())
+      ),
+    ]);
+    return { items, newThisWeek };
   }
 
   async create(

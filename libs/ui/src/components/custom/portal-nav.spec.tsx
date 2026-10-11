@@ -17,6 +17,14 @@ const items: PortalNavItem[] = [
     current: true,
   },
   {
+    id: 'children',
+    href: '/children',
+    label: 'My children',
+    shortLabel: 'Children',
+    icon: <svg data-testid="children-icon" />,
+    current: false,
+  },
+  {
     id: 'fees',
     href: '/fees',
     label: 'Fees',
@@ -50,6 +58,16 @@ describe('PortalNav', () => {
       'aria-current'
     );
   });
+
+  it('keeps the full label even when an item has a short one', () => {
+    render(<PortalNav items={items} renderLink={renderLink} />);
+    expect(
+      screen.getByRole('link', { name: 'My children' })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'Children' })
+    ).not.toBeInTheDocument();
+  });
 });
 
 describe('PortalBottomNav', () => {
@@ -59,8 +77,17 @@ describe('PortalBottomNav', () => {
       'fixed',
       'bottom-0'
     );
-    expect(screen.getAllByRole('link')).toHaveLength(2);
+    expect(screen.getAllByRole('link')).toHaveLength(3);
     expect(screen.getByTestId('fees-icon')).toBeInTheDocument();
+  });
+
+  it('shows an item’s short label in place of its label', () => {
+    render(<PortalBottomNav items={items} renderLink={renderLink} />);
+    expect(screen.getByRole('link', { name: 'Children' })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'My children' })
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Home' })).toBeInTheDocument();
   });
 });
 

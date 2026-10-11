@@ -3,7 +3,7 @@ export const statements = {
   campus: ['readAll'],
   schoolAccount: ['read', 'update'],
   organization: ['update', 'delete'],
-  student: ['create', 'read', 'update', 'archive', 'markAway'],
+  student: ['create', 'read', 'readOwn', 'update', 'archive', 'markAway'],
   enrollment: ['create', 'read', 'place'],
   guardian: ['create', 'read', 'update', 'link'],
   session: ['create', 'read', 'update', 'setCurrent'],
@@ -73,6 +73,8 @@ export const PERM_HELP: Partial<Record<Permission, string>> = {
     'Records students leaving or graduating, and undoes it in the same term.',
   'student:markAway':
     'Marks students not seen since a date, and back in school.',
+  'student:readOwn':
+    'Students see their own records. Guardians see their own children.',
 };
 
 const RESOURCE_LABELS: Record<Resource, string> = {

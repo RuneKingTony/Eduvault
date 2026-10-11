@@ -14,5 +14,6 @@ import { KyselyAnnouncementRepository } from './kysely-announcement.repository';
     AnnouncementService,
     { provide: AnnouncementRepository, useClass: KyselyAnnouncementRepository },
   ],
+  exports: [AnnouncementService],
 })
 export class AnnouncementModule {}

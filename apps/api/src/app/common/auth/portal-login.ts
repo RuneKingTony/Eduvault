@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Kysely } from 'kysely';
 import { splitRoles } from '@eduvault/policy';
+import { PLACEHOLDER_EMAIL_DOMAIN } from '@eduvault/shared';
 import type { DB } from '../../../db/db-types';
 
 export type PortalRole = 'student' | 'guardian';
@@ -16,7 +17,7 @@ export interface NewPortalLogin {
 
 /** Placeholder for users who sign in by username; never shown, never sent to. */
 const placeholderEmail = (userId: string): string =>
-  `${userId}@users.eduvault.invalid`;
+  `${userId}@${PLACEHOLDER_EMAIL_DOMAIN}`;
 
 export async function createPortalLogin(
   db: Kysely<DB>,

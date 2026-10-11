@@ -215,6 +215,28 @@ describe('RolePage levels', () => {
     });
   });
 
+  it('offers Own records no Can change, since there is nothing to change', async () => {
+    const { create } = setup();
+    await screen.findByRole('heading', { name: 'New role' });
+    const group = within(
+      screen.getByRole('radiogroup', { name: 'Own records access' })
+    );
+    expect(group.getAllByRole('radio')).toHaveLength(2);
+    expect(group.queryByRole('radio', { name: 'Can change' })).toBeNull();
+    fireEvent.click(group.getByRole('radio', { name: 'Can see' }));
+    fireEvent.change(nameField(), { target: { value: 'Family view' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create role' }));
+    await waitFor(() => {
+      expect(create).toHaveBeenCalledWith({
+        body: {
+          label: 'Family view',
+          description: null,
+          permissions: { student: ['readOwn'] },
+        },
+      });
+    });
+  });
+
   it('sets Can change with its see permissions', async () => {
     const { create } = setup();
     await screen.findByRole('heading', { name: 'New role' });

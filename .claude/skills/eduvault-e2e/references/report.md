@@ -21,7 +21,7 @@ VERDICT: BLOCKED
 cause: environment
 artefacts: /abs/path/tmp/e2e/<run>
 goal: owner signs in on both SPAs; role matrix over HTTP
-blocked: student, guardian could not be created over HTTP (the portal sign-in screens come with M2.8)
+blocked: the stack answered but the API refused the guardian's sign-in by username
 passed 5, failed 0, blocked 2
 
 ## Steps

@@ -8,6 +8,7 @@ import {
 } from '@eduvault/api-contract';
 import {
   OWNER_ROLE,
+  PORTAL_ROLES,
   can,
   isSuperAdmin,
   splitRoles,
@@ -113,6 +114,7 @@ export class AuthContextService {
       activeCampusId: null,
       campusScope: 'all',
       classScope: 'all',
+      studentScope: [],
       acting: { organizationId, writes, reason },
       headers: session.headers,
     };
@@ -168,9 +170,38 @@ export class AuthContextService {
           permissions
         )
       ),
+      studentScope: await this.listStudentScope(
+        organizationId,
+        session.user.id,
+        roles
+      ),
       acting: null,
       headers,
     };
+  }
+
+  private async listStudentScope(
+    organizationId: string,
+    userId: string,
+    roles: readonly string[]
+  ): Promise<string[]> {
+    if (!roles.some((slug) => PORTAL_ROLES.includes(slug))) {
+      return [];
+    }
+    const rows = await this.pool.query<{ student_id: string }>(
+      `SELECT id AS student_id
+       FROM student
+       WHERE organization_id = $1 AND user_id = $2
+       UNION
+       SELECT link.student_id
+       FROM guardian
+       JOIN guardian_student link
+         ON link.guardian_id = guardian.id
+        AND link.organization_id = guardian.organization_id
+       WHERE guardian.organization_id = $1 AND guardian.user_id = $2`,
+      [organizationId, userId]
+    );
+    return rows.rows.map((row) => row.student_id);
   }
 
   private async listTaughtClassIds(

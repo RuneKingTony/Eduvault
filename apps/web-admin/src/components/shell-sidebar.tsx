@@ -1,7 +1,8 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { ChevronsUpDownIcon } from 'lucide-react';
-import { initials } from '@eduvault/shared';
+import { initials, logoSrc } from '@eduvault/shared';
+import { API_URL } from '../env';
 import {
   SchoolSwitcher,
   UserAvatar,
@@ -23,7 +24,6 @@ import {
 import { useActing } from '../acting-store';
 import { useApi } from '../api';
 import { currentTermQueryOptions, schoolProfileQueryOptions } from '../queries';
-import { logoSrc } from '../school-logo';
 import type { NavGroup } from '../nav';
 import { SidebarNav } from './sidebar-nav';
 
@@ -97,7 +97,7 @@ function SidebarHead() {
                 <SchoolCrest
                   name={name}
                   initials={initials(name)}
-                  logoUrl={logoSrc(profile.data?.logoUrl ?? null)}
+                  logoUrl={logoSrc(API_URL, profile.data?.logoUrl ?? null)}
                 />
               )}
               subtitle={subtitle}

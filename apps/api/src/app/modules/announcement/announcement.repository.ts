@@ -49,6 +49,11 @@ export abstract class AnnouncementRepository {
     limit: number
   ): Promise<AnnouncementSummary[]>;
 
+  abstract countPublishedSince(
+    scope: AnnouncementScope,
+    since: string
+  ): Promise<number>;
+
   abstract create(
     write: AnnouncementWrite,
     activity: ActivityInput

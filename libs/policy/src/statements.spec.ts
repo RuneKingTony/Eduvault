@@ -28,6 +28,15 @@ describe('statements', () => {
     );
   });
 
+  it('has student readOwn with help, not sensitive', () => {
+    expect(ALL_PERMISSIONS).toContain('student:readOwn');
+    expect(SENSITIVE).not.toContain('student:readOwn');
+    expect(permLabel('student:readOwn')).toBe('Students: read own');
+    expect(PERM_HELP['student:readOwn']).toBe(
+      'Students see their own records. Guardians see their own children.'
+    );
+  });
+
   it('has announcement create, read and update, with no delete and none sensitive', () => {
     expect(ALL_PERMISSIONS).toEqual(
       expect.arrayContaining([

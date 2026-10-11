@@ -98,6 +98,7 @@ const context = (
   activeCampusId: null,
   campusScope: 'all',
   classScope: 'all',
+  studentScope: [],
   acting: null,
   headers: new Headers(),
 });

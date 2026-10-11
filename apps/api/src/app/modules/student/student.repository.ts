@@ -5,7 +5,7 @@ import type {
   StudentTab,
   UpdateStudentInput,
 } from '@eduvault/api-contract';
-import type { StudentScope } from './visibility';
+import type { StudentVisibility } from './visibility';
 
 export interface StudentListParams {
   tab: StudentTab;
@@ -26,19 +26,19 @@ export interface StudentListResult {
 export abstract class StudentRepository {
   abstract list(
     organizationId: string,
-    scope: StudentScope,
+    scope: StudentVisibility,
     params: StudentListParams
   ): Promise<StudentListResult>;
 
   abstract findDetail(
     organizationId: string,
-    scope: StudentScope,
+    scope: StudentVisibility,
     id: string
   ): Promise<StudentDetail | undefined>;
 
   abstract isVisible(
     organizationId: string,
-    scope: StudentScope,
+    scope: StudentVisibility,
     id: string
   ): Promise<boolean>;
 

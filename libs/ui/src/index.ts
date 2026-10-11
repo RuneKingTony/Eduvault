@@ -43,6 +43,8 @@ export * from './hooks-custom/use-is-compact';
 export * from './components/custom/text-field';
 export * from './components/custom/select-field';
 export * from './components/custom/nav-icon';
+export * from './components/custom/day-off-list';
+export * from './components/custom/day-off-row';
 export * from './components/custom/school-crest';
 export * from './components/custom/app-topbar';
 export * from './components/custom/portal-topbar';

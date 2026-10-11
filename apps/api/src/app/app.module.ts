@@ -11,6 +11,7 @@ import { ConfigModule } from './common/config/config.module';
 import { DatabaseModule } from './common/db/database.module';
 import { FilesModule } from './common/files';
 import { AnnouncementModule } from './modules/announcement/announcement.module';
+import { PortalModule } from './modules/portal/portal.module';
 import { CalendarModule } from './modules/calendar/calendar.module';
 import { CampusModule } from './modules/campus/campus.module';
 import { ClassModule } from './modules/class/class.module';
@@ -49,6 +50,7 @@ import { StudentModule } from './modules/student/student.module';
     ClassModule,
     DashboardModule,
     AnnouncementModule,
+    PortalModule,
   ],
 })
 export class AppModule implements NestModule {

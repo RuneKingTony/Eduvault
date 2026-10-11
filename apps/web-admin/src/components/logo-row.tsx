@@ -3,11 +3,11 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { PlusIcon, RefreshCwIcon } from 'lucide-react';
 import type { SchoolProfile } from '@eduvault/api-contract';
 import { useCan } from '@eduvault/auth-client';
-import { initials } from '@eduvault/shared';
+import { initials, logoSrc } from '@eduvault/shared';
+import { API_URL } from '../env';
 import { Button, FieldError, SchoolCrest, toast } from '@eduvault/ui';
 import { useApi } from '../api';
 import { invalidateSchool } from '../queries';
-import { logoSrc } from '../school-logo';
 import { SettingsRow } from './settings-page';
 
 const ACCEPTED_TYPES = 'image/png,image/jpeg,image/webp';
@@ -118,7 +118,7 @@ export function LogoRow({ profile }: { profile: SchoolProfile }) {
           <SchoolCrest
             name={profile.name}
             initials={initials(profile.name)}
-            logoUrl={logoSrc(profile.logoUrl)}
+            logoUrl={logoSrc(API_URL, profile.logoUrl)}
             className="size-13 text-base"
           />
         }
