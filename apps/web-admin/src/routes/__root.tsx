@@ -9,6 +9,8 @@ import { meQueryOptions } from '@eduvault/auth-client';
 import { clearActing, getActing, type ActingState } from '../acting-store';
 import type { Api } from '../api';
 import { AppShell } from '../components/app-shell';
+import { PortalOnlyScreen } from '../components/portal-only-screen';
+import { isPortalOnlyAccount } from '../portal-access';
 import { mePermissionsQueryOptions } from '../queries';
 import { redirectTo } from '../redirect-to';
 
@@ -22,7 +24,10 @@ const isPlatformPath = (pathname: string) =>
 
 function RootLayout() {
   const { access } = useRouteContext({ from: '__root__' });
-  return access === null ? <Outlet /> : <AppShell />;
+  if (access === null) {
+    return <Outlet />;
+  }
+  return isPortalOnlyAccount(access) ? <PortalOnlyScreen /> : <AppShell />;
 }
 
 async function actingAccess(
