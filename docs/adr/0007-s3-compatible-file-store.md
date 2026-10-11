@@ -52,7 +52,7 @@ Add `S3FileStore` beside `PostgresFileStore`, chosen by `FILE_STORE_DRIVER`. The
 **Write path**
 
 - `put` is a single `PutObject` with the content type. `get` maps `NoSuchKey` to `undefined`; every other error (credentials, network) is thrown, never turned into a 404. `delete` is `DeleteObject`, which is a no-op on a missing key.
-- `FileSweepService` must delete the object of each orphan, not just the row. `deleteOrphansUploadedBefore` therefore returns the removed records, and the sweep calls `store.delete` for each. The Postgres driver still tolerates that (the cascade has already removed the blob).
+- `FileSweepService` must delete the object of each orphan, not just the row, and in the order `FilesService.discard` already uses: object first, then row. The repository selects the orphans (a new `findOrphansUploadedBefore`, replacing the bulk delete) and the sweep discards each one. If the object delete fails the row stays and the next sweep retries, so an object is never left without a row that points to it. The Postgres driver is unaffected (its `delete` removes the blob; the cascade finds nothing left).
 - A crash after the row insert but before `put` leaves a row with no object: reads answer 404 and the sweep removes it after 24 hours, as today. A crash between `put` and the record attaching leaves an orphan the sweep now also cleans.
 
 **Migrating existing blobs (Postgres to S3)**
@@ -93,13 +93,14 @@ Add `S3FileStore` beside `PostgresFileStore`, chosen by `FILE_STORE_DRIVER`. The
 - Presigned or direct browser uploads (LD-07 (c)); presigned reads (above).
 - Dropping `file_blob` after cutover; object lock for proofs; malware scanning (LD-10 revisited).
 - Streaming `get` for large files, when a kind exceeds a few MB.
+- Reconciling objects that have no `file_object` row: a `put` that succeeded after the client timed out (the `upload` catch block deletes the row), or a sweep interrupted mid-run.
 
 ## Phase 2 work list (one PR, after this one is accepted)
 
 1. `pnpm-workspace.yaml`: `@aws-sdk/client-s3` in a catalog, `@testcontainers/minio` in `testing`; dependencies in `apps/api` and `libs/testcontainers`.
 2. `apps/api/src/app/common/files/s3-file-store.ts` and its key helper.
 3. `apps/api/src/app/common/config/env.ts` refinement, `.env.example`, and the `files.module.ts` factory with the boot `HeadBucket`.
-4. Sweep fix: `deleteOrphansUploadedBefore` returns records; `FileSweepService` deletes their objects; update its spec.
+4. Sweep fix: `deleteOrphansUploadedBefore` becomes a select of orphans; `FileSweepService` discards each (object, then row); update its spec and the repository.
 5. `libs/testcontainers/src/minio.ts` and its export.
 6. `apps/api/test/file-store.contract.ts`, run for both drivers, plus the S3 run of `files.integration.spec.ts`.
 7. `docker-compose.yml` `minio` service (profile `s3`, bucket created on start) and the notes in `docs/development.md`.
