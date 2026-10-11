@@ -32,6 +32,13 @@ import {
   updateClassSchema,
 } from './classes';
 import {
+  activityPageSchema,
+  activityQuerySchema,
+  dashboardRollSchema,
+  dashboardTaskSchema,
+  myClassSchema,
+} from './dashboard';
+import {
   editGuardianSchema,
   guardianDetailSchema,
   guardianLinkParamsSchema,
@@ -586,6 +593,31 @@ export const contract = defineContract({
       path: '/calendar/days-off',
       query: daysOffQuerySchema,
       response: z.array(dayOffSchema),
+    }),
+  },
+  dashboard: {
+    tasks: defineRoute({
+      method: 'GET',
+      path: '/dashboard/tasks',
+      response: z.array(dashboardTaskSchema),
+    }),
+    roll: defineRoute({
+      method: 'GET',
+      path: '/dashboard/roll',
+      response: dashboardRollSchema,
+    }),
+    myClasses: defineRoute({
+      method: 'GET',
+      path: '/dashboard/my-classes',
+      response: z.array(myClassSchema),
+    }),
+  },
+  activity: {
+    list: defineRoute({
+      method: 'GET',
+      path: '/activity',
+      query: activityQuerySchema,
+      response: activityPageSchema,
     }),
   },
   classLevels: {

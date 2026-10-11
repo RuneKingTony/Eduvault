@@ -26,6 +26,30 @@ export function lagosDateOf(timestamp: string | Date): string {
   return `${part('year')}-${part('month')}-${part('day')}`;
 }
 
+const lagosHour = new Intl.DateTimeFormat('en-GB', {
+  timeZone: LAGOS_TIME_ZONE,
+  hour: '2-digit',
+  hourCycle: 'h23',
+});
+
+const NOON = 12;
+const EVENING_FROM = 17;
+
+export function lagosHourOf(timestamp: string | Date): number {
+  const instant = new Date(timestamp);
+  if (Number.isNaN(instant.getTime())) {
+    throw new RangeError(`Invalid timestamp: ${String(timestamp)}`);
+  }
+  return Number(lagosHour.format(instant));
+}
+
+export function greetingFor(hour: number): string {
+  if (hour < NOON) {
+    return 'Good morning';
+  }
+  return hour < EVENING_FROM ? 'Good afternoon' : 'Good evening';
+}
+
 export function fmtLagosDateTime(timestamp: string | Date): string {
   return `${lagosDateOf(timestamp)} ${lagosClock.format(new Date(timestamp))}`;
 }

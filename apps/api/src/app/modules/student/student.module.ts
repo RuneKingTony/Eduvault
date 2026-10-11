@@ -56,5 +56,6 @@ import { StudentService } from './student.service';
     },
     { provide: AdmissionRepository, useClass: KyselyAdmissionRepository },
   ],
+  exports: [NewSchoolYearService],
 })
 export class StudentModule {}

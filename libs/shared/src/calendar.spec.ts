@@ -3,14 +3,19 @@ import {
   canMakeCurrent,
   type CalendarTerm,
   daysBetween,
+  daysUntilLabel,
   daysOff,
   firstMondayOnOrAfter,
   isWeekend,
   lastFridayOnOrBefore,
   newYearDefaults,
+  relativeDays,
   schoolDays,
   schoolDaysSoFar,
   splitTerms,
+  termPercentDone,
+  termWeek,
+  termWeeks,
   YEAR_NAME_ERROR,
   yearNameError,
 } from './calendar';
@@ -260,5 +265,70 @@ describe('canMakeCurrent', () => {
         { currentTerm: null, years }
       )
     ).toBe(false);
+  });
+});
+
+describe('termWeek', () => {
+  it('is Week 1 on day 0 and day 1', () => {
+    expect(termWeek(0)).toBe(1);
+    expect(termWeek(1)).toBe(1);
+  });
+
+  it('stays in week 1 on day 5 and moves to week 2 on day 6', () => {
+    expect(termWeek(5)).toBe(1);
+    expect(termWeek(6)).toBe(2);
+  });
+
+  it('counts a holiday-shortened term by school days', () => {
+    expect(termWeeks(47)).toBe(10);
+    expect(termWeek(47)).toBe(10);
+    expect(termWeeks(50)).toBe(10);
+  });
+});
+
+describe('termPercentDone', () => {
+  it('is 0 for a term with no school days', () => {
+    expect(termPercentDone(0, 0)).toBe(0);
+  });
+
+  it('is the share of school days done', () => {
+    expect(termPercentDone(22, 88)).toBe(25);
+    expect(termPercentDone(88, 88)).toBe(100);
+  });
+});
+
+describe('relativeDays', () => {
+  const from = '2026-10-01';
+  const after = (days: number) => relativeDays(from, addDays(from, days));
+
+  it('says Today and Tomorrow', () => {
+    expect(after(0)).toBe('Today');
+    expect(after(1)).toBe('Tomorrow');
+  });
+
+  it('counts days under two weeks', () => {
+    expect(after(2)).toBe('in 2 days');
+    expect(after(13)).toBe('in 13 days');
+  });
+
+  it('rounds weeks from 14 days to under 70', () => {
+    expect(after(14)).toBe('in 2 weeks');
+    expect(after(69)).toBe('in 10 weeks');
+  });
+
+  it('rounds months from 70 days', () => {
+    expect(after(70)).toBe('in 2 months');
+    expect(after(200)).toBe('in 7 months');
+  });
+});
+
+describe('daysUntilLabel', () => {
+  const from = '2026-10-01';
+
+  it('says Today, Tomorrow and a day count', () => {
+    expect(daysUntilLabel(from, from)).toBe('Today');
+    expect(daysUntilLabel(from, '2026-10-02')).toBe('Tomorrow');
+    expect(daysUntilLabel(from, '2026-10-14')).toBe('13 days');
+    expect(daysUntilLabel(from, '2026-12-09')).toBe('69 days');
   });
 });
