@@ -69,6 +69,7 @@ export const detail = (
   permissions: {},
   campusScope: [LEKKI.id],
   classScope: 'all',
+  classes: [],
   lastOwner: false,
   ...overrides,
 });

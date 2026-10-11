@@ -1,5 +1,10 @@
-import type { MemberSummary, SchoolRoleEntry } from '@eduvault/api-contract';
+import type {
+  MemberSummary,
+  SchoolRoleEntry,
+  TaughtClass,
+} from '@eduvault/api-contract';
 import type { CampusScope } from '../../common/campus-scope';
+import type { ClassScope } from '../../common/class-scope';
 
 /** A member with every campus they belong to, whatever the viewer can see. */
 export type MemberRecord = MemberSummary;
@@ -10,6 +15,11 @@ export interface MemberListQuery {
   q?: string;
   role?: string;
   page: number;
+}
+
+export interface Viewer {
+  campusScope: CampusScope;
+  classScope: ClassScope;
 }
 
 export abstract class MembersRepository {
@@ -41,4 +51,11 @@ export abstract class MembersRepository {
   ): Promise<boolean>;
 
   abstract listRoles(organizationId: string): Promise<SchoolRoleEntry[]>;
+
+  /** Active classes the user teaches this school year, limited to what the viewer can see. */
+  abstract taughtClasses(
+    organizationId: string,
+    userId: string,
+    viewer: Viewer
+  ): Promise<TaughtClass[]>;
 }

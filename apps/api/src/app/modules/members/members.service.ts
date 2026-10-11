@@ -35,6 +35,7 @@ import {
 } from '@eduvault/policy';
 import { MemberAdminService, type OrgContext } from '../../common/auth';
 import { canSeeCampus, type CampusScope } from '../../common/campus-scope';
+import { computeClassScope } from '../../common/class-scope';
 import { CampusService } from '../campus/campus.service';
 import { MembersRepository, type MemberRecord } from './members.repository';
 
@@ -114,6 +115,11 @@ function campusChange(
     remove: record.campusIds.filter((campusId) => !finalSet.has(campusId)),
   };
 }
+
+const readsAllCampuses = (
+  roles: readonly string[],
+  entries: readonly SchoolRoleEntry[]
+): boolean => can(permissionsOfRoles(roles, entries), 'campus', 'readAll');
 
 const titleOrDefault = (title: string | undefined): string =>
   title === undefined || title === '' ? DEFAULT_MEMBER_TITLE : title;
@@ -200,10 +206,12 @@ export class MembersService {
           : campusChange(ctx, record, input.campusIds);
       await this.admin.setRolesAndCampuses({
         memberId: record.id,
+        organizationId: ctx.organizationId,
         userId: record.userId,
         roles: draft,
         addCampusIds: campuses.add,
         removeCampusIds: campuses.remove,
+        keepClassTeaching: readsAllCampuses(draft, entries),
       });
       return this.reload(ctx, record.id, entries);
     });
@@ -234,12 +242,15 @@ export class MembersService {
         await this.campuses.assertInScope(ctx, campusId);
       }
       const change = campusChange(ctx, record, input.campusIds);
+      const entries = await this.loadCatalogue(ctx);
       await this.admin.setCampuses({
+        organizationId: ctx.organizationId,
         userId: record.userId,
         addCampusIds: change.add,
         removeCampusIds: change.remove,
+        keepClassTeaching: readsAllCampuses(record.roles, entries),
       });
-      return this.reload(ctx, record.id, await this.loadCatalogue(ctx));
+      return this.reload(ctx, record.id, entries);
     });
   }
 
@@ -302,13 +313,22 @@ export class MembersService {
   ): Promise<MemberDetail> {
     const visible = limitToScope(record, ctx.campusScope);
     const permissions = permissionsOfRoles(record.roles, entries);
+    const classes = await this.members.taughtClasses(
+      ctx.organizationId,
+      record.userId,
+      { campusScope: ctx.campusScope, classScope: ctx.classScope }
+    );
     return {
       ...visible,
       permissions,
       campusScope: can(permissions, 'campus', 'readAll')
         ? 'all'
         : visible.campusIds,
-      classScope: 'all',
+      classScope: computeClassScope(
+        permissions,
+        classes.map((taught) => taught.id)
+      ),
+      classes,
       lastOwner: await this.isLastOwner(ctx, record),
     };
   }

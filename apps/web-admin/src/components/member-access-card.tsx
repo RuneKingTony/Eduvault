@@ -1,6 +1,6 @@
 import { CheckIcon, KeyRoundIcon } from 'lucide-react';
 import type { Campus, MemberDetail } from '@eduvault/api-contract';
-import { capSummary } from '@eduvault/policy';
+import { can, capSummary } from '@eduvault/policy';
 import { Card, CardContent, CardHeader, CardTitle } from '@eduvault/ui';
 
 function campusLine(member: MemberDetail, campuses: readonly Campus[]): string {
@@ -13,6 +13,18 @@ function campusLine(member: MemberDetail, campuses: readonly Campus[]): string {
   return names.length === 0 ? 'No campuses' : names.join(', ');
 }
 
+function classLine(member: MemberDetail): string | undefined {
+  if (can(member.permissions, 'class', 'readAll')) {
+    return 'Every class';
+  }
+  if (!can(member.permissions, 'class', 'read')) {
+    return undefined;
+  }
+  return member.classes.length === 0
+    ? 'No classes assigned yet'
+    : `${member.classes.map((taught) => taught.displayName).join(', ')} (classes they teach)`;
+}
+
 export function MemberAccessCard({
   member,
   campuses,
@@ -21,6 +33,7 @@ export function MemberAccessCard({
   campuses: readonly Campus[];
 }) {
   const lines = capSummary(member.permissions);
+  const classes = classLine(member);
   return (
     <Card>
       <CardHeader>
@@ -44,9 +57,17 @@ export function MemberAccessCard({
             ))}
           </ul>
         )}
-        <dl className="flex justify-between gap-3 border-t pt-3 text-sm">
-          <dt className="text-muted-foreground">Campuses</dt>
-          <dd className="text-right">{campusLine(member, campuses)}</dd>
+        <dl className="flex flex-col gap-2 border-t pt-3 text-sm">
+          <div className="flex justify-between gap-3">
+            <dt className="text-muted-foreground">Campuses</dt>
+            <dd className="text-right">{campusLine(member, campuses)}</dd>
+          </div>
+          {classes === undefined ? null : (
+            <div className="flex justify-between gap-3">
+              <dt className="text-muted-foreground">Classes</dt>
+              <dd className="text-right">{classes}</dd>
+            </div>
+          )}
         </dl>
       </CardContent>
     </Card>
