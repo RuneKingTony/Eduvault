@@ -1,4 +1,5 @@
 import {
+  keepPreviousData,
   queryOptions,
   type QueryClient,
   type QueryExecuteOptions,
@@ -41,6 +42,23 @@ export const portalAnnouncementsQueryOptions = (api: Api, studentId: string) =>
     queryKey: [...PORTAL_KEY, 'announcements', studentId],
     queryFn: () =>
       api.portal.announcements({ params: { studentId }, query: {} }),
+  });
+
+export const ANNOUNCEMENTS_PAGE_SIZE = 10;
+
+export const portalAnnouncementListQueryOptions = (
+  api: Api,
+  studentId: string,
+  page: number
+) =>
+  queryOptions({
+    queryKey: [...PORTAL_KEY, 'announcements', studentId, 'all', page],
+    queryFn: () =>
+      api.portal.announcementList({
+        params: { studentId },
+        query: { page, pageSize: ANNOUNCEMENTS_PAGE_SIZE },
+      }),
+    placeholderData: keepPreviousData,
   });
 
 export const calendarCurrentQueryOptions = (api: Api) =>

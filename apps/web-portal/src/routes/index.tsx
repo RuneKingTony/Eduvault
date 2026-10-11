@@ -48,6 +48,9 @@ function HomeRoute() {
       onChildMissing={(first) => {
         void navigate({ search: { child: first }, replace: true });
       }}
+      onSeeAllAnnouncements={(id) => {
+        void navigate({ to: '/announcements', search: { child: id } });
+      }}
     />
   );
 }

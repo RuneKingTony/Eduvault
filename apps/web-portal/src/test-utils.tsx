@@ -4,6 +4,7 @@ import { render } from '@testing-library/react';
 import type {
   CalendarCurrent,
   DayOffEntry,
+  PortalAnnouncementList,
   PortalAnnouncements,
   PortalChild,
   PortalMe,
@@ -52,6 +53,10 @@ export const portalStudent = (
 export const portalAnnouncements = (
   overrides: Partial<PortalAnnouncements> = {}
 ): PortalAnnouncements => ({ items: [], newThisWeek: 0, ...overrides });
+
+export const portalAnnouncementList = (
+  overrides: Partial<PortalAnnouncementList> = {}
+): PortalAnnouncementList => ({ items: [], total: 0, ...overrides });
 
 export const calendarCurrent = (
   overrides: Partial<CalendarCurrent> = {}
