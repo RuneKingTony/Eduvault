@@ -5,8 +5,27 @@ import {
   expect,
   waitForAuditRows,
 } from './support/base-test';
-import { createStudent } from './support/factories/students';
+import { createStudent, ensureClass } from './support/factories/students';
 import { twoSchools } from './support/two-schools';
+
+const admitBody = (classArmId: string) => ({
+  firstName: 'New',
+  lastName: 'Pupil',
+  gender: 'F',
+  dateOfBirth: '2014-03-03',
+  classArmId,
+  guardians: [
+    {
+      new: {
+        fullName: 'Pupil Parent',
+        phone: '08012345678',
+        address: '1 Test Street',
+        relationship: 'mother',
+        login: { kind: 'username' },
+      },
+    },
+  ],
+});
 
 const REASON = 'SUP-2207 fix misspelt surname';
 
@@ -51,7 +70,7 @@ test.describe('acting in a school', () => {
       .get('/students')
       .set(acting(orgB.id, 'sneaky'))
       .expect(200);
-    expect(listed.body).toHaveLength(2);
+    expect(listed.body.items).toHaveLength(2);
 
     const admin = await makeSuperAdmin(await createUser());
     await api(admin).get('/students').set(acting(orgA.id)).expect(200);
@@ -82,7 +101,7 @@ test.describe('acting in a school', () => {
     await api(admin)
       .patch(`/students/${studentLekki.id}`)
       .set(acting(orgA.id, reason))
-      .send({ fullName: 'Ada Okafor' })
+      .send({ firstName: 'Ada' })
       .expect(200);
     const [row] = await waitForAuditRows(pool, { kind: 'acting' }, 1);
     expect(row?.reason).toBe(reason);
@@ -183,7 +202,7 @@ test.describe('acting in a school', () => {
       .get('/students')
       .set(acting(orgA.id))
       .expect(200);
-    expect(students.body).toHaveLength(2);
+    expect(students.body.items).toHaveLength(2);
 
     const access = await api(admin)
       .get('/me/permissions')
@@ -232,7 +251,7 @@ test.describe('acting in a school', () => {
     const res = await api(admin)
       .patch(`/students/${studentLekki.id}`)
       .set(acting(orgA.id))
-      .send({ fullName: 'Changed' })
+      .send({ firstName: 'Changed' })
       .expect(403);
     expect(res.body).toMatchObject({
       code: 'ActingReadOnly',
@@ -251,7 +270,7 @@ test.describe('acting in a school', () => {
       .get(`/students/${studentLekki.id}`)
       .set(acting(orgA.id))
       .expect(200);
-    expect(unchanged.body.fullName).toBe(studentLekki.fullName);
+    expect(unchanged.body.firstName).toBe(studentLekki.firstName);
   });
 
   test('a write with a reason succeeds and the row carries the reason', async ({
@@ -276,9 +295,9 @@ test.describe('acting in a school', () => {
     const res = await api(admin)
       .patch(`/students/${studentLekki.id}`)
       .set(acting(orgA.id, REASON))
-      .send({ fullName: 'Corrected Name' })
+      .send({ firstName: 'Corrected' })
       .expect(200);
-    expect(res.body.fullName).toBe('Corrected Name');
+    expect(res.body.firstName).toBe('Corrected');
 
     const access = await api(admin)
       .get('/me/permissions')
@@ -323,7 +342,7 @@ test.describe('acting in a school', () => {
     expect(res.body).toMatchObject({ code: 'ValidationError' });
   });
 
-  test('creating a student needs a campus because acting has no active one', async ({
+  test('admitting a student with a reason works, and a class from another school answers 404', async ({
     api,
     app,
     createUser,
@@ -332,7 +351,7 @@ test.describe('acting in a school', () => {
     addMember,
     makeSuperAdmin,
   }) => {
-    const { orgA, lekki } = await twoSchools({
+    const { owner, ownerB, orgA, lekki, campusB } = await twoSchools({
       app,
       createUser,
       createOrganization,
@@ -340,22 +359,21 @@ test.describe('acting in a school', () => {
       addMember,
     });
     const admin = await makeSuperAdmin(await createUser());
-    const student = { fullName: 'New Pupil', admissionNumber: 'ADM-900' };
 
-    await api(admin)
-      .post('/students')
-      .set(acting(orgA.id, REASON))
-      .send(student)
-      .expect(400);
     const created = await api(admin)
       .post('/students')
       .set(acting(orgA.id, REASON))
-      .send({ ...student, campusId: lekki.id })
+      .send(admitBody(await ensureClass(app, owner, lekki.id)))
       .expect(201);
-    expect(created.body).toMatchObject({
-      organizationId: orgA.id,
-      campusId: lekki.id,
+    expect(created.body.student).toMatchObject({
+      firstName: 'New',
+      effectiveCampus: { id: lekki.id },
     });
+    await api(admin)
+      .post('/students')
+      .set(acting(orgA.id, REASON))
+      .send(admitBody(await ensureClass(app, ownerB, campusB.id)))
+      .expect(404);
   });
 
   test('a handler that throws still writes one row with status 500', async ({
@@ -381,7 +399,7 @@ test.describe('acting in a school', () => {
       await api(admin)
         .patch(`/students/${studentLekki.id}`)
         .set(acting(orgA.id, REASON))
-        .send({ fullName: 'Never saved' })
+        .send({ firstName: 'Never saved' })
         .expect(500);
     } finally {
       await repairStudentUpdates(pool);
@@ -462,7 +480,7 @@ test.describe('acting in a school', () => {
       .get('/students')
       .set(acting(school.id))
       .expect(200);
-    expect(listed.body).toHaveLength(1);
+    expect(listed.body.items).toHaveLength(1);
   });
 
   test.describe('isolation', () => {
@@ -490,7 +508,7 @@ test.describe('acting in a school', () => {
       await api(admin)
         .patch(`/students/${studentB.id}`)
         .set(acting(orgA.id, REASON))
-        .send({ fullName: 'Nope' })
+        .send({ firstName: 'Nope' })
         .expect(404);
     });
 
@@ -566,12 +584,15 @@ test.describe('acting in a school', () => {
         .post('/students')
         .set(acting(orgA.id, REASON))
         .send({
-          campusId: campusB.id,
-          fullName: 'Across Schools',
-          admissionNumber: 'ADM-2000',
+          firstName: 'Across',
+          lastName: 'Schools',
+          gender: 'F',
+          dateOfBirth: '2014-03-03',
+          classArmId: crypto.randomUUID(),
+          guardians: [],
         })
         .expect(404);
-      expect(created.body.message).toBe('Campus not found');
+      expect(created.body.message).toBe('Class not found');
       await waitForAuditRows(pool, { kind: 'acting' }, 2);
     });
 
@@ -584,7 +605,7 @@ test.describe('acting in a school', () => {
       addMember,
       makeSuperAdmin,
     }) => {
-      const { orgA, lekki } = await twoSchools({
+      const { orgA, studentLekki } = await twoSchools({
         app,
         createUser,
         createOrganization,
@@ -592,13 +613,56 @@ test.describe('acting in a school', () => {
         addMember,
       });
       const admin = await makeSuperAdmin(await createUser());
+      const student = `/students/${studentLekki.id}`;
+      const guardianId = studentLekki.guardians?.[0]?.guardianId ?? '';
+      const withActing = () => api(admin);
+      const writes = [
+        () =>
+          withActing()
+            .post(`${student}/guardians`)
+            .set(acting(orgA.id))
+            .send({
+              new: {
+                fullName: 'No Reason',
+                phone: '08011112222',
+                address: '1 Test Street',
+                relationship: 'mother',
+                login: { kind: 'username' },
+              },
+            }),
+        () =>
+          withActing()
+            .patch(`${student}/guardians/${guardianId}`)
+            .set(acting(orgA.id))
+            .send({ paysFees: true }),
+        () =>
+          withActing()
+            .delete(`${student}/guardians/${guardianId}`)
+            .set(acting(orgA.id)),
+        () =>
+          withActing()
+            .patch(`/guardians/${guardianId}`)
+            .set(acting(orgA.id))
+            .send({ phone: '08099990000' }),
+        () =>
+          withActing()
+            .post(`/guardians/${guardianId}/reset-login`)
+            .set(acting(orgA.id)),
+      ];
+      for (const write of writes) {
+        const refused = await write().expect(403);
+        expect(refused.body).toMatchObject({ code: 'ActingReadOnly' });
+      }
       const res = await api(admin)
         .post('/students')
         .set(acting(orgA.id))
         .send({
-          campusId: lekki.id,
-          fullName: 'No Reason',
-          admissionNumber: 'ADM-1000',
+          firstName: 'No',
+          lastName: 'Reason',
+          gender: 'F',
+          dateOfBirth: '2014-03-03',
+          classArmId: crypto.randomUUID(),
+          guardians: [],
         })
         .expect(403);
       expect(res.body).toMatchObject({ code: 'ActingReadOnly' });

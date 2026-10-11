@@ -10,21 +10,26 @@ import {
 import { contract, type RouteOutput } from '@eduvault/api-contract';
 import { Org, OrganizationAuth, type OrgContext } from '../../common/auth';
 import { zod } from '../../common/http/zod.pipe';
+import { AdmissionService } from './admission.service';
 import { StudentService } from './student.service';
 
 const routes = contract.students;
 
 @Controller('students')
 export class StudentController {
-  constructor(private readonly students: StudentService) {}
+  constructor(
+    private readonly students: StudentService,
+    private readonly admissions: AdmissionService
+  ) {}
 
   @Get()
   @OrganizationAuth('student', 'read')
   list(
     @Org() org: OrgContext,
-    @Query(zod(routes.list.query)) query: { campusId?: string }
+    @Query(zod(routes.list.query))
+    query: Parameters<StudentService['list']>[1]
   ): Promise<RouteOutput<typeof routes.list>> {
-    return this.students.list(org, query.campusId);
+    return this.students.list(org, query);
   }
 
   @Get(':id')
@@ -41,9 +46,9 @@ export class StudentController {
   create(
     @Org() org: OrgContext,
     @Body(zod(routes.create.body))
-    body: Parameters<StudentService['create']>[1]
+    body: Parameters<AdmissionService['admit']>[1]
   ): Promise<RouteOutput<typeof routes.create>> {
-    return this.students.create(org, body);
+    return this.admissions.admit(org, body);
   }
 
   @Patch(':id')

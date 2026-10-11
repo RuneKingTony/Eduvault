@@ -1,17 +1,37 @@
 import type { ReactElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render } from '@testing-library/react';
-import type { Student } from '@eduvault/api-contract';
+import type { StudentList, StudentRow } from '@eduvault/api-contract';
 import { ApiProvider, type Api } from './api';
 
-export const student = (overrides: Partial<Student> = {}): Student => ({
+export const student = (overrides: Partial<StudentRow> = {}): StudentRow => ({
   id: '5b0f1e1e-6e53-4c52-9f1c-0a1d7a7f9c11',
-  organizationId: '9c0f1e1e-6e53-4c52-9f1c-0a1d7a7f9c22',
-  campusId: '7d0f1e1e-6e53-4c52-9f1c-0a1d7a7f9c33',
-  fullName: 'Ada Obi',
+  firstName: 'Ada',
+  lastName: 'Obi',
   admissionNumber: 'GF-001',
-  createdAt: '2026-01-01T00:00:00.000Z',
+  life: 'active',
+  dueLeft: false,
+  isNewIntake: false,
+  notSeenSince: null,
+  notSeenBy: null,
+  weeksAway: null,
+  currentPlacement: null,
+  latestClassName: null,
+  effectiveCampus: {
+    id: '7d0f1e1e-6e53-4c52-9f1c-0a1d7a7f9c33',
+    name: 'Main Campus',
+  },
+  admittedOn: '2026-01-01',
+  exit: null,
+  graduatedSessionName: null,
   ...overrides,
+});
+
+export const studentList = (items: StudentRow[]): StudentList => ({
+  items,
+  total: items.length,
+  counts: { active: items.length, new: 0, inactive: 0, left: 0, graduated: 0 },
+  startYear: null,
 });
 
 export function renderWithApi(

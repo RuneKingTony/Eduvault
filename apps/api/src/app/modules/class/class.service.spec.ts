@@ -272,6 +272,34 @@ describe('ClassService.get', () => {
     });
   });
 
+  it('lists the placed students as the roster and counts them', async () => {
+    const { repository, service } = setup();
+    addClass(repository, 'gold');
+    repository.rosters['gold'] = [
+      { studentId: 's1', name: 'Ada Okeke', admissionNumber: 'GF-0001' },
+      { studentId: 's2', name: 'Tobi Lawal', admissionNumber: 'GF-0002' },
+    ];
+
+    expect(await service.get(admin, 'gold')).toMatchObject({
+      studentCount: 2,
+      roster: [{ name: 'Ada Okeke' }, { name: 'Tobi Lawal' }],
+    });
+  });
+
+  it('counts students in the summary even when the roster is hidden', async () => {
+    const { repository, service } = setup();
+    addClass(repository, 'gold');
+    repository.counts['gold'] = 5;
+    const noStudents = ctxFor(['class:read', 'class:readAll']);
+
+    expect(await service.get(noStudents, 'gold')).toMatchObject({
+      studentCount: 5,
+      roster: null,
+    });
+    const [listed] = await service.list(noStudents, { status: 'active' });
+    expect(listed?.studentCount).toBe(5);
+  });
+
   it('leaves the roster out without student:read', async () => {
     const { repository, service } = setup();
     addClass(repository, 'gold');

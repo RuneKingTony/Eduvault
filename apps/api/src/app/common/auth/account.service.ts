@@ -74,6 +74,11 @@ export class AccountService {
     };
   }
 
+  async hashPassword(password: string): Promise<string> {
+    const context = await this.authService.instance.$context;
+    return context.password.hash(password);
+  }
+
   /**
    * Better Auth's `setUserPassword` needs a super admin session, so the hash is
    * written through its context, as `MeService.setPassword` does. The old

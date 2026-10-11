@@ -24,6 +24,9 @@ import {
   schoolRolesQueryOptions,
   schoolYearsQueryOptions,
   teacherCandidatesQueryOptions,
+  invalidateStudents,
+  studentQueryOptions,
+  studentsQueryOptions,
 } from './queries';
 
 describe('member removal', () => {
@@ -218,5 +221,55 @@ describe('class queries', () => {
     expect(fns.permissions).toHaveBeenCalledTimes(2);
     expect(queryClient.getQueryState(ME_PERMISSIONS_KEY)).toBeDefined();
     stop();
+  });
+});
+
+describe('students queries', () => {
+  it('keys the list by every search parameter and keeps the last page while the next loads', () => {
+    const api = {} as Api;
+    const first = studentsQueryOptions(api, { tab: 'left', q: 'ada', page: 2 });
+    const other = studentsQueryOptions(api, { tab: 'left', q: 'ada', page: 3 });
+    const plain = studentsQueryOptions(api, {});
+
+    expect(first.queryKey).not.toEqual(other.queryKey);
+    expect(plain.queryKey).toEqual([
+      'students',
+      'list',
+      {
+        tab: 'active',
+        q: undefined,
+        campusId: undefined,
+        levelId: undefined,
+        page: 1,
+      },
+    ]);
+    expect(first.placeholderData).toBeDefined();
+  });
+
+  it('refreshes the list, one student and the guardians after a student write', async () => {
+    const list = vi.fn().mockResolvedValue({ items: [], total: 0 });
+    const get = vi.fn().mockResolvedValue({ id: 's1' });
+    const guardians = vi.fn().mockResolvedValue([]);
+    const api = {
+      students: { list, get },
+      guardians: { list: guardians },
+    } as unknown as Api;
+    const queryClient = new QueryClient();
+    const unsubscribe = [
+      new QueryObserver(queryClient, studentsQueryOptions(api, {})),
+      new QueryObserver(queryClient, studentQueryOptions(api, 's1')),
+    ].map((observer) => observer.subscribe(() => undefined));
+    await vi.waitFor(() => {
+      expect(queryClient.isFetching()).toBe(0);
+      expect(list).toHaveBeenCalledTimes(1);
+    });
+
+    await invalidateStudents(queryClient);
+
+    expect(list).toHaveBeenCalledTimes(2);
+    expect(get).toHaveBeenCalledTimes(2);
+    for (const stop of unsubscribe) {
+      stop();
+    }
   });
 });

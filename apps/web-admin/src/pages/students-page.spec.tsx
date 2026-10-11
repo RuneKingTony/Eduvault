@@ -1,146 +1,529 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
-import { clearActing, startActing } from '../acting-store';
-import { renderWithApi, starterAccess, student } from '../test-utils';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import type { MePermissions } from '@eduvault/api-contract';
+import { toPermissionMap, type Permission } from '@eduvault/policy';
+import { fakeAccess, renderWithApi, starterAccess } from '../test-utils';
+import { IKEJA, LEKKI } from '../test-members';
+import {
+  ARM_ID,
+  counts,
+  guardianLink,
+  preview,
+  studentList,
+  studentRow,
+} from '../test-students';
 import { StudentsPage } from './students-page';
 
-const campus = {
-  id: '7d0f1e1e-6e53-4c52-9f1c-0a1d7a7f9c33',
-  organizationId: '9c0f1e1e-6e53-4c52-9f1c-0a1d7a7f9c22',
-  name: 'Main Campus',
-  address: null,
-  createdAt: '2026-01-01T00:00:00.000Z',
-};
+const ada = studentRow();
+const ifeoma = studentRow({
+  id: 'st-2',
+  firstName: 'Ifeoma',
+  lastName: 'Nnaji',
+  admissionNumber: 'GF-0140',
+  payers: ['Ngozi Okeke', 'Bayo Adewale'],
+});
+
+const accessWith = (...permissions: Permission[]): MePermissions =>
+  fakeAccess({
+    roles: ['custom'],
+    permissions: toPermissionMap(permissions),
+    campusScope: 'all',
+  });
+
+function setup(
+  options: {
+    props?: Partial<Parameters<typeof StudentsPage>[0]>;
+    access?: MePermissions;
+    list?: ReturnType<typeof studentList>;
+    campuses?: unknown[];
+    classes?: unknown[];
+    settings?: { maxGuardians: number; requireGuardian: boolean };
+  } = {}
+) {
+  const students = {
+    list: vi.fn().mockResolvedValue(options.list ?? studentList([ada, ifeoma])),
+    guardians: vi.fn().mockResolvedValue([guardianLink()]),
+  };
+  const api = {
+    students,
+    campuses: {
+      list: vi.fn().mockResolvedValue(options.campuses ?? [LEKKI, IKEJA]),
+    },
+    classLevels: {
+      list: vi.fn().mockResolvedValue([
+        {
+          id: 'lvl-1',
+          code: 'JSS1',
+          name: 'JSS 1',
+          sequence: 7,
+          nextLevelId: null,
+          isFinalYear: false,
+        },
+      ]),
+    },
+    classes: { list: vi.fn().mockResolvedValue(options.classes ?? []) },
+    admissions: { preview: vi.fn().mockResolvedValue(preview()) },
+    schoolAccount: {
+      get: vi.fn().mockResolvedValue({ admissionPrefix: 'GF' }),
+    },
+    schoolSettings: {
+      get: vi
+        .fn()
+        .mockResolvedValue(
+          options.settings ?? { maxGuardians: 4, requireGuardian: true }
+        ),
+    },
+    calendar: {
+      current: vi.fn().mockResolvedValue({ schoolYear: { name: '2026/2027' } }),
+    },
+    guardians: { list: vi.fn().mockResolvedValue([]) },
+  };
+  const handlers = {
+    onSearchChange: vi.fn(),
+    onOpenStudent: vi.fn(),
+    onAdmitted: vi.fn(),
+    onOpenCalendar: vi.fn(),
+  };
+  renderWithApi(
+    <StudentsPage
+      search={{}}
+      schoolName="Greenfield College"
+      {...handlers}
+      {...options.props}
+    />,
+    api,
+    options.access
+  );
+  return { students, api, ...handlers };
+}
 
 describe('StudentsPage', () => {
-  it('lists students with their campus name', async () => {
-    renderWithApi(<StudentsPage />, {
-      students: { list: vi.fn().mockResolvedValue([student()]) },
-      campuses: { list: vi.fn().mockResolvedValue([campus]) },
-    });
-
-    expect(await screen.findByText('Ada Obi')).toBeInTheDocument();
-    expect(await screen.findByText(/GF-001 · Main Campus/)).toBeInTheDocument();
+  it('shows the scope note, the shown count, the tabs with counts and each student', async () => {
+    setup();
+    expect(
+      await screen.findByText('Ada Okeke', { exact: false })
+    ).toBeInTheDocument();
+    expect(screen.getByText('All campuses · 2 shown')).toBeInTheDocument();
+    for (const [name, count] of [
+      ['Active', 2],
+      ['New intakes', 1],
+      ['Inactive', 1],
+      ['Left', 1],
+      ['Graduated', 1],
+    ] as const) {
+      expect(
+        screen.getByRole('tab', { name: `${name} ${count}` })
+      ).toBeInTheDocument();
+    }
+    expect(screen.getByText('GF-0123')).toBeInTheDocument();
+    expect(screen.getAllByText('JSS 2 Gold', { selector: 'td' })).toHaveLength(
+      2
+    );
   });
 
-  it('creates a student from the form', async () => {
-    const create = vi.fn().mockResolvedValue(student());
-    renderWithApi(<StudentsPage />, {
-      students: { list: vi.fn().mockResolvedValue([]), create },
-      campuses: { list: vi.fn().mockResolvedValue([campus]) },
+  it('requests the tab, query, filters and page from the URL search', async () => {
+    const { students } = setup({
+      props: {
+        search: {
+          tab: 'inactive',
+          q: 'ada',
+          campusId: 'c1',
+          levelId: 'l1',
+          page: 2,
+        },
+      },
     });
+    await screen.findByText('Ada Okeke', { exact: false });
+    expect(students.list).toHaveBeenCalledWith({
+      query: {
+        tab: 'inactive',
+        q: 'ada',
+        campusId: 'c1',
+        levelId: 'l1',
+        page: 2,
+      },
+    });
+  });
 
-    fireEvent.change(await screen.findByLabelText('Full name'), {
-      target: { value: 'Bayo Ade' },
+  it('reports a tab change and leaves the default tab out of the URL', async () => {
+    const { onSearchChange } = setup({
+      props: { search: { tab: 'left', page: 2 } },
     });
-    fireEvent.change(screen.getByLabelText('Admission number'), {
-      target: { value: 'GF-002' },
+    fireEvent.mouseDown(await screen.findByRole('tab', { name: 'Active 2' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Active 2' }));
+    expect(onSearchChange).toHaveBeenCalledWith({
+      tab: undefined,
+      page: undefined,
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Add student' }));
+  });
 
-    await waitFor(() =>
-      expect(create).toHaveBeenCalledWith({
-        body: { fullName: 'Bayo Ade', admissionNumber: 'GF-002' },
+  it('uses the school prefix in the search box and reports typing from page one', async () => {
+    const { onSearchChange } = setup({ props: { search: { page: 3 } } });
+    const box = await screen.findByPlaceholderText('Search name or GF number');
+    fireEvent.change(box, { target: { value: 'ada' } });
+    expect(onSearchChange).toHaveBeenCalledWith({ page: undefined, q: 'ada' });
+  });
+
+  it('offers the Campus and Level filters, the Campus one only with more than one campus', async () => {
+    const { onSearchChange } = setup();
+    fireEvent.change(await screen.findByLabelText('Campus'), {
+      target: { value: IKEJA.id },
+    });
+    expect(onSearchChange).toHaveBeenCalledWith({
+      campusId: IKEJA.id,
+      page: undefined,
+    });
+    fireEvent.change(await screen.findByLabelText('Level'), {
+      target: { value: 'lvl-1' },
+    });
+    expect(onSearchChange).toHaveBeenCalledWith({
+      levelId: 'lvl-1',
+      page: undefined,
+    });
+  });
+
+  it('hides the Campus filter and column with one campus', async () => {
+    setup({ campuses: [LEKKI] });
+    await screen.findByText('Ada Okeke', { exact: false });
+    expect(screen.queryByLabelText('Campus')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('columnheader', { name: 'Campus' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows the Campus column with more than one campus', async () => {
+    setup();
+    await screen.findByText('Ada Okeke', { exact: false });
+    expect(
+      screen.getByRole('columnheader', { name: 'Campus' })
+    ).toBeInTheDocument();
+  });
+});
+
+describe('StudentsPage permissions', () => {
+  it('gives guardian:read the expand toggle and the Pays fees names', async () => {
+    setup({ access: accessWith('student:read', 'guardian:read') });
+    expect(
+      await screen.findByText('Ngozi Okeke, Bayo Adewale')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('columnheader', { name: 'Pays fees' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getAllByRole('button', { name: /Show guardians of/ })
+    ).toHaveLength(2);
+  });
+
+  it('hides the expand column and Pays fees without guardian:read', async () => {
+    setup({ access: accessWith('student:read') });
+    await screen.findByText('Ada Okeke', { exact: false });
+    expect(
+      screen.queryByRole('columnheader', { name: 'Pays fees' })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /Show guardians of/ })
+    ).not.toBeInTheDocument();
+  });
+
+  it('opens the guardians row with the heading, the lines and no Add guardian without guardian:link', async () => {
+    setup({ access: accessWith('student:read', 'guardian:read') });
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Show guardians of Ada Okeke' })
+    );
+    expect(await screen.findByText('Guardians of Ada')).toBeInTheDocument();
+    expect(await screen.findByText('Ngozi Okeke')).toBeInTheDocument();
+    expect(screen.getByText('Mother · 0803 456 7890')).toBeInTheDocument();
+    expect(screen.getAllByText('Pays fees').length).toBeGreaterThan(1);
+    expect(screen.getByText('Email login')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Add guardian' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('offers Add guardian with guardian:link and disables it at the maximum', async () => {
+    setup({
+      access: accessWith(
+        'student:read',
+        'guardian:read',
+        'guardian:link',
+        'schoolAccount:read'
+      ),
+      settings: { maxGuardians: 1, requireGuardian: true },
+    });
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Show guardians of Ada Okeke' })
+    );
+    await screen.findByText('Ngozi Okeke');
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: 'Add guardian' })
+      ).toBeDisabled();
+    });
+  });
+
+  it('shows Admit student with student:create, and for a starter administrator', async () => {
+    setup({ access: starterAccess('administrator') });
+    expect(
+      await screen.findByRole('button', { name: 'Admit student' })
+    ).toBeInTheDocument();
+  });
+
+  it('hides Admit student without student:create', async () => {
+    setup({ access: accessWith('student:read') });
+    await screen.findByText('Ada Okeke', { exact: false });
+    expect(
+      screen.queryByRole('button', { name: 'Admit student' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('hides Admit student without guardian:link while a guardian is required', async () => {
+    setup({ access: accessWith('student:read', 'student:create') });
+    await screen.findByText('Ada Okeke', { exact: false });
+    expect(
+      screen.queryByRole('button', { name: 'Admit student' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('does not open the admit sheet from the admit search flag without guardian:link while a guardian is required', async () => {
+    setup({
+      access: accessWith('student:read', 'student:create'),
+      props: { search: { admit: 1 } },
+    });
+    await screen.findByText('Ada Okeke', { exact: false });
+    expect(screen.queryByText('Admit a student')).not.toBeInTheDocument();
+  });
+
+  it('opens the sheet from the button through the admit search flag', async () => {
+    const { onSearchChange } = setup();
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Admit student' })
+    );
+    expect(onSearchChange).toHaveBeenCalledWith({ admit: 1 });
+  });
+});
+
+describe('StudentsPage states', () => {
+  it.each([
+    ['active', 'No students match', 'Try a different name, campus or level.'],
+    ['new', 'No new intakes', 'Nobody admitted in 2026/2027 matches.'],
+    [
+      'inactive',
+      'Nobody is inactive',
+      'Every student has been seen in the last 5 weeks.',
+    ],
+    ['left', 'Nobody has left', 'Students recorded as leaving appear here.'],
+    [
+      'graduated',
+      'No graduates yet',
+      'Graduate a final-year class from its class page, or start the school year.',
+    ],
+  ] as const)(
+    'has an empty state for the %s tab',
+    async (tab, title, description) => {
+      setup({
+        props: { search: { tab } },
+        list: studentList([], { counts: counts({ active: 0 }) }),
+      });
+      expect(await screen.findByText(title)).toBeInTheDocument();
+      expect(await screen.findByText(description)).toBeInTheDocument();
+    }
+  );
+
+  it('shows the New intakes callout with the school year', async () => {
+    setup({ props: { search: { tab: 'new' } } });
+    expect(
+      await screen.findByText(
+        /Students admitted in 2026\/2027\. They are Active students/
+      )
+    ).toBeInTheDocument();
+  });
+
+  it('shows the pager only above ten rows', async () => {
+    const many = Array.from({ length: 10 }, (_, index) =>
+      studentRow({
+        id: `st-${index}`,
+        firstName: `Kid${index}`,
+        admissionNumber: `GF-${index}`,
       })
     );
+    setup({ list: studentList(many, { total: 23 }) });
+    expect(
+      await screen.findByText('Showing 1 to 10 of 23')
+    ).toBeInTheDocument();
   });
 
-  it('shows the API error message', async () => {
-    renderWithApi(<StudentsPage />, {
-      students: {
-        list: vi.fn().mockRejectedValue(new Error('No active school')),
-      },
-      campuses: { list: vi.fn().mockResolvedValue([]) },
+  it('has no pager for ten rows or fewer', async () => {
+    setup();
+    await screen.findByText('Ada Okeke', { exact: false });
+    expect(screen.queryByText(/Showing 1 to/)).not.toBeInTheDocument();
+  });
+
+  it('shows a loading state and an error', async () => {
+    const { students } = setup();
+    students.list.mockReturnValue(new Promise(() => undefined));
+    expect(await screen.findAllByRole('status')).not.toHaveLength(0);
+  });
+
+  it('opens a student from the row', async () => {
+    const { onOpenStudent } = setup();
+    fireEvent.click(await screen.findByText('Ada Okeke', { exact: false }));
+    expect(onOpenStudent).toHaveBeenCalledWith(ada.id);
+  });
+});
+
+const headers = () =>
+  screen.getAllByRole('columnheader').map((header) => header.textContent);
+
+describe('StudentsPage columns per tab', () => {
+  it('shows Admitted on New intakes', async () => {
+    setup({ props: { search: { tab: 'new' } } });
+    await screen.findByText('Ada Okeke', { exact: false });
+    expect(headers()).toContain('Admitted');
+    expect(screen.getAllByText('8 Sep 2025')).toHaveLength(2);
+  });
+
+  it('shows Not seen since, Weeks away and the due badge on Inactive', async () => {
+    setup({
+      props: { search: { tab: 'inactive' } },
+      list: studentList([
+        studentRow({
+          life: 'inactive',
+          dueLeft: true,
+          notSeenSince: '2026-05-22',
+          notSeenBy: { id: 'u1', name: 'Tunde Bakare' },
+          weeksAway: 20,
+        }),
+      ]),
     });
-
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      'No active school'
+    await screen.findByText('Ada Okeke', { exact: false });
+    expect(headers()).toEqual(
+      expect.arrayContaining(['Not seen since', 'Weeks away'])
     );
+    expect(screen.getByText('Marked by Tunde Bakare')).toBeInTheDocument();
+    expect(screen.getByText('Due to be marked Left')).toBeInTheDocument();
+    expect(screen.getByText('20')).toBeInTheDocument();
   });
 
-  it('has no create form and no remove button without student:create', async () => {
-    renderWithApi(
-      <StudentsPage />,
-      {
-        students: { list: vi.fn().mockResolvedValue([student()]) },
-        campuses: { list: vi.fn().mockResolvedValue([campus]) },
-      },
-      starterAccess('teacher')
-    );
-
-    expect(await screen.findByText('Ada Obi')).toBeInTheDocument();
-    expect(screen.queryByLabelText('Full name')).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', { name: 'Add student' })
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', { name: 'Remove' })
-    ).not.toBeInTheDocument();
-  });
-
-  it('shows the create form with student:create and never a remove button', async () => {
-    renderWithApi(
-      <StudentsPage />,
-      {
-        students: { list: vi.fn().mockResolvedValue([student()]) },
-        campuses: { list: vi.fn().mockResolvedValue([campus]) },
-      },
-      starterAccess('administrator')
-    );
-
-    expect(await screen.findByLabelText('Full name')).toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', { name: 'Remove' })
-    ).not.toBeInTheDocument();
-  });
-
-  describe('while acting', () => {
-    afterEach(() => {
-      clearActing();
-    });
-
-    it('makes the campus required, because a super admin has no active campus', async () => {
-      startActing('s1', 'Greenfield College');
-      const create = vi.fn().mockResolvedValue(student());
-      renderWithApi(<StudentsPage />, {
-        students: { list: vi.fn().mockResolvedValue([]), create },
-        campuses: { list: vi.fn().mockResolvedValue([campus]) },
-      });
-
-      const select = await screen.findByLabelText('Campus');
-      expect(select).toBeRequired();
-      expect(
-        screen.getByRole('option', { name: 'Choose a campus' })
-      ).toBeInTheDocument();
-      expect(
-        screen.queryByRole('option', { name: 'Active campus' })
-      ).not.toBeInTheDocument();
-
-      await screen.findByRole('option', { name: 'Main Campus' });
-      fireEvent.change(select, { target: { value: campus.id } });
-      fireEvent.change(screen.getByLabelText('Full name'), {
-        target: { value: 'Bayo Ade' },
-      });
-      fireEvent.change(screen.getByLabelText('Admission number'), {
-        target: { value: 'GF-002' },
-      });
-      fireEvent.click(screen.getByRole('button', { name: 'Add student' }));
-      await waitFor(() => {
-        expect(create).toHaveBeenCalledWith({
-          body: {
-            fullName: 'Bayo Ade',
-            admissionNumber: 'GF-002',
-            campusId: campus.id,
+  it('shows Left on, the reason and its note on Left', async () => {
+    setup({
+      props: { search: { tab: 'left' } },
+      list: studentList([
+        studentRow({
+          life: 'left',
+          exit: {
+            kind: 'left',
+            on: '2026-09-25',
+            reason: 'Relocated',
+            note: 'Moved to Abuja',
+            recordedOn: '2026-09-28',
           },
-        });
-      });
+        }),
+      ]),
     });
+    await screen.findByText('Ada Okeke', { exact: false });
+    expect(headers()).toEqual(
+      expect.arrayContaining(['Last class', 'Left on', 'Reason'])
+    );
+    expect(screen.getByText('25 Sep 2026')).toBeInTheDocument();
+    expect(screen.getByText('Relocated')).toBeInTheDocument();
+    expect(screen.getByText('Moved to Abuja')).toBeInTheDocument();
+  });
 
-    it('leaves the campus optional when not acting', async () => {
-      renderWithApi(<StudentsPage />, {
-        students: { list: vi.fn().mockResolvedValue([]) },
-        campuses: { list: vi.fn().mockResolvedValue([campus]) },
-      });
-      expect(await screen.findByLabelText('Campus')).not.toBeRequired();
+  it('shows the final class and school year on Graduated', async () => {
+    setup({
+      props: { search: { tab: 'graduated' } },
+      list: studentList([
+        studentRow({
+          life: 'graduated',
+          latestClassName: 'SS 3 Gold',
+          graduatedSessionName: '2025/2026',
+          exit: {
+            kind: 'graduated',
+            on: '2026-07-24',
+            reason: 'Completed SS 3',
+            note: null,
+            recordedOn: '2026-07-24',
+          },
+        }),
+      ]),
     });
+    await screen.findByText('Ada Okeke', { exact: false });
+    expect(headers()).toEqual(
+      expect.arrayContaining(['Final class', 'Graduated', 'School year'])
+    );
+    expect(screen.getByText('SS 3 Gold')).toBeInTheDocument();
+    expect(screen.getByText('2025/2026')).toBeInTheDocument();
+  });
+
+  it('shows No class yet for an Active student with no placement and the Not seen badge for a marked one', async () => {
+    setup({
+      list: studentList([
+        studentRow({ currentPlacement: null }),
+        studentRow({
+          id: 'st-3',
+          firstName: 'Zainab',
+          notSeenSince: '2026-10-01',
+          weeksAway: 1,
+        }),
+      ]),
+    });
+    expect(await screen.findByText('No class yet')).toBeInTheDocument();
+    expect(screen.getByText('Not seen 1 wk')).toBeInTheDocument();
+  });
+});
+
+describe('StudentsPage scope notes', () => {
+  it('names the campuses for a campus-scoped member', async () => {
+    setup({
+      access: fakeAccess({
+        roles: ['bursar'],
+        permissions: toPermissionMap(['student:read']),
+        campusScope: [LEKKI.id],
+      }),
+      campuses: [LEKKI],
+    });
+    expect(
+      await screen.findByText('Lekki campus · 2 shown')
+    ).toBeInTheDocument();
+  });
+
+  it('names the classes for a class-scoped member', async () => {
+    setup({
+      access: fakeAccess({
+        roles: ['teacher'],
+        permissions: toPermissionMap(['student:read', 'class:read']),
+        campusScope: [LEKKI.id],
+        classScope: [ARM_ID],
+      }),
+      classes: [{ id: ARM_ID, displayName: 'JSS 2 Gold' }],
+    });
+    expect(
+      await screen.findByText(
+        'Students placed this term in JSS 2 Gold · 2 shown'
+      )
+    ).toBeInTheDocument();
+  });
+
+  it('does not leave a blank class name for a teacher with no class yet', async () => {
+    setup({
+      access: fakeAccess({
+        roles: ['teacher'],
+        permissions: toPermissionMap(['student:read', 'class:read']),
+        campusScope: [LEKKI.id],
+        classScope: [],
+      }),
+      classes: [],
+    });
+    expect(
+      await screen.findByText('Students in your classes · 2 shown')
+    ).toBeInTheDocument();
+  });
+});
+
+describe('within a row', () => {
+  it('keeps the name and number together in the first cell', async () => {
+    setup();
+    const row = (await screen.findByText('GF-0123')).closest('tr');
+    expect(row).not.toBeNull();
+    expect(within(row!).getByText('Ada Okeke')).toBeInTheDocument();
   });
 });

@@ -15,16 +15,21 @@ import {
   SUSPENDED_SLUG,
   schools,
 } from './schools';
-import { students } from './students';
+import {
+  SEED_ENROLMENTS,
+  SEED_GUARDIANS,
+  SEED_PLACEMENTS,
+  students,
+} from './students';
 
-// Until class scope narrows teachers to their arms, Emeka sees all of Lekki.
+// Emeka is class-scoped to JSS 3 Gold, where Bola Johnson sits.
 export const visibleStudents: Record<string, number> = {
   funmi: 28,
   tunde: 28,
   grace: 28,
   chika: 23,
   yemi: 5,
-  emeka: 23,
+  emeka: 1,
   kola: 0,
 };
 
@@ -208,6 +213,111 @@ async function checkClasses(
   );
 }
 
+const byName = (a: string, b: string) => a.localeCompare(b);
+
+async function checkRoll(
+  app: INestApplicationContext,
+  db: Database,
+  check: Check
+) {
+  const funmi = await orgContextFor(app, emailOf('funmi'));
+  const organizationId = funmi.organizationId;
+  const count = async (
+    table:
+      | 'student_enrollment'
+      | 'enrollment_placement'
+      | 'guardian'
+      | 'guardian_student'
+  ) => {
+    const row = await db
+      .selectFrom(table)
+      .where('organization_id', '=', organizationId)
+      .select((eb) => eb.fn.countAll<string>().as('total'))
+      .executeTakeFirstOrThrow();
+    return Number(row.total);
+  };
+  check(
+    'Greenfield enrolments',
+    await count('student_enrollment'),
+    SEED_ENROLMENTS
+  );
+  check(
+    'Greenfield placements',
+    await count('enrollment_placement'),
+    SEED_PLACEMENTS
+  );
+  check('Greenfield guardians', await count('guardian'), SEED_GUARDIANS.length);
+  check(
+    'Greenfield guardian links',
+    await count('guardian_student'),
+    students.reduce((total, row) => total + row.guardians.length, 0)
+  );
+
+  const listed = await app
+    .get(StudentService, { strict: false })
+    .list(funmi, { tab: 'new', page: 1, pageSize: 100 });
+  check(
+    'Greenfield new intakes',
+    listed.items
+      .map((row) => row.firstName)
+      .toSorted(byName)
+      .join(','),
+    students
+      .filter((row) => row.isNewIntake)
+      .map((row) => row.firstName)
+      .toSorted(byName)
+      .join(',')
+  );
+}
+
+async function checkLogins(organizationId: string, db: Database, check: Check) {
+  const ada = await db
+    .selectFrom('student')
+    .innerJoin('user', 'user.id', 'student.user_id')
+    .select(['student.admission_number', 'user.username'])
+    .where('student.organization_id', '=', organizationId)
+    .where('student.first_name', '=', 'Ada')
+    .executeTakeFirst();
+  check('Ada admission number', ada?.admission_number ?? 'missing', 'GF-0123');
+  check('Ada username', ada?.username ?? 'missing', 'greenfield-0123');
+
+  await checkGuardianLogins(organizationId, db, check);
+}
+
+async function checkGuardianLogins(
+  organizationId: string,
+  db: Database,
+  check: Check
+) {
+  for (const guardian of SEED_GUARDIANS) {
+    const row = await db
+      .selectFrom('guardian')
+      .innerJoin('user', 'user.id', 'guardian.user_id')
+      .select(['user.username', 'user.email'])
+      .where('guardian.organization_id', '=', organizationId)
+      .where('guardian.full_name', '=', guardian.fullName)
+      .executeTakeFirst();
+    check(
+      `${guardian.fullName} login`,
+      (guardian.login.kind === 'email' ? row?.email : row?.username) ??
+        'missing',
+      guardian.login.kind === 'email'
+        ? guardian.login.email
+        : guardian.login.username
+    );
+  }
+}
+
+async function checkStudents(
+  app: INestApplicationContext,
+  db: Database,
+  check: Check
+) {
+  await checkRoll(app, db, check);
+  const funmi = await orgContextFor(app, emailOf('funmi'));
+  await checkLogins(funmi.organizationId, db, check);
+}
+
 async function checkPlatform(db: Database, check: Check, offsetDays: number) {
   await checkSuperAdmin(db, check);
   for (const school of schools) {
@@ -243,17 +353,27 @@ export async function runSeedCheck(
   check('Greenfield campuses', campuses.length, 2);
   for (const campus of campuses) {
     const expected = students.filter((s) => s.campus === campus.name).length;
-    const listed = await studentService.list(funmi, campus.id);
-    check(`${campus.name} students`, listed.length, expected);
+    const listed = await studentService.list(funmi, {
+      tab: 'active',
+      page: 1,
+      pageSize: 100,
+      campusId: campus.id,
+    });
+    check(`${campus.name} students`, listed.total, expected);
   }
 
   await checkCalendar(app, db, check);
   await checkClasses(app, db, check);
+  await checkStudents(app, db, check);
 
   for (const [key, expected] of Object.entries(visibleStudents)) {
     const ctx = await orgContextFor(app, emailOf(key));
-    const listed = await studentService.list(ctx);
-    check(`${key} sees students`, listed.length, expected);
+    const listed = await studentService.list(ctx, {
+      tab: 'active',
+      page: 1,
+      pageSize: 100,
+    });
+    check(`${key} sees students`, listed.total, expected);
   }
   return failures;
 }

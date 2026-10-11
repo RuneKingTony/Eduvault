@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { acting, expect } from './support/base-test';
-import { schoolsTest } from './support/two-schools';
+import { bareSchoolsTest } from './support/two-schools';
 
-const test = schoolsTest;
+const test = bareSchoolsTest;
 
 const MIGRATION = readFileSync(
   new URL(

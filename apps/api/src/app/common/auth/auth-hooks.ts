@@ -69,6 +69,21 @@ export class AuthRequestHooks {
     }
   }
 
+  @BeforeHook('/sign-in/username')
+  limitUsernameSignIn(ctx: { body?: unknown }): void {
+    const username = stringIn(ctx.body, 'username')?.toLowerCase();
+    if (
+      isSignInLimited(this.env) &&
+      username !== undefined &&
+      !this.attempts.allow(`username:${username}`)
+    ) {
+      throw new APIError('TOO_MANY_REQUESTS', {
+        code: 'TOO_MANY_ATTEMPTS',
+        message: TOO_MANY_ATTEMPTS_MESSAGE,
+      });
+    }
+  }
+
   @AfterHook('/sign-in/email')
   clearSignInAttempts(ctx: {
     body?: unknown;
@@ -82,6 +97,22 @@ export class AuthRequestHooks {
       newSession !== null
     ) {
       this.attempts.reset(email);
+    }
+  }
+
+  @AfterHook('/sign-in/username')
+  clearUsernameAttempts(ctx: {
+    body?: unknown;
+    context: { newSession?: unknown };
+  }): void {
+    const username = stringIn(ctx.body, 'username')?.toLowerCase();
+    const { newSession } = ctx.context;
+    if (
+      username !== undefined &&
+      typeof newSession === 'object' &&
+      newSession !== null
+    ) {
+      this.attempts.reset(`username:${username}`);
     }
   }
 

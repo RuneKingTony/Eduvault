@@ -186,13 +186,13 @@ Owned by M2.2 (Settings, "Admissions rules", section "Guardians"). Cited here be
   - It is refused (409) when it would break G-7, or, with `require_guardian` on, leave an active student with no guardian. Left and graduated students may lose their last guardian.
   - A guardian left with no children in the school loses their membership of the school in the same transaction, so the portal no longer shows it. Their `guardian` row stays, so they can be re-linked later, which restores the membership. Their user account and any links in other schools are never touched.
 - **G-10 Gates.**
-  - Linking an existing guardian, editing a link and removing a link need `guardian:link`.
+  - Linking an existing guardian, editing a link and removing a link need `guardian:link`. Linking and editing a link, and editing guardian details, also need `guardian:read` because their answers carry contact data ([D-159](../technical-reference.md#decision-log)).
   - Creating a new guardian also needs `guardian:create`. The prototype checks only `guardian:link`, but the starter roles hold both.
   - Editing guardian details and resetting a login need `guardian:update`.
   - Reading needs `guardian:read`.
 - **G-11 Visibility.** A guardian is visible to a staff member only when linked to a student that member can see, after campus and class scope ([D-048](../technical-reference.md#decision-log)). The profile card's children and "Pays the fees" badge are computed over the visible children only. One exception, for linking siblings: the existing-guardian picker also returns a guardian anywhere in the school whose phone or email matches the search exactly, with their name only.
 - **G-12 Payer on charges.** `pays_fees` decides who receives charges and who is offered as the payer when a payment is recorded. That rule is M3 ([finance](../brainstorming/data-model-finance.md)); this slice only stores it. It does not decide what a guardian sees: every linked guardian sees each linked child's fees and purchases in the portal ([D-030](../technical-reference.md#decision-log)).
-- **G-13 Reset login.** `guardian:update` on a visible guardian. Sets a new generated temporary password and `mustChangePassword` on the guardian's user, ends their sessions, and returns the password once. It is refused (409) for a guardian whose user is also a staff member of this school (G-5): staff passwords are reset through staff flows.
+- **G-13 Reset login.** `guardian:update` on a visible guardian. Sets a new generated temporary password and `mustChangePassword` on the guardian's user, ends their sessions, and returns the password once. It is refused (409) for a guardian whose user is also a staff member of this school (G-5): staff passwords are reset through staff flows. It is also refused (409) when the user belongs to another school or is a platform user, so one school can never reset a login it shares.
 
 ## Data
 
@@ -254,7 +254,7 @@ Owned by M2.2 (Settings, "Admissions rules", section "Guardians"). Cited here be
   - Removing a guardian's last link removes their school membership in the same transaction; re-linking restores it.
   - The picker's exact phone or email match returns an out-of-scope guardian with name only, never their phone or children; a partial match returns nothing outside scope.
   - Class scope narrows `GET /guardians` and `GET /guardians/:id` as it narrows students.
-  - Reset login: 403 without `guardian:update`, 404 out of scope, 409 for a staff user; the old password fails afterwards.
+  - Reset login: 403 without `guardian:update`, 404 out of scope, 409 for a staff user and for a login shared with another school or the platform (its password stays unchanged); the old password fails afterwards.
   - Photo: a file id from another school, or one already attached, answers 400.
 - **E2E (required, `eduvault-e2e`)**
   - Administrator adds an existing guardian to a second child from the expand row; the guardian's profile card lists both children.

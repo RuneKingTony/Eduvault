@@ -94,21 +94,27 @@ export class ClassService {
     ctx: OrgContext,
     records: readonly ClassRecord[]
   ): Promise<ClassSummary[]> {
-    const teachers = await this.teachersOf(
-      ctx,
-      records.map((record) => record.id)
-    );
+    const ids = records.map((record) => record.id);
+    const [teachers, counts] = await Promise.all([
+      this.teachersOf(ctx, ids),
+      this.classes.studentCounts(ctx.organizationId, ids),
+    ]);
     return records.map((record) =>
       toClassSummary(
         record,
-        teachers.filter((teacher) => teacher.classId === record.id)
+        teachers.filter((teacher) => teacher.classId === record.id),
+        counts[record.id] ?? 0
       )
     );
   }
 
   private async summaryOf(ctx: OrgContext, id: string): Promise<ClassSummary> {
     const record = await this.requireClass(ctx, id, everything);
-    return toClassSummary(record, await this.teachersOf(ctx, [id]));
+    const [teachers, counts] = await Promise.all([
+      this.teachersOf(ctx, [id]),
+      this.classes.studentCounts(ctx.organizationId, [id]),
+    ]);
+    return toClassSummary(record, teachers, counts[id] ?? 0);
   }
 
   async list(ctx: OrgContext, query: ClassListQuery): Promise<ClassSummary[]> {
@@ -126,11 +132,19 @@ export class ClassService {
 
   async get(ctx: OrgContext, id: string): Promise<ClassDetail> {
     const record = await this.requireClass(ctx, id);
-    return toClassDetail(
-      record,
-      toClassSummary(record, await this.teachersOf(ctx, [id])).classTeachers,
-      can(ctx.permissions, 'student', 'read') ? [] : null
-    );
+    const roster = can(ctx.permissions, 'student', 'read')
+      ? await this.classes.roster(ctx.organizationId, id)
+      : null;
+    const counts = await this.classes.studentCounts(ctx.organizationId, [id]);
+    const count = roster?.length ?? counts[id] ?? 0;
+    return {
+      ...toClassDetail(
+        record,
+        toClassSummary(record, await this.teachersOf(ctx, [id])).classTeachers,
+        roster
+      ),
+      studentCount: count,
+    };
   }
 
   async create(

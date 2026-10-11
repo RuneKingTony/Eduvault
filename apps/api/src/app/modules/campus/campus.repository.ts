@@ -32,6 +32,11 @@ export abstract class CampusRepository {
     campusIds: readonly string[]
   ): Promise<CampusMemberRecord[]>;
 
+  abstract placedStudentCounts(
+    organizationId: string,
+    campusIds: readonly string[]
+  ): Promise<Record<string, number>>;
+
   abstract activeClassCounts(
     organizationId: string,
     campusIds: readonly string[]

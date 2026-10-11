@@ -5,7 +5,6 @@ import type {
   AuditRow,
   MePermissions,
   PlatformSchool,
-  Student,
 } from '@eduvault/api-contract';
 import {
   PermissionsProvider,
@@ -15,16 +14,6 @@ import {
 import { ALL_PERMISSIONS, READ_PERMS, toPermissionMap } from '@eduvault/policy';
 import { TooltipProvider } from '@eduvault/ui';
 import { ApiProvider, type Api } from './api';
-
-export const student = (overrides: Partial<Student> = {}): Student => ({
-  id: '5b0f1e1e-6e53-4c52-9f1c-0a1d7a7f9c11',
-  organizationId: '9c0f1e1e-6e53-4c52-9f1c-0a1d7a7f9c22',
-  campusId: '7d0f1e1e-6e53-4c52-9f1c-0a1d7a7f9c33',
-  fullName: 'Ada Obi',
-  admissionNumber: 'GF-001',
-  createdAt: '2026-01-01T00:00:00.000Z',
-  ...overrides,
-});
 
 export const platformSchool = (
   overrides: Partial<PlatformSchool> = {}

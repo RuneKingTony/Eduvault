@@ -8,6 +8,7 @@ import { OWNER_ROLE, MEMBER_ROLE, splitRoles } from '@eduvault/policy';
 import type { DB } from '../../../db/db-types';
 import type { PlatformAuditEntry } from '../../common/audit';
 import { insertPlatformAudit } from '../../common/audit/kysely-audit.repository';
+import { escapeLike } from '../../common/db/escape-like';
 import { iso } from '../../common/db/rows';
 import { KYSELY_TOKEN, type Database } from '../../common/db/tokens';
 import { ownerRoles } from './owner-roles';
@@ -54,9 +55,6 @@ const toSchool = (
   status: row.suspended_at === null ? 'active' : 'suspended',
   createdAt: iso(row.createdAt),
 });
-
-const escapeLike = (text: string) =>
-  text.replaceAll(/[\\%_]/g, String.raw`\$&`);
 
 const toMember = ({
   role,

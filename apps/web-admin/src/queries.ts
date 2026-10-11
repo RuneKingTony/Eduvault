@@ -7,6 +7,7 @@ import type { ClassStatus, RouteQuery, contract } from '@eduvault/api-contract';
 import type { ActingState } from './acting-store';
 import type { Api } from './api';
 import type { MembersSearch } from './members-search';
+import type { StudentsSearch } from './students-search';
 
 export const ME_PERMISSIONS_KEY = ['me', 'permissions'] as const;
 export const PLATFORM_SCHOOLS_KEY = ['platform', 'schools'] as const;
@@ -79,10 +80,62 @@ export const mePermissionsQueryOptions = (
     refetchOnWindowFocus: 'always',
   });
 
-export const studentsQueryOptions = (api: Api) =>
+const STUDENTS_KEY = ['students'] as const;
+
+export const studentsQueryOptions = (
+  api: Api,
+  {
+    tab = 'active',
+    q,
+    campusId,
+    levelId,
+    page = 1,
+  }: Omit<StudentsSearch, 'admit'>
+) =>
   queryOptions({
-    queryKey: ['students'],
-    queryFn: () => api.students.list({ query: {} }),
+    queryKey: [...STUDENTS_KEY, 'list', { tab, q, campusId, levelId, page }],
+    queryFn: () =>
+      api.students.list({ query: { tab, q, campusId, levelId, page } }),
+    placeholderData: keepPreviousData,
+  });
+
+export const studentQueryOptions = (api: Api, id: string) =>
+  queryOptions({
+    queryKey: [...STUDENTS_KEY, 'one', id],
+    queryFn: () => api.students.get({ params: { id } }),
+  });
+
+export const studentGuardiansQueryOptions = (api: Api, id: string) =>
+  queryOptions({
+    queryKey: [...STUDENTS_KEY, 'guardians', id],
+    queryFn: () => api.students.guardians({ params: { id } }),
+  });
+
+export const admissionPreviewQueryOptions = (api: Api) =>
+  queryOptions({
+    queryKey: [...STUDENTS_KEY, 'admission-preview'],
+    queryFn: () => api.admissions.preview({}),
+    gcTime: 0,
+  });
+
+export const guardiansQueryOptions = (
+  api: Api,
+  query: { q?: string; excludeStudentId?: string }
+) =>
+  queryOptions({
+    queryKey: [
+      'guardians',
+      'list',
+      query.q ?? '',
+      query.excludeStudentId ?? '',
+    ],
+    queryFn: () => api.guardians.list({ query }),
+  });
+
+export const guardianQueryOptions = (api: Api, id: string) =>
+  queryOptions({
+    queryKey: ['guardians', 'one', id],
+    queryFn: () => api.guardians.get({ params: { id } }),
   });
 
 export const campusesQueryOptions = (api: Api) =>
@@ -299,5 +352,17 @@ export async function invalidateClassTeachers(
   await Promise.all([
     queryClient.invalidateQueries({ queryKey: CLASSES_KEY }),
     queryClient.invalidateQueries({ queryKey: ME_PERMISSIONS_KEY }),
+  ]);
+}
+
+/** A student write can change the roll, the class lists and the campus counts. */
+export async function invalidateStudents(
+  queryClient: QueryClient
+): Promise<void> {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: STUDENTS_KEY }),
+    queryClient.invalidateQueries({ queryKey: ['guardians'] }),
+    queryClient.invalidateQueries({ queryKey: CLASSES_KEY }),
+    queryClient.invalidateQueries({ queryKey: CAMPUSES_KEY }),
   ]);
 }

@@ -97,6 +97,24 @@ describe('statements', () => {
     expect(PERM_HELP['class:assignTeacher']).toBeDefined();
   });
 
+  it('has the enrollment and guardian resources with their labels and help', () => {
+    expect(ALL_PERMISSIONS).toEqual(
+      expect.arrayContaining([
+        'enrollment:create',
+        'enrollment:read',
+        'enrollment:place',
+        'guardian:create',
+        'guardian:read',
+        'guardian:update',
+        'guardian:link',
+      ])
+    );
+    expect(permLabel('enrollment:place')).toBe('Enrolment: place');
+    expect(permLabel('guardian:link')).toBe('Guardians: link');
+    expect(PERM_HELP['guardian:create']).toBeDefined();
+    expect(PERM_HELP['guardian:link']).toBeDefined();
+  });
+
   it('keeps SENSITIVE and PERM_HELP to listed permissions', () => {
     for (const permission of SENSITIVE) {
       expect(ALL_PERMISSIONS).toContain(permission);

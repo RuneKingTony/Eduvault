@@ -1,11 +1,12 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { sql } from 'kysely';
-import { classTeacherRoleSchema } from '@eduvault/api-contract';
+import { classTeacherRoleSchema, type RosterRow } from '@eduvault/api-contract';
 import { splitRoles, type PermissionMap } from '@eduvault/policy';
 import { customRolePermissions } from '../../common/auth';
 import { inCampusScope } from '../../common/db/in-campus-scope';
 import { iso } from '../../common/db/rows';
 import { KYSELY_TOKEN, type Database } from '../../common/db/tokens';
+import { placedNow } from '../../common/students';
 import {
   ClassRepository,
   type ClassFilter,
@@ -293,8 +294,61 @@ export class KyselyClassRepository extends ClassRepository {
       .execute();
   }
 
-  hasPlacementsFromCurrentTerm(): Promise<boolean> {
-    return Promise.resolve(false);
+  async hasPlacementsFromCurrentTerm(
+    organizationId: string,
+    classId: string
+  ): Promise<boolean> {
+    const { rows } = await sql<{ placed: boolean }>`
+      SELECT EXISTS (
+        SELECT 1
+        FROM enrollment_placement ep
+        JOIN term t ON t.id = ep.term_id
+        WHERE ep.organization_id = ${organizationId}
+          AND ep.class_arm_id = ${classId}
+          AND t.starts_on >= COALESCE(
+            (SELECT c.starts_on FROM term c
+             WHERE c.organization_id = ${organizationId} AND c.is_current),
+            '-infinity'::date
+          )
+      ) AS placed`.execute(this.db);
+    return rows[0]?.placed ?? false;
+  }
+
+  async studentCounts(
+    organizationId: string,
+    classIds: readonly string[]
+  ): Promise<Record<string, number>> {
+    if (classIds.length === 0) {
+      return {};
+    }
+    const rows = await placedNow(this.db, organizationId)
+      .where('ep.class_arm_id', 'in', [...classIds])
+      .select(['ep.class_arm_id', (eb) => eb.fn.countAll<string>().as('total')])
+      .groupBy('ep.class_arm_id')
+      .execute();
+    return Object.fromEntries(
+      rows.map((row) => [row.class_arm_id, Number(row.total)])
+    );
+  }
+
+  async roster(organizationId: string, classId: string): Promise<RosterRow[]> {
+    const rows = await placedNow(this.db, organizationId)
+      .where('ep.class_arm_id', '=', classId)
+      .select([
+        'student.id',
+        'student.first_name',
+        'student.last_name',
+        'student.admission_number',
+      ])
+      .orderBy('student.last_name')
+      .orderBy('student.first_name')
+      .orderBy('student.id')
+      .execute();
+    return rows.map((row) => ({
+      studentId: row.id,
+      name: `${row.first_name} ${row.last_name}`,
+      admissionNumber: row.admission_number,
+    }));
   }
 
   async currentSessionId(organizationId: string): Promise<string | null> {

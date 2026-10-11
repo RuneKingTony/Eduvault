@@ -8,7 +8,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import type { FileKind, FileRef } from '@eduvault/api-contract';
-import { holds } from '@eduvault/policy';
+import { holds, type PermissionMap } from '@eduvault/policy';
 import type { OrgContext } from '../auth';
 import { FILE_STORE_TOKEN, type FileStore } from './file-store';
 import { FILE_KIND_RULES, type FileKindRule } from './file-kinds';
@@ -26,6 +26,9 @@ interface FileDownload {
 }
 
 const NAME_MAX = 200;
+
+const mayWrite = (permissions: PermissionMap, rule: FileKindRule): boolean =>
+  rule.write.some((permission) => holds(permissions, permission));
 
 const notFound = () => new NotFoundException('File not found');
 
@@ -52,7 +55,7 @@ export class FilesService {
     input: { kind: FileKind; file: UploadedFile }
   ): Promise<FileRef> {
     const rule = FILE_KIND_RULES[input.kind];
-    if (!holds(ctx.permissions, rule.write)) {
+    if (!mayWrite(ctx.permissions, rule)) {
       throw new ForbiddenException(rule.denied);
     }
     const { buffer } = input.file;
@@ -101,7 +104,7 @@ export class FilesService {
       throw notFound();
     }
     const rule = FILE_KIND_RULES[file.kind];
-    if (!holds(ctx.permissions, rule.write)) {
+    if (!mayWrite(ctx.permissions, rule)) {
       throw (await this.canRead(ctx, file))
         ? new ForbiddenException(rule.denied)
         : notFound();

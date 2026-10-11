@@ -24,7 +24,12 @@ test.describe('dev seed', () => {
                 (SELECT count(*) FROM class_level) AS class_level,
                 (SELECT count(*) FROM class_arm) AS class_arm,
                 (SELECT count(*) FROM class_arm WHERE retired_at IS NOT NULL) AS retired_class_arm,
-                (SELECT count(*) FROM class_arm_teacher) AS class_arm_teacher`
+                (SELECT count(*) FROM class_arm_teacher) AS class_arm_teacher,
+                (SELECT count(*) FROM student_enrollment) AS student_enrollment,
+                (SELECT count(*) FROM enrollment_placement) AS enrollment_placement,
+                (SELECT count(*) FROM guardian) AS guardian,
+                (SELECT count(*) FROM guardian_student) AS guardian_student,
+                (SELECT count(*) FROM activity_event) AS activity_event`
       );
       return rows[0];
     };
@@ -38,7 +43,7 @@ test.describe('dev seed', () => {
     expect(await counts()).toEqual({
       organization: '3',
       team: '6',
-      user: String(personas.length + 1),
+      user: String(personas.length + 1 + 28 + 4 + 2),
       student: '28',
       academic_session: '2',
       term: '6',
@@ -48,6 +53,11 @@ test.describe('dev seed', () => {
       class_arm: '10',
       retired_class_arm: '1',
       class_arm_teacher: '5',
+      student_enrollment: '36',
+      enrollment_placement: '62',
+      guardian: '6',
+      guardian_student: '8',
+      activity_event: '28',
     });
 
     const scopeOf = async (key: string) => {
@@ -90,7 +100,7 @@ test.describe('dev seed', () => {
         .map((c) => c.split(';')[0])
         .join('; ');
       const list = await api({ cookie }).get('/students').expect(200);
-      expect(list.body, key).toHaveLength(expected);
+      expect(list.body.total, key).toBe(expected);
     }
 
     const kemi = await api()
@@ -204,6 +214,33 @@ test.describe('dev seed', () => {
       .get('/students')
       .expect(403);
     expect(paused.body).toMatchObject({ code: 'SchoolSuspended' });
+
+    for (const username of ['greenfield-0123', 'okeke-father', 'etim-family']) {
+      await api()
+        .post('/api/auth/sign-in/username')
+        .send({ username, password: SEED_PASSWORD })
+        .expect(200);
+    }
+    await api()
+      .post('/api/auth/sign-in/email')
+      .send({ email: 'ngozi.okeke@greenfield.test', password: SEED_PASSWORD })
+      .expect(200);
+    const links = await pool.query<{ guardian: string; children: string }>(
+      `SELECT g.full_name AS guardian,
+              string_agg(s.first_name, ',' ORDER BY s.first_name) AS children
+       FROM guardian g
+       JOIN guardian_student gs ON gs.guardian_id = g.id
+       JOIN student s ON s.id = gs.student_id
+       GROUP BY g.full_name ORDER BY g.full_name`
+    );
+    expect(links.rows).toEqual([
+      { guardian: 'Bayo Adewale', children: 'Tobi' },
+      { guardian: 'Emmanuel Etim', children: 'Samuel' },
+      { guardian: 'Grace Johnson', children: 'Bola' },
+      { guardian: 'Hauwa Bello', children: 'Zainab' },
+      { guardian: 'Ifeanyi Okeke', children: 'Ada' },
+      { guardian: 'Ngozi Okeke', children: 'Ada,Chidi,Kelechi' },
+    ]);
 
     const before = await counts();
     lines.length = 0;

@@ -6,6 +6,7 @@ import type { CampusScope } from '../../common/campus-scope';
 import { inCampusScope } from '../../common/db/in-campus-scope';
 import { iso } from '../../common/db/rows';
 import { KYSELY_TOKEN, type Database } from '../../common/db/tokens';
+import { placedNow } from '../../common/students';
 import {
   CampusRepository,
   type CampusMemberRecord,
@@ -116,6 +117,26 @@ export class KyselyCampusRepository extends CampusRepository {
     }));
   }
 
+  async placedStudentCounts(
+    organizationId: string,
+    campusIds: readonly string[]
+  ): Promise<Record<string, number>> {
+    if (campusIds.length === 0) {
+      return {};
+    }
+    const rows = await placedNow(this.db, organizationId)
+      .where('ep.campus_id', 'in', [...campusIds])
+      .select([
+        'ep.campus_id',
+        (eb) => eb.fn.count<string>('student.id').distinct().as('total'),
+      ])
+      .groupBy('ep.campus_id')
+      .execute();
+    return Object.fromEntries(
+      rows.map((row) => [row.campus_id, Number(row.total)])
+    );
+  }
+
   async activeClassCounts(
     organizationId: string,
     campusIds: readonly string[]
@@ -147,7 +168,7 @@ export class KyselyCampusRepository extends CampusRepository {
   }
 
   async hasDependents(organizationId: string, id: string): Promise<boolean> {
-    const [arm, student, fee] = await Promise.all([
+    const [arm, student, placement, fee] = await Promise.all([
       this.db
         .selectFrom('class_arm')
         .select('id')
@@ -161,13 +182,24 @@ export class KyselyCampusRepository extends CampusRepository {
         .where('organization_id', '=', organizationId)
         .executeTakeFirst(),
       this.db
+        .selectFrom('enrollment_placement')
+        .select('id')
+        .where('campus_id', '=', id)
+        .where('organization_id', '=', organizationId)
+        .executeTakeFirst(),
+      this.db
         .selectFrom('fee_schedule')
         .select('id')
         .where('campus_id', '=', id)
         .where('organization_id', '=', organizationId)
         .executeTakeFirst(),
     ]);
-    return arm !== undefined || student !== undefined || fee !== undefined;
+    return (
+      arm !== undefined ||
+      student !== undefined ||
+      placement !== undefined ||
+      fee !== undefined
+    );
   }
 
   async create(organizationId: string, input: NewCampus): Promise<void> {

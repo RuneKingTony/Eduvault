@@ -82,6 +82,12 @@ describe('toClassSummary', () => {
   });
 });
 
+describe('toClassSummary with students', () => {
+  it('carries the student count it is given', () => {
+    expect(toClassSummary(record(), [], 7).studentCount).toBe(7);
+  });
+});
+
 describe('toClassDetail', () => {
   it('adds the final-year flag and passes the roster through', () => {
     expect(toClassDetail(record(), [], [])).toMatchObject({

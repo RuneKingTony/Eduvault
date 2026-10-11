@@ -2,6 +2,7 @@ import type { BetterAuthOptions } from 'better-auth';
 import {
   admin,
   organization,
+  username,
   type OrganizationOptions,
 } from 'better-auth/plugins';
 import type { Pool } from 'pg';
@@ -125,6 +126,13 @@ export const getPlugins = (pool: Pool) => [
     bannedUserMessage: BANNED_USER_MESSAGE,
   }),
   organization(getOrganizationOptions(pool)),
+  // The default validator rejects the hyphen every generated username has.
+  username({
+    minUsernameLength: 3,
+    maxUsernameLength: 80,
+    usernameValidator: (value) => /^[\w.-]+$/.test(value),
+    immutableUsername: true,
+  }),
 ];
 
 /**

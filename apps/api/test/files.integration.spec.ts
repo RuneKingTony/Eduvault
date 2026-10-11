@@ -7,20 +7,22 @@ import {
   type Fixtures,
   type TestUser,
 } from './support/base-test';
-import { twoSchools, type TwoSchools } from './support/two-schools';
+import {
+  twoSchoolsWithoutStudents,
+  type TwoSchoolsWithoutStudents,
+} from './support/two-schools';
 
 const test = baseTest.extend<{
-  schools: TwoSchools;
+  schools: TwoSchoolsWithoutStudents;
   upload: (user: TestUser, bytes: Buffer, name?: string) => Promise<FileRef>;
   attach: (user: TestUser, file: FileRef) => Promise<SchoolProfile>;
 }>({
   schools: async (
-    { app, createUser, createOrganization, createCampus, addMember },
+    { createUser, createOrganization, createCampus, addMember },
     use
   ) => {
     await use(
-      await twoSchools({
-        app,
+      await twoSchoolsWithoutStudents({
         createUser,
         createOrganization,
         createCampus,

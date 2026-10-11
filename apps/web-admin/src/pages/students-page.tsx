@@ -1,143 +1,485 @@
-import { useState, type SubmitEvent } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { Campus, Student } from '@eduvault/api-contract';
-import { Can } from '@eduvault/auth-client';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
+  GraduationCapIcon,
+  InfoIcon,
+  SearchIcon,
+  UserCheckIcon,
+  UserPlusIcon,
+  UserXIcon,
+} from 'lucide-react';
+import {
+  STUDENT_PAGE_SIZE,
+  STUDENT_TABS,
+  type AdmitStudentResult,
+  type StudentCounts,
+  type StudentTab,
+} from '@eduvault/api-contract';
+import { useCan, usePermissions } from '@eduvault/auth-client';
+import {
+  Alert,
+  AlertDescription,
   Button,
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
   ErrorMessage,
+  Input,
   NativeSelect,
   NativeSelectOption,
-  TextField,
-  fieldValue,
+  NumberedPager,
+  Skeleton,
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
 } from '@eduvault/ui';
-import { useActing } from '../acting-store';
+import { useCanAdmit } from '../admission-rules';
 import { useApi } from '../api';
-import { campusesQueryOptions, studentsQueryOptions } from '../queries';
+import { AdmitStudentSheet } from '../components/admit-student-sheet';
+import type { GuardianAction } from '../components/guardian-actions';
+import { GuardianDialogs } from '../components/guardian-dialogs';
+import { StudentTable } from '../components/student-table';
+import {
+  campusesQueryOptions,
+  classLevelsQueryOptions,
+  classesQueryOptions,
+  currentTermQueryOptions,
+  schoolProfileQueryOptions,
+  studentsQueryOptions,
+} from '../queries';
+import type { StudentsSearch } from '../students-search';
 
-export function StudentsPage() {
+interface StudentsPageProps {
+  search: StudentsSearch;
+  schoolName: string;
+  onSearchChange: (next: StudentsSearch) => void;
+  onOpenStudent: (id: string) => void;
+  onAdmitted: (result: AdmitStudentResult) => void;
+  onOpenCalendar: () => void;
+}
+
+const TAB_LABELS: Record<StudentTab, string> = {
+  active: 'Active',
+  new: 'New intakes',
+  inactive: 'Inactive',
+  left: 'Left',
+  graduated: 'Graduated',
+};
+
+const ALL = '';
+
+function useScope(): { note: string; tip: string } {
   const api = useApi();
-  const queryClient = useQueryClient();
-  const students = useQuery(studentsQueryOptions(api));
+  const { campusScope, classScope } = usePermissions();
   const campuses = useQuery(campusesQueryOptions(api));
-  const [campusId, setCampusId] = useState('');
-  const acting = useActing();
-
-  const refresh = () =>
-    queryClient.invalidateQueries({ queryKey: ['students'] });
-  const create = useMutation({
-    mutationFn: (input: { fullName: string; admissionNumber: string }) =>
-      api.students.create({
-        body: { ...input, ...(campusId ? { campusId } : {}) },
-      }),
-    onSuccess: refresh,
+  const classes = useQuery({
+    ...classesQueryOptions(api, 'active'),
+    enabled: classScope !== 'all',
   });
-
-  function submit(event: SubmitEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = event.currentTarget;
-    const data = new FormData(form);
-    create.mutate(
-      {
-        fullName: fieldValue(data, 'fullName'),
-        admissionNumber: fieldValue(data, 'admissionNumber'),
-      },
-      { onSuccess: () => form.reset() }
-    );
+  if (classScope !== 'all') {
+    const names = (classes.data ?? [])
+      .filter((row) => classScope.includes(row.id))
+      .map((row) => row.displayName);
+    return {
+      note:
+        names.length === 0
+          ? 'Students in your classes'
+          : `Students placed this term in ${names.join(', ')}`,
+      tip: 'You see the students in the classes you teach.',
+    };
   }
+  if (campusScope !== 'all') {
+    const names = (campuses.data ?? []).map((campus) => campus.name);
+    return {
+      note: `${names.join(', ')} campus`,
+      tip: 'You see the students on your campus.',
+    };
+  }
+  return { note: 'All campuses', tip: 'You see students on every campus.' };
+}
 
-  const campusName = (id: string) =>
-    campuses.data?.find((campus) => campus.id === id)?.name ?? id;
+function Header({
+  props,
+  shown,
+}: {
+  props: StudentsPageProps;
+  shown: number | undefined;
+}) {
+  const scope = useScope();
+  const admit = useCanAdmit();
+  return (
+    <header className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex flex-col gap-1">
+        <h1 className="flex items-center gap-1">
+          Students
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button type="button" aria-label="About this list">
+                <InfoIcon className="size-4" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>{scope.tip}</TooltipContent>
+          </Tooltip>
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          {scope.note}
+          {shown === undefined ? '' : ` · ${shown} shown`}
+        </p>
+      </div>
+      {admit ? (
+        <Button
+          type="button"
+          onClick={() => {
+            props.onSearchChange({ ...props.search, admit: 1 });
+          }}
+        >
+          <UserPlusIcon />
+          Admit student
+        </Button>
+      ) : null}
+    </header>
+  );
+}
 
+function CountTabs({
+  tab,
+  counts,
+  onTab,
+}: {
+  tab: StudentTab;
+  counts: StudentCounts | undefined;
+  onTab: (tab: StudentTab) => void;
+}) {
+  return (
+    <Tabs
+      value={tab}
+      onValueChange={(value) => {
+        const next = STUDENT_TABS.find((candidate) => candidate === value);
+        if (next !== undefined) {
+          onTab(next);
+        }
+      }}
+    >
+      <TabsList>
+        {STUDENT_TABS.map((name) => (
+          <TabsTrigger key={name} value={name}>
+            {TAB_LABELS[name]}
+            {counts === undefined ? '' : ` ${counts[name]}`}
+          </TabsTrigger>
+        ))}
+      </TabsList>
+    </Tabs>
+  );
+}
+
+type Patch = (patch: Partial<StudentsSearch>) => void;
+
+function SearchBox({
+  search,
+  onChange,
+}: {
+  search: StudentsSearch;
+  onChange: Patch;
+}) {
+  const api = useApi();
+  const canReadSchool = useCan('schoolAccount', 'read');
+  const profile = useQuery({
+    ...schoolProfileQueryOptions(api),
+    enabled: canReadSchool,
+  });
+  return (
+    <Input
+      type="search"
+      aria-label="Search"
+      placeholder={`Search name or ${profile.data?.admissionPrefix ?? 'admission'} number`}
+      defaultValue={search.q ?? ''}
+      className="max-w-xs"
+      onChange={(event) => {
+        const q = event.target.value.trim();
+        onChange({ q: q === '' ? undefined : q });
+      }}
+    />
+  );
+}
+
+function CampusFilter({
+  search,
+  onChange,
+}: {
+  search: StudentsSearch;
+  onChange: Patch;
+}) {
+  const api = useApi();
+  const campuses = useQuery(campusesQueryOptions(api));
+  if ((campuses.data ?? []).length <= 1) {
+    return null;
+  }
+  return (
+    <NativeSelect
+      aria-label="Campus"
+      value={search.campusId ?? ALL}
+      onChange={(event) => {
+        onChange({ campusId: event.target.value || undefined });
+      }}
+    >
+      <NativeSelectOption value={ALL}>All campuses</NativeSelectOption>
+      {(campuses.data ?? []).map((campus) => (
+        <NativeSelectOption key={campus.id} value={campus.id}>
+          {campus.name}
+        </NativeSelectOption>
+      ))}
+    </NativeSelect>
+  );
+}
+
+function LevelFilter({
+  search,
+  onChange,
+}: {
+  search: StudentsSearch;
+  onChange: Patch;
+}) {
+  const api = useApi();
+  const canReadClasses = useCan('class', 'read');
+  const levels = useQuery({
+    ...classLevelsQueryOptions(api),
+    enabled: canReadClasses,
+  });
+  if (levels.data === undefined) {
+    return null;
+  }
+  return (
+    <NativeSelect
+      aria-label="Level"
+      value={search.levelId ?? ALL}
+      onChange={(event) => {
+        onChange({ levelId: event.target.value || undefined });
+      }}
+    >
+      <NativeSelectOption value={ALL}>All levels</NativeSelectOption>
+      {levels.data.map((level) => (
+        <NativeSelectOption key={level.id} value={level.id}>
+          {level.name}
+        </NativeSelectOption>
+      ))}
+    </NativeSelect>
+  );
+}
+
+function Toolbar({ props }: { props: StudentsPageProps }) {
+  const { search, onSearchChange } = props;
+  const change: Patch = (patch) => {
+    onSearchChange({ ...search, ...patch, page: undefined });
+  };
+  return (
+    <div className="flex flex-wrap items-center gap-3">
+      <SearchBox search={search} onChange={change} />
+      <CampusFilter search={search} onChange={change} />
+      <LevelFilter search={search} onChange={change} />
+    </div>
+  );
+}
+
+const EMPTY: Record<
+  StudentTab,
+  {
+    icon: typeof SearchIcon;
+    title: string;
+    description: (year: string) => string;
+  }
+> = {
+  active: {
+    icon: SearchIcon,
+    title: 'No students match',
+    description: () => 'Try a different name, campus or level.',
+  },
+  new: {
+    icon: UserPlusIcon,
+    title: 'No new intakes',
+    description: (year) => `Nobody admitted in ${year} matches.`,
+  },
+  inactive: {
+    icon: UserCheckIcon,
+    title: 'Nobody is inactive',
+    description: () => 'Every student has been seen in the last 5 weeks.',
+  },
+  left: {
+    icon: UserXIcon,
+    title: 'Nobody has left',
+    description: () => 'Students recorded as leaving appear here.',
+  },
+  graduated: {
+    icon: GraduationCapIcon,
+    title: 'No graduates yet',
+    description: () =>
+      'Graduate a final-year class from its class page, or start the school year.',
+  },
+};
+
+function EmptyTab({ tab, year }: { tab: StudentTab; year: string }) {
+  const { icon: Icon, title, description } = EMPTY[tab];
+  return (
+    <Empty className="border-0">
+      <EmptyHeader>
+        <EmptyMedia variant="icon">
+          <Icon />
+        </EmptyMedia>
+        <EmptyTitle>{title}</EmptyTitle>
+        <EmptyDescription>{description(year)}</EmptyDescription>
+      </EmptyHeader>
+    </Empty>
+  );
+}
+
+function useCurrentYear(): string {
+  const api = useApi();
+  const canSee = useCan('session', 'read');
+  const current = useQuery({
+    ...currentTermQueryOptions(api),
+    enabled: canSee,
+  });
+  return current.data?.schoolYear?.name ?? 'this school year';
+}
+
+function LoadingRows() {
+  return (
+    <div role="status" aria-label="Loading" className="flex flex-col gap-2 p-3">
+      {Array.from({ length: 4 }, (_, index) => (
+        <Skeleton key={index} className="h-10 w-full" />
+      ))}
+    </div>
+  );
+}
+
+function StudentsTableArea({
+  props,
+  tab,
+  onAction,
+}: {
+  props: StudentsPageProps;
+  tab: StudentTab;
+  onAction: (action: GuardianAction) => void;
+}) {
+  const api = useApi();
+  const { search, onSearchChange } = props;
+  const list = useQuery(studentsQueryOptions(api, search));
+  const guardianRead = useCan('guardian', 'read');
+  const campuses = useQuery(campusesQueryOptions(api));
+  const year = useCurrentYear();
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
+  const toggle = (id: string) => {
+    const next = new Set(expanded);
+    if (!next.delete(id)) {
+      next.add(id);
+    }
+    setExpanded(next);
+  };
+  if (list.isPending) {
+    return <LoadingRows />;
+  }
+  if (list.data === undefined) {
+    return <ErrorMessage error={list.error} />;
+  }
+  if (list.data.items.length === 0) {
+    return <EmptyTab tab={tab} year={year} />;
+  }
+  return (
+    <>
+      <StudentTable
+        rows={list.data.items}
+        tab={tab}
+        flags={{ guardianRead, campusColumn: (campuses.data ?? []).length > 1 }}
+        expanded={expanded}
+        actions={{ onToggle: toggle, onOpen: props.onOpenStudent, onAction }}
+      />
+      {list.data.total > STUDENT_PAGE_SIZE ? (
+        <NumberedPager
+          page={search.page ?? 1}
+          total={list.data.total}
+          pageSize={STUDENT_PAGE_SIZE}
+          onPage={(next) => {
+            onSearchChange({ ...search, page: next > 1 ? next : undefined });
+          }}
+        />
+      ) : null}
+    </>
+  );
+}
+
+function StudentsCard({
+  props,
+  onAction,
+}: {
+  props: StudentsPageProps;
+  onAction: (action: GuardianAction) => void;
+}) {
+  const api = useApi();
+  const { search, onSearchChange } = props;
+  const tab = search.tab ?? 'active';
+  const list = useQuery(studentsQueryOptions(api, search));
+  const year = useCurrentYear();
+  return (
+    <div className="flex flex-col gap-3">
+      <CountTabs
+        tab={tab}
+        counts={list.data?.counts}
+        onTab={(next) => {
+          onSearchChange({
+            ...search,
+            tab: next === 'active' ? undefined : next,
+            page: undefined,
+          });
+        }}
+      />
+      {tab === 'new' ? (
+        <Alert>
+          <InfoIcon />
+          <AlertDescription>
+            Students admitted in {year}. They are Active students, shown here so
+            you can follow their first fees.
+          </AlertDescription>
+        </Alert>
+      ) : null}
+      <div className="rounded-xl border">
+        <div className="border-b p-3">
+          <Toolbar props={props} />
+        </div>
+        <StudentsTableArea props={props} tab={tab} onAction={onAction} />
+      </div>
+    </div>
+  );
+}
+
+export function StudentsPage(props: StudentsPageProps) {
+  const api = useApi();
+  const { search, onSearchChange } = props;
+  const list = useQuery(studentsQueryOptions(api, search));
+  const admit = useCanAdmit();
+  const [action, setAction] = useState<GuardianAction | null>(null);
   return (
     <section className="flex flex-col gap-4">
-      <h1>Students</h1>
-      <ErrorMessage error={students.error ?? create.error} />
-      <StudentList students={students.data} campusName={campusName} />
-      <Can permission="student:create">
-        <StudentForm
-          campuses={campuses.data}
-          campusId={campusId}
-          campusRequired={acting !== null}
-          onCampusChange={setCampusId}
-          pending={create.isPending}
-          onSubmit={submit}
+      <Header props={props} shown={list.data?.total} />
+      <StudentsCard props={props} onAction={setAction} />
+      {admit ? (
+        <AdmitStudentSheet
+          open={search.admit === 1}
+          onOpenChange={(open) => {
+            onSearchChange({ ...search, admit: open ? 1 : undefined });
+          }}
+          onAdmitted={props.onAdmitted}
+          onOpenCalendar={props.onOpenCalendar}
         />
-      </Can>
-    </section>
-  );
-}
-
-function StudentList({
-  students,
-  campusName,
-}: {
-  students: Student[] | undefined;
-  campusName: (id: string) => string;
-}) {
-  return (
-    <ul className="divide-y rounded-md border">
-      {students?.map((student) => (
-        <li key={student.id} className="flex items-center justify-between p-3">
-          <span>
-            {student.fullName}{' '}
-            <span className="text-sm text-muted-foreground">
-              {student.admissionNumber} · {campusName(student.campusId)}
-            </span>
-          </span>
-        </li>
-      ))}
-      {students?.length === 0 ? (
-        <li className="p-3 text-muted-foreground">No students yet.</li>
       ) : null}
-    </ul>
-  );
-}
-
-function StudentForm({
-  campuses,
-  campusId,
-  campusRequired,
-  onCampusChange,
-  pending,
-  onSubmit,
-}: {
-  campuses: Campus[] | undefined;
-  campusId: string;
-  campusRequired: boolean;
-  onCampusChange: (id: string) => void;
-  pending: boolean;
-  onSubmit: (event: SubmitEvent<HTMLFormElement>) => void;
-}) {
-  return (
-    <form onSubmit={onSubmit} className="flex flex-wrap items-end gap-3">
-      <TextField label="Full name" name="fullName" required />
-      <TextField label="Admission number" name="admissionNumber" required />
-      <div className="flex flex-col gap-1">
-        <label
-          htmlFor="student-campus"
-          className="text-sm font-medium text-foreground"
-        >
-          Campus
-        </label>
-        <NativeSelect
-          id="student-campus"
-          value={campusId}
-          required={campusRequired}
-          onChange={(event) => onCampusChange(event.target.value)}
-        >
-          <NativeSelectOption value="">
-            {campusRequired ? 'Choose a campus' : 'Active campus'}
-          </NativeSelectOption>
-          {campuses?.map((campus) => (
-            <NativeSelectOption key={campus.id} value={campus.id}>
-              {campus.name}
-            </NativeSelectOption>
-          ))}
-        </NativeSelect>
-      </div>
-      <Button type="submit" disabled={pending}>
-        Add student
-      </Button>
-    </form>
+      <GuardianDialogs
+        action={action}
+        schoolName={props.schoolName}
+        onAction={setAction}
+      />
+    </section>
   );
 }

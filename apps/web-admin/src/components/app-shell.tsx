@@ -28,6 +28,7 @@ import {
   useIsCompact,
 } from '@eduvault/ui';
 import { useActing, type ActingState } from '../acting-store';
+import { useCanAdmit } from '../admission-rules';
 import { useApi } from '../api';
 import { mePermissionsQueryOptions } from '../queries';
 import {
@@ -79,6 +80,15 @@ const ADD_MEMBER_ACTION: CommandEntry = {
   keywords: ['new', 'hire', 'invite', 'staff', 'member'],
 };
 
+const ADMIT_STUDENT_ACTION: CommandEntry = {
+  id: 'admit-student',
+  label: 'Admit a student',
+  hint: 'People',
+  route: '/students?admit=1',
+  icon: 'user-plus',
+  keywords: ['new', 'student', 'enrol', 'enroll', 'admission'],
+};
+
 const CREATE_ROLE_ACTION: CommandEntry = {
   id: 'create-role',
   label: 'Create a custom role',
@@ -90,11 +100,15 @@ const CREATE_ROLE_ACTION: CommandEntry = {
 
 function commandActions(
   builtRoutes: ReadonlySet<string>,
-  access: MePermissions
+  access: MePermissions,
+  canAdmitStudent: boolean
 ): CommandEntry[] {
   const allowed = (route: string, gate: Gate) =>
     builtRoutes.has(route) && canAny(access.permissions, gate);
   return [
+    ...(builtRoutes.has('/students') && canAdmitStudent
+      ? [ADMIT_STUDENT_ACTION]
+      : []),
     ...(allowed('/members', ['member:create']) ? [ADD_MEMBER_ACTION] : []),
     ...(allowed('/roles/new', ['ac:create']) ? [CREATE_ROLE_ACTION] : []),
   ];
@@ -157,6 +171,7 @@ function crumbs(current: ReturnType<typeof findCurrent>, pathname: string) {
 
 function useShellModel(access: MePermissions) {
   const router = useRouter();
+  const canAdmitStudent = useCanAdmit();
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
   });
@@ -169,7 +184,7 @@ function useShellModel(access: MePermissions) {
     current,
     pages: commandEntries(groups),
     settings: settingsEntries(builtRoutes, access),
-    actions: commandActions(builtRoutes, access),
+    actions: commandActions(builtRoutes, access, canAdmitStudent),
     ...crumbs(current, pathname),
     open: (route: string) => {
       router.history.push(route);

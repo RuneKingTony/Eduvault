@@ -12,6 +12,18 @@ export type Generated<T> = T extends ColumnType<infer S, infer I, infer U>
 
 export type Int8 = ColumnType<string, bigint | number | string, bigint | number | string>;
 
+export type Json = JsonValue;
+
+export type JsonArray = JsonValue[];
+
+export type JsonObject = {
+  [x: string]: JsonValue | undefined;
+};
+
+export type JsonPrimitive = boolean | number | string | null;
+
+export type JsonValue = JsonArray | JsonObject | JsonPrimitive;
+
 export type Timestamp = ColumnType<Date, Date | string, Date | string>;
 
 export interface AcademicSession {
@@ -38,6 +50,20 @@ export interface Account {
   scope: string | null;
   updatedAt: Timestamp;
   userId: string;
+}
+
+export interface ActivityEvent {
+  actor_user_id: string;
+  campus_id: string | null;
+  data: Generated<Json>;
+  id: Generated<string>;
+  kind: string;
+  occurred_at: Generated<Timestamp>;
+  organization_id: string;
+  pillar: string;
+  subject_id: string;
+  subject_type: string;
+  text: string;
 }
 
 export interface AuditLog {
@@ -95,6 +121,25 @@ export interface ClassLevel {
   updated_at: Generated<Timestamp>;
 }
 
+export interface DocumentSequence {
+  id: Generated<string>;
+  kind: string;
+  next_value: number;
+  organization_id: string;
+  year: number | null;
+}
+
+export interface EnrollmentPlacement {
+  campus_id: string;
+  class_arm_id: string;
+  created_at: Generated<Timestamp>;
+  created_by: string | null;
+  enrollment_id: string;
+  id: Generated<string>;
+  organization_id: string;
+  term_id: string;
+}
+
 export interface FeeSchedule {
   amount_minor: Int8;
   campus_id: string | null;
@@ -123,6 +168,31 @@ export interface FileObject {
   storage_key: string;
   uploaded_at: Generated<Timestamp>;
   uploaded_by: string | null;
+}
+
+export interface Guardian {
+  address: string | null;
+  created_at: Generated<Timestamp>;
+  created_by: string | null;
+  email: string | null;
+  full_name: string;
+  id: Generated<string>;
+  organization_id: string;
+  phone: string;
+  photo_file_id: string | null;
+  updated_at: Generated<Timestamp>;
+  user_id: string;
+}
+
+export interface GuardianStudent {
+  created_at: Generated<Timestamp>;
+  created_by: string | null;
+  guardian_id: string;
+  id: Generated<string>;
+  organization_id: string;
+  pays_fees: Generated<boolean>;
+  relationship: string;
+  student_id: string;
 }
 
 export interface Invitation {
@@ -221,11 +291,41 @@ export interface Session {
 
 export interface Student {
   admission_number: string;
+  admitted_on: Timestamp;
+  archived_at: Timestamp | null;
+  archived_by: string | null;
+  archived_term_id: string | null;
   campus_id: string;
   created_at: Generated<Timestamp>;
-  full_name: string;
+  created_by: string | null;
+  date_of_birth: Timestamp;
+  exit_kind: string | null;
+  exit_note: string | null;
+  exit_reason: string | null;
+  first_name: string;
+  gender: string;
+  graduated_session_id: string | null;
   id: Generated<string>;
+  last_day: Timestamp | null;
+  last_name: string;
+  not_seen_by: string | null;
+  not_seen_note: string | null;
+  not_seen_since: Timestamp | null;
   organization_id: string;
+  updated_at: Generated<Timestamp>;
+  user_id: string | null;
+}
+
+export interface StudentEnrollment {
+  class_level_id: string;
+  created_at: Generated<Timestamp>;
+  created_by: string | null;
+  id: Generated<string>;
+  is_new_student: Generated<boolean>;
+  organization_id: string;
+  session_id: string;
+  status: Generated<string>;
+  student_id: string;
   updated_at: Generated<Timestamp>;
 }
 
@@ -264,6 +364,7 @@ export interface User {
   banned: boolean | null;
   banReason: string | null;
   createdAt: Generated<Timestamp>;
+  displayUsername: string | null;
   email: string;
   emailVerified: boolean;
   id: Generated<string>;
@@ -272,6 +373,7 @@ export interface User {
   name: string;
   role: string | null;
   updatedAt: Generated<Timestamp>;
+  username: string | null;
 }
 
 export interface Verification {
@@ -286,14 +388,19 @@ export interface Verification {
 export interface DB {
   academic_session: AcademicSession;
   account: Account;
+  activity_event: ActivityEvent;
   audit_log: AuditLog;
   campus: Campus;
   class_arm: ClassArm;
   class_arm_teacher: ClassArmTeacher;
   class_level: ClassLevel;
+  document_sequence: DocumentSequence;
+  enrollment_placement: EnrollmentPlacement;
   fee_schedule: FeeSchedule;
   file_blob: FileBlob;
   file_object: FileObject;
+  guardian: Guardian;
+  guardian_student: GuardianStudent;
   invitation: Invitation;
   member: Member;
   organization: Organization;
@@ -303,6 +410,7 @@ export interface DB {
   school_setting: SchoolSetting;
   session: Session;
   student: Student;
+  student_enrollment: StudentEnrollment;
   team: Team;
   teamMember: TeamMember;
   term: Term;

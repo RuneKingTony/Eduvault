@@ -18,16 +18,18 @@ import {
   YEAR_2027,
   createSchoolYear,
 } from './support/factories/calendar';
-import { twoSchools, type TwoSchools } from './support/two-schools';
+import {
+  twoSchoolsWithoutStudents,
+  type TwoSchoolsWithoutStudents,
+} from './support/two-schools';
 
-const test = baseTest.extend<{ schools: TwoSchools }>({
+const test = baseTest.extend<{ schools: TwoSchoolsWithoutStudents }>({
   schools: async (
-    { app, createUser, createOrganization, createCampus, addMember },
+    { createUser, createOrganization, createCampus, addMember },
     use
   ) => {
     await use(
-      await twoSchools({
-        app,
+      await twoSchoolsWithoutStudents({
         createUser,
         createOrganization,
         createCampus,

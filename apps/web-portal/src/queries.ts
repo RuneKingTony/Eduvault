@@ -4,7 +4,7 @@ import type { Api } from './api';
 export const studentsQueryOptions = (api: Api) =>
   queryOptions({
     queryKey: ['students'],
-    queryFn: () => api.students.list({ query: {} }),
+    queryFn: () => api.students.list({ query: { pageSize: 100 } }),
   });
 
 export const campusesQueryOptions = (api: Api) =>

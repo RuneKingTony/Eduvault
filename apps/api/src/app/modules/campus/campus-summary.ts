@@ -5,7 +5,10 @@ import type { CampusMemberRecord } from './campus.repository';
 export function summariseCampus(
   campus: Campus,
   members: readonly CampusMemberRecord[],
-  classCounts: Readonly<Record<string, number>>
+  counts: {
+    classes: Readonly<Record<string, number>>;
+    students: Readonly<Record<string, number>>;
+  }
 ): CampusSummary {
   const onCampus = members.filter((member) => member.campusId === campus.id);
   return {
@@ -14,8 +17,8 @@ export function summariseCampus(
       .filter((member) => member.roles.includes('principal'))
       .map(({ userId, name }) => ({ userId, name })),
     counts: {
-      classes: classCounts[campus.id] ?? 0,
-      students: 0,
+      classes: counts.classes[campus.id] ?? 0,
+      students: counts.students[campus.id] ?? 0,
       staff: onCampus.filter((member) => !isPortalOnly(member.roles)).length,
     },
   };

@@ -135,6 +135,37 @@ describe('the Classes area', () => {
   });
 });
 
+describe('the Students and Parents and guardians areas', () => {
+  const students = area('students');
+  const guardians = area('guardians');
+
+  it('puts enrolment permissions in Students and the four guardian ones in Parents and guardians', () => {
+    expect(students.change).toEqual([
+      'student:create',
+      'student:update',
+      'enrollment:read',
+      'enrollment:create',
+      'enrollment:place',
+    ]);
+    expect(guardians.group).toBe('School');
+    expect(guardians.label).toBe('Parents and guardians');
+    expect(guardians.see).toEqual(['guardian:read']);
+    expect(guardians.change).toEqual([
+      'guardian:create',
+      'guardian:update',
+      'guardian:link',
+    ]);
+    expect(guardians.changeDesc).toBe(
+      'Add guardians and link them to students'
+    );
+  });
+
+  it('sits after Students', () => {
+    const ids = CAP_AREAS.map((candidate) => candidate.id);
+    expect(ids.indexOf('guardians')).toBe(ids.indexOf('students') + 1);
+  });
+});
+
 describe('capLevel', () => {
   const campuses = area('campuses');
 
@@ -173,6 +204,7 @@ describe('capSummary', () => {
       'Classes: add, archive and restore classes, change levels and name class teachers',
       'Sees every class',
       'Students: admit students, update them and put them in classes',
+      'Parents and guardians: add guardians and link them to students',
     ]);
   });
 
@@ -187,6 +219,7 @@ describe('capSummary', () => {
       'Classes: add, archive and restore classes, change levels and name class teachers',
       'Sees every class',
       'Students: admit students, update them and put them in classes',
+      'Parents and guardians: add guardians and link them to students',
     ]);
   });
 
@@ -195,7 +228,10 @@ describe('capSummary', () => {
       'Classes: can see',
       'Students: can see',
     ]);
-    expect(summaryFor('bursar')).toEqual(['Students: can see']);
+    expect(summaryFor('bursar')).toEqual([
+      'Students: can see',
+      'Parents and guardians: can see',
+    ]);
   });
 
   it('describes the principal', () => {
@@ -232,8 +268,14 @@ describe('capChanges', () => {
   });
 
   it('counts a higher level as gained and a lower one as lost, never both', () => {
-    const change = held('student:read', 'student:create', 'student:update');
     const see = held('student:read');
+    const change = held(
+      ...CAP_AREAS.flatMap((candidate) =>
+        candidate.id === 'students'
+          ? [...candidate.see, ...candidate.change]
+          : []
+      )
+    );
     const changeLine =
       'Students: admit students, update them and put them in classes';
     expect(capChanges(see, change)).toEqual({ gained: [changeLine], lost: [] });

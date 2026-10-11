@@ -44,7 +44,8 @@ export const orderTeachers = (
 
 export const toClassSummary = (
   record: ClassRecord,
-  teachers: readonly ClassTeacher[]
+  teachers: readonly ClassTeacher[],
+  studentCount = 0
 ): ClassSummary => ({
   id: record.id,
   name: record.name,
@@ -52,7 +53,7 @@ export const toClassSummary = (
   level: { id: record.levelId, code: record.levelCode, name: record.levelName },
   campus: { id: record.campusId, name: record.campusName },
   classTeachers: orderTeachers(teachers),
-  studentCount: 0,
+  studentCount,
   retiredAt: record.retiredAt,
 });
 
@@ -61,7 +62,7 @@ export const toClassDetail = (
   teachers: readonly ClassTeacher[],
   roster: ClassDetail['roster']
 ): ClassDetail => ({
-  ...toClassSummary(record, teachers),
+  ...toClassSummary(record, teachers, roster?.length ?? 0),
   isFinalYear: record.levelNextLevelId === null,
   roster,
 });

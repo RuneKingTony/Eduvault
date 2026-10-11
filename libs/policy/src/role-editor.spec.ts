@@ -220,6 +220,9 @@ describe('applyAreaLevel', () => {
     'student:read',
     'student:create',
     'student:update',
+    'enrollment:read',
+    'enrollment:create',
+    'enrollment:place',
     'team:read',
     'team:create',
     'team:update',
@@ -245,6 +248,7 @@ describe('applyAreaLevel', () => {
     expect(capLevel(changed.map, students)).toBe('change');
     expect(changed.map).toEqual({
       student: ['read', 'create', 'update'],
+      enrollment: ['read', 'create', 'place'],
     });
   });
 
@@ -323,7 +327,12 @@ describe('applyAreaLevel', () => {
       editorMap: editor,
     });
     expect(result.map).toEqual({ student: ['read', 'create'] });
-    expect(result.leftOut).toEqual(['student:update']);
+    expect(result.leftOut).toEqual([
+      'student:update',
+      'enrollment:read',
+      'enrollment:create',
+      'enrollment:place',
+    ]);
   });
 
   it('is a no-op shape for a level the editor holds nothing of', () => {

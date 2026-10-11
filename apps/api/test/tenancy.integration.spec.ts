@@ -1,13 +1,13 @@
 import { expect } from './support/base-test';
+import {
+  admissionBody,
+  createStudent,
+  ensureClass,
+  ensureCurrentTerm,
+} from './support/factories/students';
 import { schoolsTest } from './support/two-schools';
 
 const test = schoolsTest;
-
-const student = (campusId: string, n: string) => ({
-  campusId,
-  fullName: `Student ${n}`,
-  admissionNumber: `ADM-${n}`,
-});
 
 const ids = (rows: { id: string }[]) =>
   rows.map((row) => row.id).toSorted((a, b) => a.localeCompare(b));
@@ -21,7 +21,7 @@ test.describe('students', () => {
       await api(ownerB).get(`/students/${studentLekki.id}`).expect(404);
       await api(ownerB)
         .patch(`/students/${studentLekki.id}`)
-        .send({ fullName: 'x' })
+        .send({ firstName: 'x' })
         .expect(404);
     });
 
@@ -30,7 +30,7 @@ test.describe('students', () => {
       schools: { owner, lekkiOnly, campusB, studentLekki, studentIkeja },
     }) => {
       const list = (await api(owner).get('/students').expect(200)).body;
-      expect(ids(list)).toEqual(ids([studentLekki, studentIkeja]));
+      expect(ids(list.items)).toEqual(ids([studentLekki, studentIkeja]));
 
       for (const user of [owner, lekkiOnly]) {
         const res = await api(user)
@@ -48,7 +48,7 @@ test.describe('students', () => {
       await api(lekkiOnly).get(`/students?campusId=${ikeja.id}`).expect(404);
       await api(lekkiOnly)
         .patch(`/students/${studentLekki.id}`)
-        .send({ fullName: 'x' })
+        .send({ firstName: 'x' })
         .expect(403);
     });
 
@@ -57,60 +57,62 @@ test.describe('students', () => {
       schools: { lekkiOnly, studentLekki },
     }) => {
       const list = (await api(lekkiOnly).get('/students').expect(200)).body;
-      expect(ids(list)).toEqual([studentLekki.id]);
+      expect(ids(list.items)).toEqual([studentLekki.id]);
     });
 
     test('5: a member without the student permission gets 403', async ({
       api,
-      schools: { noPermission, lekki, studentLekki },
+      schools: { noPermission, studentLekki },
     }) => {
       await api(noPermission).get('/students').expect(403);
       await api(noPermission).get(`/students/${studentLekki.id}`).expect(403);
       await api(noPermission)
         .post('/students')
-        .send(student(lekki.id, 'N'))
+        .send(admissionBody(crypto.randomUUID(), 'N'))
         .expect(403);
       await api(noPermission)
         .patch(`/students/${studentLekki.id}`)
-        .send({ fullName: 'x' })
+        .send({ firstName: 'x' })
         .expect(403);
     });
 
     test('6: no session answers 401', async ({
       api,
-      schools: { lekki, studentLekki },
+      schools: { studentLekki },
     }) => {
       await api().get('/students').expect(401);
       await api().get(`/students/${studentLekki.id}`).expect(401);
-      await api().post('/students').send(student(lekki.id, 'N')).expect(401);
+      await api()
+        .post('/students')
+        .send(admissionBody(crypto.randomUUID(), 'N'))
+        .expect(401);
       await api()
         .patch(`/students/${studentLekki.id}`)
-        .send({ fullName: 'x' })
+        .send({ firstName: 'x' })
         .expect(401);
     });
 
-    test('7: a cross-school campus answers 404 and the composite foreign key refuses a bypass', async ({
+    test('7: a cross-school class answers 404 and the composite foreign key refuses a bypass', async ({
       api,
+      app,
       pool,
-      schools: { owner, ownerB, orgA, lekki, campusB, studentLekki },
+      schools: { owner, ownerB, orgA, lekki, campusB },
     }) => {
       await api(owner)
         .post('/students')
-        .send(student(campusB.id, 'X'))
+        .send(admissionBody(await ensureClass(app, ownerB, campusB.id), 'X'))
         .expect(404);
       await api(ownerB)
         .post('/students')
-        .send(student(lekki.id, 'Y'))
-        .expect(404);
-      await api(owner)
-        .patch(`/students/${studentLekki.id}`)
-        .send({ campusId: campusB.id })
+        .send(admissionBody(await ensureClass(app, owner, lekki.id), 'Y'))
         .expect(404);
 
       await expect(
         pool.query(
-          `INSERT INTO student (organization_id, campus_id, full_name, admission_number)
-           VALUES ($1, $2, 'Raw', 'RAW-1')`,
+          `INSERT INTO student
+             (organization_id, campus_id, first_name, last_name, gender,
+              date_of_birth, admission_number, admitted_on)
+           VALUES ($1, $2, 'Raw', 'Raw', 'F', '2014-03-03', 'RAW-1', '2026-10-11')`,
           [orgA.id, campusB.id]
         )
       ).rejects.toMatchObject({ code: '23503' });
@@ -119,6 +121,7 @@ test.describe('students', () => {
 
   test('a user in both schools sees only the active one', async ({
     api,
+    app,
     createUser,
     createOrganization,
     createCampus,
@@ -131,18 +134,8 @@ test.describe('students', () => {
     const orgB = await createOrganization(ownerB, 'School B');
     const campusA = await createCampus(orgA);
     const campusB = await createCampus(orgB);
-    const studentA = (
-      await api(ownerA)
-        .post('/students')
-        .send(student(campusA.id, 'A1'))
-        .expect(201)
-    ).body;
-    const studentB = (
-      await api(ownerB)
-        .post('/students')
-        .send(student(campusB.id, 'B1'))
-        .expect(201)
-    ).body;
+    const studentA = await createStudent(app, ownerA, { campusId: campusA.id });
+    const studentB = await createStudent(app, ownerB, { campusId: campusB.id });
 
     let both = await addMember(orgA, await createUser(), {
       roles: ['administrator'],
@@ -151,16 +144,18 @@ test.describe('students', () => {
     await setActiveOrganization(both, orgA.id);
 
     const list = (await api(both).get('/students').expect(200)).body;
-    expect(list.map((s: { id: string }) => s.id)).toEqual([studentA.id]);
+    expect(list.items.map((s: { id: string }) => s.id)).toEqual([studentA.id]);
     await api(both).get(`/students/${studentB.id}`).expect(404);
     await api(both)
       .post('/students')
-      .send(student(campusB.id, 'X'))
+      .send(admissionBody(await ensureClass(app, ownerB, campusB.id), 'X'))
       .expect(404);
 
     await setActiveOrganization(both, orgB.id);
     const switched = (await api(both).get('/students').expect(200)).body;
-    expect(switched.map((s: { id: string }) => s.id)).toEqual([studentB.id]);
+    expect(switched.items.map((s: { id: string }) => s.id)).toEqual([
+      studentB.id,
+    ]);
     await api(both).get(`/students/${studentA.id}`).expect(404);
   });
 });
@@ -470,6 +465,7 @@ test.describe('files', () => {
 test.describe('role per school', () => {
   test('the same user is a teacher in A and an administrator in B', async ({
     api,
+    app,
     createUser,
     createOrganization,
     createCampus,
@@ -493,21 +489,22 @@ test.describe('role per school', () => {
     await api(user).get('/students').expect(200);
     await api(user)
       .post('/students')
-      .send(student(campusA.id, 'T'))
+      .send(admissionBody(crypto.randomUUID(), 'T'))
       .expect(403);
     await api(user).get('/campuses/summary').expect(403);
 
     await setActiveOrganization(user, orgB.id);
+    await ensureCurrentTerm(app, ownerB);
     await api(user)
       .post('/students')
-      .send(student(campusB.id, 'T'))
+      .send(admissionBody(await ensureClass(app, ownerB, campusB.id), 'T'))
       .expect(201);
     await api(user).get('/campuses/summary').expect(200);
 
     await setActiveOrganization(user, orgA.id);
     await api(user)
       .post('/students')
-      .send(student(campusA.id, 'T2'))
+      .send(admissionBody(crypto.randomUUID(), 'T2'))
       .expect(403);
   });
 

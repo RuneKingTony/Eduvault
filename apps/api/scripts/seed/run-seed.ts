@@ -14,9 +14,9 @@ import { AuditRepository } from '../../src/app/common/audit';
 import { KYSELY_TOKEN, type Database } from '../../src/app/common/db/tokens';
 import { CampusService } from '../../src/app/modules/campus/campus.service';
 import { PlatformService } from '../../src/app/modules/platform/platform.service';
-import { StudentService } from '../../src/app/modules/student/student.service';
 import { seedCalendar } from './calendar';
 import { seedClasses } from './classes';
+import { seedStudents } from './student-seed';
 import { orgContextFor } from './actors';
 import { PROTOTYPE_TODAY, seedOffsetDays, shiftDate } from './date-shift';
 import {
@@ -145,25 +145,6 @@ async function addMembers(
   }
 }
 
-async function createStudents(
-  app: INestApplicationContext,
-  campusIds: Map<string, string>
-) {
-  const studentService = app.get(StudentService, { strict: false });
-  const tunde = await orgContextFor(app, emailOf('tunde'));
-  for (const student of students) {
-    await studentService.create(tunde, {
-      campusId: lookup(
-        campusIds,
-        `${GREENFIELD_SLUG}/${student.campus}`,
-        'campus'
-      ),
-      fullName: student.fullName,
-      admissionNumber: student.admissionNumber,
-    });
-  }
-}
-
 async function ensureSuperAdmin(
   app: INestApplicationContext,
   log: (line: string) => void
@@ -247,13 +228,17 @@ export async function runSeed(
   const created = await createSchools(app, superAdmin);
   await backdateSchools(db, created.organizationIds, offsetDays);
   await addMembers(app, created);
-  await createStudents(app, created.campusIds);
   const greenfieldOwner = lookupOwner(created.owners, GREENFIELD_SLUG);
   await seedCalendar(app, { owner: greenfieldOwner, today, offsetDays });
   await seedClasses(app, {
     owner: greenfieldOwner,
     campusIds: created.campusIds,
     userIds: created.userIds,
+    offsetDays,
+  });
+  await seedStudents(app, {
+    owner: await orgContextFor(app, emailOf('tunde')),
+    today,
     offsetDays,
   });
   await addSupportActivity(app, superAdmin, created.organizationIds);

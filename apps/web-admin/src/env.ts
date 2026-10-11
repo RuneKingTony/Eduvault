@@ -4,3 +4,7 @@ export const API_URL =
 
 /** True only in the dev server; the production build folds it to `false`. */
 export const isDev = import.meta.env.DEV;
+
+export const PORTAL_URL =
+  (import.meta.env.VITE_PORTAL_URL as string | undefined) ??
+  'http://localhost:4201';

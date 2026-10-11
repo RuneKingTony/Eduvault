@@ -12,15 +12,10 @@ import {
   syncStarterRoles,
 } from '../src/app/common/auth/starter-roles';
 import { expect } from './support/base-test';
+import { admissionBody, ensureClass } from './support/factories/students';
 import { schoolsTest } from './support/two-schools';
 
 const test = schoolsTest;
-
-const student = (campusId: string, n: string) => ({
-  campusId,
-  fullName: `Student ${n}`,
-  admissionNumber: `ADM-${n}`,
-});
 
 const FEE = { name: 'Tuition', amountMinor: 1, currency: 'NGN' };
 
@@ -86,6 +81,16 @@ test.describe('guard order', () => {
       ['get', `/students/${id}`],
       ['post', '/students'],
       ['patch', `/students/${id}`],
+      ['get', '/admissions/preview'],
+      ['get', '/admissions/duplicates'],
+      ['get', '/guardians'],
+      ['get', `/guardians/${id}`],
+      ['patch', `/guardians/${id}`],
+      ['post', `/guardians/${id}/reset-login`],
+      ['get', `/students/${id}/guardians`],
+      ['post', `/students/${id}/guardians`],
+      ['patch', `/students/${id}/guardians/${id}`],
+      ['delete', `/students/${id}/guardians/${id}`],
       ['post', '/campuses'],
       ['patch', `/campuses/${lekki.id}`],
       ['delete', `/campuses/${lekki.id}`],
@@ -126,15 +131,21 @@ test.describe('guard order', () => {
 
   test('the owner passes every gated route and /me/permissions lists every permission', async ({
     api,
+    app,
     schools: { owner, orgA, lekki, studentLekki },
   }) => {
     await api(owner).get('/students').expect(200);
     await api(owner).get(`/students/${studentLekki.id}`).expect(200);
-    await api(owner).post('/students').send(student(lekki.id, 'O')).expect(201);
+    await api(owner)
+      .post('/students')
+      .send(admissionBody(await ensureClass(app, owner, lekki.id), 'O'))
+      .expect(201);
     await api(owner)
       .patch(`/students/${studentLekki.id}`)
-      .send({ fullName: 'Renamed' })
+      .send({ firstName: 'Renamed' })
       .expect(200);
+    await api(owner).get('/admissions/preview').expect(200);
+    await api(owner).get('/guardians').expect(200);
     await api(owner).get('/campuses').expect(200);
     await api(owner).post('/campuses').send({ name: 'Annex' }).expect(201);
     await api(owner).get('/fee-schedules').expect(200);
@@ -173,15 +184,16 @@ test.describe('guard order', () => {
 test.describe('role union', () => {
   test('permissions from two custom roles are combined', async ({
     api,
+    app,
     createUser,
     addMember,
     createRole,
-    schools: { orgA, lekki },
+    schools: { owner, orgA, lekki },
   }) => {
     await createRole(orgA, { slug: 'reader', permissions: ['student:read'] });
     await createRole(orgA, {
       slug: 'enroller',
-      permissions: ['student:create'],
+      permissions: ['student:create', 'guardian:link', 'guardian:create'],
     });
     const reader = await addMember(orgA, await createUser(), {
       roles: ['reader'],
@@ -189,7 +201,7 @@ test.describe('role union', () => {
     });
     await api(reader)
       .post('/students')
-      .send(student(lekki.id, 'U'))
+      .send(admissionBody(crypto.randomUUID(), 'U'))
       .expect(403);
 
     const both = await addMember(orgA, await createUser(), {
@@ -197,7 +209,10 @@ test.describe('role union', () => {
       campuses: [lekki],
     });
     await api(both).get('/students').expect(200);
-    await api(both).post('/students').send(student(lekki.id, 'U')).expect(201);
+    await api(both)
+      .post('/students')
+      .send(admissionBody(await ensureClass(app, owner, lekki.id), 'U'))
+      .expect(201);
   });
 
   test('a role change applies on the next request', async ({
@@ -240,27 +255,36 @@ test.describe('campus scope', () => {
     expect(res.body.message).toBe('Campus not found');
   });
 
-  test('creating or moving a student onto a campus outside the scope answers 404 "Campus not found"', async ({
+  test('admitting into a class on a campus outside the scope answers 404 "Class not found"', async ({
     api,
+    app,
     withPermissions,
-    schools: { orgA, lekki, ikeja, studentLekki },
+    schools: { owner, orgA, lekki, ikeja, studentLekki },
   }) => {
     const clerk = await withPermissions(
       orgA,
-      ['student:create', 'student:read', 'student:update'],
+      [
+        'student:create',
+        'student:read',
+        'student:update',
+        'guardian:link',
+        'guardian:create',
+      ],
       { campuses: [lekki] }
     );
     const create = await api(clerk)
       .post('/students')
-      .send(student(ikeja.id, 'X'))
+      .send(admissionBody(await ensureClass(app, owner, ikeja.id), 'X'))
       .expect(404);
-    expect(create.body.message).toBe('Campus not found');
-    const move = await api(clerk)
+    expect(create.body.message).toBe('Class not found');
+    await api(clerk)
       .patch(`/students/${studentLekki.id}`)
       .send({ campusId: ikeja.id })
-      .expect(404);
-    expect(move.body.message).toBe('Campus not found');
-    await api(clerk).post('/students').send(student(lekki.id, 'Y')).expect(201);
+      .expect(400);
+    await api(clerk)
+      .post('/students')
+      .send(admissionBody(await ensureClass(app, owner, lekki.id), 'Y'))
+      .expect(201);
   });
 
   test('a fee-schedule campusId filter outside the scope answers 404 "Campus not found"', async ({
@@ -364,7 +388,11 @@ test.describe('/me/permissions', () => {
   }) => {
     const res = await api(lekkiOnly).get('/me/permissions').expect(200);
     expect(res.body.campusScope).toEqual([lekki.id]);
-    expect(res.body.permissions).toEqual({ student: ['read'] });
+    expect(res.body.permissions).toEqual({
+      student: ['read'],
+      guardian: ['read'],
+      enrollment: ['read'],
+    });
   });
 
   test('401 without a session and 403 NoSchool without a school', async ({
@@ -415,12 +443,16 @@ test.describe('isolation', () => {
     expect(inB.body).toMatchObject({
       organizationId: orgB.id,
       roles: ['bursar'],
-      permissions: { student: ['read'] },
+      permissions: {
+        student: ['read'],
+        guardian: ['read'],
+        enrollment: ['read'],
+      },
       campusScope: [campusB.id],
     });
     await api(bursarB)
       .post('/students')
-      .send(student(campusB.id, 'B1'))
+      .send(admissionBody(crypto.randomUUID(), 'B1'))
       .expect(403);
   });
 
