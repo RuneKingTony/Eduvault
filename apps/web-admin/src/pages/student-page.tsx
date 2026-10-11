@@ -3,6 +3,8 @@ import { useQuery } from '@tanstack/react-query';
 import {
   ChevronDownIcon,
   HistoryIcon,
+  KeyRoundIcon,
+  PencilIcon,
   UserIcon,
   UsersRoundIcon,
 } from 'lucide-react';
@@ -59,6 +61,10 @@ import {
   type LifecycleDialog,
 } from '../components/student-lifecycle-dialogs';
 import type { StudentAction } from '../components/student-lifecycle-model';
+import {
+  EditStudentDialog,
+  ResetStudentLoginDialog,
+} from '../components/student-detail-dialogs';
 import { StudentMenu, useMenuItems } from '../components/student-menu';
 import { studentQueryOptions } from '../queries';
 
@@ -70,6 +76,11 @@ interface StudentPageProps {
   onDialogClosed?: () => void;
   onOpenTab: (tab: StudentTab) => void;
   onBack: () => void;
+}
+
+interface Issued {
+  logins: LoginCredential[];
+  title?: string;
 }
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
@@ -114,7 +125,57 @@ function ExitRow({ student }: { student: StudentDetail }) {
   );
 }
 
-function ProfileCard({ student }: { student: StudentDetail }) {
+type DetailAction = 'edit' | 'reset-login';
+
+function ProfileActions({
+  student,
+  onAction,
+}: {
+  student: StudentDetail;
+  onAction: (action: DetailAction) => void;
+}) {
+  if (student.exit !== null) {
+    return null;
+  }
+  return (
+    <Can permission="student:update">
+      <div className="flex gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            onAction('edit');
+          }}
+        >
+          <PencilIcon />
+          Edit details
+        </Button>
+        {student.portalLogin?.active === true ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              onAction('reset-login');
+            }}
+          >
+            <KeyRoundIcon />
+            Reset login
+          </Button>
+        ) : null}
+      </div>
+    </Can>
+  );
+}
+
+function ProfileCard({
+  student,
+  onAction,
+}: {
+  student: StudentDetail;
+  onAction: (action: DetailAction) => void;
+}) {
   return (
     <Card>
       <CardHeader>
@@ -122,6 +183,9 @@ function ProfileCard({ student }: { student: StudentDetail }) {
           <UserIcon className="size-4 text-primary" />
           Profile
         </CardTitle>
+        <CardAction>
+          <ProfileActions student={student} onAction={onAction} />
+        </CardAction>
       </CardHeader>
       <CardContent>
         <dl className="flex flex-col gap-3">
@@ -324,6 +388,7 @@ interface BodyProps {
   onDialogClosed?: () => void;
   onOpenTab: (tab: StudentTab) => void;
   onBack: () => void;
+  onIssued: (issued: Issued) => void;
 }
 
 function useLifecycle(props: BodyProps) {
@@ -348,9 +413,38 @@ function useLifecycle(props: BodyProps) {
   return { items, open, close, dialog: allowed ? dialog : null };
 }
 
+function DetailDialog({
+  action,
+  student,
+  onClose,
+  onIssued,
+}: {
+  action: DetailAction | null;
+  student: StudentDetail;
+  onClose: () => void;
+  onIssued: (issued: Issued) => void;
+}) {
+  if (action === 'edit') {
+    return <EditStudentDialog student={student} onClose={onClose} />;
+  }
+  if (action === 'reset-login') {
+    return (
+      <ResetStudentLoginDialog
+        student={student}
+        onClose={onClose}
+        onIssued={(logins) => {
+          onIssued({ logins, title: `New login for ${nameOf(student)}` });
+        }}
+      />
+    );
+  }
+  return null;
+}
+
 function StudentBody(props: BodyProps) {
   const { student } = props;
   const [action, setAction] = useState<GuardianAction | null>(null);
+  const [detailAction, setDetailAction] = useState<DetailAction | null>(null);
   const canReadGuardians = useCan('guardian', 'read');
   const lifecycle = useLifecycle(props);
   return (
@@ -369,7 +463,7 @@ function StudentBody(props: BodyProps) {
         }}
       />
       <div className="grid gap-4 md:grid-cols-2">
-        <ProfileCard student={student} />
+        <ProfileCard student={student} onAction={setDetailAction} />
         {canReadGuardians ? (
           <Can permission="guardian:read">
             <GuardiansCard student={student} onAction={setAction} />
@@ -381,6 +475,14 @@ function StudentBody(props: BodyProps) {
         action={action}
         schoolName={props.schoolName}
         onAction={setAction}
+      />
+      <DetailDialog
+        action={detailAction}
+        student={student}
+        onClose={() => {
+          setDetailAction(null);
+        }}
+        onIssued={props.onIssued}
       />
       {lifecycle.dialog === null ? null : (
         <StudentLifecycleDialog
@@ -413,7 +515,9 @@ function StudentNotFound({ onBack }: { onBack: () => void }) {
 export function StudentPage(props: StudentPageProps) {
   const api = useApi();
   const student = useQuery(studentQueryOptions(api, props.studentId));
-  const [logins, setLogins] = useState(props.logins ?? null);
+  const [issued, setIssued] = useState<Issued | null>(
+    props.logins === undefined ? null : { logins: props.logins }
+  );
   if (student.error instanceof ApiError && student.error.status === 404) {
     return <StudentNotFound onBack={props.onBack} />;
   }
@@ -433,14 +537,16 @@ export function StudentPage(props: StudentPageProps) {
         onDialogClosed={props.onDialogClosed}
         onOpenTab={props.onOpenTab}
         onBack={props.onBack}
+        onIssued={setIssued}
       />
       <LoginsDialog
-        open={logins !== null}
+        open={issued !== null}
+        {...(issued?.title === undefined ? {} : { title: issued.title })}
         studentFirstName={student.data.firstName}
-        logins={logins ?? []}
+        logins={issued?.logins ?? []}
         schoolName={props.schoolName}
         onDone={() => {
-          setLogins(null);
+          setIssued(null);
         }}
       />
     </>

@@ -2,6 +2,7 @@ import { createFileRoute, useRouter } from '@tanstack/react-router';
 import { useAuthClient } from '@eduvault/auth-client';
 import { toast } from '@eduvault/ui';
 import { requireGate } from '../access';
+import { admittedToast } from '../admit-model';
 import { StudentsPage } from '../pages/students-page';
 import { campusesQueryOptions, studentsQueryOptions } from '../queries';
 import { parseStudentsSearch } from '../students-search';
@@ -56,9 +57,7 @@ function StudentsRoute() {
         });
       }}
       onAdmitted={({ student, logins }) => {
-        toast.success(
-          `${student.firstName} ${student.lastName} admitted as ${student.admissionNumber}.`
-        );
+        toast.success(admittedToast(student));
         router.history.push(`/students/${student.id}`, {
           admitted: { logins },
         });

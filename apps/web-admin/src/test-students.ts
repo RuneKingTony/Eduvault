@@ -154,6 +154,7 @@ export const preview = (
   nextStudentUsername: 'greenfield-0234',
   currentTerm: { id: 't1', name: 'First term' },
   currentSession: { id: 's2', name: '2026/2027' },
+  nextTerm: null,
   maxGuardians: 4,
   requireGuardian: true,
   classes: [

@@ -2,7 +2,9 @@ import {
   ADMIT_DOB_MESSAGE,
   ADMIT_FIRST_NAME_REQUIRED,
   ADMIT_LAST_NAME_REQUIRED,
+  type AdmissionPreview,
   type AdmitStudentInput,
+  type StudentDetail,
 } from '@eduvault/api-contract';
 import {
   newDraft,
@@ -20,6 +22,7 @@ export interface AdmitForm {
   gender: 'F' | 'M';
   dateOfBirth: string;
   classArmId: string;
+  termId: string;
   guardians: GuardianDraftState[];
   nextKey: number;
 }
@@ -47,6 +50,7 @@ export function initialAdmitForm(admitter: Admitter): AdmitForm {
     gender: 'F',
     dateOfBirth: '',
     classArmId: '',
+    termId: '',
     guardians: admitter.canLink ? [firstGuardian(1, admitter)] : [],
     nextKey: 2,
   };
@@ -70,6 +74,33 @@ export function studentErrors(form: AdmitForm, today: string): StudentErrors {
   return errors;
 }
 
+export function chosenTerm(
+  preview: Pick<AdmissionPreview, 'currentTerm' | 'nextTerm'>,
+  form: Pick<AdmitForm, 'termId'>
+): { id: string; name: string; later: boolean } {
+  const { nextTerm } = preview;
+  return nextTerm !== null && form.termId === nextTerm.id
+    ? { ...nextTerm, later: true }
+    : { ...preview.currentTerm, later: false };
+}
+
+export function admittedToast(
+  student: Pick<
+    StudentDetail,
+    | 'firstName'
+    | 'lastName'
+    | 'admissionNumber'
+    | 'currentPlacement'
+    | 'history'
+  >
+): string {
+  const base = `${student.firstName} ${student.lastName} admitted as ${student.admissionNumber}.`;
+  const from = student.history[0]?.placements.at(-1)?.termName;
+  return student.currentPlacement === null && from !== undefined
+    ? `${base} They have no class until ${from} starts.`
+    : base;
+}
+
 export const canRemoveGuardian = (
   index: number,
   requireGuardian: boolean
@@ -89,6 +120,7 @@ export function admitBody(form: AdmitForm): AdmitStudentInput {
     gender: form.gender,
     dateOfBirth: form.dateOfBirth,
     classArmId: form.classArmId,
+    ...(form.termId === '' ? {} : { termId: form.termId }),
     guardians: form.guardians.map((draft) => toDraftInput(draft)),
   };
 }
