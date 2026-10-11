@@ -14,6 +14,7 @@ import {
   type AnnouncementListQuery,
   type AnnouncementSummary,
   type CreateAnnouncementInput,
+  type PortalAnnouncementList,
   type PortalAnnouncements,
   type UpdateAnnouncementInput,
 } from '@eduvault/api-contract';
@@ -187,6 +188,16 @@ export class AnnouncementService {
       ),
     ]);
     return { items, newThisWeek };
+  }
+
+  forPortalList(
+    ctx: Pick<OrgContext, 'organizationId'>,
+    options: { campusId: string; page: number; pageSize: number }
+  ): Promise<PortalAnnouncementList> {
+    return this.announcements.publishedPage(
+      { organizationId: ctx.organizationId, campusScope: [options.campusId] },
+      options
+    );
   }
 
   async create(

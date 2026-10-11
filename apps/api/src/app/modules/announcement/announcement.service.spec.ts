@@ -386,3 +386,29 @@ describe('forPortal', () => {
     expect(result.newThisWeek).toBe(3);
   });
 });
+
+describe('forPortalList', () => {
+  it('pages the published items for everyone and the campus, never drafts, withdrawn or another campus', async () => {
+    const { service } = setup(
+      at('a', '2026-10-10', null),
+      at('b', '2026-10-09', 'lekki'),
+      at('c', '2026-10-08', null),
+      at('ikeja', '2026-10-07', 'ikeja'),
+      row({ id: 'draft', status: 'draft' }),
+      row({ id: 'gone', status: 'withdrawn' })
+    );
+    const first = await service.forPortalList(everyone, {
+      campusId: 'lekki',
+      page: 1,
+      pageSize: 2,
+    });
+    const second = await service.forPortalList(everyone, {
+      campusId: 'lekki',
+      page: 2,
+      pageSize: 2,
+    });
+    expect(first.total).toBe(3);
+    expect(first.items).toHaveLength(2);
+    expect(second.items.map((item) => item.id)).toEqual(['c']);
+  });
+});

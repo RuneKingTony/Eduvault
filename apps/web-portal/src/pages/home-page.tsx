@@ -21,9 +21,15 @@ interface ChildHomeProps {
   me: PortalMe;
   selected: PortalChild;
   onChildMissing: (firstChildId: string) => void;
+  onSeeAllAnnouncements: (childId: string) => void;
 }
 
-function ChildHome({ me, selected, onChildMissing }: ChildHomeProps) {
+function ChildHome({
+  me,
+  selected,
+  onChildMissing,
+  onSeeAllAnnouncements,
+}: ChildHomeProps) {
   const student = useQuery(portalStudentQueryOptions(useApi(), selected.id));
   const [today] = useState(() => lagosDateOf(new Date()));
   const firstId = me.children[0]?.id;
@@ -50,7 +56,13 @@ function ChildHome({ me, selected, onChildMissing }: ChildHomeProps) {
       <HomeHero me={me} student={student.data} />
       <HomeTiles student={student.data} today={today} />
       <div className="grid gap-4 lg:grid-cols-2">
-        <AnnouncementsCard studentId={selected.id} today={today} />
+        <AnnouncementsCard
+          studentId={selected.id}
+          today={today}
+          onSeeAll={() => {
+            onSeeAllAnnouncements(selected.id);
+          }}
+        />
         <div className="flex flex-col gap-4">
           <HolidaysCard today={today} />
           <ProfileCard me={me} student={student.data} />
@@ -64,10 +76,12 @@ export function HomePage({
   me,
   childId,
   onChildMissing,
+  onSeeAllAnnouncements,
 }: {
   me: PortalMe;
   childId: string | undefined;
   onChildMissing: (firstChildId: string) => void;
+  onSeeAllAnnouncements: (childId: string) => void;
 }) {
   const selected = selectChild(me.children, childId);
   if (selected === undefined) {
@@ -79,6 +93,7 @@ export function HomePage({
       me={me}
       selected={selected}
       onChildMissing={onChildMissing}
+      onSeeAllAnnouncements={onSeeAllAnnouncements}
     />
   );
 }

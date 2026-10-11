@@ -3,6 +3,7 @@ import { METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
 import { ModulesContainer } from '@nestjs/core';
 import type {
   LoginCredential,
+  PortalAnnouncementList,
   PortalAnnouncements,
   PortalChild,
   PortalMe,
@@ -105,6 +106,16 @@ const newsOf = async (
 ): Promise<PortalAnnouncements> =>
   (await api(user).get(path).expect(200)).body as PortalAnnouncements;
 
+const listOf = async (
+  api: Api,
+  user: Signed,
+  path: string
+): Promise<PortalAnnouncementList> =>
+  (await api(user).get(path).expect(200)).body as PortalAnnouncementList;
+
+const listPath = (id: string, query = '') =>
+  `/portal/students/${id}/announcements/all${query}`;
+
 const newsPath = (id: string, query = '') =>
   `/portal/students/${id}/announcements${query}`;
 
@@ -116,6 +127,7 @@ const names = (children: readonly PortalChild[]) =>
 const studentRoutes = (id: string) => [
   `/portal/students/${id}`,
   `/portal/students/${id}/announcements`,
+  `/portal/students/${id}/announcements/all`,
 ];
 
 const allRoutes = (id: string) => [
@@ -496,6 +508,88 @@ test.describe('GET /portal/students/:studentId/announcements', () => {
 
     const news = await newsOf(api, guardian, newsPath(tobi.id));
     expect(news.items.map((item) => item.title)).toEqual(['Ikeja only']);
+  });
+});
+
+test.describe('GET /portal/students/:studentId/announcements/all', () => {
+  test('pages every published item for the child, pinned first then newest, and never a draft, a withdrawn or another campus’s item', async ({
+    api,
+    app,
+    clock,
+    schools,
+  }) => {
+    const { ada, guardianLogin } = await family(app, schools);
+    const { owner, lekki, ikeja } = schools;
+    const publish = async (
+      title: string,
+      on: string,
+      extra: { campusId?: string | null; pinned?: boolean } = {}
+    ) => {
+      clock.set(on);
+      return createAnnouncement(app, owner, {
+        campusId: extra.campusId ?? null,
+        title,
+        ...(extra.pinned === undefined ? {} : { pinned: extra.pinned }),
+      });
+    };
+    await publish('Pinned notice', '2026-09-01', { pinned: true });
+    await publish('Day 3', '2026-10-03');
+    await publish('Day 4 Lekki', '2026-10-04', { campusId: lekki.id });
+    await publish('Day 5', '2026-10-05');
+    await publish('Day 6 Ikeja', '2026-10-06', { campusId: ikeja.id });
+    await publish('Day 7', '2026-10-07');
+    await publish('Day 8', '2026-10-08');
+    const gone = await publish('Withdrawn one', '2026-10-09');
+    clock.set('2026-10-10');
+    await api(owner).post(`/announcements/${gone.id}/withdraw`).expect(201);
+    clock.set('2026-10-09');
+    await createAnnouncement(app, owner, {
+      campusId: null,
+      title: 'Draft one',
+      status: 'draft',
+    });
+    clock.set(TODAY);
+    const guardian = await signInAs(api, guardianLogin);
+
+    const first = await listOf(api, guardian, listPath(ada.id, '?pageSize=3'));
+    expect(first.total).toBe(6);
+    expect(first.items.map((item) => item.title)).toEqual([
+      'Pinned notice',
+      'Day 8',
+      'Day 7',
+    ]);
+    const second = await listOf(
+      api,
+      guardian,
+      listPath(ada.id, '?page=2&pageSize=3')
+    );
+    expect(second.items.map((item) => item.title)).toEqual([
+      'Day 5',
+      'Day 4 Lekki',
+      'Day 3',
+    ]);
+    const beyond = await listOf(
+      api,
+      guardian,
+      listPath(ada.id, '?page=3&pageSize=3')
+    );
+    expect(beyond).toEqual({ items: [], total: 6 });
+    expect((await listOf(api, guardian, listPath(ada.id))).items).toHaveLength(
+      6
+    );
+  });
+
+  test('refuses a page size over fifty or a page below one', async ({
+    api,
+    app,
+    schools,
+  }) => {
+    const { ada, guardianLogin } = await family(app, schools);
+    const guardian = await signInAs(api, guardianLogin);
+
+    for (const query of ['?pageSize=51', '?pageSize=0', '?page=0']) {
+      await api(guardian).get(listPath(ada.id, query)).expect(400);
+    }
   });
 });
 

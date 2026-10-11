@@ -61,6 +61,29 @@ const toAnnouncement = (row: AnnouncementRow): Announcement => ({
   updatedAt: iso(row.updated_at),
 });
 
+interface SummaryRow {
+  id: string;
+  title: string;
+  body: string;
+  tag: string;
+  pinned: boolean;
+  published_on: string | null;
+}
+
+const toSummaries = (row: SummaryRow): AnnouncementSummary[] =>
+  row.published_on === null
+    ? []
+    : [
+        {
+          id: row.id,
+          title: row.title,
+          body: row.body,
+          tag: announcementTagSchema.parse(row.tag),
+          pinned: row.pinned,
+          publishedOn: row.published_on,
+        },
+      ];
+
 const EVERYTHING = { campusScope: 'all' } as const;
 
 const datedBy = sql`CASE announcement.status
@@ -171,11 +194,8 @@ export class KyselyAnnouncementRepository extends AnnouncementRepository {
     return row && toAnnouncement(row);
   }
 
-  async feed(
-    scope: AnnouncementScope,
-    limit: number
-  ): Promise<AnnouncementSummary[]> {
-    const rows = await this.visible(this.db, scope)
+  private publishedSummaries(scope: AnnouncementScope) {
+    return this.visible(this.db, scope)
       .where('announcement.status', '=', 'published')
       .select([
         'announcement.id',
@@ -188,23 +208,35 @@ export class KyselyAnnouncementRepository extends AnnouncementRepository {
       .orderBy('announcement.pinned', 'desc')
       .orderBy('announcement.published_on', 'desc')
       .orderBy('announcement.updated_at', 'desc')
-      .orderBy('announcement.id')
-      .limit(limit)
-      .execute();
-    return rows.flatMap((row) =>
-      row.published_on === null
-        ? []
-        : [
-            {
-              id: row.id,
-              title: row.title,
-              body: row.body,
-              tag: announcementTagSchema.parse(row.tag),
-              pinned: row.pinned,
-              publishedOn: row.published_on,
-            },
-          ]
-    );
+      .orderBy('announcement.id');
+  }
+
+  async feed(
+    scope: AnnouncementScope,
+    limit: number
+  ): Promise<AnnouncementSummary[]> {
+    const rows = await this.publishedSummaries(scope).limit(limit).execute();
+    return rows.flatMap((row) => toSummaries(row));
+  }
+
+  async publishedPage(
+    scope: AnnouncementScope,
+    paging: { page: number; pageSize: number }
+  ): Promise<{ items: AnnouncementSummary[]; total: number }> {
+    const [rows, count] = await Promise.all([
+      this.publishedSummaries(scope)
+        .limit(paging.pageSize)
+        .offset((paging.page - 1) * paging.pageSize)
+        .execute(),
+      this.visible(this.db, scope)
+        .where('announcement.status', '=', 'published')
+        .select(sql<number>`count(*)::int`.as('total'))
+        .executeTakeFirstOrThrow(),
+    ]);
+    return {
+      items: rows.flatMap((row) => toSummaries(row)),
+      total: count.total,
+    };
   }
 
   async countPublishedSince(

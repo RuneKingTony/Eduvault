@@ -1,6 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import {
   PORTAL_STUDENT_NOT_FOUND_MESSAGE,
+  type PortalAnnouncementList,
+  type PortalAnnouncementListQuery,
   type PortalAnnouncements,
   type PortalAnnouncementsQuery,
   type PortalChild,
@@ -69,6 +71,18 @@ export class PortalService {
     return this.announcements.forPortal(ctx, {
       campusId: record.campusId,
       limit: query.limit,
+    });
+  }
+
+  async announcementListFor(
+    ctx: OrgContext,
+    studentId: string,
+    query: PortalAnnouncementListQuery
+  ): Promise<PortalAnnouncementList> {
+    const record = await this.require(ctx, studentId);
+    return this.announcements.forPortalList(ctx, {
+      campusId: record.campusId,
+      ...query,
     });
   }
 

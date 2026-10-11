@@ -17,6 +17,7 @@ import { NotFoundPage } from './components/portal-fallbacks';
 import { routeTree } from './routeTree.gen';
 import {
   calendarCurrent,
+  portalAnnouncementList,
   portalAnnouncements,
   portalChild,
   portalMe,
@@ -62,6 +63,7 @@ function fakeApi(
         .fn()
         .mockResolvedValue(portalStudent({ id: 'ada', firstName: 'Ada' })),
       announcements: vi.fn().mockResolvedValue(portalAnnouncements()),
+      announcementList: vi.fn().mockResolvedValue(portalAnnouncementList()),
     },
     calendar: {
       current: vi.fn().mockResolvedValue(calendarCurrent()),
@@ -138,6 +140,23 @@ describe('the portal routes', () => {
       fakeApi(access(['guardian'], ['student:readOwn']))
     );
     (await screen.findByRole('button', { name: /Tobi Okeke/ })).click();
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/');
+    });
+    expect(router.state.location.search).toEqual({ child: 'tobi' });
+  });
+
+  it('opens the full announcements list for the chosen child and goes back to Home', async () => {
+    const api = fakeApi(access(['guardian'], ['student:readOwn']));
+    const router = renderAt('/announcements?child=tobi', api);
+    expect(
+      await screen.findByRole('heading', { name: 'Announcements' })
+    ).toBeInTheDocument();
+    expect(api.portal.announcementList).toHaveBeenCalledWith({
+      params: { studentId: 'tobi' },
+      query: { page: 1, pageSize: 10 },
+    });
+    screen.getByRole('button', { name: 'Back to Home' }).click();
     await waitFor(() => {
       expect(router.state.location.pathname).toBe('/');
     });

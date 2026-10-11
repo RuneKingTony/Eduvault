@@ -87,6 +87,18 @@ export class FakeAnnouncementRepository extends AnnouncementRepository {
     );
   }
 
+  async publishedPage(
+    scope: AnnouncementScope,
+    paging: { page: number; pageSize: number }
+  ): Promise<{ items: AnnouncementSummary[]; total: number }> {
+    const all = await this.feed(scope, Number.MAX_SAFE_INTEGER);
+    const start = (paging.page - 1) * paging.pageSize;
+    return {
+      items: all.slice(start, start + paging.pageSize),
+      total: all.length,
+    };
+  }
+
   countPublishedSince(
     scope: AnnouncementScope,
     since: string

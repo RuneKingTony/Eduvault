@@ -61,13 +61,19 @@ const apiWith = ({
 
 const renderHome = (
   api: ReturnType<typeof apiWith>,
-  props: { me?: typeof guardian; childId?: string; onMissing?: () => void } = {}
+  props: {
+    me?: typeof guardian;
+    childId?: string;
+    onMissing?: () => void;
+    onSeeAll?: (childId: string) => void;
+  } = {}
 ) =>
   renderWithApi(
     <HomePage
       me={props.me ?? guardian}
       childId={props.childId}
       onChildMissing={props.onMissing ?? vi.fn()}
+      onSeeAllAnnouncements={props.onSeeAll ?? vi.fn()}
     />,
     api
   );
@@ -230,6 +236,31 @@ describe('Home announcements', () => {
     );
     const row = await screen.findByRole('button', { name: /PTA meeting/ });
     expect(within(row).getByText('Academics')).toBeInTheDocument();
+  });
+
+  it('offers See all only when the card is full, and opens the full list for the child', async () => {
+    const onSeeAll = vi.fn();
+    const full = Array.from({ length: 5 }, (_, index) =>
+      item({ id: `n${index}`, title: `News ${index}` })
+    );
+    renderHome(apiWith({ news: portalAnnouncements({ items: full }) }), {
+      childId: 'ada',
+      onSeeAll,
+    });
+    fireEvent.click(await screen.findByRole('button', { name: 'See all' }));
+    expect(onSeeAll).toHaveBeenCalledWith('ada');
+  });
+
+  it('has no See all link when everything already fits on the card', async () => {
+    renderHome(
+      apiWith({
+        news: portalAnnouncements({ items: [item(), item({ id: 'n2' })] }),
+      })
+    );
+    await screen.findAllByRole('button', { name: /PTA meeting/ });
+    expect(
+      screen.queryByRole('button', { name: 'See all' })
+    ).not.toBeInTheDocument();
   });
 
   it('says there is no news yet', async () => {
