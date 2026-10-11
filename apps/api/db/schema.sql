@@ -112,6 +112,39 @@ CREATE TABLE public.campus (
 );
 
 --
+-- Name: class_arm; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.class_arm (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id text NOT NULL,
+    class_level_id uuid NOT NULL,
+    campus_id text NOT NULL,
+    name text NOT NULL,
+    retired_at timestamp with time zone,
+    retired_by text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT class_arm_name_check CHECK ((btrim(name) <> ''::text))
+);
+
+--
+-- Name: class_arm_teacher; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.class_arm_teacher (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id text NOT NULL,
+    class_arm_id uuid NOT NULL,
+    session_id uuid NOT NULL,
+    user_id text NOT NULL,
+    role text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    created_by text,
+    CONSTRAINT class_arm_teacher_role_check CHECK ((role = ANY (ARRAY['lead'::text, 'assistant'::text, 'uniform'::text])))
+);
+
+--
 -- Name: class_level; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -462,6 +495,41 @@ ALTER TABLE ONLY public.campus
     ADD CONSTRAINT campus_team_id_organization_id_key UNIQUE (team_id, organization_id);
 
 --
+-- Name: class_arm class_arm_id_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.class_arm
+    ADD CONSTRAINT class_arm_id_organization_id_key UNIQUE (id, organization_id);
+
+--
+-- Name: class_arm class_arm_name_unique; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.class_arm
+    ADD CONSTRAINT class_arm_name_unique UNIQUE (class_level_id, campus_id, name);
+
+--
+-- Name: class_arm class_arm_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.class_arm
+    ADD CONSTRAINT class_arm_pkey PRIMARY KEY (id);
+
+--
+-- Name: class_arm_teacher class_arm_teacher_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.class_arm_teacher
+    ADD CONSTRAINT class_arm_teacher_pkey PRIMARY KEY (id);
+
+--
+-- Name: class_arm_teacher class_arm_teacher_unique; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.class_arm_teacher
+    ADD CONSTRAINT class_arm_teacher_unique UNIQUE (class_arm_id, session_id, user_id);
+
+--
 -- Name: class_level class_level_id_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -717,6 +785,24 @@ CREATE INDEX audit_log_organization_created_idx ON public.audit_log USING btree 
 CREATE INDEX campus_organization_id_idx ON public.campus USING btree (organization_id);
 
 --
+-- Name: class_arm_scope_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX class_arm_scope_idx ON public.class_arm USING btree (organization_id, campus_id);
+
+--
+-- Name: class_arm_teacher_one_lead; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX class_arm_teacher_one_lead ON public.class_arm_teacher USING btree (class_arm_id, session_id) WHERE (role = 'lead'::text);
+
+--
+-- Name: class_arm_teacher_scope_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX class_arm_teacher_scope_idx ON public.class_arm_teacher USING btree (organization_id, session_id, user_id);
+
+--
 -- Name: fee_schedule_organization_campus_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -852,6 +938,69 @@ ALTER TABLE ONLY public.campus
 
 ALTER TABLE ONLY public.campus
     ADD CONSTRAINT campus_team_id_fkey FOREIGN KEY (team_id) REFERENCES public.team(id) ON DELETE CASCADE;
+
+--
+-- Name: class_arm class_arm_campus_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.class_arm
+    ADD CONSTRAINT class_arm_campus_id_organization_id_fkey FOREIGN KEY (campus_id, organization_id) REFERENCES public.campus(team_id, organization_id);
+
+--
+-- Name: class_arm class_arm_class_level_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.class_arm
+    ADD CONSTRAINT class_arm_class_level_id_organization_id_fkey FOREIGN KEY (class_level_id, organization_id) REFERENCES public.class_level(id, organization_id);
+
+--
+-- Name: class_arm class_arm_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.class_arm
+    ADD CONSTRAINT class_arm_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE CASCADE;
+
+--
+-- Name: class_arm class_arm_retired_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.class_arm
+    ADD CONSTRAINT class_arm_retired_by_fkey FOREIGN KEY (retired_by) REFERENCES public."user"(id) ON DELETE SET NULL;
+
+--
+-- Name: class_arm_teacher class_arm_teacher_class_arm_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.class_arm_teacher
+    ADD CONSTRAINT class_arm_teacher_class_arm_id_organization_id_fkey FOREIGN KEY (class_arm_id, organization_id) REFERENCES public.class_arm(id, organization_id) ON DELETE CASCADE;
+
+--
+-- Name: class_arm_teacher class_arm_teacher_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.class_arm_teacher
+    ADD CONSTRAINT class_arm_teacher_created_by_fkey FOREIGN KEY (created_by) REFERENCES public."user"(id) ON DELETE SET NULL;
+
+--
+-- Name: class_arm_teacher class_arm_teacher_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.class_arm_teacher
+    ADD CONSTRAINT class_arm_teacher_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE CASCADE;
+
+--
+-- Name: class_arm_teacher class_arm_teacher_session_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.class_arm_teacher
+    ADD CONSTRAINT class_arm_teacher_session_id_organization_id_fkey FOREIGN KEY (session_id, organization_id) REFERENCES public.academic_session(id, organization_id);
+
+--
+-- Name: class_arm_teacher class_arm_teacher_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.class_arm_teacher
+    ADD CONSTRAINT class_arm_teacher_user_id_fkey FOREIGN KEY (user_id) REFERENCES public."user"(id) ON DELETE CASCADE;
 
 --
 -- Name: class_level class_level_next_level_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -1067,4 +1216,5 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20261010090000'),
     ('20261010100000'),
     ('20261010120000'),
-    ('20261010130000');
+    ('20261010130000'),
+    ('20261010140000');

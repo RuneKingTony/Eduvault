@@ -10,8 +10,6 @@ import {
   OWNER_ROLE,
   can,
   isSuperAdmin,
-  parsePermissionMap,
-  resolvePermissions,
   splitRoles,
   type PermissionMap,
 } from '@eduvault/policy';
@@ -20,6 +18,8 @@ import type { Pool } from 'pg';
 import { DB_TOKEN } from '../db/tokens';
 import { actingPermissions, parseActingReason } from './acting';
 import type { AppAuth } from './better-auth';
+import { computeClassScope, isClassScoped } from '../class-scope';
+import { loadPermissions } from './role-permissions';
 import { findSuspendedSchool } from './suspended-school';
 import type {
   AuthedRequest,
@@ -138,7 +138,7 @@ export class AuthContextService {
     }
 
     const roles = splitRoles(member.role);
-    const permissions = await this.loadPermissions(organizationId, roles);
+    const permissions = await loadPermissions(this.pool, organizationId, roles);
     const schoolWide = can(permissions, 'campus', 'readAll');
     const campuses = schoolWide
       ? await this.authService.api.listOrganizationTeams({
@@ -160,26 +160,43 @@ export class AuthContextService {
           ? activeTeamId
           : null,
       campusScope: schoolWide ? 'all' : campusIds,
-      classScope: 'all',
+      classScope: computeClassScope(
+        permissions,
+        await this.listTaughtClassIds(
+          organizationId,
+          session.user.id,
+          permissions
+        )
+      ),
       acting: null,
       headers,
     };
   }
 
-  private async loadPermissions(
+  private async listTaughtClassIds(
     organizationId: string,
-    roles: string[]
-  ): Promise<PermissionMap> {
-    const rows = await this.pool.query<{ role: string; permission: string }>(
-      `SELECT role, permission FROM "organizationRole"
-       WHERE "organizationId" = $1 AND role = ANY($2)`,
-      [organizationId, roles]
-    );
-    const custom: Record<string, PermissionMap> = {};
-    for (const row of rows.rows) {
-      custom[row.role] = parsePermissionMap(row.permission);
+    userId: string,
+    permissions: PermissionMap
+  ): Promise<string[]> {
+    if (!isClassScoped(permissions)) {
+      return [];
     }
-    return resolvePermissions(roles, custom);
+    const rows = await this.pool.query<{ class_arm_id: string }>(
+      `SELECT DISTINCT teacher.class_arm_id
+       FROM class_arm_teacher teacher
+       JOIN class_arm arm
+         ON arm.id = teacher.class_arm_id
+        AND arm.organization_id = teacher.organization_id
+       JOIN term current_term
+         ON current_term.session_id = teacher.session_id
+        AND current_term.organization_id = teacher.organization_id
+        AND current_term.is_current
+       WHERE teacher.organization_id = $1
+         AND teacher.user_id = $2
+         AND arm.retired_at IS NULL`,
+      [organizationId, userId]
+    );
+    return rows.rows.map((row) => row.class_arm_id);
   }
 
   private async listUserCampuses(headers: Headers, organizationId: string) {

@@ -13,12 +13,14 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApprovalsRouteImport } from './routes/approvals'
 import { Route as CalendarRouteImport } from './routes/calendar'
 import { Route as CampusesRouteImport } from './routes/campuses'
+import { Route as ClassesRouteImport } from './routes/classes'
 import { Route as FeesRouteImport } from './routes/fees'
 import { Route as MembersRouteImport } from './routes/members'
 import { Route as PlatformRouteImport } from './routes/platform'
 import { Route as RolesRouteImport } from './routes/roles'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as StudentsRouteImport } from './routes/students'
+import { Route as ClassesClassIdRouteImport } from './routes/classes_.$classId'
 import { Route as DevUiRouteImport } from './routes/dev/ui'
 import { Route as MembersMemberIdRouteImport } from './routes/members_.$memberId'
 import { Route as PlatformIndexRouteImport } from './routes/platform.index'
@@ -28,6 +30,7 @@ import { Route as RolesNewRouteImport } from './routes/roles_.new'
 import { Route as SettingsIndexRouteImport } from './routes/settings.index'
 import { Route as SettingsAdmissionsRouteImport } from './routes/settings.admissions'
 import { Route as SettingsDangerRouteImport } from './routes/settings.danger'
+import { Route as SettingsLevelsRouteImport } from './routes/settings.levels'
 import { Route as SettingsProfileRouteImport } from './routes/settings.profile'
 import { Route as PlatformSchoolsIndexRouteImport } from './routes/platform.schools.index'
 import { Route as PlatformSchoolsSchoolIdRouteImport } from './routes/platform.schools.$schoolId'
@@ -50,6 +53,11 @@ const CalendarRoute = CalendarRouteImport.update({
 const CampusesRoute = CampusesRouteImport.update({
   id: '/campuses',
   path: '/campuses',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ClassesRoute = ClassesRouteImport.update({
+  id: '/classes',
+  path: '/classes',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FeesRoute = FeesRouteImport.update({
@@ -80,6 +88,11 @@ const SettingsRoute = SettingsRouteImport.update({
 const StudentsRoute = StudentsRouteImport.update({
   id: '/students',
   path: '/students',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ClassesClassIdRoute = ClassesClassIdRouteImport.update({
+  id: '/classes_/$classId',
+  path: '/classes/$classId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DevUiRoute = DevUiRouteImport.update({
@@ -127,6 +140,11 @@ const SettingsDangerRoute = SettingsDangerRouteImport.update({
   path: '/danger',
   getParentRoute: () => SettingsRoute,
 } as any)
+const SettingsLevelsRoute = SettingsLevelsRouteImport.update({
+  id: '/levels',
+  path: '/levels',
+  getParentRoute: () => SettingsRoute,
+} as any)
 const SettingsProfileRoute = SettingsProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
@@ -148,12 +166,14 @@ export interface FileRoutesByFullPath {
   '/approvals': typeof ApprovalsRoute
   '/calendar': typeof CalendarRoute
   '/campuses': typeof CampusesRoute
+  '/classes': typeof ClassesRoute
   '/fees': typeof FeesRoute
   '/members': typeof MembersRoute
   '/platform': typeof PlatformRouteWithChildren
   '/roles': typeof RolesRoute
   '/settings': typeof SettingsRouteWithChildren
   '/students': typeof StudentsRoute
+  '/classes/$classId': typeof ClassesClassIdRoute
   '/dev/ui': typeof DevUiRoute
   '/members/$memberId': typeof MembersMemberIdRoute
   '/platform/audit': typeof PlatformAuditRoute
@@ -161,6 +181,7 @@ export interface FileRoutesByFullPath {
   '/roles/new': typeof RolesNewRoute
   '/settings/admissions': typeof SettingsAdmissionsRoute
   '/settings/danger': typeof SettingsDangerRoute
+  '/settings/levels': typeof SettingsLevelsRoute
   '/settings/profile': typeof SettingsProfileRoute
   '/platform/': typeof PlatformIndexRoute
   '/settings/': typeof SettingsIndexRoute
@@ -172,10 +193,12 @@ export interface FileRoutesByTo {
   '/approvals': typeof ApprovalsRoute
   '/calendar': typeof CalendarRoute
   '/campuses': typeof CampusesRoute
+  '/classes': typeof ClassesRoute
   '/fees': typeof FeesRoute
   '/members': typeof MembersRoute
   '/roles': typeof RolesRoute
   '/students': typeof StudentsRoute
+  '/classes/$classId': typeof ClassesClassIdRoute
   '/dev/ui': typeof DevUiRoute
   '/members/$memberId': typeof MembersMemberIdRoute
   '/platform/audit': typeof PlatformAuditRoute
@@ -183,6 +206,7 @@ export interface FileRoutesByTo {
   '/roles/new': typeof RolesNewRoute
   '/settings/admissions': typeof SettingsAdmissionsRoute
   '/settings/danger': typeof SettingsDangerRoute
+  '/settings/levels': typeof SettingsLevelsRoute
   '/settings/profile': typeof SettingsProfileRoute
   '/platform': typeof PlatformIndexRoute
   '/settings': typeof SettingsIndexRoute
@@ -195,12 +219,14 @@ export interface FileRoutesById {
   '/approvals': typeof ApprovalsRoute
   '/calendar': typeof CalendarRoute
   '/campuses': typeof CampusesRoute
+  '/classes': typeof ClassesRoute
   '/fees': typeof FeesRoute
   '/members': typeof MembersRoute
   '/platform': typeof PlatformRouteWithChildren
   '/roles': typeof RolesRoute
   '/settings': typeof SettingsRouteWithChildren
   '/students': typeof StudentsRoute
+  '/classes_/$classId': typeof ClassesClassIdRoute
   '/dev/ui': typeof DevUiRoute
   '/members_/$memberId': typeof MembersMemberIdRoute
   '/platform/audit': typeof PlatformAuditRoute
@@ -208,6 +234,7 @@ export interface FileRoutesById {
   '/roles_/new': typeof RolesNewRoute
   '/settings/admissions': typeof SettingsAdmissionsRoute
   '/settings/danger': typeof SettingsDangerRoute
+  '/settings/levels': typeof SettingsLevelsRoute
   '/settings/profile': typeof SettingsProfileRoute
   '/platform/': typeof PlatformIndexRoute
   '/settings/': typeof SettingsIndexRoute
@@ -221,12 +248,14 @@ export interface FileRouteTypes {
     | '/approvals'
     | '/calendar'
     | '/campuses'
+    | '/classes'
     | '/fees'
     | '/members'
     | '/platform'
     | '/roles'
     | '/settings'
     | '/students'
+    | '/classes/$classId'
     | '/dev/ui'
     | '/members/$memberId'
     | '/platform/audit'
@@ -234,6 +263,7 @@ export interface FileRouteTypes {
     | '/roles/new'
     | '/settings/admissions'
     | '/settings/danger'
+    | '/settings/levels'
     | '/settings/profile'
     | '/platform/'
     | '/settings/'
@@ -245,10 +275,12 @@ export interface FileRouteTypes {
     | '/approvals'
     | '/calendar'
     | '/campuses'
+    | '/classes'
     | '/fees'
     | '/members'
     | '/roles'
     | '/students'
+    | '/classes/$classId'
     | '/dev/ui'
     | '/members/$memberId'
     | '/platform/audit'
@@ -256,6 +288,7 @@ export interface FileRouteTypes {
     | '/roles/new'
     | '/settings/admissions'
     | '/settings/danger'
+    | '/settings/levels'
     | '/settings/profile'
     | '/platform'
     | '/settings'
@@ -267,12 +300,14 @@ export interface FileRouteTypes {
     | '/approvals'
     | '/calendar'
     | '/campuses'
+    | '/classes'
     | '/fees'
     | '/members'
     | '/platform'
     | '/roles'
     | '/settings'
     | '/students'
+    | '/classes_/$classId'
     | '/dev/ui'
     | '/members_/$memberId'
     | '/platform/audit'
@@ -280,6 +315,7 @@ export interface FileRouteTypes {
     | '/roles_/new'
     | '/settings/admissions'
     | '/settings/danger'
+    | '/settings/levels'
     | '/settings/profile'
     | '/platform/'
     | '/settings/'
@@ -292,12 +328,14 @@ export interface RootRouteChildren {
   ApprovalsRoute: typeof ApprovalsRoute
   CalendarRoute: typeof CalendarRoute
   CampusesRoute: typeof CampusesRoute
+  ClassesRoute: typeof ClassesRoute
   FeesRoute: typeof FeesRoute
   MembersRoute: typeof MembersRoute
   PlatformRoute: typeof PlatformRouteWithChildren
   RolesRoute: typeof RolesRoute
   SettingsRoute: typeof SettingsRouteWithChildren
   StudentsRoute: typeof StudentsRoute
+  ClassesClassIdRoute: typeof ClassesClassIdRoute
   DevUiRoute: typeof DevUiRoute
   MembersMemberIdRoute: typeof MembersMemberIdRoute
   RolesRoleSlugRoute: typeof RolesRoleSlugRoute
@@ -332,6 +370,13 @@ declare module '@tanstack/react-router' {
       path: '/campuses'
       fullPath: '/campuses'
       preLoaderRoute: typeof CampusesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/classes': {
+      id: '/classes'
+      path: '/classes'
+      fullPath: '/classes'
+      preLoaderRoute: typeof ClassesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/fees': {
@@ -374,6 +419,13 @@ declare module '@tanstack/react-router' {
       path: '/students'
       fullPath: '/students'
       preLoaderRoute: typeof StudentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/classes_/$classId': {
+      id: '/classes_/$classId'
+      path: '/classes/$classId'
+      fullPath: '/classes/$classId'
+      preLoaderRoute: typeof ClassesClassIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dev/ui': {
@@ -439,6 +491,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsDangerRouteImport
       parentRoute: typeof SettingsRoute
     }
+    '/settings/levels': {
+      id: '/settings/levels'
+      path: '/levels'
+      fullPath: '/settings/levels'
+      preLoaderRoute: typeof SettingsLevelsRouteImport
+      parentRoute: typeof SettingsRoute
+    }
     '/settings/profile': {
       id: '/settings/profile'
       path: '/profile'
@@ -484,6 +543,7 @@ const PlatformRouteWithChildren = PlatformRoute._addFileChildren(
 interface SettingsRouteChildren {
   SettingsAdmissionsRoute: typeof SettingsAdmissionsRoute
   SettingsDangerRoute: typeof SettingsDangerRoute
+  SettingsLevelsRoute: typeof SettingsLevelsRoute
   SettingsProfileRoute: typeof SettingsProfileRoute
   SettingsIndexRoute: typeof SettingsIndexRoute
 }
@@ -491,6 +551,7 @@ interface SettingsRouteChildren {
 const SettingsRouteChildren: SettingsRouteChildren = {
   SettingsAdmissionsRoute: SettingsAdmissionsRoute,
   SettingsDangerRoute: SettingsDangerRoute,
+  SettingsLevelsRoute: SettingsLevelsRoute,
   SettingsProfileRoute: SettingsProfileRoute,
   SettingsIndexRoute: SettingsIndexRoute,
 }
@@ -504,12 +565,14 @@ const rootRouteChildren: RootRouteChildren = {
   ApprovalsRoute: ApprovalsRoute,
   CalendarRoute: CalendarRoute,
   CampusesRoute: CampusesRoute,
+  ClassesRoute: ClassesRoute,
   FeesRoute: FeesRoute,
   MembersRoute: MembersRoute,
   PlatformRoute: PlatformRouteWithChildren,
   RolesRoute: RolesRoute,
   SettingsRoute: SettingsRouteWithChildren,
   StudentsRoute: StudentsRoute,
+  ClassesClassIdRoute: ClassesClassIdRoute,
   DevUiRoute: DevUiRoute,
   MembersMemberIdRoute: MembersMemberIdRoute,
   RolesRoleSlugRoute: RolesRoleSlugRoute,

@@ -2,11 +2,20 @@ import { QueryClient, QueryObserver } from '@tanstack/react-query';
 import type { Api } from './api';
 import { detail } from './test-members';
 import {
+  ME_PERMISSIONS_KEY,
+  campusSummaryQueryOptions,
+  classLevelsQueryOptions,
+  classQueryOptions,
+  classesQueryOptions,
   currentTermQueryOptions,
   daysOffQueryOptions,
   forgetMember,
   invalidateCalendar,
   invalidateAfterRemoval,
+  invalidateClassTeachers,
+  invalidateClasses,
+  invalidateLevels,
+  mePermissionsQueryOptions,
   invalidateRoles,
   memberQueryOptions,
   membersQueryOptions,
@@ -14,6 +23,7 @@ import {
   rolesQueryOptions,
   schoolRolesQueryOptions,
   schoolYearsQueryOptions,
+  teacherCandidatesQueryOptions,
 } from './queries';
 
 describe('member removal', () => {
@@ -125,5 +135,88 @@ describe('calendar writes', () => {
     expect(schoolYearsQueryOptions(api, 1).queryKey).not.toEqual(
       schoolYearsQueryOptions(api, 2).queryKey
     );
+  });
+});
+
+describe('class queries', () => {
+  const api = {} as Api;
+
+  it('keys the lists by status and the class and its candidates by id', () => {
+    expect(classesQueryOptions(api, 'active').queryKey).not.toEqual(
+      classesQueryOptions(api, 'archived').queryKey
+    );
+    expect(classQueryOptions(api, 'a').queryKey).not.toEqual(
+      classQueryOptions(api, 'b').queryKey
+    );
+    expect(teacherCandidatesQueryOptions(api, 'a').queryKey).not.toEqual(
+      classQueryOptions(api, 'a').queryKey
+    );
+    expect(classLevelsQueryOptions(api).queryKey).toEqual(['class-levels']);
+  });
+
+  async function observe() {
+    const fns = {
+      levels: vi.fn().mockResolvedValue([]),
+      classes: vi.fn().mockResolvedValue([]),
+      one: vi.fn().mockResolvedValue({}),
+      summary: vi.fn().mockResolvedValue([]),
+      permissions: vi.fn().mockResolvedValue({}),
+    };
+    const wired = {
+      classLevels: { list: fns.levels },
+      classes: { list: fns.classes, get: fns.one },
+      campuses: { summary: fns.summary },
+      me: { permissions: fns.permissions },
+    } as unknown as Api;
+    const queryClient = new QueryClient();
+    const unsubscribe = [
+      new QueryObserver(queryClient, classLevelsQueryOptions(wired)),
+      new QueryObserver(queryClient, classesQueryOptions(wired, 'active')),
+      new QueryObserver(queryClient, classQueryOptions(wired, 'c1')),
+      new QueryObserver(queryClient, campusSummaryQueryOptions(wired)),
+      new QueryObserver(queryClient, mePermissionsQueryOptions(wired)),
+    ].map((observer) => observer.subscribe(() => undefined));
+    await vi.waitFor(() => {
+      expect(queryClient.isFetching()).toBe(0);
+      expect(fns.permissions).toHaveBeenCalledTimes(1);
+    });
+    return {
+      fns,
+      queryClient,
+      stop: () => {
+        for (const unsubscribeOne of unsubscribe) {
+          unsubscribeOne();
+        }
+      },
+    };
+  }
+
+  it('refreshes the levels and the classes after a level change', async () => {
+    const { fns, queryClient, stop } = await observe();
+    await invalidateLevels(queryClient);
+    expect(fns.levels).toHaveBeenCalledTimes(2);
+    expect(fns.classes).toHaveBeenCalledTimes(2);
+    expect(fns.one).toHaveBeenCalledTimes(2);
+    expect(fns.summary).toHaveBeenCalledTimes(1);
+    stop();
+  });
+
+  it('refreshes the classes and the campus counts after a class change', async () => {
+    const { fns, queryClient, stop } = await observe();
+    await invalidateClasses(queryClient);
+    expect(fns.classes).toHaveBeenCalledTimes(2);
+    expect(fns.summary).toHaveBeenCalledTimes(2);
+    expect(fns.levels).toHaveBeenCalledTimes(1);
+    expect(fns.permissions).toHaveBeenCalledTimes(1);
+    stop();
+  });
+
+  it('refreshes the caller’s own permissions after a class teacher change', async () => {
+    const { fns, queryClient, stop } = await observe();
+    await invalidateClassTeachers(queryClient);
+    expect(fns.classes).toHaveBeenCalledTimes(2);
+    expect(fns.permissions).toHaveBeenCalledTimes(2);
+    expect(queryClient.getQueryState(ME_PERMISSIONS_KEY)).toBeDefined();
+    stop();
   });
 });

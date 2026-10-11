@@ -79,6 +79,24 @@ describe('statements', () => {
     );
   });
 
+  it('has the class resource with readAll and assignTeacher help and no delete', () => {
+    expect(ALL_PERMISSIONS).toEqual(
+      expect.arrayContaining([
+        'class:create',
+        'class:read',
+        'class:readAll',
+        'class:update',
+        'class:assignTeacher',
+      ])
+    );
+    expect(ALL_PERMISSIONS).not.toContain('class:delete');
+    expect(permLabel('class:assignTeacher')).toBe('Classes: assign teacher');
+    expect(PERM_HELP['class:readAll']).toBe(
+      'Sees every class. Without it a member with class access sees only the classes they teach.'
+    );
+    expect(PERM_HELP['class:assignTeacher']).toBeDefined();
+  });
+
   it('keeps SENSITIVE and PERM_HELP to listed permissions', () => {
     for (const permission of SENSITIVE) {
       expect(ALL_PERMISSIONS).toContain(permission);

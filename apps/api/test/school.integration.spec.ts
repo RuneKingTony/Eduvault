@@ -5,6 +5,8 @@ import {
   type Fixtures,
   type TestUser,
 } from './support/base-test';
+import { createSchoolYear } from './support/factories/calendar';
+import { assignClassTeacher, createClass } from './support/factories/classes';
 import { schoolsTest } from './support/two-schools';
 
 const test = schoolsTest;
@@ -367,6 +369,7 @@ test.describe('deleting the school', () => {
 
   test('removes a school with no students, with its configuration, and leaves other schools alone', async ({
     api,
+    app,
     pool,
     createUser,
     createOrganization,
@@ -377,9 +380,15 @@ test.describe('deleting the school', () => {
     const doomedOwner = await createUser();
     const doomed = await createOrganization(doomedOwner, 'Doomed School');
     const campus = await createCampus(doomed, 'Only');
-    await addMember(doomed, await createUser(), {
+    const teacher = await addMember(doomed, await createUser(), {
       roles: ['teacher'],
       campuses: [campus],
+    });
+    await createSchoolYear(app, doomedOwner);
+    const arm = await createClass(app, doomedOwner, { campusId: campus.id });
+    await assignClassTeacher(app, doomedOwner, {
+      classId: arm.id,
+      userId: teacher.id,
     });
 
     const res = await api(doomedOwner)
@@ -397,6 +406,9 @@ test.describe('deleting the school', () => {
       ['member', '"organizationId"'],
       ['"organizationRole"', '"organizationId"'],
       ['class_level', 'organization_id'],
+      ['class_arm', 'organization_id'],
+      ['class_arm_teacher', 'organization_id'],
+      ['academic_session', 'organization_id'],
     ]) {
       const { rows } = await pool.query(
         `SELECT 1 FROM ${table} WHERE ${column} = $1`,

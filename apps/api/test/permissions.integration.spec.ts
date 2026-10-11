@@ -50,6 +50,7 @@ test.describe('guard order', () => {
       { path: '/fee-schedules', permission: 'feeSchedule:read' },
       { path: '/campuses/summary', permission: 'team:read' },
       { path: '/school-years', permission: 'session:read' },
+      { path: '/classes', permission: 'class:read' },
     ];
     for (const { path, permission } of routes) {
       const unauthenticated = await api().get(path).expect(401);
@@ -106,6 +107,15 @@ test.describe('guard order', () => {
       ['post', `/terms/${id}/make-current`],
       ['post', `/terms/${id}/holidays`],
       ['delete', `/holidays/${id}`],
+      ['get', '/classes'],
+      ['get', `/classes/${id}`],
+      ['post', '/classes'],
+      ['patch', `/classes/${id}`],
+      ['get', `/classes/${id}/teacher-candidates`],
+      ['post', `/classes/${id}/teachers`],
+      ['delete', `/classes/${id}/teachers/${id}`],
+      ['post', '/class-levels'],
+      ['patch', `/class-levels/${id}`],
     ] as const;
     for (const [method, path] of gated) {
       const res = await api(noPermission)[method](path).send({});
@@ -145,6 +155,8 @@ test.describe('guard order', () => {
       .send({ name: '2040/2041', startsOn: '2040-09-03', endsOn: '2041-07-25' })
       .expect(201);
     await api(owner).get('/calendar/current').expect(200);
+    await api(owner).get('/classes').expect(200);
+    await api(owner).get('/class-levels').expect(200);
 
     const res = await api(owner).get('/me/permissions').expect(200);
     expect(res.body).toEqual({
@@ -321,6 +333,7 @@ test.describe('/me/permissions', () => {
       roles: ['teacher', 'principal'],
       permissions: {
         student: ['read'],
+        class: ['read', 'readAll'],
         team: ['read'],
         campus: ['readAll'],
       },
@@ -446,6 +459,7 @@ test.describe('isolation', () => {
     );
     expect(parsePermissionMap(teacherA?.permission ?? '')).toEqual({
       student: ['read'],
+      class: ['read'],
     });
   });
 });
@@ -500,6 +514,7 @@ test.describe('starter roles', () => {
       rows.find((row) => row.role === slug)?.permission;
     expect(parsePermissionMap(permissionOf('teacher') ?? '')).toEqual({
       student: ['read'],
+      class: ['read'],
     });
     expect(permissionOf('bursar')).toBe('{}');
     expect(permissionOf('guardian')).toBeDefined();

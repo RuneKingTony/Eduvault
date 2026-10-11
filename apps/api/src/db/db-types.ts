@@ -61,6 +61,29 @@ export interface Campus {
   updated_at: Generated<Timestamp>;
 }
 
+export interface ClassArm {
+  campus_id: string;
+  class_level_id: string;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  name: string;
+  organization_id: string;
+  retired_at: Timestamp | null;
+  retired_by: string | null;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface ClassArmTeacher {
+  class_arm_id: string;
+  created_at: Generated<Timestamp>;
+  created_by: string | null;
+  id: Generated<string>;
+  organization_id: string;
+  role: string;
+  session_id: string;
+  user_id: string;
+}
+
 export interface ClassLevel {
   code: string;
   created_at: Generated<Timestamp>;
@@ -265,6 +288,8 @@ export interface DB {
   account: Account;
   audit_log: AuditLog;
   campus: Campus;
+  class_arm: ClassArm;
+  class_arm_teacher: ClassArmTeacher;
   class_level: ClassLevel;
   fee_schedule: FeeSchedule;
   file_blob: FileBlob;

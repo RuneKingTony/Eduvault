@@ -90,6 +90,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         pageTitle: 'Classes',
         route: '/classes',
         icon: 'school',
+        gate: ['class:read'],
       },
       {
         id: 'subjects',
@@ -210,6 +211,14 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
     group: 'School structure',
     icon: 'building',
     gate: ['team:read'],
+  },
+  {
+    id: 'levels',
+    label: 'Levels',
+    route: '/settings/levels',
+    group: 'School structure',
+    icon: 'layers',
+    gate: ['class:read'],
   },
   {
     id: 'roles',

@@ -64,11 +64,14 @@ export class CampusService {
 
   async summary(ctx: OrgContext): Promise<CampusSummary[]> {
     const campuses = await this.list(ctx);
-    const members = await this.campuses.membersOf(
-      ctx.organizationId,
-      campuses.map((campus) => campus.id)
+    const campusIds = campuses.map((campus) => campus.id);
+    const [members, classCounts] = await Promise.all([
+      this.campuses.membersOf(ctx.organizationId, campusIds),
+      this.campuses.activeClassCounts(ctx.organizationId, campusIds),
+    ]);
+    return campuses.map((campus) =>
+      summariseCampus(campus, members, classCounts)
     );
-    return campuses.map((campus) => summariseCampus(campus, members));
   }
 
   create(ctx: OrgContext, input: CreateInput): Promise<Campus> {

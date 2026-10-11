@@ -14,6 +14,21 @@ import {
   termSchema,
   updateTermSchema,
 } from './calendar';
+import {
+  assignClassTeacherSchema,
+  classDetailSchema,
+  classLevelSchema,
+  classListQuerySchema,
+  classSummarySchema,
+  classTeacherParamsSchema,
+  classTeacherRemovedSchema,
+  classTeacherSchema,
+  createClassLevelSchema,
+  createClassSchema,
+  teacherCandidateSchema,
+  updateClassLevelSchema,
+  updateClassSchema,
+} from './classes';
 import { defineContract, defineRoute } from './route';
 import {
   campusFilterSchema,
@@ -404,6 +419,72 @@ export const contract = defineContract({
       path: '/calendar/days-off',
       query: daysOffQuerySchema,
       response: z.array(dayOffSchema),
+    }),
+  },
+  classLevels: {
+    list: defineRoute({
+      method: 'GET',
+      path: '/class-levels',
+      response: z.array(classLevelSchema),
+    }),
+    create: defineRoute({
+      method: 'POST',
+      path: '/class-levels',
+      body: createClassLevelSchema,
+      response: classLevelSchema,
+    }),
+    update: defineRoute({
+      method: 'PATCH',
+      path: '/class-levels/:id',
+      params: idParamsSchema,
+      body: updateClassLevelSchema,
+      response: classLevelSchema,
+    }),
+  },
+  classes: {
+    list: defineRoute({
+      method: 'GET',
+      path: '/classes',
+      query: classListQuerySchema,
+      response: z.array(classSummarySchema),
+    }),
+    get: defineRoute({
+      method: 'GET',
+      path: '/classes/:id',
+      params: idParamsSchema,
+      response: classDetailSchema,
+    }),
+    create: defineRoute({
+      method: 'POST',
+      path: '/classes',
+      body: createClassSchema,
+      response: classSummarySchema,
+    }),
+    update: defineRoute({
+      method: 'PATCH',
+      path: '/classes/:id',
+      params: idParamsSchema,
+      body: updateClassSchema,
+      response: classSummarySchema,
+    }),
+    teacherCandidates: defineRoute({
+      method: 'GET',
+      path: '/classes/:id/teacher-candidates',
+      params: idParamsSchema,
+      response: z.array(teacherCandidateSchema),
+    }),
+    assignTeacher: defineRoute({
+      method: 'POST',
+      path: '/classes/:id/teachers',
+      params: idParamsSchema,
+      body: assignClassTeacherSchema,
+      response: classTeacherSchema,
+    }),
+    removeTeacher: defineRoute({
+      method: 'DELETE',
+      path: '/classes/:id/teachers/:userId',
+      params: classTeacherParamsSchema,
+      response: classTeacherRemovedSchema,
     }),
   },
   schoolAccount: {

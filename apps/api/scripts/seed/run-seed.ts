@@ -16,6 +16,7 @@ import { CampusService } from '../../src/app/modules/campus/campus.service';
 import { PlatformService } from '../../src/app/modules/platform/platform.service';
 import { StudentService } from '../../src/app/modules/student/student.service';
 import { seedCalendar } from './calendar';
+import { seedClasses } from './classes';
 import { orgContextFor } from './actors';
 import { PROTOTYPE_TODAY, seedOffsetDays, shiftDate } from './date-shift';
 import {
@@ -247,9 +248,12 @@ export async function runSeed(
   await backdateSchools(db, created.organizationIds, offsetDays);
   await addMembers(app, created);
   await createStudents(app, created.campusIds);
-  await seedCalendar(app, {
-    owner: lookupOwner(created.owners, GREENFIELD_SLUG),
-    today,
+  const greenfieldOwner = lookupOwner(created.owners, GREENFIELD_SLUG);
+  await seedCalendar(app, { owner: greenfieldOwner, today, offsetDays });
+  await seedClasses(app, {
+    owner: greenfieldOwner,
+    campusIds: created.campusIds,
+    userIds: created.userIds,
     offsetDays,
   });
   await addSupportActivity(app, superAdmin, created.organizationIds);

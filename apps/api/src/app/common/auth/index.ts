@@ -11,3 +11,4 @@ export * from './member-admin.service';
 export * from './organization-admin.service';
 export * from './slug-conflict';
 export * from './role-admin.service';
+export * from './role-permissions';

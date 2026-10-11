@@ -38,7 +38,12 @@ describe('MyAccessSheet', () => {
         'Students: admit students, update them and put them in classes'
       )
     ).toBeInTheDocument();
-    expect(screen.queryByText('Classes')).not.toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Classes: add, archive and restore classes, change levels and name class teachers'
+      )
+    ).toBeInTheDocument();
+    expect(screen.getByText('Sees every class')).toBeInTheDocument();
   });
 
   it('says there is nothing yet for a member with no roles', () => {

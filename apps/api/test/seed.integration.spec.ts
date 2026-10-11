@@ -20,7 +20,11 @@ test.describe('dev seed', () => {
                 (SELECT count(*) FROM academic_session) AS academic_session,
                 (SELECT count(*) FROM term) AS term,
                 (SELECT count(*) FROM school_holiday) AS school_holiday,
-                (SELECT count(*) FROM term WHERE is_current) AS current_term`
+                (SELECT count(*) FROM term WHERE is_current) AS current_term,
+                (SELECT count(*) FROM class_level) AS class_level,
+                (SELECT count(*) FROM class_arm) AS class_arm,
+                (SELECT count(*) FROM class_arm WHERE retired_at IS NOT NULL) AS retired_class_arm,
+                (SELECT count(*) FROM class_arm_teacher) AS class_arm_teacher`
       );
       return rows[0];
     };
@@ -40,7 +44,35 @@ test.describe('dev seed', () => {
       term: '6',
       school_holiday: '11',
       current_term: '1',
+      class_level: '36',
+      class_arm: '10',
+      retired_class_arm: '1',
+      class_arm_teacher: '5',
     });
+
+    const scopeOf = async (key: string) => {
+      const res = await api()
+        .post('/api/auth/sign-in/email')
+        .send({ email: emailOf(key), password: SEED_PASSWORD })
+        .expect(200);
+      const cookie = (res.headers['set-cookie'] as unknown as string[])
+        .map((c) => c.split(';')[0])
+        .join('; ');
+      const me = await api({ cookie }).get('/me/permissions').expect(200);
+      return (me.body as { classScope: 'all' | string[] }).classScope;
+    };
+    const { rows: jss3 } = await pool.query<{ id: string }>(
+      `SELECT a.id FROM class_arm a JOIN class_level l ON l.id = a.class_level_id
+       WHERE l.name = 'JSS 3' AND a.name = 'Gold'`
+    );
+    expect(await scopeOf('emeka')).toEqual([jss3[0]?.id]);
+    expect(await scopeOf('tunde')).toBe('all');
+    expect(await scopeOf('grace')).toBe('all');
+    const { rows: jss2 } = await pool.query<{ id: string }>(
+      `SELECT a.id FROM class_arm a JOIN class_level l ON l.id = a.class_level_id
+       WHERE l.name = 'JSS 2' AND a.name = 'Gold'`
+    );
+    expect(await scopeOf('ayo')).toEqual([jss2[0]?.id]);
 
     const { rows: titled } = await pool.query<{ title: string | null }>(
       `SELECT m.title FROM member m JOIN "user" u ON u.id = m."userId"

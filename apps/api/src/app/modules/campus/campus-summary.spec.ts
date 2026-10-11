@@ -34,34 +34,41 @@ const members = [
 
 describe('summariseCampus', () => {
   it('lists the members holding principal on that campus only', () => {
-    expect(summariseCampus(LEKKI, members).principals).toEqual([
+    expect(summariseCampus(LEKKI, members, {}).principals).toEqual([
       { userId: 'user-Grace', name: 'Grace' },
     ]);
-    expect(summariseCampus(IKEJA, members).principals).toEqual([]);
+    expect(summariseCampus(IKEJA, members, {}).principals).toEqual([]);
   });
 
   it('lists every principal when a campus has two', () => {
     const two = [...members, person('lekki', 'Femi', ['principal', 'teacher'])];
 
     expect(
-      summariseCampus(LEKKI, two).principals.map((entry) => entry.name)
+      summariseCampus(LEKKI, two, {}).principals.map((entry) => entry.name)
     ).toEqual(['Grace', 'Femi']);
   });
 
   it('counts staff without portal-only accounts', () => {
-    expect(summariseCampus(LEKKI, members).counts.staff).toBe(2);
-    expect(summariseCampus(IKEJA, members).counts.staff).toBe(1);
+    expect(summariseCampus(LEKKI, members, {}).counts.staff).toBe(2);
+    expect(summariseCampus(IKEJA, members, {}).counts.staff).toBe(1);
   });
 
-  it('keeps classes and students at 0 until they exist', () => {
-    expect(summariseCampus(LEKKI, members).counts).toMatchObject({
-      classes: 0,
+  it('counts the active classes of that campus and keeps students at 0', () => {
+    const counts = { lekki: 7, ikeja: 3 };
+
+    expect(summariseCampus(LEKKI, members, counts).counts).toMatchObject({
+      classes: 7,
       students: 0,
     });
+    expect(summariseCampus(IKEJA, members, counts).counts.classes).toBe(3);
+  });
+
+  it('shows 0 classes for a campus with none', () => {
+    expect(summariseCampus(LEKKI, members, {}).counts.classes).toBe(0);
   });
 
   it('keeps the campus fields and an empty campus at zero staff', () => {
-    const empty = summariseCampus(campus('ajah', 'Ajah'), members);
+    const empty = summariseCampus(campus('ajah', 'Ajah'), members, {});
 
     expect(empty).toMatchObject({ id: 'ajah', name: 'Ajah', principals: [] });
     expect(empty.counts.staff).toBe(0);

@@ -2,9 +2,11 @@ import type { INestApplicationContext } from '@nestjs/common';
 import { KYSELY_TOKEN, type Database } from '../../src/app/common/db/tokens';
 import { CalendarService } from '../../src/app/modules/calendar/calendar.service';
 import { CampusService } from '../../src/app/modules/campus/campus.service';
+import { ClassService } from '../../src/app/modules/class/class.service';
 import { StudentService } from '../../src/app/modules/student/student.service';
 import { orgContextFor } from './actors';
 import { SEEDED_ACTING_REASON } from './acting-requests';
+import { CURRENT_CLASS_TEACHERS, SEED_CLASSES } from './classes';
 import { shiftDate } from './date-shift';
 import { emailOf, SUPER_ADMIN_EMAIL } from './members';
 import {
@@ -167,6 +169,45 @@ async function checkCalendar(
   check('Greenfield school days', now.schoolDays, 67);
 }
 
+async function checkClasses(
+  app: INestApplicationContext,
+  db: Database,
+  check: Check
+) {
+  const funmi = await orgContextFor(app, emailOf('funmi'));
+  const classes = app.get(ClassService, { strict: false });
+  const everyClass = await classes.list(funmi, { status: 'all' });
+  check('Greenfield classes', everyClass.length, SEED_CLASSES.length);
+  check(
+    'Greenfield archived classes',
+    everyClass.filter((row) => row.retiredAt !== null).length,
+    1
+  );
+  const teachers = await db
+    .selectFrom('class_arm_teacher')
+    .innerJoin('term', (join) =>
+      join
+        .onRef('term.session_id', '=', 'class_arm_teacher.session_id')
+        .on('term.is_current', '=', true)
+    )
+    .select((eb) => eb.fn.countAll<string>().as('total'))
+    .where('class_arm_teacher.organization_id', '=', funmi.organizationId)
+    .executeTakeFirstOrThrow();
+  check(
+    'Greenfield current class teachers',
+    Number(teachers.total),
+    CURRENT_CLASS_TEACHERS.length
+  );
+
+  const emeka = await orgContextFor(app, emailOf('emeka'));
+  const jss3Gold = everyClass.find((row) => row.displayName === 'JSS 3 Gold');
+  check(
+    'Emeka class scope',
+    emeka.classScope === 'all' ? 'all' : emeka.classScope.join(','),
+    jss3Gold?.id ?? 'missing'
+  );
+}
+
 async function checkPlatform(db: Database, check: Check, offsetDays: number) {
   await checkSuperAdmin(db, check);
   for (const school of schools) {
@@ -207,6 +248,7 @@ export async function runSeedCheck(
   }
 
   await checkCalendar(app, db, check);
+  await checkClasses(app, db, check);
 
   for (const [key, expected] of Object.entries(visibleStudents)) {
     const ctx = await orgContextFor(app, emailOf(key));
