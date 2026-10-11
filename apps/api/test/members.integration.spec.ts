@@ -1456,6 +1456,9 @@ test.describe('members', () => {
         .expect(200);
 
       expect(await teachingOf(pool, teacher.id)).toEqual([atIkeja.id]);
+      const scope = (await api(teacher).get('/me/permissions').expect(200))
+        .body as { classScope: string[] };
+      expect(scope.classScope).toEqual([atIkeja.id]);
     });
 
     test('changing roles and leaving a campus in one save ends that campus’s rows too', async ({
