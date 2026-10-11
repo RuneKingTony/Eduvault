@@ -355,18 +355,20 @@ async function openPortalLogins(
   const hash = await app
     .get(AccountService, { strict: false })
     .hashPassword(SEED_PASSWORD);
+  const portalUsers = db
+    .selectFrom('member')
+    .select('userId')
+    .where('organizationId', '=', organizationId)
+    .where('role', 'in', ['student', 'guardian']);
   await db
     .updateTable('account')
     .set({ password: hash })
-    .where(
-      'userId',
-      'in',
-      db
-        .selectFrom('member')
-        .select('userId')
-        .where('organizationId', '=', organizationId)
-        .where('role', 'in', ['student', 'guardian'])
-    )
+    .where('userId', 'in', portalUsers)
+    .execute();
+  await db
+    .updateTable('user')
+    .set({ mustChangePassword: false })
+    .where('id', 'in', portalUsers)
     .execute();
 }
 

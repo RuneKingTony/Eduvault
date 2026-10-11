@@ -224,10 +224,15 @@ test.describe('dev seed', () => {
     expect(paused.body).toMatchObject({ code: 'SchoolSuspended' });
 
     for (const username of ['greenfield-0123', 'okeke-father', 'etim-family']) {
-      await api()
+      const res = await api()
         .post('/api/auth/sign-in/username')
         .send({ username, password: SEED_PASSWORD })
         .expect(200);
+      const cookie = (res.headers['set-cookie'] as unknown as string[])
+        .map((c) => c.split(';')[0])
+        .join('; ');
+      const me = await api({ cookie }).get('/me').expect(200);
+      expect(me.body, username).toMatchObject({ mustChangePassword: false });
     }
     await api()
       .post('/api/auth/sign-in/email')
