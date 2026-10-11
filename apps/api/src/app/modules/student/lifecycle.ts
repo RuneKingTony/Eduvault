@@ -1,5 +1,14 @@
-import type { StudentLife } from '@eduvault/api-contract';
-import { DUE_LEFT_AFTER_DAYS, INACTIVE_AFTER_DAYS } from '@eduvault/shared';
+import {
+  LEAVE_FUTURE_MESSAGE,
+  MARK_AWAY_FUTURE_MESSAGE,
+  markAwayBeforeAdmittedMessage,
+  type StudentLife,
+} from '@eduvault/api-contract';
+import {
+  DUE_LEFT_AFTER_DAYS,
+  INACTIVE_AFTER_DAYS,
+  fmtDate,
+} from '@eduvault/shared';
 
 const MS_PER_DAY = 86_400_000;
 const DAYS_PER_WEEK = 7;
@@ -41,3 +50,37 @@ export function weeksAway(facts: LifecycleFacts): number | null {
   const days = daysAway(facts);
   return days === null ? null : Math.floor(Math.max(days, 0) / DAYS_PER_WEEK);
 }
+
+interface MarkAwayDateFacts {
+  date: string;
+  today: string;
+  admittedOn: string;
+}
+
+export function markAwayDateError(facts: MarkAwayDateFacts): string | null {
+  if (facts.date > facts.today) {
+    return MARK_AWAY_FUTURE_MESSAGE;
+  }
+  return facts.date < facts.admittedOn
+    ? markAwayBeforeAdmittedMessage(fmtDate(facts.admittedOn))
+    : null;
+}
+
+export const leaveDateError = (
+  lastDay: string,
+  today: string
+): string | null => (lastDay > today ? LEAVE_FUTURE_MESSAGE : null);
+
+interface UndoFacts {
+  exitKind: 'left' | 'graduated' | null;
+  archivedTermId: string | null;
+  currentTermId: string | null;
+}
+
+export const canUndoLeaving = (facts: UndoFacts): boolean =>
+  facts.exitKind !== null &&
+  facts.archivedTermId !== null &&
+  facts.archivedTermId === facts.currentTermId;
+
+export const inactiveAtOnce = (date: string, today: string): boolean =>
+  daysBetween(date, today) >= INACTIVE_AFTER_DAYS;

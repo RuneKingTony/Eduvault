@@ -105,6 +105,12 @@ export const studentQueryOptions = (api: Api, id: string) =>
     queryFn: () => api.students.get({ params: { id } }),
   });
 
+export const nextTermClassesQueryOptions = (api: Api, id: string) =>
+  queryOptions({
+    queryKey: [...STUDENTS_KEY, 'next-term-classes', id],
+    queryFn: () => api.students.nextTermClasses({ params: { id } }),
+  });
+
 export const studentGuardiansQueryOptions = (api: Api, id: string) =>
   queryOptions({
     queryKey: [...STUDENTS_KEY, 'guardians', id],
@@ -115,6 +121,13 @@ export const admissionPreviewQueryOptions = (api: Api) =>
   queryOptions({
     queryKey: [...STUDENTS_KEY, 'admission-preview'],
     queryFn: () => api.admissions.preview({}),
+    gcTime: 0,
+  });
+
+export const newSchoolYearQueryOptions = (api: Api) =>
+  queryOptions({
+    queryKey: [...STUDENTS_KEY, 'new-school-year'],
+    queryFn: () => api.students.newSchoolYearPreview({}),
     gcTime: 0,
   });
 
@@ -364,5 +377,14 @@ export async function invalidateStudents(
     queryClient.invalidateQueries({ queryKey: ['guardians'] }),
     queryClient.invalidateQueries({ queryKey: CLASSES_KEY }),
     queryClient.invalidateQueries({ queryKey: CAMPUSES_KEY }),
+  ]);
+}
+
+export async function invalidateYearStart(
+  queryClient: QueryClient
+): Promise<void> {
+  await Promise.all([
+    invalidateStudents(queryClient),
+    invalidateCalendar(queryClient),
   ]);
 }

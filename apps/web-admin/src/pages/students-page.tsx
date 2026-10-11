@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
+  CalendarPlusIcon,
   GraduationCapIcon,
   InfoIcon,
   SearchIcon,
@@ -13,6 +14,7 @@ import {
   STUDENT_TABS,
   type AdmitStudentResult,
   type StudentCounts,
+  type StudentList,
   type StudentTab,
 } from '@eduvault/api-contract';
 import { useCan, usePermissions } from '@eduvault/auth-client';
@@ -43,6 +45,7 @@ import { useApi } from '../api';
 import { AdmitStudentSheet } from '../components/admit-student-sheet';
 import type { GuardianAction } from '../components/guardian-actions';
 import { GuardianDialogs } from '../components/guardian-dialogs';
+import { StartYearDialog } from '../components/start-year-dialog';
 import { StudentTable } from '../components/student-table';
 import {
   campusesQueryOptions,
@@ -59,6 +62,7 @@ interface StudentsPageProps {
   schoolName: string;
   onSearchChange: (next: StudentsSearch) => void;
   onOpenStudent: (id: string) => void;
+  onRecordLeaving: (id: string) => void;
   onAdmitted: (result: AdmitStudentResult) => void;
   onOpenCalendar: () => void;
 }
@@ -106,12 +110,15 @@ function useScope(): { note: string; tip: string } {
 function Header({
   props,
   shown,
+  startYear,
 }: {
   props: StudentsPageProps;
   shown: number | undefined;
+  startYear: StudentList['startYear'] | undefined;
 }) {
   const scope = useScope();
   const admit = useCanAdmit();
+  const canPlace = useCan('enrollment', 'place');
   return (
     <header className="flex flex-wrap items-start justify-between gap-3">
       <div className="flex flex-col gap-1">
@@ -131,17 +138,31 @@ function Header({
           {shown === undefined ? '' : ` · ${shown} shown`}
         </p>
       </div>
-      {admit ? (
-        <Button
-          type="button"
-          onClick={() => {
-            props.onSearchChange({ ...props.search, admit: 1 });
-          }}
-        >
-          <UserPlusIcon />
-          Admit student
-        </Button>
-      ) : null}
+      <div className="flex flex-wrap items-center gap-2">
+        {canPlace && startYear !== null && startYear !== undefined ? (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              props.onSearchChange({ ...props.search, dialog: 'start-year' });
+            }}
+          >
+            <CalendarPlusIcon />
+            Start {startYear.name}
+          </Button>
+        ) : null}
+        {admit ? (
+          <Button
+            type="button"
+            onClick={() => {
+              props.onSearchChange({ ...props.search, admit: 1 });
+            }}
+          >
+            <UserPlusIcon />
+            Admit student
+          </Button>
+        ) : null}
+      </div>
     </header>
   );
 }
@@ -356,6 +377,18 @@ function LoadingRows() {
   );
 }
 
+function useColumnFlags() {
+  const api = useApi();
+  const guardianRead = useCan('guardian', 'read');
+  const canArchive = useCan('student', 'archive');
+  const campuses = useQuery(campusesQueryOptions(api));
+  return {
+    guardianRead,
+    canArchive,
+    campusColumn: (campuses.data ?? []).length > 1,
+  };
+}
+
 function StudentsTableArea({
   props,
   tab,
@@ -368,8 +401,7 @@ function StudentsTableArea({
   const api = useApi();
   const { search, onSearchChange } = props;
   const list = useQuery(studentsQueryOptions(api, search));
-  const guardianRead = useCan('guardian', 'read');
-  const campuses = useQuery(campusesQueryOptions(api));
+  const flags = useColumnFlags();
   const year = useCurrentYear();
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
   const toggle = (id: string) => {
@@ -393,9 +425,14 @@ function StudentsTableArea({
       <StudentTable
         rows={list.data.items}
         tab={tab}
-        flags={{ guardianRead, campusColumn: (campuses.data ?? []).length > 1 }}
+        flags={flags}
         expanded={expanded}
-        actions={{ onToggle: toggle, onOpen: props.onOpenStudent, onAction }}
+        actions={{
+          onToggle: toggle,
+          onOpen: props.onOpenStudent,
+          onRecordLeaving: props.onRecordLeaving,
+          onAction,
+        }}
       />
       {list.data.total > STUDENT_PAGE_SIZE ? (
         <NumberedPager
@@ -460,10 +497,15 @@ export function StudentsPage(props: StudentsPageProps) {
   const { search, onSearchChange } = props;
   const list = useQuery(studentsQueryOptions(api, search));
   const admit = useCanAdmit();
+  const canPlace = useCan('enrollment', 'place');
   const [action, setAction] = useState<GuardianAction | null>(null);
   return (
     <section className="flex flex-col gap-4">
-      <Header props={props} shown={list.data?.total} />
+      <Header
+        props={props}
+        shown={list.data?.total}
+        startYear={list.data?.startYear}
+      />
       <StudentsCard props={props} onAction={setAction} />
       {admit ? (
         <AdmitStudentSheet
@@ -472,6 +514,17 @@ export function StudentsPage(props: StudentsPageProps) {
             onSearchChange({ ...search, admit: open ? 1 : undefined });
           }}
           onAdmitted={props.onAdmitted}
+          onOpenCalendar={props.onOpenCalendar}
+        />
+      ) : null}
+      {canPlace && search.dialog === 'start-year' ? (
+        <StartYearDialog
+          onOpenChange={(open) => {
+            onSearchChange({
+              ...search,
+              dialog: open ? 'start-year' : undefined,
+            });
+          }}
           onOpenCalendar={props.onOpenCalendar}
         />
       ) : null}

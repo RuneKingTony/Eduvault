@@ -7,6 +7,7 @@ export interface StudentsSearch {
   levelId?: string;
   page?: number;
   admit?: 1;
+  dialog?: 'start-year';
 }
 
 const textOf = (value: unknown): string | undefined => {
@@ -32,5 +33,16 @@ export function parseStudentsSearch(
     levelId: textOf(search['levelId']),
     page: Number.isInteger(page) && page > 1 ? page : undefined,
     admit: textOf(search['admit']) === '1' ? 1 : undefined,
+    dialog: search['dialog'] === 'start-year' ? 'start-year' : undefined,
   };
+}
+
+interface StudentSearch {
+  dialog?: 'leave';
+}
+
+export function parseStudentSearch(
+  search: Record<string, unknown>
+): StudentSearch {
+  return { dialog: search['dialog'] === 'leave' ? 'leave' : undefined };
 }

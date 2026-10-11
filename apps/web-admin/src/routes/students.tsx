@@ -48,6 +48,13 @@ function StudentsRoute() {
       onOpenStudent={(studentId) => {
         void navigate({ to: '/students/$studentId', params: { studentId } });
       }}
+      onRecordLeaving={(studentId) => {
+        void navigate({
+          to: '/students/$studentId',
+          params: { studentId },
+          search: { dialog: 'leave' },
+        });
+      }}
       onAdmitted={({ student, logins }) => {
         toast.success(
           `${student.firstName} ${student.lastName} admitted as ${student.admissionNumber}.`

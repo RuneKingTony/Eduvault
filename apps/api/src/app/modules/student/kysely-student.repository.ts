@@ -13,7 +13,13 @@ import { Clock, schoolToday } from '../../common/clock';
 import { KYSELY_TOKEN, type Database } from '../../common/db/tokens';
 import { visibleStudentsCte } from '../../common/students';
 import { exitReasonLabel } from './exit-reasons';
-import { isDueToBeLeft, isNewIntake, lifeOf, weeksAway } from './lifecycle';
+import {
+  canUndoLeaving,
+  isDueToBeLeft,
+  isNewIntake,
+  lifeOf,
+  weeksAway,
+} from './lifecycle';
 import {
   StudentRepository,
   type StudentListParams,
@@ -46,6 +52,7 @@ interface RowFacts {
   last_day: string | null;
   archived_on: string | null;
   archived_by: string | null;
+  archived_term_id: string | null;
   archived_by_name: string | null;
   graduated_session_name: string | null;
   latest_class_name: string | null;
@@ -273,6 +280,41 @@ function toExit(row: RowFacts): StudentRow['exit'] {
   };
 }
 
+type TermAbilities = Pick<
+  StudentDetail,
+  'nextTerm' | 'canMoveForNextTerm' | 'canUndoLeaving'
+>;
+
+const NO_TERM: TermFactsRow = {
+  current_term_id: null,
+  next_id: null,
+  next_name: null,
+  enrolment_id: null,
+  has_next_placement: true,
+};
+
+function toTermAbilities(
+  row: RowFacts,
+  term: TermFactsRow = NO_TERM
+): TermAbilities {
+  const canPlace =
+    term.next_id !== null &&
+    term.enrolment_id !== null &&
+    !term.has_next_placement;
+  return {
+    nextTerm:
+      term.next_id === null
+        ? null
+        : { id: term.next_id, name: term.next_name ?? '' },
+    canMoveForNextTerm: row.exit_kind === null && canPlace,
+    canUndoLeaving: canUndoLeaving({
+      exitKind: row.exit_kind,
+      archivedTermId: row.archived_term_id,
+      currentTermId: term.current_term_id,
+    }),
+  };
+}
+
 const toCounts = (row: CountsRow): StudentCounts => ({
   active: row.active,
   new: row.new,
@@ -283,6 +325,14 @@ const toCounts = (row: CountsRow): StudentCounts => ({
 
 const hasStudent = (row: ListRow): row is CountsRow & RowFacts =>
   row.id !== null;
+
+interface TermFactsRow {
+  current_term_id: string | null;
+  next_id: string | null;
+  next_name: string | null;
+  enrolment_id: string | null;
+  has_next_placement: boolean;
+}
 
 interface HistoryRow {
   enrollment_id: string;
@@ -350,9 +400,10 @@ export class KyselyStudentRepository extends StudentRepository {
     if (row === undefined) {
       return undefined;
     }
-    const [history, portalLogin] = await Promise.all([
+    const [history, portalLogin, term] = await Promise.all([
       this.history(organizationId, id),
       this.portalLogin(organizationId, row),
+      this.termFacts(organizationId, id),
     ]);
     return {
       ...toStudentRow(row, today),
@@ -366,10 +417,20 @@ export class KyselyStudentRepository extends StudentRepository {
           ? null
           : { id: row.archived_by, name: row.archived_by_name ?? '' },
       history,
-      nextTerm: null,
-      canMoveForNextTerm: false,
-      canUndoLeaving: false,
+      ...toTermAbilities(row, term),
     };
+  }
+
+  async isVisible(
+    organizationId: string,
+    scope: StudentScope,
+    id: string
+  ): Promise<boolean> {
+    const today = schoolToday({ organizationId }, this.clock);
+    const { rows } = await sql<{ id: string }>`
+      WITH ${visibleStudentsCte({ organizationId, ...scope, today, studentId: id })}
+      SELECT id FROM visible`.execute(this.db);
+    return rows.length > 0;
   }
 
   async update(
@@ -393,6 +454,37 @@ export class KyselyStudentRepository extends StudentRepository {
       .where('id', '=', id)
       .where('organization_id', '=', organizationId)
       .execute();
+  }
+
+  private async termFacts(
+    organizationId: string,
+    studentId: string
+  ): Promise<TermFactsRow | undefined> {
+    const { rows } = await sql<TermFactsRow>`
+      SELECT
+        cur.id AS current_term_id,
+        nxt.id AS next_id,
+        nxt.name AS next_name,
+        en.id AS enrolment_id,
+        EXISTS (
+          SELECT 1
+          FROM enrollment_placement p
+          WHERE p.enrollment_id = en.id AND p.term_id = nxt.id
+        ) AS has_next_placement
+      FROM term cur
+      LEFT JOIN term nxt
+        ON nxt.organization_id = cur.organization_id
+        AND nxt.session_id = cur.session_id
+        AND nxt.sequence = cur.sequence + 1
+      LEFT JOIN student_enrollment en
+        ON en.organization_id = cur.organization_id
+        AND en.student_id = ${studentId}::uuid
+        AND en.session_id = cur.session_id
+        AND en.status = 'active'
+      WHERE cur.organization_id = ${organizationId} AND cur.is_current`.execute(
+      this.db
+    );
+    return rows[0];
   }
 
   private async portalLogin(

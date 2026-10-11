@@ -46,6 +46,9 @@ function CalendarRoute() {
             }),
           });
         }}
+        onStartYear={() => {
+          void navigate({ to: '/students', search: { dialog: 'start-year' } });
+        }}
         onNewYearOpenChange={(open) => {
           void navigate({
             search: (previous) => ({

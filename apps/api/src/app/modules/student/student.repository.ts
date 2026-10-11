@@ -36,6 +36,12 @@ export abstract class StudentRepository {
     id: string
   ): Promise<StudentDetail | undefined>;
 
+  abstract isVisible(
+    organizationId: string,
+    scope: StudentScope,
+    id: string
+  ): Promise<boolean>;
+
   abstract update(
     organizationId: string,
     id: string,

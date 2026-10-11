@@ -1,7 +1,8 @@
-import { ClockIcon, InfoIcon } from 'lucide-react';
+import { ClockIcon, InfoIcon, UserXIcon } from 'lucide-react';
 import type { StudentDetail } from '@eduvault/api-contract';
 import { dueLeftOn, fmtDate, inactiveFrom } from '@eduvault/shared';
-import { Alert, AlertDescription } from '@eduvault/ui';
+import { useCan } from '@eduvault/auth-client';
+import { Alert, AlertAction, AlertDescription, Button } from '@eduvault/ui';
 
 function lifecycleMessage(student: StudentDetail): string | null {
   const { exit, notSeenSince, weeksAway } = student;
@@ -21,7 +22,14 @@ function lifecycleMessage(student: StudentDetail): string | null {
   return `Not seen since ${fmtDate(notSeenSince)} (${weeksAway} weeks). Moves to Inactive on ${fmtDate(inactiveFrom(notSeenSince))} if the school hears nothing.`;
 }
 
-export function LifecycleCallout({ student }: { student: StudentDetail }) {
+export function LifecycleCallout({
+  student,
+  onRecordLeaving,
+}: {
+  student: StudentDetail;
+  onRecordLeaving: () => void;
+}) {
+  const canArchive = useCan('student', 'archive');
   const message = lifecycleMessage(student);
   if (message === null) {
     return null;
@@ -31,6 +39,19 @@ export function LifecycleCallout({ student }: { student: StudentDetail }) {
     <Alert variant={student.dueLeft ? 'destructive' : 'default'}>
       <Icon />
       <AlertDescription>{message}</AlertDescription>
+      {student.dueLeft && canArchive ? (
+        <AlertAction>
+          <Button
+            type="button"
+            variant="destructive"
+            size="sm"
+            onClick={onRecordLeaving}
+          >
+            <UserXIcon />
+            Record leaving
+          </Button>
+        </AlertAction>
+      ) : null}
     </Alert>
   );
 }

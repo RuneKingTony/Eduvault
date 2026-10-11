@@ -16,6 +16,7 @@ export interface CalendarView {
   today: string;
   currentTerm: Pick<TermRecord, 'id' | 'sessionId'> | null;
   years: readonly SchoolYearRecord[];
+  waiting?: { yearId: string; count: number } | null;
 }
 
 export const holidayDates = (holidays: readonly HolidayRecord[]): string[] =>
@@ -81,6 +82,7 @@ export function toSchoolYearView(
     endsOn: year.endsOn,
     terms: year.terms.map((term) => toTermView(term, holidays, view)),
     deletable: { ok: reason === null, reason },
-    studentsWaiting: null,
+    studentsWaiting:
+      view.waiting?.yearId === year.id ? view.waiting.count : null,
   };
 }

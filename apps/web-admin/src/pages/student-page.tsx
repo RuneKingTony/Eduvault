@@ -10,6 +10,7 @@ import {
   ApiError,
   type LoginCredential,
   type StudentDetail,
+  type StudentTab,
 } from '@eduvault/api-contract';
 import { Can, useCan } from '@eduvault/auth-client';
 import { fmtDate } from '@eduvault/shared';
@@ -50,14 +51,24 @@ import { AddGuardianButton, GuardianLines } from '../components/guardian-lines';
 import type { GuardianAction } from '../components/guardian-actions';
 import { GuardianDialogs } from '../components/guardian-dialogs';
 import { LoginsDialog } from '../components/logins-dialog';
+import { useBackInSchool } from '../components/student-actions';
 import { LifecycleCallout } from '../components/student-callout';
 import { StatusBadges, nameOf } from '../components/student-bits';
+import {
+  StudentLifecycleDialog,
+  type LifecycleDialog,
+} from '../components/student-lifecycle-dialogs';
+import type { StudentAction } from '../components/student-lifecycle-model';
+import { StudentMenu, useMenuItems } from '../components/student-menu';
 import { studentQueryOptions } from '../queries';
 
 interface StudentPageProps {
   studentId: string;
   schoolName: string;
   logins?: LoginCredential[];
+  initialDialog?: LifecycleDialog;
+  onDialogClosed?: () => void;
+  onOpenTab: (tab: StudentTab) => void;
   onBack: () => void;
 }
 
@@ -263,9 +274,11 @@ function HistoryCard({ student }: { student: StudentDetail }) {
 function StudentHeader({
   student,
   onBack,
+  actions,
 }: {
   student: StudentDetail;
   onBack: () => void;
+  actions: React.ReactNode;
 }) {
   const where =
     student.currentPlacement === null
@@ -288,34 +301,73 @@ function StudentHeader({
           </BreadcrumbItem>
         </BreadcrumbList>
       </Breadcrumb>
-      <header className="flex flex-col gap-1">
-        <h1 className="flex flex-wrap items-center gap-2">
-          {nameOf(student)}
-          <StatusBadges row={student} />
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          {student.admissionNumber} · {where}
-        </p>
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex flex-col gap-1">
+          <h1 className="flex flex-wrap items-center gap-2">
+            {nameOf(student)}
+            <StatusBadges row={student} />
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            {student.admissionNumber} · {where}
+          </p>
+        </div>
+        {actions}
       </header>
     </>
   );
 }
 
-function StudentBody({
-  student,
-  schoolName,
-  onBack,
-}: {
+interface BodyProps {
   student: StudentDetail;
   schoolName: string;
+  initialDialog?: LifecycleDialog;
+  onDialogClosed?: () => void;
+  onOpenTab: (tab: StudentTab) => void;
   onBack: () => void;
-}) {
+}
+
+function useLifecycle(props: BodyProps) {
+  const { student } = props;
+  const items = useMenuItems(student);
+  const [dialog, setDialog] = useState<LifecycleDialog | null>(
+    props.initialDialog ?? null
+  );
+  const back = useBackInSchool(student);
+  const open = (action: StudentAction) => {
+    if (action === 'back') {
+      back.mutate();
+    } else {
+      setDialog(action);
+    }
+  };
+  const close = () => {
+    setDialog(null);
+    props.onDialogClosed?.();
+  };
+  const allowed = items.some((item) => item.action === dialog);
+  return { items, open, close, dialog: allowed ? dialog : null };
+}
+
+function StudentBody(props: BodyProps) {
+  const { student } = props;
   const [action, setAction] = useState<GuardianAction | null>(null);
   const canReadGuardians = useCan('guardian', 'read');
+  const lifecycle = useLifecycle(props);
   return (
     <section className="flex flex-col gap-4">
-      <StudentHeader student={student} onBack={onBack} />
-      <LifecycleCallout student={student} />
+      <StudentHeader
+        student={student}
+        onBack={props.onBack}
+        actions={
+          <StudentMenu items={lifecycle.items} onAction={lifecycle.open} />
+        }
+      />
+      <LifecycleCallout
+        student={student}
+        onRecordLeaving={() => {
+          lifecycle.open('leave');
+        }}
+      />
       <div className="grid gap-4 md:grid-cols-2">
         <ProfileCard student={student} />
         {canReadGuardians ? (
@@ -327,9 +379,17 @@ function StudentBody({
       </div>
       <GuardianDialogs
         action={action}
-        schoolName={schoolName}
+        schoolName={props.schoolName}
         onAction={setAction}
       />
+      {lifecycle.dialog === null ? null : (
+        <StudentLifecycleDialog
+          dialog={lifecycle.dialog}
+          student={student}
+          onClose={lifecycle.close}
+          onOpenTab={props.onOpenTab}
+        />
+      )}
     </section>
   );
 }
@@ -369,6 +429,9 @@ export function StudentPage(props: StudentPageProps) {
       <StudentBody
         student={student.data}
         schoolName={props.schoolName}
+        initialDialog={props.initialDialog}
+        onDialogClosed={props.onDialogClosed}
+        onOpenTab={props.onOpenTab}
         onBack={props.onBack}
       />
       <LoginsDialog

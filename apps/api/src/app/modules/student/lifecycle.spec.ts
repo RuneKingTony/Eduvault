@@ -1,8 +1,12 @@
 import {
+  canUndoLeaving,
   daysBetween,
+  inactiveAtOnce,
   isDueToBeLeft,
   isNewIntake,
+  leaveDateError,
   lifeOf,
+  markAwayDateError,
   weeksAway,
   type LifecycleFacts,
 } from './lifecycle';
@@ -90,5 +94,63 @@ describe('weeksAway', () => {
     expect(weeksAway(facts({ notSeenSince: daysAgo(6) }))).toBe(0);
     expect(weeksAway(facts({ notSeenSince: daysAgo(7) }))).toBe(1);
     expect(weeksAway(facts({ notSeenSince: daysAgo(40) }))).toBe(5);
+  });
+});
+
+describe('markAwayDateError', () => {
+  const admittedOn = '2026-09-01';
+
+  it('refuses a date after today with the screen copy', () => {
+    expect(markAwayDateError({ date: '2026-10-12', today, admittedOn })).toBe(
+      'Choose a date on or before today.'
+    );
+  });
+
+  it('refuses a date before admission and names it', () => {
+    expect(markAwayDateError({ date: '2026-08-31', today, admittedOn })).toBe(
+      'Choose a date on or after 1 Sep 2026.'
+    );
+  });
+
+  it('allows today and the admission day', () => {
+    expect(markAwayDateError({ date: today, today, admittedOn })).toBeNull();
+    expect(
+      markAwayDateError({ date: admittedOn, today, admittedOn })
+    ).toBeNull();
+  });
+});
+
+describe('leaveDateError', () => {
+  it('refuses only a last day after today', () => {
+    expect(leaveDateError('2026-10-12', today)).toBe(
+      'Choose a last day on or before today.'
+    );
+    expect(leaveDateError(today, today)).toBeNull();
+    expect(leaveDateError('2026-01-01', today)).toBeNull();
+  });
+});
+
+describe('inactiveAtOnce', () => {
+  it('is true from 35 days ago, not from 34', () => {
+    expect(inactiveAtOnce(daysAgo(34), today)).toBe(false);
+    expect(inactiveAtOnce(daysAgo(35), today)).toBe(true);
+    expect(inactiveAtOnce(daysAgo(132), today)).toBe(true);
+  });
+});
+
+describe('canUndoLeaving', () => {
+  const archived = {
+    exitKind: 'left' as const,
+    archivedTermId: 't1',
+    currentTermId: 't1',
+  };
+
+  it('needs an archived student and the same current term', () => {
+    expect(canUndoLeaving(archived)).toBe(true);
+    expect(canUndoLeaving({ ...archived, exitKind: 'graduated' })).toBe(true);
+    expect(canUndoLeaving({ ...archived, currentTermId: 't2' })).toBe(false);
+    expect(canUndoLeaving({ ...archived, currentTermId: null })).toBe(false);
+    expect(canUndoLeaving({ ...archived, exitKind: null })).toBe(false);
+    expect(canUndoLeaving({ ...archived, archivedTermId: null })).toBe(false);
   });
 });

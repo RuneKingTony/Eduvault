@@ -14,6 +14,7 @@ import {
   type SchoolYearWithTerms,
   type TermDetail,
   type TermRecord,
+  type WaitingQuery,
 } from './calendar.repository';
 import { CalendarService } from './calendar.service';
 
@@ -26,6 +27,8 @@ class FakeCalendar extends CalendarRepository {
   terms: TermRecord[] = [];
   holidays: HolidayRecord[] = [];
   referenced = false;
+  waiting = 0;
+  waitingQueries: WaitingQuery[] = [];
   private counter = 0;
 
   private id(prefix: string) {
@@ -136,6 +139,11 @@ class FakeCalendar extends CalendarRepository {
       });
     }
     return Promise.resolve(year.id);
+  }
+
+  countStudentsWaiting(_org: string, query: WaitingQuery) {
+    this.waitingQueries.push(query);
+    return Promise.resolve(this.waiting);
   }
 
   setCurrent(_org: string, termId: string) {
@@ -564,5 +572,40 @@ describe('CalendarService reads', () => {
   it('answers 404 for a year that is not there', async () => {
     const { service } = setup();
     await expect(service.get(ctx, 'nope')).rejects.toThrow(NotFoundException);
+  });
+});
+
+describe('CalendarService studentsWaiting', () => {
+  it('counts the waiting students on the year that starts next only', async () => {
+    const { service, repository } = await withYear();
+    const nextYear = await service.create(ctx, next);
+    repository.waiting = 357;
+    const { items } = await service.list(ctx, 1);
+    expect(items.map((year) => [year.name, year.studentsWaiting])).toEqual([
+      ['2027/2028', 357],
+      ['2026/2027', null],
+    ]);
+    expect(repository.waitingQueries.at(-1)).toEqual({
+      fromYearId: items[1]?.id,
+      toYearId: nextYear.id,
+      today: '2026-10-07',
+    });
+    await expect(service.get(ctx, nextYear.id)).resolves.toMatchObject({
+      studentsWaiting: 357,
+    });
+  });
+
+  it('answers 0 when everyone is already moved', async () => {
+    const { service } = await withYear();
+    await service.create(ctx, next);
+    const { items } = await service.list(ctx, 1);
+    expect(items[0]?.studentsWaiting).toBe(0);
+  });
+
+  it('asks nothing while no year follows the current one', async () => {
+    const { service, repository } = await withYear();
+    const { items } = await service.list(ctx, 1);
+    expect(items[0]?.studentsWaiting).toBeNull();
+    expect(repository.waitingQueries).toEqual([]);
   });
 });

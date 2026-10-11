@@ -1,3 +1,7 @@
+import type { LeavingReason } from '@eduvault/api-contract';
+import { lifeOf } from '../../src/app/modules/student/lifecycle';
+import { PROTOTYPE_TODAY } from './date-shift';
+
 interface SeedGuardianLink {
   guardian: string;
   relationship: 'mother' | 'father' | 'guardian';
@@ -9,7 +13,6 @@ export interface SeedStudent {
   firstName: string;
   lastName: string;
   gender: 'F' | 'M';
-  /** Prototype dates; the seed shifts them with its "today". */
   dateOfBirth: string;
   admittedOn: string;
   className: string;
@@ -17,6 +20,9 @@ export interface SeedStudent {
   isNewIntake: boolean;
   completedJss1Gold: boolean;
   placedForSecondTerm: boolean;
+  notSeen: { since: string; note: string } | null;
+  leaving: { reason: LeavingReason; lastDay: string; note: string } | null;
+  graduatedLastYear: boolean;
   guardians: readonly SeedGuardianLink[];
 }
 
@@ -87,7 +93,13 @@ type Draft = Pick<
   Partial<
     Pick<
       SeedStudent,
-      'isNewIntake' | 'completedJss1Gold' | 'placedForSecondTerm' | 'guardians'
+      | 'isNewIntake'
+      | 'completedJss1Gold'
+      | 'placedForSecondTerm'
+      | 'notSeen'
+      | 'leaving'
+      | 'graduatedLastYear'
+      | 'guardians'
     >
   >;
 
@@ -97,6 +109,9 @@ const student = (draft: Draft): SeedStudent => ({
   isNewIntake: false,
   completedJss1Gold: false,
   placedForSecondTerm: false,
+  notSeen: null,
+  leaving: null,
+  graduatedLastYear: false,
   guardians: [],
   ...draft,
   campus: IKEJA_CLASSES.has(draft.className) ? 'Ikeja' : 'Lekki',
@@ -210,6 +225,10 @@ export const students: SeedStudent[] = [
     className: 'JSS 2 Gold',
     completedJss1Gold: true,
     placedForSecondTerm: true,
+    notSeen: {
+      since: '2026-07-10',
+      note: 'Phone calls to the family unanswered',
+    },
   }),
   student({
     number: '0177',
@@ -230,6 +249,10 @@ export const students: SeedStudent[] = [
     dateOfBirth: '2013-12-09',
     admittedOn: '2024-09-09',
     className: 'JSS 2 Silver',
+    notSeen: {
+      since: '2026-09-21',
+      note: 'Family travelling; told the class teacher',
+    },
   }),
   student({
     number: '0244',
@@ -260,6 +283,10 @@ export const students: SeedStudent[] = [
     admittedOn: '2024-09-09',
     className: 'JSS 2 Emerald',
     placedForSecondTerm: true,
+    notSeen: {
+      since: '2026-05-22',
+      note: 'No contact since the end of last term',
+    },
   }),
   student({
     number: '0310',
@@ -308,6 +335,11 @@ export const students: SeedStudent[] = [
     admittedOn: '2022-09-12',
     className: 'JSS 3 Gold',
     guardians: [link('grace', 'mother', true)],
+    leaving: {
+      reason: 'relocated',
+      lastDay: '2026-09-25',
+      note: 'Family moved to Abuja',
+    },
   }),
   student({
     number: '0219',
@@ -317,6 +349,11 @@ export const students: SeedStudent[] = [
     dateOfBirth: '2011-06-22',
     admittedOn: '2022-09-12',
     className: 'SS 1 Arts',
+    leaving: {
+      reason: 'transferred',
+      lastDay: '2026-09-18',
+      note: 'Moved to a school nearer home',
+    },
   }),
   student({
     number: '0251',
@@ -373,6 +410,7 @@ export const students: SeedStudent[] = [
     dateOfBirth: '2008-05-17',
     admittedOn: '2019-09-09',
     className: 'SS 3 Gold',
+    graduatedLastYear: true,
   }),
   student({
     number: '0034',
@@ -382,6 +420,7 @@ export const students: SeedStudent[] = [
     dateOfBirth: '2008-08-26',
     admittedOn: '2019-09-09',
     className: 'SS 3 Gold',
+    graduatedLastYear: true,
   }),
   student({
     number: '0039',
@@ -391,6 +430,7 @@ export const students: SeedStudent[] = [
     dateOfBirth: '2009-03-11',
     admittedOn: '2019-09-09',
     className: 'SS 3 Gold',
+    graduatedLastYear: true,
   }),
 ];
 
@@ -402,4 +442,22 @@ const TERMS_PER_YEAR = 3;
 export const SEED_PLACEMENTS =
   students.length +
   students.filter((s) => s.completedJss1Gold).length * TERMS_PER_YEAR +
-  students.filter((s) => s.placedForSecondTerm).length;
+  students.filter((s) => s.placedForSecondTerm).length +
+  students.filter((s) => s.graduatedLastYear).length * (TERMS_PER_YEAR - 1);
+
+const exitKindOf = (row: SeedStudent): 'left' | 'graduated' | null => {
+  if (row.leaving !== null) {
+    return 'left';
+  }
+  return row.graduatedLastYear ? 'graduated' : null;
+};
+
+export const seedLife = (
+  row: SeedStudent
+): 'active' | 'inactive' | 'left' | 'graduated' =>
+  lifeOf({
+    notSeenSince: row.notSeen?.since ?? null,
+    exitKind: exitKindOf(row),
+    newInCurrentSession: false,
+    today: PROTOTYPE_TODAY,
+  });

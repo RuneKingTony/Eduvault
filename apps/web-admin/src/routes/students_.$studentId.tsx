@@ -12,9 +12,11 @@ import { useAuthClient } from '@eduvault/auth-client';
 import { requireGate } from '../access';
 import { StudentPage } from '../pages/student-page';
 import { studentQueryOptions } from '../queries';
+import { parseStudentSearch } from '../students-search';
 import { useSchool } from '../use-school';
 
 export const Route = createFileRoute('/students_/$studentId')({
+  validateSearch: parseStudentSearch,
   beforeLoad: ({ context }) => {
     requireGate(context.access, '/students');
   },
@@ -50,6 +52,7 @@ function StudentRoute() {
 function StudentRouteBody({ studentId }: { studentId: string }) {
   const navigate = Route.useNavigate();
   const router = useRouter();
+  const { dialog } = Route.useSearch();
   const state = useLocation({ select: (location) => location.state });
   const { schoolName } = useSchool(useAuthClient());
   const [logins] = useState(() => loginsOf(state));
@@ -65,6 +68,13 @@ function StudentRouteBody({ studentId }: { studentId: string }) {
       studentId={studentId}
       schoolName={schoolName}
       logins={logins ?? undefined}
+      initialDialog={dialog}
+      onDialogClosed={() => {
+        void navigate({ search: {}, replace: true });
+      }}
+      onOpenTab={(tab) => {
+        void navigate({ to: '/students', search: { tab } });
+      }}
       onBack={() => {
         void navigate({ to: '/students' });
       }}

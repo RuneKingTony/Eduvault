@@ -525,8 +525,8 @@ test.describe('student detail', () => {
       gender: 'F',
       dateOfBirth: '2014-03-03',
       portalLogin: { active: true },
-      nextTerm: null,
-      canMoveForNextTerm: false,
+      nextTerm: { name: 'Second term' },
+      canMoveForNextTerm: true,
       canUndoLeaving: false,
     });
     expect(res.body.history).toHaveLength(1);

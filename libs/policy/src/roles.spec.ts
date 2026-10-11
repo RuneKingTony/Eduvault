@@ -105,6 +105,21 @@ describe('roles', () => {
     }
   });
 
+  it('gives the administrator archive and markAway and the teacher markAway only', () => {
+    expect(starter('administrator').student).toEqual([
+      'create',
+      'read',
+      'update',
+      'archive',
+      'markAway',
+    ]);
+    expect(starter('teacher').student).toEqual(['read', 'markAway']);
+    for (const slug of ['bursar', 'principal', 'student', 'guardian']) {
+      expect(starter(slug).student ?? []).not.toContain('archive');
+      expect(starter(slug).student ?? []).not.toContain('markAway');
+    }
+  });
+
   it('counts the new read permissions in READ_PERMS', () => {
     expect(READ_PERMS).toEqual(
       expect.arrayContaining(['enrollment:read', 'guardian:read'])
@@ -172,7 +187,7 @@ describe('roles', () => {
       principal: starter('principal'),
     });
     expect(permissions).toEqual({
-      student: ['read'],
+      student: ['read', 'markAway'],
       class: ['read', 'readAll'],
       team: ['read'],
       campus: ['readAll'],

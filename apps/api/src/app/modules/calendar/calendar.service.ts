@@ -44,6 +44,7 @@ import {
   schoolDaysSoFar,
   splitTerms,
   yearNameError,
+  yearStartingNext,
 } from '@eduvault/shared';
 import type { OrgContext } from '../../common/auth';
 import { Clock, schoolToday } from '../../common/clock';
@@ -100,6 +101,23 @@ export class CalendarService {
     };
   }
 
+  private async loadYearsView(ctx: OrgContext): Promise<CalendarView> {
+    const view = await this.loadView(ctx);
+    const next =
+      view.currentTerm === null
+        ? undefined
+        : yearStartingNext(view.years, view.currentTerm.sessionId);
+    if (view.currentTerm === null || next === undefined) {
+      return view;
+    }
+    const count = await this.calendar.countStudentsWaiting(ctx.organizationId, {
+      fromYearId: view.currentTerm.sessionId,
+      toYearId: next.id,
+      today: view.today,
+    });
+    return { ...view, waiting: { yearId: next.id, count } };
+  }
+
   private async termView(ctx: OrgContext, termId: string): Promise<Term> {
     const [detail, holidays, view] = await Promise.all([
       this.calendar.findTerm(ctx.organizationId, termId),
@@ -122,7 +140,7 @@ export class CalendarService {
         ctx.organizationId,
         year.terms.map((term) => term.id)
       ),
-      this.loadView(ctx),
+      this.loadYearsView(ctx),
     ]);
     return toSchoolYearView(year, holidays, view);
   }
@@ -148,7 +166,7 @@ export class CalendarService {
         ctx.organizationId,
         items.flatMap((year) => year.terms.map((term) => term.id))
       ),
-      this.loadView(ctx),
+      this.loadYearsView(ctx),
     ]);
     return {
       items: items.map((year) => toSchoolYearView(year, holidays, view)),

@@ -42,6 +42,7 @@ function TermDialog({
   target,
   current,
   onChange,
+  onStartYear,
 }: {
   dialog: Extract<
     CalendarDialog,
@@ -50,6 +51,7 @@ function TermDialog({
   target: TermInYear;
   current: CalendarCurrent | undefined;
   onChange: (dialog: CalendarDialog | null) => void;
+  onStartYear: () => void;
 }) {
   const close = (open: boolean) => {
     if (!open) {
@@ -77,6 +79,7 @@ function TermDialog({
           target={target}
           current={current}
           onOpenChange={close}
+          onStartYear={onStartYear}
         />
       );
     }
@@ -88,11 +91,13 @@ export function CalendarDialogs({
   years,
   current,
   onChange,
+  onStartYear,
 }: {
   dialog: CalendarDialog | null;
   years: readonly SchoolYear[];
   current: CalendarCurrent | undefined;
   onChange: (dialog: CalendarDialog | null) => void;
+  onStartYear: () => void;
 }) {
   if (dialog === null) {
     return null;
@@ -117,6 +122,7 @@ export function CalendarDialogs({
       target={target}
       current={current}
       onChange={onChange}
+      onStartYear={onStartYear}
     />
   );
 }

@@ -236,6 +236,17 @@ export function daysOff(options: {
     .slice(0, options.limit);
 }
 
+export function yearStartingNext<
+  Y extends { id: string; startsOn: string; endsOn: string },
+>(years: readonly Y[], currentYearId: string): Y | undefined {
+  const current = years.find((year) => year.id === currentYearId);
+  return current === undefined
+    ? undefined
+    : years
+        .filter((year) => year.startsOn > current.endsOn)
+        .toSorted((a, b) => a.startsOn.localeCompare(b.startsOn))[0];
+}
+
 export function canMakeCurrent(
   term: Pick<CalendarTerm, 'id' | 'sessionId' | 'sequence'>,
   context: {
@@ -250,12 +261,8 @@ export function canMakeCurrent(
   if (term.sessionId === currentTerm.sessionId) {
     return true;
   }
-  const currentYear = years.find((year) => year.id === currentTerm.sessionId);
-  if (currentYear === undefined || term.sequence !== 1) {
-    return false;
-  }
-  const next = years
-    .filter((year) => year.startsOn > currentYear.endsOn)
-    .toSorted((a, b) => a.startsOn.localeCompare(b.startsOn))[0];
-  return next?.id === term.sessionId;
+  return (
+    term.sequence === 1 &&
+    yearStartingNext(years, currentTerm.sessionId)?.id === term.sessionId
+  );
 }

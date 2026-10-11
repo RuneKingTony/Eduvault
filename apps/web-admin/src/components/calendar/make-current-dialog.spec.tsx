@@ -15,11 +15,13 @@ function setup(
     throw new Error('no target');
   }
   const onOpenChange = vi.fn();
+  const onStartYear = vi.fn();
   renderWithApi(
     <MakeCurrentDialog
       target={target}
       current={currentCalendar()}
       onOpenChange={onOpenChange}
+      onStartYear={onStartYear}
     />,
     {
       terms: { makeCurrent },
@@ -28,7 +30,7 @@ function setup(
     },
     access
   );
-  return { makeCurrent, onOpenChange };
+  return { makeCurrent, onOpenChange, onStartYear };
 }
 
 describe('MakeCurrentDialog', () => {
@@ -102,5 +104,39 @@ describe('MakeCurrentDialog', () => {
       screen.queryByRole('button', { name: /Make current/ })
     ).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
+  });
+
+  it('offers Start {year} first to a holder of enrollment:place', () => {
+    const { onStartYear } = setup(357);
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Start 2027/2028 first' })
+    );
+    expect(onStartYear).toHaveBeenCalled();
+    expect(
+      screen.queryByText(/Ask someone who can place students/)
+    ).not.toBeInTheDocument();
+  });
+
+  it('asks the member to find someone who can place students without enrollment:place', () => {
+    setup(
+      357,
+      fakeAccess({ permissions: { session: ['read', 'setCurrent'] } })
+    );
+    expect(
+      screen.queryByRole('button', { name: 'Start 2027/2028 first' })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText('Ask someone who can place students to start 2027/2028.')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Make current anyway' })
+    ).toBeInTheDocument();
+  });
+
+  it('has no Start button when nobody is waiting', () => {
+    setup(0);
+    expect(
+      screen.queryByRole('button', { name: /Start 2027\/2028 first/ })
+    ).not.toBeInTheDocument();
   });
 });

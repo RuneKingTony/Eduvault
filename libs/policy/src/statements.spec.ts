@@ -14,6 +14,20 @@ describe('statements', () => {
     expect(ALL_PERMISSIONS).not.toContain('student:delete');
   });
 
+  it('has the student lifecycle permissions with help and no delete', () => {
+    expect(ALL_PERMISSIONS).toEqual(
+      expect.arrayContaining(['student:archive', 'student:markAway'])
+    );
+    expect(SENSITIVE).not.toContain('student:archive');
+    expect(permLabel('student:markAway')).toBe('Students: mark away');
+    expect(PERM_HELP['student:archive']).toBe(
+      'Records students leaving or graduating, and undoes it in the same term.'
+    );
+    expect(PERM_HELP['student:markAway']).toBe(
+      'Marks students not seen since a date, and back in school.'
+    );
+  });
+
   it('has the member resource and marks adding and removing sensitive', () => {
     expect(ALL_PERMISSIONS).toEqual(
       expect.arrayContaining([

@@ -1,4 +1,4 @@
-import { fireEvent, screen } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import {
   ApiError,
   type LoginCredential,
@@ -6,7 +6,9 @@ import {
   type StudentDetail,
 } from '@eduvault/api-contract';
 import { toPermissionMap, type Permission } from '@eduvault/policy';
-import { fakeAccess, renderWithApi } from '../test-utils';
+import { currentCalendar } from '../test-calendar';
+import { classSummary } from '../test-classes';
+import { actingAccess, fakeAccess, renderWithApi } from '../test-utils';
 import { guardianLink, preview, studentDetail } from '../test-students';
 import { StudentPage } from './student-page';
 
@@ -23,13 +25,20 @@ function setup(
     error?: Error;
     access?: MePermissions;
     logins?: LoginCredential[];
+    initialDialog?: 'leave';
   } = {}
 ) {
+  const detail = studentDetail(options.student);
   const students = {
     get: options.error
       ? vi.fn().mockRejectedValue(options.error)
-      : vi.fn().mockResolvedValue(studentDetail(options.student)),
+      : vi.fn().mockResolvedValue(detail),
     guardians: vi.fn().mockResolvedValue([guardianLink()]),
+    markAway: vi.fn().mockResolvedValue(detail),
+    backInSchool: vi.fn().mockResolvedValue(detail),
+    leave: vi.fn().mockResolvedValue(detail),
+    undoLeaving: vi.fn().mockResolvedValue(detail),
+    place: vi.fn().mockResolvedValue(detail),
   };
   const api = {
     students,
@@ -40,19 +49,26 @@ function setup(
         .mockResolvedValue({ maxGuardians: 4, requireGuardian: true }),
     },
     guardians: { list: vi.fn().mockResolvedValue([]), get: vi.fn() },
+    classes: { list: vi.fn().mockResolvedValue([classSummary()]) },
+    calendar: { current: vi.fn().mockResolvedValue(currentCalendar()) },
   };
   const onBack = vi.fn();
+  const onOpenTab = vi.fn();
+  const onDialogClosed = vi.fn();
   renderWithApi(
     <StudentPage
       studentId="5b0f1e1e-6e53-4c52-9f1c-0a1d7a7f9c11"
       schoolName="Greenfield College"
       logins={options.logins}
+      initialDialog={options.initialDialog}
+      onDialogClosed={onDialogClosed}
+      onOpenTab={onOpenTab}
       onBack={onBack}
     />,
     api,
     options.access
   );
-  return { students, api, onBack };
+  return { students, api, onBack, onOpenTab, onDialogClosed };
 }
 
 describe('StudentPage', () => {
@@ -167,7 +183,10 @@ describe('StudentPage guardians', () => {
   });
 });
 
-const callout = async () => (await screen.findByRole('alert')).textContent;
+const callout = async () =>
+  (await screen.findByRole('alert')).querySelector(
+    '[data-slot="alert-description"]'
+  )?.textContent;
 
 describe('StudentPage lifecycle callouts', () => {
   it('says Left on the last day for a student who left', async () => {
@@ -265,5 +284,178 @@ describe('StudentPage states', () => {
     expect(screen.getAllByText('Abcd2345Wxyz').length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole('button', { name: 'Done' }));
     expect(screen.queryByText('Abcd2345Wxyz')).not.toBeInTheDocument();
+  });
+});
+
+const openMenu = async () => {
+  fireEvent.keyDown(
+    await screen.findByRole('button', { name: 'More actions' }),
+    {
+      key: 'Enter',
+    }
+  );
+};
+
+const items = async () =>
+  (await screen.findAllByRole('menuitem')).map((item) => item.textContent);
+
+describe('StudentPage menu', () => {
+  it('lists the actions the permissions and state allow, with Record leaving last', async () => {
+    setup({ student: { canMoveForNextTerm: true } });
+    await openMenu();
+    expect(await items()).toEqual([
+      'Move for next term',
+      'Mark not seen since…',
+      'Record leaving…',
+    ]);
+  });
+
+  it('hides the menu without any of the three permissions', async () => {
+    setup({ access: accessWith('student:read') });
+    await screen.findByText('Admission no.');
+    expect(
+      screen.queryByRole('button', { name: 'More actions' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('hides the menu for a read-only acting super admin', async () => {
+    setup({ access: actingAccess(false) });
+    await screen.findByText('Admission no.');
+    expect(
+      screen.queryByRole('button', { name: 'More actions' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('offers only mark away to a holder of student:markAway', async () => {
+    setup({ access: accessWith('student:read', 'student:markAway') });
+    await openMenu();
+    expect(await items()).toEqual(['Mark not seen since…']);
+  });
+
+  it('offers Reactivate for an Inactive student and marks them back at once', async () => {
+    const { students } = setup({
+      student: {
+        life: 'inactive',
+        notSeenSince: '2026-08-01',
+        weeksAway: 9,
+      },
+    });
+    await openMenu();
+    fireEvent.click(
+      await screen.findByRole('menuitem', {
+        name: 'Reactivate: back in school',
+      })
+    );
+    await waitFor(() => {
+      expect(students.backInSchool).toHaveBeenCalledWith({
+        params: { id: '5b0f1e1e-6e53-4c52-9f1c-0a1d7a7f9c11' },
+      });
+    });
+  });
+
+  it('shows Undo leaving only while the term is still current', async () => {
+    const left = {
+      life: 'left' as const,
+      exit: {
+        kind: 'left' as const,
+        on: '2026-10-02',
+        reason: 'Relocated',
+        note: null,
+        recordedOn: '2026-10-07',
+      },
+    };
+    const { students } = setup({
+      student: { ...left, canUndoLeaving: true },
+    });
+    await openMenu();
+    expect(await items()).toEqual(['Undo leaving…']);
+    fireEvent.click(await screen.findByRole('menuitem'));
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Undo leaving' })
+    );
+    await waitFor(() => {
+      expect(students.undoLeaving).toHaveBeenCalled();
+    });
+  });
+
+  it('hides Undo once the term has changed', async () => {
+    setup({
+      student: {
+        life: 'graduated',
+        exit: {
+          kind: 'graduated',
+          on: '2026-07-17',
+          reason: 'Completed JSS 3',
+          note: null,
+          recordedOn: '2026-07-17',
+        },
+        canUndoLeaving: false,
+      },
+    });
+    await screen.findByText('Admission no.');
+    expect(
+      screen.queryByRole('button', { name: 'More actions' })
+    ).not.toBeInTheDocument();
+  });
+});
+
+describe('StudentPage Record leaving', () => {
+  const due = {
+    life: 'inactive' as const,
+    dueLeft: true,
+    notSeenSince: '2026-05-22',
+    weeksAway: 20,
+  };
+
+  it('shows the danger callout’s button and opens the leaving dialog from it', async () => {
+    setup({ student: due });
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Record leaving' })
+    );
+    expect(
+      await screen.findByRole('dialog', { name: 'Record Ada leaving' })
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText('Reason')).toHaveValue('did_not_return');
+    expect(screen.getByLabelText('Last day attended')).toHaveValue(
+      '2026-05-22'
+    );
+  });
+
+  it('hides the callout’s button without student:archive', async () => {
+    setup({
+      student: due,
+      access: accessWith('student:read', 'student:markAway'),
+    });
+    await screen.findByRole('alert');
+    expect(
+      screen.queryByRole('button', { name: 'Record leaving' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('opens the dialog on arrival for a link from the Inactive tab, and tells the route when it closes', async () => {
+    const { onDialogClosed } = setup({ student: due, initialDialog: 'leave' });
+    expect(
+      await screen.findByRole('dialog', { name: 'Record Ada leaving' })
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(onDialogClosed).toHaveBeenCalled();
+  });
+
+  it('does not open the dialog on arrival for a student who has already left', async () => {
+    setup({
+      student: {
+        life: 'left',
+        exit: {
+          kind: 'left',
+          on: '2026-10-02',
+          reason: 'Relocated',
+          note: null,
+          recordedOn: '2026-10-07',
+        },
+      },
+      initialDialog: 'leave',
+    });
+    await screen.findByText('Admission no.');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 });

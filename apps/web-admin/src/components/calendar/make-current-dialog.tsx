@@ -1,6 +1,11 @@
-import { CalendarDaysIcon, InfoIcon, TriangleAlertIcon } from 'lucide-react';
+import {
+  CalendarDaysIcon,
+  CalendarPlusIcon,
+  InfoIcon,
+  TriangleAlertIcon,
+} from 'lucide-react';
 import type { CalendarCurrent } from '@eduvault/api-contract';
-import { Can } from '@eduvault/auth-client';
+import { Can, useCan } from '@eduvault/auth-client';
 import { countOf } from '@eduvault/shared';
 import {
   Alert,
@@ -17,12 +22,43 @@ import {
 import { termTitle, type TermInYear } from './calendar-text';
 import { useMakeCurrent } from './use-make-current';
 
+function StartYearAction({
+  yearName,
+  onStartYear,
+}: {
+  yearName: string;
+  onStartYear: () => void;
+}) {
+  const canPlace = useCan('enrollment', 'place');
+  if (!canPlace) {
+    return (
+      <p className="mt-1">
+        Ask someone who can place students to start {yearName}.
+      </p>
+    );
+  }
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      className="mt-2"
+      onClick={onStartYear}
+    >
+      <CalendarPlusIcon />
+      Start {yearName} first
+    </Button>
+  );
+}
+
 function WaitingCallout({
   yearName,
   waiting,
+  onStartYear,
 }: {
   yearName: string;
   waiting: number | null;
+  onStartYear: () => void;
 }) {
   if (waiting === null) {
     return null;
@@ -43,6 +79,7 @@ function WaitingCallout({
       <AlertDescription>
         {countOf(waiting, 'student is', 'students are')} not in a {yearName}{' '}
         class yet. Start {yearName} first, or they will have no class this term.
+        <StartYearAction yearName={yearName} onStartYear={onStartYear} />
       </AlertDescription>
     </Alert>
   );
@@ -81,10 +118,12 @@ export function MakeCurrentDialog({
   target,
   current,
   onOpenChange,
+  onStartYear,
 }: {
   target: TermInYear;
   current: CalendarCurrent | undefined;
   onOpenChange: (open: boolean) => void;
+  onStartYear: () => void;
 }) {
   const { term, year } = target;
   const make = useMakeCurrent(() => {
@@ -106,7 +145,11 @@ export function MakeCurrentDialog({
               : `${year.name} begins, and ${outgoing} stops being the current term.`}
           </DialogDescription>
         </DialogHeader>
-        <WaitingCallout yearName={year.name} waiting={waiting} />
+        <WaitingCallout
+          yearName={year.name}
+          waiting={waiting}
+          onStartYear={onStartYear}
+        />
         <ErrorMessage error={make.error} />
         <DialogFooter>
           <Button

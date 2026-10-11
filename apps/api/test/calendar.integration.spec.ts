@@ -1,3 +1,4 @@
+import type { Pool } from 'pg';
 import type { Test } from 'supertest';
 import type {
   CreatedSchoolYear,
@@ -18,6 +19,8 @@ import {
   YEAR_2027,
   createSchoolYear,
 } from './support/factories/calendar';
+import { createClass } from './support/factories/classes';
+import { createStudent } from './support/factories/students';
 import {
   twoSchoolsWithoutStudents,
   type TwoSchoolsWithoutStudents,
@@ -866,5 +869,174 @@ test.describe('isolation', () => {
       .set(acting(orgA.id, 'SUP-1 set up the year'))
       .send(YEAR_2027)
       .expect(201);
+  });
+});
+
+const placementsOf = async (
+  pool: Pool,
+  studentId: string
+): Promise<{ term: string; arm: string; campus: string }[]> =>
+  (
+    await pool.query(
+      `SELECT t.name || ' ' || s.name AS term, ep.class_arm_id AS arm, ep.campus_id AS campus
+       FROM enrollment_placement ep
+       JOIN student_enrollment e ON e.id = ep.enrollment_id
+       JOIN term t ON t.id = ep.term_id
+       JOIN academic_session s ON s.id = t.session_id
+       WHERE e.student_id = $1
+       ORDER BY t.starts_on`,
+      [studentId]
+    )
+  ).rows;
+
+test.describe('placement roll-forward', () => {
+  test('copies the latest placement of each active enrolment into the new current term', async ({
+    api,
+    clock,
+    app,
+    pool,
+    schools: { owner, lekki, ikeja },
+  }) => {
+    clock.set(TODAY);
+    const ada = await createStudent(app, owner, { campusId: lekki.id });
+    const moved = await createStudent(app, owner, { campusId: lekki.id });
+    const ikejaArm = await createClass(app, owner, { campusId: ikeja.id });
+    const second = await api(owner)
+      .get('/school-years')
+      .expect(200)
+      .then((res) => termOf((res.body as SchoolYearList).items[0]!, 2));
+    await api(owner)
+      .post(`/students/${moved.id}/placements`)
+      .send({ termId: second.id, classArmId: ikejaArm.id })
+      .expect(201);
+
+    await api(owner).post(`/terms/${second.id}/make-current`).expect(200);
+
+    const adaRows = await placementsOf(pool, ada.id);
+    expect(adaRows).toHaveLength(2);
+    expect(adaRows[1]).toEqual({
+      term: 'Second term 2026/2027',
+      arm: adaRows[0]?.arm,
+      campus: adaRows[0]?.campus,
+    });
+    const movedRows = await placementsOf(pool, moved.id);
+    expect(movedRows).toHaveLength(2);
+    expect(movedRows[1]).toMatchObject({ arm: ikejaArm.id, campus: ikeja.id });
+  });
+
+  test('skips withdrawn, completed and already-placed enrolments', async ({
+    api,
+    clock,
+    app,
+    pool,
+    schools: { owner, lekki },
+  }) => {
+    clock.set(TODAY);
+    const left = await createStudent(app, owner, { campusId: lekki.id });
+    const done = await createStudent(app, owner, { campusId: lekki.id });
+    await api(owner)
+      .post(`/students/${left.id}/leave`)
+      .send({ reason: 'relocated', lastDay: TODAY })
+      .expect(201);
+    await pool.query(
+      `UPDATE student_enrollment SET status = 'completed' WHERE student_id = $1`,
+      [done.id]
+    );
+    const list = (await api(owner).get('/school-years').expect(200))
+      .body as SchoolYearList;
+    const second = termOf(list.items[0]!, 2);
+
+    await api(owner).post(`/terms/${second.id}/make-current`).expect(200);
+
+    expect(await placementsOf(pool, left.id)).toHaveLength(1);
+    expect(await placementsOf(pool, done.id)).toHaveLength(1);
+  });
+
+  test('copies nothing into next year’s first term', async ({
+    api,
+    clock,
+    app,
+    pool,
+    schools: { owner, lekki },
+  }) => {
+    clock.set(TODAY);
+    const ada = await createStudent(app, owner, { campusId: lekki.id });
+    const next = await createSchoolYear(app, owner, YEAR_2027);
+    const list = (await api(owner).get('/school-years').expect(200))
+      .body as SchoolYearList;
+    const current = list.items.find((item) => item.name === '2026/2027');
+    await api(owner)
+      .post(`/terms/${termOf(current!, 3).id}/make-current`)
+      .expect(200);
+
+    await api(owner)
+      .post(`/terms/${termOf(next, 1).id}/make-current`)
+      .expect(200);
+
+    const rows = await placementsOf(pool, ada.id);
+    expect(rows.map((row) => row.term)).toEqual([
+      'First term 2026/2027',
+      'Third term 2026/2027',
+    ]);
+  });
+});
+
+test.describe('students waiting for the new year', () => {
+  test('counts Active students enrolled this year and not next year, on the next year only', async ({
+    api,
+    clock,
+    app,
+    schools: { owner, lekki, ikeja },
+  }) => {
+    clock.set(TODAY);
+    await createStudent(app, owner, { campusId: lekki.id });
+    await createStudent(app, owner, { campusId: ikeja.id });
+    const away = await createStudent(app, owner, { campusId: lekki.id });
+    const left = await createStudent(app, owner, { campusId: lekki.id });
+    await createSchoolYear(app, owner, YEAR_2027);
+    await api(owner)
+      .post(`/students/${away.id}/not-seen`)
+      .send({ date: TODAY })
+      .expect(201);
+    await api(owner)
+      .post(`/students/${left.id}/leave`)
+      .send({ reason: 'relocated', lastDay: TODAY })
+      .expect(201);
+    clock.set('2026-11-11');
+
+    const list = (await api(owner).get('/school-years').expect(200))
+      .body as SchoolYearList;
+
+    expect(list.items.map((year) => [year.name, year.studentsWaiting])).toEqual(
+      [
+        ['2027/2028', 2],
+        ['2026/2027', null],
+      ]
+    );
+  });
+
+  test('is 0 once every student is in next year and null before next year exists', async ({
+    api,
+    clock,
+    app,
+    schools: { owner },
+  }) => {
+    clock.set(TODAY);
+    const only = (await api(owner).get('/school-years').expect(200))
+      .body as SchoolYearList;
+    expect(only.items).toEqual([]);
+
+    await createSchoolYear(app, owner, YEAR_2026);
+    const before = (await api(owner).get('/school-years').expect(200))
+      .body as SchoolYearList;
+    expect(before.items[0]?.studentsWaiting).toBeNull();
+
+    await createSchoolYear(app, owner, YEAR_2027);
+    const after = (await api(owner).get('/school-years').expect(200))
+      .body as SchoolYearList;
+    expect(after.items[0]).toMatchObject({
+      name: '2027/2028',
+      studentsWaiting: 0,
+    });
   });
 });
