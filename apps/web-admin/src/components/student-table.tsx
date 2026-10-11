@@ -1,5 +1,5 @@
 import { Fragment, type ReactNode } from 'react';
-import { ChevronDownIcon, ChevronRightIcon } from 'lucide-react';
+import { ChevronDownIcon, ChevronRightIcon, UserXIcon } from 'lucide-react';
 import type { StudentRow, StudentTab } from '@eduvault/api-contract';
 import { fmtDate } from '@eduvault/shared';
 import {
@@ -18,12 +18,20 @@ import { StatusBadges, StudentNameCell, nameOf } from './student-bits';
 interface ColumnFlags {
   guardianRead: boolean;
   campusColumn: boolean;
+  canArchive: boolean;
+}
+
+interface RowActions {
+  onToggle: (id: string) => void;
+  onOpen: (id: string) => void;
+  onRecordLeaving: (id: string) => void;
+  onAction: (action: GuardianAction) => void;
 }
 
 interface Column {
   id: string;
   header: string;
-  cell: (row: StudentRow) => ReactNode;
+  cell: (row: StudentRow, actions: RowActions) => ReactNode;
 }
 
 const muted = (text: string) => (
@@ -81,6 +89,27 @@ function reason(row: StudentRow): ReactNode {
   );
 }
 
+const recordLeaving: Column = {
+  id: 'record-leaving',
+  header: '',
+  cell: (row, actions) =>
+    row.dueLeft ? (
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        aria-label={`Record leaving for ${nameOf(row)}`}
+        onClick={(event) => {
+          event.stopPropagation();
+          actions.onRecordLeaving(row.id);
+        }}
+      >
+        <UserXIcon />
+        Record leaving
+      </Button>
+    ) : null,
+};
+
 const TAB_COLUMNS: Record<StudentTab, (flags: ColumnFlags) => Column[]> = {
   active: (flags) => [
     { id: 'class', header: 'Class', cell: currentClass },
@@ -103,6 +132,7 @@ const TAB_COLUMNS: Record<StudentTab, (flags: ColumnFlags) => Column[]> = {
     { id: 'not-seen', header: 'Not seen since', cell: notSeen },
     { id: 'weeks', header: 'Weeks away', cell: (row) => row.weeksAway ?? '—' },
     status,
+    ...(flags.canArchive ? [recordLeaving] : []),
   ],
   left: (flags) => [
     { id: 'class', header: 'Last class', cell: latestClass },
@@ -173,11 +203,7 @@ function StudentRowView({
   columns: readonly Column[];
   open: boolean;
   flags: ColumnFlags;
-  actions: {
-    onToggle: (id: string) => void;
-    onOpen: (id: string) => void;
-    onAction: (action: GuardianAction) => void;
-  };
+  actions: RowActions;
 }) {
   return (
     <Fragment>
@@ -202,7 +228,7 @@ function StudentRowView({
           <StudentNameCell row={row} />
         </TableCell>
         {columns.map((column) => (
-          <TableCell key={column.id}>{column.cell(row)}</TableCell>
+          <TableCell key={column.id}>{column.cell(row, actions)}</TableCell>
         ))}
       </TableRow>
       {open ? (
@@ -227,11 +253,7 @@ export function StudentTable({
   tab: StudentTab;
   flags: ColumnFlags;
   expanded: ReadonlySet<string>;
-  actions: {
-    onToggle: (id: string) => void;
-    onOpen: (id: string) => void;
-    onAction: (action: GuardianAction) => void;
-  };
+  actions: RowActions;
 }) {
   const columns = columnsFor(tab, flags);
   return (

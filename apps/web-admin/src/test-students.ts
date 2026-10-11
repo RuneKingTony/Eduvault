@@ -1,5 +1,6 @@
 import type {
   AdmissionPreview,
+  NewSchoolYearPreview,
   GuardianDetail,
   GuardianLink,
   StudentCounts,
@@ -161,6 +162,62 @@ export const preview = (
       id: '7d0f1e1e-6e53-4c52-9f1c-0a1d7a7f9c99',
       label: 'JSS 2 Emerald · Ikeja',
       campusId: IKEJA.id,
+    },
+  ],
+  ...overrides,
+});
+
+export const ARM_J3 = '8e0f1e1e-6e53-4c52-9f1c-0a1d7a7f9c01';
+const ARM_SS3 = '8e0f1e1e-6e53-4c52-9f1c-0a1d7a7f9c02';
+
+const person = (id: string, firstName: string, lastName: string) => ({
+  id,
+  firstName,
+  lastName,
+  admissionNumber: `GF-${id}`,
+});
+
+export const newSchoolYearPreview = (
+  overrides: Partial<NewSchoolYearPreview> = {}
+): NewSchoolYearPreview => ({
+  targetYear: {
+    id: 'y2',
+    name: '2027/2028',
+    firstTerm: { id: 't4', name: 'First term', isCurrent: false },
+  },
+  leavingYear: { id: 'y1', name: '2026/2027' },
+  canGraduate: true,
+  alreadyInTargetYear: 0,
+  groups: [
+    {
+      fromClass: {
+        id: ARM_ID,
+        name: 'JSS 2 Gold',
+        campusName: 'Lekki',
+        archived: false,
+      },
+      level: { id: 'l-j2', name: 'JSS 2', isFinalYear: false },
+      nextLevel: { id: 'l-j3', name: 'JSS 3' },
+      toClass: { id: ARM_J3, name: 'JSS 3 Gold', campusName: 'Lekki' },
+      classChoices: [],
+      repeatClassChoices: [],
+      students: [person('s1', 'Ada', 'Okeke'), person('s2', 'Tobi', 'Lawal')],
+      inactive: [{ id: 's9', name: 'Uche Mba' }],
+    },
+    {
+      fromClass: {
+        id: ARM_SS3,
+        name: 'SS 3 Blue',
+        campusName: 'Ikeja',
+        archived: false,
+      },
+      level: { id: 'l-ss3', name: 'SS 3', isFinalYear: true },
+      nextLevel: null,
+      toClass: null,
+      classChoices: [],
+      repeatClassChoices: [],
+      students: [person('s3', 'Efe', 'Ade')],
+      inactive: [],
     },
   ],
   ...overrides,

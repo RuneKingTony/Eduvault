@@ -46,6 +46,7 @@ interface CalendarPageProps {
   newYearOpen: boolean;
   onPageChange: (page: number) => void;
   onNewYearOpenChange: (open: boolean) => void;
+  onStartYear: () => void;
 }
 
 function CalendarHeader({ onNewYear }: { onNewYear: () => void }) {
@@ -206,6 +207,7 @@ export function CalendarPage({
   newYearOpen,
   onPageChange,
   onNewYearOpenChange,
+  onStartYear,
 }: CalendarPageProps) {
   const api = useApi();
   const years = useQuery(schoolYearsQueryOptions(api, page));
@@ -233,6 +235,7 @@ export function CalendarPage({
         years={years.data?.items ?? []}
         current={current.data}
         onChange={setDialog}
+        onStartYear={onStartYear}
       />
     </section>
   );

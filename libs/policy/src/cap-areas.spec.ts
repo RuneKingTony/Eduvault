@@ -160,6 +160,19 @@ describe('the Students and Parents and guardians areas', () => {
     );
   });
 
+  it('lists the lifecycle permissions as Students extras', () => {
+    expect(students.extras).toEqual([
+      expect.objectContaining({
+        label: 'Records leavers and graduates',
+        permissions: ['student:archive'],
+      }),
+      expect.objectContaining({
+        label: 'Marks students away',
+        permissions: ['student:markAway'],
+      }),
+    ]);
+  });
+
   it('sits after Students', () => {
     const ids = CAP_AREAS.map((candidate) => candidate.id);
     expect(ids.indexOf('guardians')).toBe(ids.indexOf('students') + 1);
@@ -204,6 +217,8 @@ describe('capSummary', () => {
       'Classes: add, archive and restore classes, change levels and name class teachers',
       'Sees every class',
       'Students: admit students, update them and put them in classes',
+      'Records leavers and graduates',
+      'Marks students away',
       'Parents and guardians: add guardians and link them to students',
     ]);
   });
@@ -219,6 +234,8 @@ describe('capSummary', () => {
       'Classes: add, archive and restore classes, change levels and name class teachers',
       'Sees every class',
       'Students: admit students, update them and put them in classes',
+      'Records leavers and graduates',
+      'Marks students away',
       'Parents and guardians: add guardians and link them to students',
     ]);
   });
@@ -227,6 +244,7 @@ describe('capSummary', () => {
     expect(summaryFor('teacher')).toEqual([
       'Classes: can see',
       'Students: can see',
+      'Marks students away',
     ]);
     expect(summaryFor('bursar')).toEqual([
       'Students: can see',

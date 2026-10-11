@@ -164,3 +164,21 @@ export const classTeacherRemovedSchema = z.object({
   userId: idSchema,
 });
 export type ClassTeacherRemoved = z.infer<typeof classTeacherRemovedSchema>;
+
+export const GRADUATE_NONE_MESSAGE = 'Tick at least one student.';
+
+export const graduateNotFinalYearMessage = (display: string): string =>
+  `${display} is not a final-year class.`;
+
+export const GRADUATE_NOT_ON_ROSTER_MESSAGE =
+  'Every ticked student must be on this class’s roster this term.';
+
+export const graduateClassSchema = z.object({
+  studentIds: z.array(idSchema).min(1, GRADUATE_NONE_MESSAGE),
+});
+export type GraduateClassInput = z.input<typeof graduateClassSchema>;
+
+export const classGraduatedSchema = z.object({
+  graduated: z.number().int().nonnegative(),
+});
+export type ClassGraduated = z.infer<typeof classGraduatedSchema>;

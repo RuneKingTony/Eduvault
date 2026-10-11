@@ -225,3 +225,200 @@ export const admissionDuplicatesSchema = z.object({
   ),
 });
 export type AdmissionDuplicates = z.infer<typeof admissionDuplicatesSchema>;
+
+export const STUDENT_NOTE_MAX = 500;
+
+export const LEAVING_REASONS = [
+  { code: 'did_not_return', label: 'Did not return' },
+  { code: 'relocated', label: 'Relocated' },
+  { code: 'transferred', label: 'Transferred to another school' },
+  { code: 'fees', label: 'Fees' },
+  { code: 'expelled', label: 'Expelled' },
+  { code: 'other', label: 'Other' },
+] as const;
+
+export type LeavingReason = (typeof LEAVING_REASONS)[number]['code'];
+
+export const leavingReasonLabel = (code: string): string =>
+  LEAVING_REASONS.find((reason) => reason.code === code)?.label ?? 'Other';
+
+export const leavingReasonSchema = z.enum(
+  LEAVING_REASONS.map((reason) => reason.code)
+);
+
+export const MARK_AWAY_FUTURE_MESSAGE = 'Choose a date on or before today.';
+export const LEAVE_FUTURE_MESSAGE = 'Choose a last day on or before today.';
+export const LEAVE_NO_CURRENT_TERM_MESSAGE =
+  'Make a term current before recording a leaving.';
+export const MOVE_NO_NEXT_TERM_MESSAGE =
+  'There is no next term in this school year.';
+export const MOVE_NOT_NEXT_TERM_MESSAGE = 'Choose the next term.';
+export const MOVE_NO_ENROLMENT_MESSAGE =
+  'This student has no enrolment in the current school year.';
+export const START_NOTHING_MESSAGE =
+  'There is no school year to start. Create the next school year first.';
+export const START_WRONG_YEAR_MESSAGE =
+  'That is not the school year to start now.';
+export const START_NO_CURRENT_TERM_MESSAGE =
+  'Make a term current before starting a school year.';
+export const START_NO_ROWS_MESSAGE = 'Choose at least one student.';
+export const START_CLASS_REQUIRED_MESSAGE = 'Choose a class.';
+export const START_DUPLICATE_ROW_MESSAGE = 'List each student once.';
+export const START_FINAL_YEAR_MOVE_MESSAGE =
+  'Final-year students graduate; they cannot move up.';
+export const START_NOT_FINAL_YEAR_GRADUATE_MESSAGE =
+  'Only final-year students can graduate.';
+export const GRADUATE_NO_CURRENT_TERM_MESSAGE =
+  'Make a term current before graduating students.';
+
+export const studentGoneMessage = (name: string): string =>
+  `${name} is no longer on the roll.`;
+
+export const studentNotMarkedMessage = (name: string): string =>
+  `${name} is not marked as not seen.`;
+
+export const studentOnRollMessage = (name: string): string =>
+  `${name} is still on the roll.`;
+
+export const alreadyMarkedMessage = (date: string): string =>
+  `Already marked not seen since ${date}.`;
+
+export const markAwayBeforeAdmittedMessage = (admitted: string): string =>
+  `Choose a date on or after ${admitted}.`;
+
+export const undoWindowMessage = (kind: 'left' | 'graduated'): string =>
+  `A ${kind === 'left' ? 'leaving' : 'graduation'} can only be undone in the term it was recorded.`;
+
+export const moveHasPlacementMessage = (name: string, term: string): string =>
+  `${name} already has a ${term} placement.`;
+
+export const chooseLevelClassMessage = (level: string): string =>
+  `Choose a ${level} class.`;
+
+export const archivedClassMessage = (display: string): string =>
+  `${display} is archived. Choose another class.`;
+
+export const chooseClassForGroupMessage = (
+  className: string,
+  campus: string
+): string => `Choose a class for ${className} (${campus}).`;
+
+const noteSchema = z
+  .string()
+  .trim()
+  .max(STUDENT_NOTE_MAX, `Use ${STUDENT_NOTE_MAX} characters or fewer.`);
+
+export const markAwaySchema = z.object({
+  date: z.iso.date({ error: MARK_AWAY_FUTURE_MESSAGE }),
+  note: noteSchema.optional(),
+});
+export type MarkAwayInput = z.input<typeof markAwaySchema>;
+
+export const leaveSchema = z.object({
+  reason: leavingReasonSchema,
+  lastDay: z.iso.date({ error: LEAVE_FUTURE_MESSAGE }),
+  note: noteSchema.optional(),
+});
+export type LeaveInput = z.input<typeof leaveSchema>;
+
+export const placeStudentSchema = z.object({
+  termId: idSchema,
+  classArmId: idSchema,
+});
+export type PlaceStudentInput = z.input<typeof placeStudentSchema>;
+
+export const placementClassSchema = z.object({
+  id: idSchema,
+  name: z.string(),
+  campus: z.object({ id: idSchema, name: z.string() }),
+});
+export type PlacementClass = z.infer<typeof placementClassSchema>;
+
+export const NEW_SCHOOL_YEAR_OUTCOMES = ['move', 'repeat', 'graduate'] as const;
+export const newSchoolYearOutcomeSchema = z.enum(NEW_SCHOOL_YEAR_OUTCOMES);
+export type NewSchoolYearOutcome = z.infer<typeof newSchoolYearOutcomeSchema>;
+
+const classChoiceSchema = z.object({
+  id: idSchema,
+  name: z.string(),
+  campusName: z.string(),
+});
+export type ClassChoice = z.infer<typeof classChoiceSchema>;
+
+export const newSchoolYearGroupSchema = z.object({
+  fromClass: z
+    .object({
+      id: idSchema,
+      name: z.string(),
+      campusName: z.string(),
+      archived: z.boolean(),
+    })
+    .nullable(),
+  level: z.object({
+    id: idSchema,
+    name: z.string(),
+    isFinalYear: z.boolean(),
+  }),
+  nextLevel: z.object({ id: idSchema, name: z.string() }).nullable(),
+  toClass: classChoiceSchema.nullable(),
+  classChoices: z.array(classChoiceSchema),
+  repeatClassChoices: z.array(classChoiceSchema),
+  students: z.array(
+    z.object({
+      id: idSchema,
+      firstName: z.string(),
+      lastName: z.string(),
+      admissionNumber: z.string(),
+    })
+  ),
+  inactive: z.array(z.object({ id: idSchema, name: z.string() })),
+});
+export type NewSchoolYearGroup = z.infer<typeof newSchoolYearGroupSchema>;
+
+export const newSchoolYearPreviewSchema = z.object({
+  targetYear: z.object({
+    id: idSchema,
+    name: z.string(),
+    firstTerm: z.object({
+      id: idSchema,
+      name: z.string(),
+      isCurrent: z.boolean(),
+    }),
+  }),
+  leavingYear: z.object({ id: idSchema, name: z.string() }),
+  canGraduate: z.boolean(),
+  alreadyInTargetYear: z.number().int().nonnegative(),
+  groups: z.array(newSchoolYearGroupSchema),
+});
+export type NewSchoolYearPreview = z.infer<typeof newSchoolYearPreviewSchema>;
+
+export const newSchoolYearRowSchema = z
+  .object({
+    studentId: idSchema,
+    outcome: newSchoolYearOutcomeSchema,
+    classArmId: idSchema.optional(),
+  })
+  .refine((row) => row.outcome === 'graduate' || row.classArmId !== undefined, {
+    error: START_CLASS_REQUIRED_MESSAGE,
+    path: ['classArmId'],
+  });
+export type NewSchoolYearRow = z.infer<typeof newSchoolYearRowSchema>;
+
+export const startNewSchoolYearSchema = z.object({
+  targetYearId: idSchema,
+  rows: z
+    .array(newSchoolYearRowSchema)
+    .min(1, START_NO_ROWS_MESSAGE)
+    .max(10_000),
+});
+export type StartNewSchoolYearInput = z.input<typeof startNewSchoolYearSchema>;
+
+export const startNewSchoolYearResultSchema = z.object({
+  moved: z.number().int().nonnegative(),
+  repeating: z.number().int().nonnegative(),
+  graduated: z.number().int().nonnegative(),
+  skipped: z.number().int().nonnegative(),
+});
+export type StartNewSchoolYearResult = z.infer<
+  typeof startNewSchoolYearResultSchema
+>;

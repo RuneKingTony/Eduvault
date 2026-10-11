@@ -125,7 +125,21 @@ export const CAP_AREAS: readonly CapArea[] = [
       'enrollment:place',
     ],
     changeDesc: 'Admit students, update them and put them in classes',
-    extras: [],
+    extras: [
+      {
+        label: 'Records leavers and graduates',
+        description: 'Takes students off the roll when they leave or graduate.',
+        permissions: ['student:archive'],
+        important: true,
+      },
+      {
+        label: 'Marks students away',
+        description:
+          'Marks students not seen since a date, and back in school.',
+        permissions: ['student:markAway'],
+        important: false,
+      },
+    ],
   },
   {
     id: 'guardians',

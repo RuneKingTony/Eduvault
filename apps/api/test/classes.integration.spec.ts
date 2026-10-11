@@ -8,6 +8,7 @@ import type {
   ClassSummary,
   ClassTeacher,
   ClassTeacherRole,
+  StudentList,
   TeacherCandidate,
 } from '@eduvault/api-contract';
 import {
@@ -18,6 +19,7 @@ import {
 } from './support/base-test';
 import { assignClassTeacher, createClass } from './support/factories/classes';
 import { createSchoolYear } from './support/factories/calendar';
+import { createStudent } from './support/factories/students';
 import {
   bareSchoolsTest,
   type TwoSchoolsWithoutStudents as TwoSchools,
@@ -1438,5 +1440,209 @@ test.describe('isolation', () => {
       .set(acting(orgA.id, 'SUP-1 add a class'))
       .send({ levelId: level, campusId: lekki.id, name: 'Ruby' })
       .expect(201);
+  });
+
+  test('answers 401 without a session, 403 without student:archive, 404 outside class scope and for another school’s class', async ({
+    api,
+    app,
+    withPermissions,
+    schools,
+  }) => {
+    const { klass, students } = await finalYearClass(app, schools);
+    const body = { studentIds: [students[0]?.id] };
+    await api().post(`/classes/${klass.id}/graduate`).send(body).expect(401);
+    await api(schools.lekkiOnly)
+      .post(`/classes/${klass.id}/graduate`)
+      .send(body)
+      .expect(403);
+    await api(schools.ownerB)
+      .post(`/classes/${klass.id}/graduate`)
+      .send(body)
+      .expect(404);
+
+    const teacher = await withPermissions(
+      schools.orgA,
+      ['student:archive', 'class:read'],
+      { campuses: [schools.lekki] }
+    );
+    await api(teacher)
+      .post(`/classes/${klass.id}/graduate`)
+      .send(body)
+      .expect(404);
+    await assignClassTeacher(app, schools.owner, {
+      classId: klass.id,
+      userId: teacher.id,
+    });
+    const graduated = await api(teacher)
+      .post(`/classes/${klass.id}/graduate`)
+      .send(body)
+      .expect(201);
+    expect(graduated.body).toEqual({ graduated: 1 });
+  });
+});
+
+async function finalYearClass(
+  app: Parameters<typeof createStudent>[0],
+  schools: Pick<TwoSchools, 'owner' | 'lekki'>
+) {
+  const klass = await createClass(app, schools.owner, {
+    campusId: schools.lekki.id,
+    levelCode: 'SS3',
+    name: 'Gold',
+  });
+  const students = [];
+  for (const lastName of ['Adams', 'Bello', 'Chukwu']) {
+    students.push(
+      await createStudent(app, schools.owner, {
+        campusId: schools.lekki.id,
+        classArmId: klass.id,
+        lastName,
+      })
+    );
+  }
+  return { klass, students };
+}
+
+test.describe('graduate class', () => {
+  test('graduates the ticked students and leaves the rest alone', async ({
+    api,
+    app,
+    pool,
+    schools,
+  }) => {
+    const { klass, students } = await finalYearClass(app, schools);
+    const [adams, bello, chukwu] = students;
+    const res = await api(schools.owner)
+      .post(`/classes/${klass.id}/graduate`)
+      .send({ studentIds: [adams?.id, bello?.id] })
+      .expect(201);
+    expect(res.body).toEqual({ graduated: 2 });
+
+    const rows = await pool.query(
+      `SELECT s.last_name, s.exit_kind, s.exit_reason, s.last_day,
+              s.graduated_session_id = e.session_id AS in_session,
+              s.archived_term_id = (SELECT id FROM term WHERE is_current) AS in_term,
+              e.status,
+              EXISTS (SELECT 1 FROM member m WHERE m."userId" = s.user_id) AS has_member
+       FROM student s JOIN student_enrollment e ON e.student_id = s.id
+       ORDER BY s.last_name`
+    );
+    const byName = (name: string) =>
+      rows.rows.find((row) => row.last_name === name);
+    expect(byName('Adams')).toMatchObject({
+      exit_kind: 'graduated',
+      exit_reason: 'completed',
+      last_day: null,
+      in_session: true,
+      in_term: true,
+      status: 'completed',
+      has_member: false,
+    });
+    expect(byName('Bello')).toMatchObject({ status: 'completed' });
+    expect(byName('Chukwu')).toMatchObject({
+      exit_kind: null,
+      status: 'active',
+      has_member: true,
+    });
+    expect(chukwu?.id).toBeDefined();
+
+    const tab = (
+      await api(schools.owner).get('/students?tab=graduated').expect(200)
+    ).body as StudentList;
+    expect(tab.items.map((row) => row.lastName)).toEqual(['Adams', 'Bello']);
+    expect(tab.items[0]?.exit?.reason).toBe('Completed SS 3');
+    const activity = await pool.query(
+      `SELECT text FROM activity_event WHERE kind = 'student.graduated' ORDER BY text`
+    );
+    expect(activity.rows.map((row) => row.text)).toEqual([
+      'Student1 Adams graduated: Completed SS 3.'.replace(
+        'Student1 ',
+        `${adams?.firstName} `
+      ),
+      `${bello?.firstName} Bello graduated: Completed SS 3.`,
+    ]);
+  });
+
+  test('writes nothing when one id is not on the roster', async ({
+    api,
+    app,
+    pool,
+    schools,
+  }) => {
+    const { klass, students } = await finalYearClass(app, schools);
+    const junior = await createClass(app, schools.owner, {
+      campusId: schools.lekki.id,
+    });
+    const outsider = await createStudent(app, schools.owner, {
+      campusId: schools.lekki.id,
+      classArmId: junior.id,
+    });
+    const res = await api(schools.owner)
+      .post(`/classes/${klass.id}/graduate`)
+      .send({ studentIds: [students[0]?.id, outsider.id] })
+      .expect(400);
+
+    expect(res.body.message).toBe(
+      'Every ticked student must be on this class’s roster this term.'
+    );
+    const archived = await pool.query(
+      'SELECT count(*)::int AS total FROM student WHERE exit_kind IS NOT NULL'
+    );
+    expect(archived.rows[0].total).toBe(0);
+  });
+
+  test('refuses a class that is not final year, an empty tick and no current term', async ({
+    api,
+    app,
+    pool,
+    schools,
+  }) => {
+    const { klass, students } = await finalYearClass(app, schools);
+    const junior = await createClass(app, schools.owner, {
+      campusId: schools.lekki.id,
+    });
+    const notFinal = await api(schools.owner)
+      .post(`/classes/${junior.id}/graduate`)
+      .send({ studentIds: [students[0]?.id] })
+      .expect(400);
+    expect(notFinal.body.message).toBe(
+      `JSS 1 ${junior.name} is not a final-year class.`
+    );
+    const empty = await api(schools.owner)
+      .post(`/classes/${klass.id}/graduate`)
+      .send({ studentIds: [] })
+      .expect(400);
+    expect(empty.body.issues).toEqual([
+      { path: 'studentIds', message: 'Tick at least one student.' },
+    ]);
+
+    await pool.query('UPDATE term SET is_current = false');
+    await api(schools.owner)
+      .post(`/classes/${klass.id}/graduate`)
+      .send({ studentIds: [students[0]?.id] })
+      .expect(409);
+  });
+
+  test('can be undone in the term it was recorded', async ({
+    api,
+    app,
+    pool,
+    schools,
+  }) => {
+    const { klass, students } = await finalYearClass(app, schools);
+    await api(schools.owner)
+      .post(`/classes/${klass.id}/graduate`)
+      .send({ studentIds: [students[0]?.id] })
+      .expect(201);
+    const undone = await api(schools.owner)
+      .post(`/students/${students[0]?.id}/undo-leaving`)
+      .expect(201);
+
+    expect(undone.body).toMatchObject({ life: 'active', exit: null });
+    const status = await pool.query(
+      'SELECT status FROM student_enrollment WHERE student_id = $1',
+      [students[0]?.id]
+    );
+    expect(status.rows).toEqual([{ status: 'active' }]);
   });
 });

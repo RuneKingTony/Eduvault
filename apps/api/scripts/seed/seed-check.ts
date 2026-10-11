@@ -19,17 +19,18 @@ import {
   SEED_ENROLMENTS,
   SEED_GUARDIANS,
   SEED_PLACEMENTS,
+  seedLife,
   students,
 } from './students';
 
-// Emeka is class-scoped to JSS 3 Gold, where Bola Johnson sits.
+// Emeka is scoped to JSS 3 Gold, where Bola Johnson sits, but Bola has left and is only on the Left tab.
 export const visibleStudents: Record<string, number> = {
-  funmi: 28,
-  tunde: 28,
-  grace: 28,
-  chika: 23,
-  yemi: 5,
-  emeka: 1,
+  funmi: 21,
+  tunde: 21,
+  grace: 21,
+  chika: 18,
+  yemi: 3,
+  emeka: 0,
   kola: 0,
 };
 
@@ -256,6 +257,19 @@ async function checkRoll(
   const listed = await app
     .get(StudentService, { strict: false })
     .list(funmi, { tab: 'new', page: 1, pageSize: 100 });
+  const tabs = (life: ReturnType<typeof seedLife>) =>
+    students.filter((row) => seedLife(row) === life).length;
+  check(
+    'Greenfield tab counts',
+    JSON.stringify(listed.counts),
+    JSON.stringify({
+      active: tabs('active'),
+      new: students.filter((row) => row.isNewIntake).length,
+      inactive: tabs('inactive'),
+      left: tabs('left'),
+      graduated: tabs('graduated'),
+    })
+  );
   check(
     'Greenfield new intakes',
     listed.items
@@ -352,7 +366,9 @@ export async function runSeedCheck(
   const campuses = await campusService.list(funmi);
   check('Greenfield campuses', campuses.length, 2);
   for (const campus of campuses) {
-    const expected = students.filter((s) => s.campus === campus.name).length;
+    const expected = students.filter(
+      (s) => s.campus === campus.name && seedLife(s) === 'active'
+    ).length;
     const listed = await studentService.list(funmi, {
       tab: 'active',
       page: 1,

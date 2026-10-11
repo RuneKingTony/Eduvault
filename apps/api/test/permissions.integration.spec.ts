@@ -356,7 +356,7 @@ test.describe('/me/permissions', () => {
       organizationId: orgA.id,
       roles: ['teacher', 'principal'],
       permissions: {
-        student: ['read'],
+        student: ['read', 'markAway'],
         class: ['read', 'readAll'],
         team: ['read'],
         campus: ['readAll'],
@@ -490,7 +490,7 @@ test.describe('isolation', () => {
       (row) => row.role === 'teacher'
     );
     expect(parsePermissionMap(teacherA?.permission ?? '')).toEqual({
-      student: ['read'],
+      student: ['read', 'markAway'],
       class: ['read'],
     });
   });
@@ -545,7 +545,7 @@ test.describe('starter roles', () => {
     const permissionOf = (slug: string) =>
       rows.find((row) => row.role === slug)?.permission;
     expect(parsePermissionMap(permissionOf('teacher') ?? '')).toEqual({
-      student: ['read'],
+      student: ['read', 'markAway'],
       class: ['read'],
     });
     expect(permissionOf('bursar')).toBe('{}');

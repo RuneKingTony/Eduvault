@@ -4,6 +4,7 @@ import {
   classListQuerySchema,
   createClassLevelSchema,
   createClassSchema,
+  graduateClassSchema,
   updateClassLevelSchema,
   updateClassSchema,
 } from './classes';
@@ -102,13 +103,14 @@ describe('class schemas', () => {
 });
 
 describe('class routes', () => {
-  it('has no graduate route and no level delete', () => {
+  it('has the graduate route and no level delete', () => {
     expect(
       Object.keys(contract.classes).toSorted((a, b) => a.localeCompare(b))
     ).toEqual([
       'assignTeacher',
       'create',
       'get',
+      'graduate',
       'list',
       'removeTeacher',
       'teacherCandidates',
@@ -117,5 +119,19 @@ describe('class routes', () => {
     expect(
       Object.keys(contract.classLevels).toSorted((a, b) => a.localeCompare(b))
     ).toEqual(['create', 'list', 'update']);
+  });
+});
+
+describe('graduateClassSchema', () => {
+  it('needs at least one student with the screen copy', () => {
+    const empty = graduateClassSchema.safeParse({ studentIds: [] });
+    expect(empty.success).toBe(false);
+    expect(empty.error?.issues[0]?.message).toBe('Tick at least one student.');
+    expect(graduateClassSchema.safeParse({ studentIds: [id] }).success).toBe(
+      true
+    );
+    expect(graduateClassSchema.safeParse({ studentIds: ['x'] }).success).toBe(
+      false
+    );
   });
 });

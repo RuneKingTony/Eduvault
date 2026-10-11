@@ -77,7 +77,7 @@ describe('RolesPage', () => {
     ).toBeInTheDocument();
     const teacher = screen.getByRole('button', { name: 'Teacher' });
     expect(
-      within(teacher).getByText('2 things switched on')
+      within(teacher).getByText('3 things switched on')
     ).toBeInTheDocument();
     const guardian = screen.getByRole('button', { name: 'Guardian' });
     expect(

@@ -56,6 +56,12 @@ export interface Page {
   limit: number;
 }
 
+export interface WaitingQuery {
+  fromYearId: string;
+  toYearId: string;
+  today: string;
+}
+
 export abstract class CalendarRepository {
   abstract listYears(
     organizationId: string,
@@ -112,6 +118,11 @@ export abstract class CalendarRepository {
     organizationId: string,
     input: NewYearInsert
   ): Promise<string>;
+
+  abstract countStudentsWaiting(
+    organizationId: string,
+    query: WaitingQuery
+  ): Promise<number>;
 
   abstract setCurrent(organizationId: string, termId: string): Promise<void>;
 

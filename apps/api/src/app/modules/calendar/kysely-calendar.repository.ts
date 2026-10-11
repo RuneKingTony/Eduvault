@@ -1,6 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { sql } from 'kysely';
+import { INACTIVE_AFTER_DAYS } from '@eduvault/shared';
 import { KYSELY_TOKEN, type Database } from '../../common/db/tokens';
+import { rollForwardPlacements } from '../../common/students';
 import {
   CalendarRepository,
   type HolidayRecord,
@@ -10,6 +12,7 @@ import {
   type SchoolYearWithTerms,
   type TermDetail,
   type TermRecord,
+  type WaitingQuery,
 } from './calendar.repository';
 
 const PG_FOREIGN_KEY_VIOLATION = '23503';
@@ -328,6 +331,32 @@ export class KyselyCalendarRepository extends CalendarRepository {
     });
   }
 
+  async countStudentsWaiting(
+    organizationId: string,
+    query: WaitingQuery
+  ): Promise<number> {
+    const { rows } = await sql<{ waiting: number }>`
+      SELECT count(*)::int AS waiting
+      FROM student s
+      WHERE s.organization_id = ${organizationId}
+        AND s.exit_kind IS NULL
+        AND (
+          s.not_seen_since IS NULL
+          OR (${query.today}::date - s.not_seen_since) < ${INACTIVE_AFTER_DAYS}
+        )
+        AND EXISTS (
+          SELECT 1 FROM student_enrollment en
+          WHERE en.student_id = s.id
+            AND en.session_id = ${query.fromYearId}::uuid
+            AND en.status = 'active'
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM student_enrollment en
+          WHERE en.student_id = s.id AND en.session_id = ${query.toYearId}::uuid
+        )`.execute(this.db);
+    return rows[0]?.waiting ?? 0;
+  }
+
   async setCurrent(organizationId: string, termId: string): Promise<void> {
     await this.db.transaction().execute(async (trx) => {
       await trx
@@ -336,12 +365,18 @@ export class KyselyCalendarRepository extends CalendarRepository {
         .where('organization_id', '=', organizationId)
         .where('is_current', '=', true)
         .execute();
-      await trx
+      const made = await trx
         .updateTable('term')
         .set({ is_current: true, updated_at: new Date() })
         .where('organization_id', '=', organizationId)
         .where('id', '=', termId)
-        .execute();
+        .returning('session_id')
+        .executeTakeFirstOrThrow();
+      await rollForwardPlacements(trx, {
+        organizationId,
+        termId,
+        sessionId: made.session_id,
+      });
     });
   }
 

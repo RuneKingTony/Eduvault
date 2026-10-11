@@ -33,7 +33,7 @@ export class StudentService {
   async list(
     ctx: OrgContext,
     query: RouteQuery<typeof contract.students.list>
-  ): Promise<StudentList> {
+  ): Promise<Omit<StudentList, 'startYear'>> {
     if (query.campusId !== undefined) {
       await this.campuses.assertInScope(ctx, query.campusId);
     }
@@ -41,7 +41,7 @@ export class StudentService {
       ...query,
       withGuardians: can(ctx.permissions, 'guardian', 'read'),
     });
-    return { ...result, startYear: null };
+    return result;
   }
 
   async get(ctx: OrgContext, id: string): Promise<StudentDetail> {
@@ -77,6 +77,14 @@ export class StudentService {
     }
     await this.students.update(ctx.organizationId, id, patch);
     return this.get(ctx, id);
+  }
+
+  async assertVisible(ctx: OrgContext, id: string): Promise<void> {
+    if (
+      !(await this.students.isVisible(ctx.organizationId, scopeOf(ctx), id))
+    ) {
+      throw notFound();
+    }
   }
 
   private async read(

@@ -7,7 +7,11 @@ import {
   UsersIcon,
   XIcon,
 } from 'lucide-react';
-import { ApiError, type ClassDetail } from '@eduvault/api-contract';
+import {
+  ApiError,
+  type CalendarCurrent,
+  type ClassDetail,
+} from '@eduvault/api-contract';
 import { Can, UserAvatar } from '@eduvault/auth-client';
 import { countOf } from '@eduvault/shared';
 import {
@@ -47,6 +51,7 @@ import {
 import { useApi } from '../api';
 import { AddClassTeacherDialog } from '../components/add-class-teacher-dialog';
 import { ROLE_LABELS } from '../components/class-text';
+import { GraduateClassDialog } from '../components/graduate-class-dialog';
 import {
   classQueryOptions,
   currentTermQueryOptions,
@@ -300,18 +305,45 @@ function ClassNotFound({ onBack }: { onBack: () => void }) {
   );
 }
 
-function ClassBody({
+interface GraduateHandlers {
+  onOpenGraduated: () => void;
+  onOpenStartYear: () => void;
+}
+
+function GraduateButton({
+  classRow,
+  onClick,
+}: {
+  classRow: ClassDetail;
+  onClick: () => void;
+}) {
+  const hasRoster = (classRow.roster?.length ?? 0) > 0;
+  if (!classRow.isFinalYear || !hasRoster) {
+    return null;
+  }
+  return (
+    <Can permission="student:archive">
+      <Button type="button" variant="outline" onClick={onClick}>
+        <GraduationCapIcon />
+        Graduate class
+      </Button>
+    </Can>
+  );
+}
+
+function ClassHeader({
   classRow,
   term,
   onBack,
+  onGraduate,
 }: {
   classRow: ClassDetail;
   term: string | null;
   onBack: () => void;
+  onGraduate: () => void;
 }) {
-  const [adding, setAdding] = useState(false);
   return (
-    <section className="flex flex-col gap-4">
+    <>
       <Breadcrumb>
         <BreadcrumbList>
           <BreadcrumbItem>
@@ -334,8 +366,39 @@ function ClassBody({
             {describeClass(classRow, term)}
           </p>
         </div>
-        <ArchiveMenu classRow={classRow} />
+        <div className="flex items-center gap-2">
+          <GraduateButton classRow={classRow} onClick={onGraduate} />
+          <ArchiveMenu classRow={classRow} />
+        </div>
       </header>
+    </>
+  );
+}
+
+function ClassBody({
+  classRow,
+  term,
+  current,
+  onBack,
+  ...graduateHandlers
+}: GraduateHandlers & {
+  classRow: ClassDetail;
+  term: string | null;
+  current: CalendarCurrent | undefined;
+  onBack: () => void;
+}) {
+  const [adding, setAdding] = useState(false);
+  const [graduating, setGraduating] = useState(false);
+  return (
+    <section className="flex flex-col gap-4">
+      <ClassHeader
+        classRow={classRow}
+        term={term}
+        onBack={onBack}
+        onGraduate={() => {
+          setGraduating(true);
+        }}
+      />
       <div className="grid gap-4 lg:grid-cols-2">
         <TeachersCard
           classRow={classRow}
@@ -354,6 +417,17 @@ function ClassBody({
           onOpenChange={setAdding}
         />
       ) : null}
+      {graduating && classRow.roster !== null ? (
+        <GraduateClassDialog
+          classRow={classRow}
+          roster={classRow.roster}
+          current={current}
+          {...graduateHandlers}
+          onClose={() => {
+            setGraduating(false);
+          }}
+        />
+      ) : null}
     </section>
   );
 }
@@ -361,7 +435,8 @@ function ClassBody({
 export function ClassPage({
   classId,
   onBack,
-}: {
+  ...graduateHandlers
+}: GraduateHandlers & {
   classId: string;
   onBack: () => void;
 }) {
@@ -381,7 +456,9 @@ export function ClassPage({
     <ClassBody
       classRow={classRow.data}
       term={current.data?.term?.name ?? null}
+      current={current.data}
       onBack={onBack}
+      {...graduateHandlers}
     />
   );
 }

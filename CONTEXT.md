@@ -48,7 +48,7 @@ Terms the code and the people using it share. Adapted from the earlier school-ma
 
 **New intake** — an active student in their first session at the school. New-student fee lines apply to them.
 
-**Not seen since** — the date a student was last in school, recorded when they stop turning up. "Mark away" on screen; "Back in school" clears it.
+**Not seen since** — the date a student was last in school, recorded when they stop turning up. "Mark not seen since…" on screen; "Back in school" clears it.
 
 **Inactive** — a student not seen for 5 weeks or more. Not charged for new terms. After more than a further term they are flagged "Due to be marked Left", but nothing changes until staff record it.
 

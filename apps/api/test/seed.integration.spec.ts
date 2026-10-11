@@ -54,10 +54,10 @@ test.describe('dev seed', () => {
       retired_class_arm: '1',
       class_arm_teacher: '5',
       student_enrollment: '36',
-      enrollment_placement: '62',
+      enrollment_placement: '68',
       guardian: '6',
       guardian_student: '8',
-      activity_event: '28',
+      activity_event: '33',
     });
 
     const scopeOf = async (key: string) => {
@@ -241,6 +241,57 @@ test.describe('dev seed', () => {
       { guardian: 'Ifeanyi Okeke', children: 'Ada' },
       { guardian: 'Ngozi Okeke', children: 'Ada,Chidi,Kelechi' },
     ]);
+
+    const lifecycle = await pool.query<{
+      first_name: string;
+      exit_kind: string | null;
+      exit_reason: string | null;
+      last_day: string | null;
+      not_seen_since: string | null;
+      graduated_session: string | null;
+      statuses: string;
+      has_member: boolean;
+    }>(
+      `SELECT s.first_name, s.exit_kind, s.exit_reason,
+              to_char(s.last_day, 'YYYY-MM-DD') AS last_day,
+              to_char(s.not_seen_since, 'YYYY-MM-DD') AS not_seen_since,
+              g.name AS graduated_session,
+              (SELECT string_agg(a.name || ':' || e.status, ',' ORDER BY a.starts_on)
+                 FROM student_enrollment e JOIN academic_session a ON a.id = e.session_id
+                WHERE e.student_id = s.id) AS statuses,
+              EXISTS (SELECT 1 FROM member m WHERE m."userId" = s.user_id) AS has_member
+       FROM student s LEFT JOIN academic_session g ON g.id = s.graduated_session_id
+       WHERE s.first_name IN ('Uche', 'Musa', 'Kunle', 'Bola', 'Tayo', 'Tolu', 'Ibrahim', 'Ese')
+       ORDER BY s.first_name`
+    );
+    const byFirstName = (name: string) =>
+      lifecycle.rows.find((row) => row.first_name === name);
+    expect(byFirstName('Uche')?.not_seen_since).toBe('2026-07-17');
+    expect(byFirstName('Musa')?.not_seen_since).toBe('2026-09-28');
+    expect(byFirstName('Kunle')?.not_seen_since).toBe('2026-05-29');
+    expect(byFirstName('Bola')).toMatchObject({
+      exit_kind: 'left',
+      exit_reason: 'relocated',
+      last_day: '2026-10-02',
+      statuses: '2026/2027:withdrawn',
+      has_member: false,
+    });
+    expect(byFirstName('Tayo')).toMatchObject({
+      exit_kind: 'left',
+      exit_reason: 'transferred',
+      last_day: '2026-09-25',
+      statuses: '2026/2027:withdrawn',
+      has_member: false,
+    });
+    for (const name of ['Tolu', 'Ibrahim', 'Ese']) {
+      expect(byFirstName(name), name).toMatchObject({
+        exit_kind: 'graduated',
+        exit_reason: 'completed',
+        graduated_session: '2025/2026',
+        statuses: '2025/2026:completed',
+        has_member: false,
+      });
+    }
 
     const before = await counts();
     lines.length = 0;

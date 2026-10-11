@@ -71,6 +71,7 @@ const MANAGER = [
   'member:delete',
   'campus:readAll',
   'student:read',
+  'student:markAway',
   'class:read',
 ] as const;
 
@@ -964,7 +965,7 @@ test.describe('members', () => {
       const after = await api(target.user).get('/me/permissions').expect(200);
       expect(after.body).toMatchObject({
         roles: ['member', 'teacher'],
-        permissions: { student: ['read'] },
+        permissions: { student: ['read', 'markAway'] },
         campusScope: [lekki.id],
       });
     });

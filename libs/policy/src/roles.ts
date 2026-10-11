@@ -36,6 +36,8 @@ export const STARTER_ROLES: readonly StarterRole[] = [
       'student:create',
       'student:read',
       'student:update',
+      'student:archive',
+      'student:markAway',
       'enrollment:create',
       'enrollment:read',
       'enrollment:place',
@@ -58,7 +60,7 @@ export const STARTER_ROLES: readonly StarterRole[] = [
     slug: 'teacher',
     label: 'Teacher',
     description: 'Teaches their own classes. Sees only those classes.',
-    permissions: ['student:read', 'class:read'],
+    permissions: ['student:read', 'student:markAway', 'class:read'],
   },
   {
     slug: 'bursar',

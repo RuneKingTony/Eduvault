@@ -32,7 +32,7 @@ interface Options {
   access?: Access;
   row?: ClassDetail;
   failure?: Error;
-  calendar?: ReturnType<typeof currentCalendar>;
+  calendar?: ReturnType<typeof currentCalendar> | 'pending';
 }
 
 function setup({
@@ -43,6 +43,7 @@ function setup({
 }: Options = {}) {
   const api = {
     classes: {
+      graduate: vi.fn().mockResolvedValue({ graduated: 2 }),
       get:
         failure === undefined
           ? vi.fn().mockResolvedValue(row)
@@ -53,11 +54,27 @@ function setup({
         .mockResolvedValue({ classId: IDS.gold, userId: IDS.ayo }),
       teacherCandidates: vi.fn().mockResolvedValue([]),
     },
-    calendar: { current: vi.fn().mockResolvedValue(calendar) },
+    calendar: {
+      current:
+        calendar === 'pending'
+          ? vi.fn().mockReturnValue(new Promise(() => undefined))
+          : vi.fn().mockResolvedValue(calendar),
+    },
   };
   const onBack = vi.fn();
-  renderWithApi(<ClassPage classId={IDS.gold} onBack={onBack} />, api, access);
-  return { api, onBack };
+  const onOpenGraduated = vi.fn();
+  const onOpenStartYear = vi.fn();
+  renderWithApi(
+    <ClassPage
+      classId={IDS.gold}
+      onBack={onBack}
+      onOpenGraduated={onOpenGraduated}
+      onOpenStartYear={onOpenStartYear}
+    />,
+    api,
+    access
+  );
+  return { api, onBack, onOpenGraduated, onOpenStartYear };
 }
 
 const openMenu = async () => {
@@ -73,6 +90,23 @@ const card = async (title: string) => {
   });
   return within(heading.closest<HTMLElement>('[data-slot="card"]')!);
 };
+
+const TERM_NAMES = ['First term', 'Second term', 'Third term'];
+
+const calendarIn = (sequence: number) => {
+  const calendar = currentCalendar();
+  return {
+    ...calendar,
+    term: calendar.term && {
+      ...calendar.term,
+      sequence,
+      name: TERM_NAMES[sequence - 1] ?? 'First term',
+    },
+  };
+};
+
+const graduateButton = () =>
+  screen.findByRole('button', { name: 'Graduate class' });
 
 describe('ClassPage', () => {
   beforeEach(() => {
@@ -348,5 +382,146 @@ describe('ClassPage', () => {
       'Something broke'
     );
     expect(screen.queryByText('Class not found')).not.toBeInTheDocument();
+  });
+
+  describe('Graduate class', () => {
+    const FINAL = classDetail({
+      displayName: 'SS 3 Gold',
+      name: 'Gold',
+      isFinalYear: true,
+      studentCount: 3,
+      roster: [
+        { studentId: IDS.p1, name: 'Zainab Bello', admissionNumber: 'GF-0131' },
+        { studentId: IDS.jss1, name: 'Ada Adams', admissionNumber: 'GF-0123' },
+        { studentId: IDS.ss3, name: 'Tobi Bello', admissionNumber: 'GF-0124' },
+      ],
+    });
+    it('is offered for a final-year class with students to a holder of student:archive', async () => {
+      setup({ row: FINAL });
+      expect(await graduateButton()).toBeInTheDocument();
+    });
+
+    it('is hidden for a class that is not final year, an empty roster or without the permission', async () => {
+      setup({ row: { ...FINAL, isFinalYear: false } });
+      await screen.findByRole('heading', { name: 'SS 3 Gold' });
+      expect(
+        screen.queryByRole('button', { name: 'Graduate class' })
+      ).not.toBeInTheDocument();
+    });
+
+    it('is hidden when the roster is empty', async () => {
+      setup({ row: { ...FINAL, roster: [], studentCount: 0 } });
+      await screen.findByRole('heading', { name: 'SS 3 Gold' });
+      expect(
+        screen.queryByRole('button', { name: 'Graduate class' })
+      ).not.toBeInTheDocument();
+    });
+
+    it('is hidden without student:archive and for a read-only acting super admin', async () => {
+      setup({ row: FINAL, access: starterAccess('principal') });
+      await screen.findByRole('heading', { name: 'SS 3 Gold' });
+      expect(
+        screen.queryByRole('button', { name: 'Graduate class' })
+      ).not.toBeInTheDocument();
+    });
+
+    it('lists the roster by last name, all ticked, with the Start note', async () => {
+      const { onOpenStartYear } = setup({ row: FINAL });
+      fireEvent.click(await graduateButton());
+      expect(await screen.findByText('Graduate SS 3 Gold')).toBeInTheDocument();
+      const boxes = screen.getAllByRole('checkbox');
+      expect(boxes).toHaveLength(3);
+      for (const box of boxes) {
+        expect(box).toBeChecked();
+      }
+      const names = within(screen.getByRole('dialog'))
+        .getAllByText(/^(Ada Adams|Tobi Bello|Zainab Bello)$/)
+        .map((node) => node.textContent);
+      expect(names).toEqual(['Ada Adams', 'Tobi Bello', 'Zainab Bello']);
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Start new school year' })
+      );
+      expect(onOpenStartYear).toHaveBeenCalled();
+    });
+
+    it('graduates the ticked students straight away in the last term and toasts with a Graduated tab action', async () => {
+      const { api, onOpenGraduated } = setup({
+        row: FINAL,
+        calendar: calendarIn(3),
+      });
+      fireEvent.click(await graduateButton());
+      fireEvent.click(await screen.findByLabelText(/Tobi Bello/));
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Graduate ticked students' })
+      );
+      await waitFor(() => {
+        expect(api.classes.graduate).toHaveBeenCalledWith({
+          params: { id: IDS.gold },
+          body: { studentIds: [IDS.p1, IDS.jss1] },
+        });
+      });
+      await waitFor(() => {
+        expect(toast.success).toHaveBeenCalled();
+      });
+      const [message, options] = vi.mocked(toast.success).mock.calls[0] ?? [];
+      expect(message).toBe('2 students graduated.');
+      (
+        options as { action: { label: string; onClick: () => void } }
+      ).action.onClick();
+      expect(onOpenGraduated).toHaveBeenCalled();
+    });
+
+    it('asks for a second confirmation before the last term and writes nothing until Graduate now', async () => {
+      const { api } = setup({ row: FINAL, calendar: calendarIn(1) });
+      await screen.findByText('First term', { exact: false });
+      fireEvent.click(await graduateButton());
+      fireEvent.click(
+        await screen.findByRole('button', { name: 'Graduate ticked students' })
+      );
+      expect(
+        await screen.findByText('Graduate during First term?')
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          'It is still First term. Graduates leave the roll today and won’t be billed for the rest of 2026/2027.'
+        )
+      ).toBeInTheDocument();
+      expect(api.classes.graduate).not.toHaveBeenCalled();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Go back' }));
+      expect(await screen.findByText('Graduate SS 3 Gold')).toBeInTheDocument();
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Graduate ticked students' })
+      );
+      fireEvent.click(
+        await screen.findByRole('button', { name: 'Graduate now' })
+      );
+      await waitFor(() => {
+        expect(api.classes.graduate).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    it('asks for the second confirmation while the current term is still loading', async () => {
+      const { api } = setup({ row: FINAL, calendar: 'pending' });
+      fireEvent.click(await graduateButton());
+      fireEvent.click(
+        await screen.findByRole('button', { name: 'Graduate ticked students' })
+      );
+      expect(
+        await screen.findByText('Graduate during this term?')
+      ).toBeInTheDocument();
+      expect(api.classes.graduate).not.toHaveBeenCalled();
+    });
+
+    it('cannot graduate with nobody ticked', async () => {
+      setup({ row: FINAL });
+      fireEvent.click(await graduateButton());
+      for (const box of await screen.findAllByRole('checkbox')) {
+        fireEvent.click(box);
+      }
+      expect(
+        screen.getByRole('button', { name: 'Graduate ticked students' })
+      ).toBeDisabled();
+    });
   });
 });

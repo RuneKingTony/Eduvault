@@ -228,6 +228,8 @@ export const ACTION_WORDS: Record<Action, string> = {
   assignTeacher: 'assign teachers',
   place: 'place in classes',
   link: 'link to students',
+  archive: 'record leavers and graduates',
+  markAway: 'mark away',
 };
 
 export function capabilityLabel(permission: Permission): string {

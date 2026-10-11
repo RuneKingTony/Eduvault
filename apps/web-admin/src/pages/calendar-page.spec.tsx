@@ -46,6 +46,7 @@ function setup(
   const handlers = {
     onPageChange: vi.fn(),
     onNewYearOpenChange: vi.fn(),
+    onStartYear: vi.fn(),
   };
   renderWithApi(
     <CalendarPage page={1} newYearOpen={false} {...handlers} {...props} />,
@@ -294,6 +295,21 @@ describe('CalendarPage', () => {
       ).toBeInTheDocument();
       expect(api.terms.makeCurrent).not.toHaveBeenCalled();
     });
+
+    it('sends a holder of enrollment:place to the Start dialog from the waiting callout', async () => {
+      const { api, onStartYear } = setup();
+      const next = await cardOf('2027/2028');
+      const first = next.getByText('First term').closest('tr')!;
+      fireEvent.click(
+        within(first).getByRole('button', { name: 'Make current' })
+      );
+      const dialog = await screen.findByRole('dialog');
+      fireEvent.click(
+        within(dialog).getByRole('button', { name: 'Start 2027/2028 first' })
+      );
+      expect(onStartYear).toHaveBeenCalled();
+      expect(api.terms.makeCurrent).not.toHaveBeenCalled();
+    });
   });
 
   it('opens the Holidays dialog from the count and removes a holiday', async () => {
@@ -408,6 +424,7 @@ describe('CalendarPage', () => {
         newYearOpen={false}
         onPageChange={vi.fn()}
         onNewYearOpenChange={vi.fn()}
+        onStartYear={vi.fn()}
       />,
       failing
     );

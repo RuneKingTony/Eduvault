@@ -1,12 +1,18 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import type { MePermissions } from '@eduvault/api-contract';
 import { toPermissionMap, type Permission } from '@eduvault/policy';
-import { fakeAccess, renderWithApi, starterAccess } from '../test-utils';
+import {
+  actingAccess,
+  fakeAccess,
+  renderWithApi,
+  starterAccess,
+} from '../test-utils';
 import { IKEJA, LEKKI } from '../test-members';
 import {
   ARM_ID,
   counts,
   guardianLink,
+  newSchoolYearPreview,
   preview,
   studentList,
   studentRow,
@@ -42,6 +48,8 @@ function setup(
   const students = {
     list: vi.fn().mockResolvedValue(options.list ?? studentList([ada, ifeoma])),
     guardians: vi.fn().mockResolvedValue([guardianLink()]),
+    newSchoolYearPreview: vi.fn().mockResolvedValue(newSchoolYearPreview()),
+    startNewSchoolYear: vi.fn(),
   };
   const api = {
     students,
@@ -80,6 +88,7 @@ function setup(
   const handlers = {
     onSearchChange: vi.fn(),
     onOpenStudent: vi.fn(),
+    onRecordLeaving: vi.fn(),
     onAdmitted: vi.fn(),
     onOpenCalendar: vi.fn(),
   };
@@ -525,5 +534,123 @@ describe('within a row', () => {
     const row = (await screen.findByText('GF-0123')).closest('tr');
     expect(row).not.toBeNull();
     expect(within(row!).getByText('Ada Okeke')).toBeInTheDocument();
+  });
+});
+
+describe('Start the school year', () => {
+  const withStart = studentList([ada, ifeoma], {
+    startYear: { targetYearId: 'y2', name: '2027/2028' },
+  });
+
+  it('shows Start {year} to a holder of enrollment:place while the action is offered', async () => {
+    const { onSearchChange } = setup({ list: withStart });
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Start 2027/2028' })
+    );
+    expect(onSearchChange).toHaveBeenCalledWith({ dialog: 'start-year' });
+  });
+
+  it('hides it when nothing is offered, without the permission and for a read-only acting super admin', async () => {
+    setup();
+    await screen.findByText('Ada Okeke', { exact: false });
+    expect(
+      screen.queryByRole('button', { name: /^Start 20/ })
+    ).not.toBeInTheDocument();
+  });
+
+  it('hides it without enrollment:place', async () => {
+    setup({ list: withStart, access: accessWith('student:read') });
+    await screen.findByText('Ada Okeke', { exact: false });
+    expect(
+      screen.queryByRole('button', { name: /^Start 20/ })
+    ).not.toBeInTheDocument();
+  });
+
+  it('hides it for a read-only acting super admin', async () => {
+    setup({ list: withStart, access: actingAccess(false) });
+    await screen.findByText('Ada Okeke', { exact: false });
+    expect(
+      screen.queryByRole('button', { name: /^Start 20/ })
+    ).not.toBeInTheDocument();
+  });
+
+  it('opens the dialog from the start-year search param and reports closing it', async () => {
+    const { onSearchChange } = setup({
+      list: withStart,
+      props: { search: { dialog: 'start-year' } },
+    });
+    expect(
+      await screen.findByText(
+        'Ticked students move up a level for 2027/2028.',
+        {
+          exact: false,
+        }
+      )
+    ).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }));
+    expect(onSearchChange).toHaveBeenCalledWith({
+      dialog: undefined,
+    });
+  });
+
+  it('does not open the dialog from the param without enrollment:place', async () => {
+    setup({
+      list: withStart,
+      access: accessWith('student:read'),
+      props: { search: { dialog: 'start-year' } },
+    });
+    await screen.findByText('Ada Okeke', { exact: false });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+});
+
+describe('Record leaving on the Inactive tab', () => {
+  const due = studentRow({
+    id: 'st-due',
+    firstName: 'Kunle',
+    lastName: 'Ogun',
+    admissionNumber: 'GF-0207',
+    life: 'inactive',
+    dueLeft: true,
+    notSeenSince: '2026-05-22',
+    weeksAway: 20,
+  });
+  const away = studentRow({
+    id: 'st-away',
+    firstName: 'Uche',
+    lastName: 'Mba',
+    admissionNumber: 'GF-0175',
+    life: 'inactive',
+    notSeenSince: '2026-07-10',
+    weeksAway: 13,
+  });
+  const onInactive = { props: { search: { tab: 'inactive' as const } } };
+
+  it('shows the button for a due student only, and opens the leaving dialog instead of the row', async () => {
+    const { onRecordLeaving, onOpenStudent } = setup({
+      ...onInactive,
+      list: studentList([due, away]),
+    });
+    const button = await screen.findByRole('button', {
+      name: 'Record leaving for Kunle Ogun',
+    });
+    expect(
+      screen.queryByRole('button', { name: 'Record leaving for Uche Mba' })
+    ).not.toBeInTheDocument();
+    fireEvent.click(button);
+    expect(onRecordLeaving).toHaveBeenCalledWith('st-due');
+    expect(onOpenStudent).not.toHaveBeenCalled();
+  });
+
+  it('hides the button without student:archive', async () => {
+    setup({
+      ...onInactive,
+      list: studentList([due]),
+      access: accessWith('student:read', 'student:markAway'),
+    });
+    await screen.findByText('Kunle Ogun', { exact: false });
+    expect(
+      screen.queryByRole('button', { name: /Record leaving/ })
+    ).not.toBeInTheDocument();
   });
 });

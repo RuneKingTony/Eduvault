@@ -31,6 +31,12 @@ function ClassRoute() {
       onBack={() => {
         void navigate({ to: '/classes' });
       }}
+      onOpenGraduated={() => {
+        void navigate({ to: '/students', search: { tab: 'graduated' } });
+      }}
+      onOpenStartYear={() => {
+        void navigate({ to: '/students', search: { dialog: 'start-year' } });
+      }}
     />
   );
 }

@@ -1,4 +1,4 @@
-import { parseStudentsSearch } from './students-search';
+import { parseStudentSearch, parseStudentsSearch } from './students-search';
 
 describe('parseStudentsSearch', () => {
   it('keeps a tab, text, filters, a page above one and the admit flag', () => {
@@ -45,5 +45,27 @@ describe('parseStudentsSearch', () => {
     });
     expect(parseStudentsSearch({ tab: 'archived' }).tab).toBeUndefined();
     expect(parseStudentsSearch({ page: 'x' }).page).toBeUndefined();
+  });
+});
+
+describe('the start-year dialog param', () => {
+  it('keeps dialog=start-year and drops anything else', () => {
+    expect(parseStudentsSearch({ dialog: 'start-year' }).dialog).toBe(
+      'start-year'
+    );
+    expect(parseStudentsSearch({ dialog: 'admit' }).dialog).toBeUndefined();
+    expect(parseStudentsSearch({}).dialog).toBeUndefined();
+  });
+});
+
+describe('parseStudentSearch', () => {
+  it('keeps dialog=leave for the student page and drops anything else', () => {
+    expect(parseStudentSearch({ dialog: 'leave' })).toEqual({
+      dialog: 'leave',
+    });
+    expect(parseStudentSearch({ dialog: 'start-year' })).toEqual({
+      dialog: undefined,
+    });
+    expect(parseStudentSearch({})).toEqual({ dialog: undefined });
   });
 });

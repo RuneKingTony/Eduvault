@@ -49,6 +49,7 @@ const VISIBLE_COLUMNS = sql`
         s.graduated_session_id,
         s.archived_at,
         s.archived_by,
+        s.archived_term_id,
         to_char(s.date_of_birth, 'YYYY-MM-DD') AS date_of_birth,
         to_char(s.admitted_on, 'YYYY-MM-DD') AS admitted_on,
         to_char(s.not_seen_since, 'YYYY-MM-DD') AS not_seen_since,
