@@ -6,6 +6,10 @@ const MERGE_WITHIN_DAYS = 3;
 const MIN_TERM_GAP = 7;
 const MAX_TERM_GAP = 21;
 const TERM_GAP_SHARE = 0.18;
+const DAYS_IN_SCHOOL_WEEK = 5;
+const SHOW_DAYS_BELOW = 14;
+const SHOW_WEEKS_BELOW = 70;
+const DAYS_IN_MONTH = 30;
 
 export const YEAR_NAME_ERROR =
   'Write the year as two years in a row, for example 2028/2029.';
@@ -265,4 +269,40 @@ export function canMakeCurrent(
     term.sequence === 1 &&
     yearStartingNext(years, currentTerm.sessionId)?.id === term.sessionId
   );
+}
+
+export function termWeek(done: number): number {
+  return Math.max(1, Math.ceil(done / DAYS_IN_SCHOOL_WEEK));
+}
+
+export function termWeeks(total: number): number {
+  return Math.ceil(total / DAYS_IN_SCHOOL_WEEK);
+}
+
+export function termPercentDone(done: number, total: number): number {
+  return total === 0 ? 0 : (done / total) * 100;
+}
+
+function dayLabel(days: number, otherwise: () => string): string {
+  if (days <= 0) {
+    return 'Today';
+  }
+  return days === 1 ? 'Tomorrow' : otherwise();
+}
+
+export function relativeDays(from: string, to: string): string {
+  const days = daysBetween(from, to);
+  return dayLabel(days, () => {
+    if (days < SHOW_DAYS_BELOW) {
+      return `in ${days} days`;
+    }
+    return days < SHOW_WEEKS_BELOW
+      ? `in ${Math.round(days / DAYS_IN_WEEK)} weeks`
+      : `in ${Math.round(days / DAYS_IN_MONTH)} months`;
+  });
+}
+
+export function daysUntilLabel(from: string, to: string): string {
+  const days = daysBetween(from, to);
+  return dayLabel(days, () => `${days} days`);
 }

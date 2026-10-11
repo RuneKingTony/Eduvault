@@ -299,6 +299,34 @@ export const currentTermQueryOptions = (api: Api) =>
     queryFn: () => api.calendar.current({}),
   });
 
+const DASHBOARD_KEY = ['dashboard'] as const;
+const ACTIVITY_KEY = ['activity'] as const;
+
+export const dashboardTasksQueryOptions = (api: Api) =>
+  queryOptions({
+    queryKey: [...DASHBOARD_KEY, 'tasks'],
+    queryFn: () => api.dashboard.tasks({}),
+  });
+
+export const dashboardRollQueryOptions = (api: Api) =>
+  queryOptions({
+    queryKey: [...DASHBOARD_KEY, 'roll'],
+    queryFn: () => api.dashboard.roll({}),
+  });
+
+export const myClassesQueryOptions = (api: Api) =>
+  queryOptions({
+    queryKey: [...DASHBOARD_KEY, 'my-classes'],
+    queryFn: () => api.dashboard.myClasses({}),
+  });
+
+export const activityQueryOptions = (api: Api, page: number) =>
+  queryOptions({
+    queryKey: [...ACTIVITY_KEY, page],
+    queryFn: () => api.activity.list({ query: { page } }),
+    placeholderData: keepPreviousData,
+  });
+
 export const daysOffQueryOptions = (api: Api, limit: number) =>
   queryOptions({
     queryKey: [...CALENDAR_KEY, 'days-off', limit],
@@ -365,6 +393,7 @@ export async function invalidateClassTeachers(
   await Promise.all([
     queryClient.invalidateQueries({ queryKey: CLASSES_KEY }),
     queryClient.invalidateQueries({ queryKey: ME_PERMISSIONS_KEY }),
+    queryClient.invalidateQueries({ queryKey: DASHBOARD_KEY }),
   ]);
 }
 
@@ -377,6 +406,8 @@ export async function invalidateStudents(
     queryClient.invalidateQueries({ queryKey: ['guardians'] }),
     queryClient.invalidateQueries({ queryKey: CLASSES_KEY }),
     queryClient.invalidateQueries({ queryKey: CAMPUSES_KEY }),
+    queryClient.invalidateQueries({ queryKey: DASHBOARD_KEY }),
+    queryClient.invalidateQueries({ queryKey: ACTIVITY_KEY }),
   ]);
 }
 

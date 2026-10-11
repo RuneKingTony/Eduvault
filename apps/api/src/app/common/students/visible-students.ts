@@ -14,22 +14,16 @@ interface VisibleStudentsOptions {
 const idList = (ids: readonly string[]) =>
   sql.join(ids.map((id) => sql`${id}`));
 
-const campusPredicate = (scope: CampusScope): RawBuilder<boolean> => {
+export const inScope = (
+  column: RawBuilder<unknown>,
+  scope: CampusScope
+): RawBuilder<boolean> => {
   if (scope === 'all') {
     return sql<boolean>`TRUE`;
   }
   return scope.length === 0
     ? sql<boolean>`FALSE`
-    : sql<boolean>`COALESCE(cp.campus_id, s.campus_id) IN (${idList(scope)})`;
-};
-
-const classPredicate = (scope: ClassScope): RawBuilder<boolean> => {
-  if (scope === 'all') {
-    return sql<boolean>`TRUE`;
-  }
-  return scope.length === 0
-    ? sql<boolean>`FALSE`
-    : sql<boolean>`cp.class_arm_id IN (${idList(scope)})`;
+    : sql<boolean>`${column} IN (${idList(scope)})`;
 };
 
 const VISIBLE_COLUMNS = sql`
@@ -104,7 +98,7 @@ export function visibleStudentsCte(
       ) le ON TRUE
       WHERE s.organization_id = ${options.organizationId}
         ${only}
-        AND ${campusPredicate(options.campusScope)}
-        AND ${classPredicate(options.classScope)}
+        AND ${inScope(sql`COALESCE(cp.campus_id, s.campus_id)`, options.campusScope)}
+        AND ${inScope(sql`cp.class_arm_id`, options.classScope)}
     )`;
 }

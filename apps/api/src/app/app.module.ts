@@ -13,6 +13,7 @@ import { FilesModule } from './common/files';
 import { CalendarModule } from './modules/calendar/calendar.module';
 import { CampusModule } from './modules/campus/campus.module';
 import { ClassModule } from './modules/class/class.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { GuardianModule } from './modules/guardian/guardian.module';
 import { FeeScheduleModule } from './modules/fee-schedule/fee-schedule.module';
 import { HealthModule } from './modules/health/health.module';
@@ -45,6 +46,7 @@ import { StudentModule } from './modules/student/student.module';
     GuardianModule,
     CalendarModule,
     ClassModule,
+    DashboardModule,
   ],
 })
 export class AppModule implements NestModule {

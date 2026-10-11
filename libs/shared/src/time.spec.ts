@@ -1,4 +1,9 @@
-import { fmtLagosDateTime, lagosDateOf } from './time';
+import {
+  fmtLagosDateTime,
+  greetingFor,
+  lagosDateOf,
+  lagosHourOf,
+} from './time';
 
 describe('fmtLagosDateTime', () => {
   it('reads the clock in Lagos, which is an hour ahead of UTC', () => {
@@ -19,5 +24,33 @@ describe('fmtLagosDateTime', () => {
       '2026-01-01 01:00'
     );
     expect(() => fmtLagosDateTime('not a date')).toThrow(RangeError);
+  });
+});
+
+describe('lagosHourOf', () => {
+  it('reads the hour in Lagos, not UTC', () => {
+    const instant = '2026-10-07T11:30:00.000Z';
+    expect(lagosHourOf(instant)).toBe(12);
+    expect(greetingFor(lagosHourOf(instant))).toBe('Good afternoon');
+  });
+
+  it('rolls past midnight and accepts a Date', () => {
+    expect(lagosHourOf('2026-10-07T23:30:00.000Z')).toBe(0);
+    expect(lagosHourOf(new Date('2026-10-07T08:00:00Z'))).toBe(9);
+  });
+
+  it('refuses a bad timestamp', () => {
+    expect(() => lagosHourOf('not a date')).toThrow(RangeError);
+  });
+});
+
+describe('greetingFor', () => {
+  it('switches at 12:00 and 17:00', () => {
+    expect(greetingFor(0)).toBe('Good morning');
+    expect(greetingFor(11)).toBe('Good morning');
+    expect(greetingFor(12)).toBe('Good afternoon');
+    expect(greetingFor(16)).toBe('Good afternoon');
+    expect(greetingFor(17)).toBe('Good evening');
+    expect(greetingFor(23)).toBe('Good evening');
   });
 });
