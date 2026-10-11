@@ -3,7 +3,7 @@ import {
   queryOptions,
   type QueryClient,
 } from '@tanstack/react-query';
-import type { RouteQuery, contract } from '@eduvault/api-contract';
+import type { ClassStatus, RouteQuery, contract } from '@eduvault/api-contract';
 import type { ActingState } from './acting-store';
 import type { Api } from './api';
 import type { MembersSearch } from './members-search';
@@ -245,5 +245,59 @@ export async function invalidateCalendar(
   await Promise.all([
     queryClient.invalidateQueries({ queryKey: SCHOOL_YEARS_KEY }),
     queryClient.invalidateQueries({ queryKey: CALENDAR_KEY }),
+  ]);
+}
+
+const CLASS_LEVELS_KEY = ['class-levels'] as const;
+const CLASSES_KEY = ['classes'] as const;
+
+export const classLevelsQueryOptions = (api: Api) =>
+  queryOptions({
+    queryKey: CLASS_LEVELS_KEY,
+    queryFn: () => api.classLevels.list({}),
+  });
+
+export const classesQueryOptions = (api: Api, status: ClassStatus) =>
+  queryOptions({
+    queryKey: [...CLASSES_KEY, 'list', status],
+    queryFn: () => api.classes.list({ query: { status } }),
+  });
+
+export const classQueryOptions = (api: Api, id: string) =>
+  queryOptions({
+    queryKey: [...CLASSES_KEY, 'one', id],
+    queryFn: () => api.classes.get({ params: { id } }),
+  });
+
+export const teacherCandidatesQueryOptions = (api: Api, id: string) =>
+  queryOptions({
+    queryKey: [...CLASSES_KEY, 'candidates', id],
+    queryFn: () => api.classes.teacherCandidates({ params: { id } }),
+  });
+
+export async function invalidateLevels(
+  queryClient: QueryClient
+): Promise<void> {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: CLASS_LEVELS_KEY }),
+    queryClient.invalidateQueries({ queryKey: CLASSES_KEY }),
+  ]);
+}
+
+export async function invalidateClasses(
+  queryClient: QueryClient
+): Promise<void> {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: CLASSES_KEY }),
+    queryClient.invalidateQueries({ queryKey: CAMPUSES_KEY }),
+  ]);
+}
+
+export async function invalidateClassTeachers(
+  queryClient: QueryClient
+): Promise<void> {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: CLASSES_KEY }),
+    queryClient.invalidateQueries({ queryKey: ME_PERMISSIONS_KEY }),
   ]);
 }

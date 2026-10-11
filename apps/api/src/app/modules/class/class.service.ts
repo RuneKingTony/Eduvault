@@ -1,0 +1,316 @@
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import {
+  CLASS_LEVEL_NOT_FOUND_MESSAGE,
+  CLASS_MEMBER_NOT_FOUND_MESSAGE,
+  CLASS_NAME_TAKEN_MESSAGE,
+  CLASS_NOT_FOUND_MESSAGE,
+  CLASS_NO_CURRENT_TERM_MESSAGE,
+  CLASS_TEACHER_NOT_FOUND_MESSAGE,
+  classArchivedExistsMessage,
+  classArchivedTeachersMessage,
+  classExistsMessage,
+  classHasLeadMessage,
+  classHasPlacementsMessage,
+  classTeacherNotCandidateMessage,
+  classTeacherRepeatMessage,
+  type AssignClassTeacherInput,
+  type ClassDetail,
+  type ClassListQuery,
+  type ClassSummary,
+  type ClassTeacher,
+  type ClassTeacherRemoved,
+  type CreateClassInput,
+  type TeacherCandidate,
+  type UpdateClassInput,
+} from '@eduvault/api-contract';
+import { can } from '@eduvault/policy';
+import type { OrgContext } from '../../common/auth';
+import { SchoolLock } from '../../common/db/school-lock';
+import { CampusService } from '../campus/campus.service';
+import {
+  classDisplayName,
+  teacherCandidates,
+  toClassDetail,
+  toClassSummary,
+} from './class-view';
+import {
+  ClassRepository,
+  type ClassRecord,
+  type ClassTeacherRecord,
+  type Visibility,
+} from './class.repository';
+
+const classNotFound = () => new NotFoundException(CLASS_NOT_FOUND_MESSAGE);
+
+const everything: Visibility = { campusScope: 'all', classScope: 'all' };
+
+const displayOf = (record: ClassRecord): string =>
+  classDisplayName(record.levelName, record.name);
+
+@Injectable()
+export class ClassService {
+  constructor(
+    private readonly classes: ClassRepository,
+    private readonly campuses: CampusService,
+    private readonly lock: SchoolLock
+  ) {}
+
+  private visibility(ctx: OrgContext): Visibility {
+    return { campusScope: ctx.campusScope, classScope: ctx.classScope };
+  }
+
+  private async requireClass(
+    ctx: OrgContext,
+    id: string,
+    visibility: Visibility = this.visibility(ctx)
+  ): Promise<ClassRecord> {
+    const record = await this.classes.findClass(
+      ctx.organizationId,
+      id,
+      visibility
+    );
+    if (record === undefined) {
+      throw classNotFound();
+    }
+    return record;
+  }
+
+  private async teachersOf(
+    ctx: OrgContext,
+    ids: readonly string[]
+  ): Promise<ClassTeacherRecord[]> {
+    const sessionId = await this.classes.currentSessionId(ctx.organizationId);
+    return sessionId === null
+      ? []
+      : this.classes.teachersOf(ctx.organizationId, ids, sessionId);
+  }
+
+  private async summarise(
+    ctx: OrgContext,
+    records: readonly ClassRecord[]
+  ): Promise<ClassSummary[]> {
+    const teachers = await this.teachersOf(
+      ctx,
+      records.map((record) => record.id)
+    );
+    return records.map((record) =>
+      toClassSummary(
+        record,
+        teachers.filter((teacher) => teacher.classId === record.id)
+      )
+    );
+  }
+
+  private async summaryOf(ctx: OrgContext, id: string): Promise<ClassSummary> {
+    const record = await this.requireClass(ctx, id, everything);
+    return toClassSummary(record, await this.teachersOf(ctx, [id]));
+  }
+
+  async list(ctx: OrgContext, query: ClassListQuery): Promise<ClassSummary[]> {
+    if (query.campusId !== undefined) {
+      await this.campuses.assertInScope(ctx, query.campusId);
+    }
+    const records = await this.classes.listClasses(ctx.organizationId, {
+      ...this.visibility(ctx),
+      campusId: query.campusId,
+      levelId: query.levelId,
+      status: ctx.classScope === 'all' ? (query.status ?? 'active') : 'active',
+    });
+    return this.summarise(ctx, records);
+  }
+
+  async get(ctx: OrgContext, id: string): Promise<ClassDetail> {
+    const record = await this.requireClass(ctx, id);
+    return toClassDetail(
+      record,
+      toClassSummary(record, await this.teachersOf(ctx, [id])).classTeachers,
+      can(ctx.permissions, 'student', 'read') ? [] : null
+    );
+  }
+
+  async create(
+    ctx: OrgContext,
+    input: CreateClassInput
+  ): Promise<ClassSummary> {
+    const organizationId = ctx.organizationId;
+    if (
+      (await this.classes.findLevel(organizationId, input.levelId)) ===
+      undefined
+    ) {
+      throw new NotFoundException(CLASS_LEVEL_NOT_FOUND_MESSAGE);
+    }
+    await this.campuses.assertInScope(ctx, input.campusId);
+    const name = input.name.trim();
+    return this.lock.run(organizationId, async () => {
+      await this.assertNameFree(ctx, {
+        levelId: input.levelId,
+        campusId: input.campusId,
+        name,
+      });
+      const id = await this.classes.insertClass(organizationId, {
+        levelId: input.levelId,
+        campusId: input.campusId,
+        name,
+      });
+      return this.summaryOf(ctx, id);
+    });
+  }
+
+  update(
+    ctx: OrgContext,
+    id: string,
+    input: UpdateClassInput
+  ): Promise<ClassSummary> {
+    const organizationId = ctx.organizationId;
+    return this.lock.run(organizationId, async () => {
+      const record = await this.requireClass(ctx, id);
+      const name = input.name?.trim();
+      const archiving = input.archived === true && record.retiredAt === null;
+      if (
+        archiving &&
+        (await this.classes.hasPlacementsFromCurrentTerm(organizationId, id))
+      ) {
+        throw new ConflictException(
+          classHasPlacementsMessage(displayOf(record))
+        );
+      }
+      if (name !== undefined && name !== record.name) {
+        await this.assertNameFree(
+          ctx,
+          { levelId: record.levelId, campusId: record.campusId, name },
+          record.id
+        );
+        await this.classes.renameClass(organizationId, id, name);
+      }
+      if (archiving) {
+        await this.classes.setRetired(organizationId, id, ctx.user.id);
+      }
+      if (input.archived === false && record.retiredAt !== null) {
+        await this.classes.setRetired(organizationId, id, null);
+      }
+      return this.summaryOf(ctx, id);
+    });
+  }
+
+  async teacherCandidates(
+    ctx: OrgContext,
+    id: string
+  ): Promise<TeacherCandidate[]> {
+    const record = await this.requireClass(ctx, id);
+    const current = await this.teachersOf(ctx, [id]);
+    const [members, custom] = await Promise.all([
+      this.classes.listMembers(ctx.organizationId, record.campusId),
+      this.classes.rolePermissions(ctx.organizationId),
+    ]);
+    return teacherCandidates(
+      members,
+      custom,
+      new Set(current.map((teacher) => teacher.userId))
+    ).map(({ userId, name }) => ({ userId, name }));
+  }
+
+  assignTeacher(
+    ctx: OrgContext,
+    id: string,
+    input: AssignClassTeacherInput
+  ): Promise<ClassTeacher> {
+    const organizationId = ctx.organizationId;
+    return this.lock.run(organizationId, async () => {
+      const record = await this.requireClass(ctx, id);
+      const members = await this.classes.listMembers(
+        organizationId,
+        record.campusId
+      );
+      const member = members.find(
+        (candidate) => candidate.userId === input.userId
+      );
+      if (member === undefined) {
+        throw new NotFoundException(CLASS_MEMBER_NOT_FOUND_MESSAGE);
+      }
+      const sessionId = await this.classes.currentSessionId(organizationId);
+      if (sessionId === null) {
+        throw new ConflictException(CLASS_NO_CURRENT_TERM_MESSAGE);
+      }
+      const display = displayOf(record);
+      if (record.retiredAt !== null) {
+        throw new ConflictException(classArchivedTeachersMessage(display));
+      }
+      const custom = await this.classes.rolePermissions(organizationId);
+      if (teacherCandidates([member], custom, new Set()).length === 0) {
+        throw new BadRequestException(
+          classTeacherNotCandidateMessage(record.campusName)
+        );
+      }
+      const teachers = await this.classes.teachersOf(
+        organizationId,
+        [id],
+        sessionId
+      );
+      if (teachers.some((teacher) => teacher.userId === member.userId)) {
+        throw new ConflictException(
+          classTeacherRepeatMessage(member.name, display)
+        );
+      }
+      const lead = teachers.find((teacher) => teacher.role === 'lead');
+      if (input.role === 'lead' && lead !== undefined) {
+        throw new ConflictException(classHasLeadMessage(display, lead.name));
+      }
+      await this.classes.insertTeacher(organizationId, {
+        classId: id,
+        sessionId,
+        userId: member.userId,
+        role: input.role,
+        createdBy: ctx.user.id,
+      });
+      return { userId: member.userId, name: member.name, role: input.role };
+    });
+  }
+
+  removeTeacher(
+    ctx: OrgContext,
+    id: string,
+    userId: string
+  ): Promise<ClassTeacherRemoved> {
+    const organizationId = ctx.organizationId;
+    return this.lock.run(organizationId, async () => {
+      await this.requireClass(ctx, id);
+      const sessionId = await this.classes.currentSessionId(organizationId);
+      const removed =
+        sessionId !== null &&
+        (await this.classes.deleteTeacher(organizationId, {
+          classId: id,
+          sessionId,
+          userId,
+        }));
+      if (!removed) {
+        throw new NotFoundException(CLASS_TEACHER_NOT_FOUND_MESSAGE);
+      }
+      return { classId: id, userId };
+    });
+  }
+
+  private async assertNameFree(
+    ctx: OrgContext,
+    key: { levelId: string; campusId: string; name: string },
+    exceptId?: string
+  ): Promise<void> {
+    const clash = await this.classes.findClassByName(ctx.organizationId, key);
+    if (clash === undefined || clash.id === exceptId) {
+      return;
+    }
+    if (ctx.classScope !== 'all' && !ctx.classScope.includes(clash.id)) {
+      throw new ConflictException(CLASS_NAME_TAKEN_MESSAGE);
+    }
+    const display = displayOf(clash);
+    throw new ConflictException(
+      clash.retiredAt === null
+        ? classExistsMessage(display, clash.campusName)
+        : classArchivedExistsMessage(display, clash.campusName)
+    );
+  }
+}

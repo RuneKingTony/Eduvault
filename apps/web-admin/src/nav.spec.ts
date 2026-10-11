@@ -21,6 +21,7 @@ const built = new Set([
   '/students',
   '/members',
   '/fees',
+  '/classes',
   '/calendar',
   '/campuses',
   '/roles',
@@ -28,6 +29,7 @@ const built = new Set([
   '/settings/profile',
   '/settings/admissions',
   '/settings/danger',
+  '/settings/levels',
 ]);
 const starter = (slug: string) =>
   toPermissionMap(
@@ -72,6 +74,7 @@ describe('nav model', () => {
       '/approvals',
       '/students',
       '/members',
+      '/classes',
       '/fees',
       '/settings/profile',
     ]);
@@ -82,6 +85,7 @@ describe('nav model', () => {
     expect(groups.map((group) => group.id)).toEqual([
       'overview',
       'people',
+      'school',
       'finance',
       'settings',
     ]);
@@ -98,6 +102,7 @@ describe('nav model', () => {
       'Admissions rules',
       'School years and terms',
       'Campuses',
+      'Levels',
       'Roles and permissions',
       'Danger zone',
     ]);
@@ -125,6 +130,7 @@ describe('settings sections', () => {
       ['Admissions rules', 'General'],
       ['School years and terms', 'School structure'],
       ['Campuses', 'School structure'],
+      ['Levels', 'School structure'],
       ['Roles and permissions', 'Access'],
       ['Danger zone', 'Access'],
     ]);
@@ -136,6 +142,7 @@ describe('settings sections', () => {
       'admissions',
       'calendar',
       'campuses',
+      'levels',
       'roles',
       'danger',
     ]);
@@ -148,6 +155,7 @@ describe('settings sections', () => {
       'admissions',
       'calendar',
       'campuses',
+      'levels',
       'roles',
     ]);
     expect(settingsRoute(starter('administrator'))).toBe('/settings/profile');
@@ -162,9 +170,19 @@ describe('settings sections', () => {
     expect(routeGate('/calendar')).toEqual(['session:read']);
   });
 
-  it('shows a principal Campuses alone and opens it', () => {
-    expect(idsFor(starter('principal'))).toEqual(['campuses']);
+  it('shows a principal Campuses and Levels and opens Campuses', () => {
+    expect(idsFor(starter('principal'))).toEqual(['campuses', 'levels']);
     expect(settingsRoute(starter('principal'))).toBe('/campuses');
+  });
+
+  it('shows a teacher Levels alone and opens it', () => {
+    expect(idsFor(starter('teacher'))).toEqual(['levels']);
+    expect(settingsRoute(starter('teacher'))).toBe('/settings/levels');
+  });
+
+  it('gates Classes and Levels on class:read', () => {
+    expect(routeGate('/classes')).toEqual(['class:read']);
+    expect(routeGate('/settings/levels')).toEqual(['class:read']);
   });
 
   it('shows a bursar no Settings at all', () => {
@@ -320,7 +338,7 @@ describe('settingsLanding', () => {
     expect(landing.kind).toBe('list');
     expect(
       landing.kind === 'list' && landing.items.map((item) => item.label)
-    ).toEqual(['Campuses']);
+    ).toEqual(['Campuses', 'Levels']);
   });
 
   it('sends someone with no settings item to the dashboard', () => {

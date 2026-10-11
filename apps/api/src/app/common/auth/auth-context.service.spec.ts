@@ -139,3 +139,94 @@ describe('AuthContextService.resolveActing', () => {
     ).rejects.toMatchObject({ status: 400 });
   });
 });
+
+const memberSession = () =>
+  session({
+    platformRole: null,
+    activeOrganizationId: 'school-a',
+    activeTeamId: null,
+    user: { id: 'user-1', email: 'u@eduvault.test', name: 'Una' },
+  });
+
+function setupMember(
+  role: string,
+  customRoles: Record<string, Record<string, string[]>>,
+  taught: string[] = []
+) {
+  const query = vi.fn((sql: string) => {
+    if (sql.includes('"organizationRole"')) {
+      return Promise.resolve({
+        rows: Object.entries(customRoles).map(([slug, permission]) => ({
+          role: slug,
+          permission: JSON.stringify(permission),
+        })),
+      });
+    }
+    return Promise.resolve({
+      rows: taught.map((id) => ({ class_arm_id: id })),
+    });
+  });
+  const authService = {
+    api: {
+      getActiveMember: vi
+        .fn()
+        .mockResolvedValue({ organizationId: 'school-a', role }),
+      listOrganizationTeams: vi.fn().mockResolvedValue([{ id: 'campus-1' }]),
+      listUserTeams: vi
+        .fn()
+        .mockResolvedValue([{ id: 'campus-1', organizationId: 'school-a' }]),
+    },
+  };
+  const service = new AuthContextService(
+    authService as never,
+    { query } as unknown as Pool
+  );
+  const taughtQueries = () =>
+    query.mock.calls.filter(([sql]) => sql.includes('class_arm_teacher'));
+  return { service, taughtQueries };
+}
+
+describe('AuthContextService.resolveOrganization', () => {
+  it('binds class:read alone to the classes the member teaches this year', async () => {
+    const { service, taughtQueries } = setupMember(
+      'member,teacher',
+      { teacher: { class: ['read'] } },
+      ['arm-1']
+    );
+    const ctx = await service.resolveOrganization(memberSession());
+    expect(ctx?.classScope).toEqual(['arm-1']);
+    expect(taughtQueries()).toHaveLength(1);
+  });
+
+  it('gives a class-scoped member who teaches nothing, such as with no current term, an empty scope', async () => {
+    const { service } = setupMember('member,teacher', {
+      teacher: { class: ['read'] },
+    });
+    const ctx = await service.resolveOrganization(memberSession());
+    expect(ctx?.classScope).toEqual([]);
+  });
+
+  it('skips the lookup for class:readAll and for a member with no class permission', async () => {
+    const principal = setupMember('member,principal', {
+      principal: { class: ['read', 'readAll'] },
+    });
+    expect(
+      (await principal.service.resolveOrganization(memberSession()))?.classScope
+    ).toBe('all');
+    expect(principal.taughtQueries()).toHaveLength(0);
+
+    const bursar = setupMember('member,bursar', {
+      bursar: { student: ['read'] },
+    });
+    expect(
+      (await bursar.service.resolveOrganization(memberSession()))?.classScope
+    ).toBe('all');
+    expect(bursar.taughtQueries()).toHaveLength(0);
+  });
+
+  it('keeps the owner on every class', async () => {
+    const { service } = setupMember('owner', {});
+    const ctx = await service.resolveOrganization(memberSession());
+    expect(ctx?.classScope).toBe('all');
+  });
+});

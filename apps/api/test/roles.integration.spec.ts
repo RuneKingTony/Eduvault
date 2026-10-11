@@ -652,6 +652,7 @@ test.describe('roles', () => {
         'ac:read',
         'ac:update',
         'student:read',
+        'class:read',
       ]);
       expect((await roleOf(api, editor, 'wide')).editable).toBe(false);
       expect((await roleOf(api, editor, 'teacher')).editable).toBe(true);

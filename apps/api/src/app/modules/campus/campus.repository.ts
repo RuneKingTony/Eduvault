@@ -32,9 +32,13 @@ export abstract class CampusRepository {
     campusIds: readonly string[]
   ): Promise<CampusMemberRecord[]>;
 
+  abstract activeClassCounts(
+    organizationId: string,
+    campusIds: readonly string[]
+  ): Promise<Record<string, number>>;
+
   abstract existsInSchool(organizationId: string, id: string): Promise<boolean>;
 
-  /** Whether any students or fee schedules still reference the campus. */
   abstract hasDependents(organizationId: string, id: string): Promise<boolean>;
 
   abstract create(organizationId: string, input: NewCampus): Promise<void>;

@@ -116,6 +116,26 @@ export class KyselyCampusRepository extends CampusRepository {
     }));
   }
 
+  async activeClassCounts(
+    organizationId: string,
+    campusIds: readonly string[]
+  ): Promise<Record<string, number>> {
+    if (campusIds.length === 0) {
+      return {};
+    }
+    const rows = await this.db
+      .selectFrom('class_arm')
+      .where('organization_id', '=', organizationId)
+      .where('campus_id', 'in', [...campusIds])
+      .where('retired_at', 'is', null)
+      .select(['campus_id', (eb) => eb.fn.countAll<string>().as('total')])
+      .groupBy('campus_id')
+      .execute();
+    return Object.fromEntries(
+      rows.map((row) => [row.campus_id, Number(row.total)])
+    );
+  }
+
   async existsInSchool(organizationId: string, id: string): Promise<boolean> {
     const row = await this.db
       .selectFrom('campus')
@@ -127,7 +147,13 @@ export class KyselyCampusRepository extends CampusRepository {
   }
 
   async hasDependents(organizationId: string, id: string): Promise<boolean> {
-    const [student, fee] = await Promise.all([
+    const [arm, student, fee] = await Promise.all([
+      this.db
+        .selectFrom('class_arm')
+        .select('id')
+        .where('campus_id', '=', id)
+        .where('organization_id', '=', organizationId)
+        .executeTakeFirst(),
       this.db
         .selectFrom('student')
         .select('id')
@@ -141,7 +167,7 @@ export class KyselyCampusRepository extends CampusRepository {
         .where('organization_id', '=', organizationId)
         .executeTakeFirst(),
     ]);
-    return student !== undefined || fee !== undefined;
+    return arm !== undefined || student !== undefined || fee !== undefined;
   }
 
   async create(organizationId: string, input: NewCampus): Promise<void> {

@@ -1,4 +1,5 @@
 import { expect } from './support/base-test';
+import { createClass } from './support/factories/classes';
 import { schoolsTest } from './support/two-schools';
 
 const test = schoolsTest;
@@ -42,6 +43,32 @@ test.describe('campus summary', () => {
       { userId: principal.id, name: 'Test User' },
     ]);
     expect(lekkiCard.counts).toEqual({ classes: 0, students: 0, staff: 3 });
+  });
+
+  test('counts only the active classes of each campus', async ({
+    api,
+    app,
+    schools: { owner, lekki, ikeja },
+  }) => {
+    const gold = await createClass(app, owner, { campusId: lekki.id });
+    await createClass(app, owner, { campusId: lekki.id });
+    await createClass(app, owner, { campusId: ikeja.id });
+    await api(owner)
+      .patch(`/classes/${gold.id}`)
+      .send({ archived: true })
+      .expect(200);
+
+    const body = (await api(owner).get('/campuses/summary').expect(200)).body;
+
+    expect(
+      body.map((card: { name: string; counts: { classes: number } }) => [
+        card.name,
+        card.counts.classes,
+      ])
+    ).toEqual([
+      ['Ikeja', 1],
+      ['Lekki', 1],
+    ]);
   });
 
   test('limits the summary and the list to the caller’s campuses', async ({
@@ -169,6 +196,24 @@ test.describe('deleting a campus', () => {
       'This campus still has classes, students or money records, so it can’t be deleted.'
     );
     await api(owner).get(`/campuses/${lekki.id}`).expect(200);
+  });
+
+  test('answers 409 while a class references it, even an archived one, and keeps the team', async ({
+    api,
+    app,
+    createCampus,
+    schools: { owner, orgA },
+  }) => {
+    const annex = await createCampus(orgA, 'Annex');
+    const arm = await createClass(app, owner, { campusId: annex.id });
+    await api(owner).delete(`/campuses/${annex.id}`).expect(409);
+
+    await api(owner)
+      .patch(`/classes/${arm.id}`)
+      .send({ archived: true })
+      .expect(200);
+    await api(owner).delete(`/campuses/${annex.id}`).expect(409);
+    await api(owner).get(`/campuses/${annex.id}`).expect(200);
   });
 
   test('answers 409 while a fee schedule references it and keeps the team', async ({

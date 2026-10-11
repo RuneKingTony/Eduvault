@@ -94,6 +94,24 @@ export const CAP_AREAS: readonly CapArea[] = [
     extras: [],
   },
   {
+    id: 'classes',
+    group: 'School',
+    label: 'Classes',
+    important: false,
+    see: ['class:read'],
+    change: ['class:create', 'class:update', 'class:assignTeacher'],
+    changeDesc:
+      'Add, archive and restore classes, change levels and name class teachers',
+    extras: [
+      {
+        label: 'Sees every class',
+        description: 'Without this, they only see the classes they teach.',
+        permissions: ['class:readAll'],
+        important: true,
+      },
+    ],
+  },
+  {
     id: 'students',
     group: 'School',
     label: 'Students',

@@ -70,6 +70,21 @@ describe('roles', () => {
     ).toEqual([undefined, undefined, undefined, undefined, undefined]);
   });
 
+  it('gives the administrator every class permission, the principal read and readAll and the teacher read only', () => {
+    expect(starter('administrator').class).toEqual([
+      'create',
+      'read',
+      'readAll',
+      'update',
+      'assignTeacher',
+    ]);
+    expect(starter('principal').class).toEqual(['read', 'readAll']);
+    expect(starter('teacher').class).toEqual(['read']);
+    expect(starter('bursar').class).toBeUndefined();
+    expect(starter('student').class).toBeUndefined();
+    expect(starter('guardian').class).toBeUndefined();
+  });
+
   it('keeps ac:create, ac:update and ac:delete out of every starter role', () => {
     for (const role of STARTER_ROLES) {
       for (const action of ['ac:create', 'ac:update', 'ac:delete'] as const) {
@@ -132,6 +147,7 @@ describe('roles', () => {
     });
     expect(permissions).toEqual({
       student: ['read'],
+      class: ['read', 'readAll'],
       team: ['read'],
       campus: ['readAll'],
     });

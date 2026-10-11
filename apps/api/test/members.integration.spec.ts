@@ -69,6 +69,7 @@ const MANAGER = [
   'member:delete',
   'campus:readAll',
   'student:read',
+  'class:read',
 ] as const;
 
 const putRoles = (

@@ -72,9 +72,9 @@ describe('the Roles area', () => {
 describe('the School years and terms area', () => {
   const years = area('school-years');
 
-  it('sits in School before Students and splits seeing from changing', () => {
+  it('sits in School before Classes and splits seeing from changing', () => {
     const ids = CAP_AREAS.map((candidate) => candidate.id);
-    expect(ids.indexOf('school-years')).toBe(ids.indexOf('students') - 1);
+    expect(ids.indexOf('school-years')).toBe(ids.indexOf('classes') - 1);
     expect(years.group).toBe('School');
     expect(years.label).toBe('School years and terms');
     expect(years.see).toEqual(['session:read']);
@@ -94,6 +94,44 @@ describe('the School years and terms area', () => {
     ).toBe('change');
     expect(capLevel(toPermissionMap(['session:read']), years)).toBe('see');
     expect(capLevel(toPermissionMap(['session:update']), years)).toBe('custom');
+  });
+});
+
+describe('the Classes area', () => {
+  const classes = area('classes');
+
+  it('sits in School before Students and splits seeing from changing', () => {
+    const ids = CAP_AREAS.map((candidate) => candidate.id);
+    expect(ids.indexOf('classes')).toBe(ids.indexOf('students') - 1);
+    expect(classes.group).toBe('School');
+    expect(classes.label).toBe('Classes');
+    expect(classes.see).toEqual(['class:read']);
+    expect(classes.change).toEqual([
+      'class:create',
+      'class:update',
+      'class:assignTeacher',
+    ]);
+    expect(classes.changeDesc).toBe(
+      'Add, archive and restore classes, change levels and name class teachers'
+    );
+  });
+
+  it('offers Sees every class as an important extra', () => {
+    expect(classes.extras).toEqual([
+      expect.objectContaining({
+        label: 'Sees every class',
+        permissions: ['class:readAll'],
+        important: true,
+      }),
+    ]);
+  });
+
+  it('is change for all four, see for class:read and custom for a lone update', () => {
+    expect(
+      capLevel(toPermissionMap([...classes.see, ...classes.change]), classes)
+    ).toBe('change');
+    expect(capLevel(toPermissionMap(['class:read']), classes)).toBe('see');
+    expect(capLevel(toPermissionMap(['class:update']), classes)).toBe('custom');
   });
 });
 
@@ -132,6 +170,8 @@ describe('capSummary', () => {
       'Hands over the school',
       'Deletes the school',
       'School years and terms: add school years, holidays and set the current term',
+      'Classes: add, archive and restore classes, change levels and name class teachers',
+      'Sees every class',
       'Students: admit students, update them and put them in classes',
     ]);
   });
@@ -144,12 +184,17 @@ describe('capSummary', () => {
       'Roles: can see',
       'School settings: can see',
       'School years and terms: add school years, holidays and set the current term',
+      'Classes: add, archive and restore classes, change levels and name class teachers',
+      'Sees every class',
       'Students: admit students, update them and put them in classes',
     ]);
   });
 
   it('describes the teacher and bursar', () => {
-    expect(summaryFor('teacher')).toEqual(['Students: can see']);
+    expect(summaryFor('teacher')).toEqual([
+      'Classes: can see',
+      'Students: can see',
+    ]);
     expect(summaryFor('bursar')).toEqual(['Students: can see']);
   });
 
@@ -157,6 +202,8 @@ describe('capSummary', () => {
     expect(summaryFor('principal')).toEqual([
       'Campuses: can see',
       'Sees every campus',
+      'Classes: can see',
+      'Sees every class',
       'Students: can see',
     ]);
   });

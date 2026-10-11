@@ -212,6 +212,7 @@ export const RESOURCE_PILLARS: Record<Resource, Pillar> = {
   schoolAccount: 'Foundation',
   student: 'Foundation',
   session: 'Foundation',
+  class: 'Foundation',
   feeSchedule: 'Finance',
 };
 
@@ -222,6 +223,7 @@ export const ACTION_WORDS: Record<Action, string> = {
   update: 'change',
   delete: 'remove',
   setCurrent: 'set current',
+  assignTeacher: 'assign teachers',
 };
 
 export function capabilityLabel(permission: Permission): string {
