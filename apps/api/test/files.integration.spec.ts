@@ -1,59 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import type { FileRef, SchoolProfile } from '@eduvault/api-contract';
 import { FileSweepService } from '../src/app/common/files';
-import {
-  baseTest,
-  expect,
-  type Fixtures,
-  type TestUser,
-} from './support/base-test';
-import {
-  twoSchoolsWithoutStudents,
-  type TwoSchoolsWithoutStudents,
-} from './support/two-schools';
-
-const test = baseTest.extend<{
-  schools: TwoSchoolsWithoutStudents;
-  upload: (user: TestUser, bytes: Buffer, name?: string) => Promise<FileRef>;
-  attach: (user: TestUser, file: FileRef) => Promise<SchoolProfile>;
-}>({
-  schools: async (
-    { createUser, createOrganization, createCampus, addMember },
-    use
-  ) => {
-    await use(
-      await twoSchoolsWithoutStudents({
-        createUser,
-        createOrganization,
-        createCampus,
-        addMember,
-      })
-    );
-  },
-  upload: async ({ api }, use) => {
-    await use(async (user, bytes, name = 'logo.png') => {
-      const res = await api(user)
-        .post('/files')
-        .field('kind', 'school_logo')
-        .attach('file', bytes, { filename: name })
-        .expect(201);
-      return res.body as FileRef;
-    });
-  },
-  attach: async ({ api }, use) => {
-    await use(async (user, file) => {
-      const res = await api(user)
-        .put('/school-account/logo')
-        .send({ fileId: file.id })
-        .expect(200);
-      return res.body as SchoolProfile;
-    });
-  },
-});
-
-const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
-const png = (size = 64) =>
-  Buffer.concat([Buffer.from(PNG_SIGNATURE), Buffer.alloc(size, 7)]);
+import { expect, type Fixtures, type TestUser } from './support/base-test';
+import { filesTest as test, PNG_SIGNATURE, png } from './support/file-fixtures';
 
 const WRONG_TYPE = 'Choose a PNG, JPG or WebP logo.';
 const TOO_BIG = 'That logo is over 1 MB. Please choose a smaller one.';

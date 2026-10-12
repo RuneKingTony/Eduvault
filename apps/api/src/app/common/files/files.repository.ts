@@ -10,8 +10,11 @@ export interface FileRecord {
   originalName: string;
 }
 
-export interface NewFile extends FileRecord {
+export interface StoredFile extends FileRecord {
   sha256: string;
+}
+
+export interface NewFile extends StoredFile {
   uploadedBy: string | null;
 }
 
@@ -27,5 +30,11 @@ export abstract class FilesRepository {
 
   abstract delete(organizationId: string, id: string): Promise<void>;
 
-  abstract deleteOrphansUploadedBefore(cutoff: Date): Promise<number>;
+  abstract findOrphansUploadedBefore(cutoff: Date): Promise<FileRecord[]>;
+
+  /** Files in id order, for a job that walks every school's files. */
+  abstract listAfter(
+    afterId: string | undefined,
+    limit: number
+  ): Promise<StoredFile[]>;
 }

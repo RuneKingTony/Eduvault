@@ -19,16 +19,30 @@ Never run an unscoped test command across the monorepo. `pnpm validate` runs eve
 pnpm db:up && pnpm db:seed && pnpm dev
 ```
 
-| Service    | URL                   |
-| ---------- | --------------------- |
-| API        | http://localhost:3000 |
-| web-admin  | http://localhost:4200 |
-| web-portal | http://localhost:4201 |
-| Postgres   | localhost:5434        |
+| Service                        | URL                                  |
+| ------------------------------ | ------------------------------------ |
+| API                            | http://localhost:3000                |
+| web-admin                      | http://localhost:4200                |
+| web-portal                     | http://localhost:4201                |
+| Postgres                       | localhost:5434                       |
+| MinIO (optional, profile `s3`) | localhost:9100 (API), 9101 (console) |
 
 Seeded accounts all use the password `password123`; the table is in `.claude/skills/run-local/SKILL.md`. `GET /health` returns 200 when the API can reach Postgres.
 
 The API reads `apps/api/.env.local` (created from `.env.example`) and refuses to start if a variable is missing or malformed, naming each one.
+
+## File storage (optional S3)
+
+Files go to Postgres (`file_blob`) unless `FILE_STORE_DRIVER=s3` ([ADR 0007](adr/0007-s3-compatible-file-store.md)). To try the S3 driver locally:
+
+| Task                          | Command                                                                                                       |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Start MinIO and make a bucket | `nx run api:s3-start` (compose profile `s3`; API :9100, console :9101, login `eduvault` / `eduvault-secret`)  |
+| Switch the API to it          | uncomment the `FILE_STORE_DRIVER` and `S3_*` lines in `apps/api/.env.local`, restart the API                  |
+| Dry-run the copy              | `nx run api:files-copy --args="--from=postgres --to=s3"` (prints counts; exits non-zero on a mismatch or gap) |
+| Copy for real                 | add `--apply`; it is idempotent, verifies each object's SHA-256 and deletes nothing                           |
+
+Cutover is copy, verify, switch the driver, then copy and verify once more. Roll back by switching to `postgres`; after uploads on S3, run `--from=s3 --to=postgres --apply` first. The bucket must exist and should have versioning on; the app only checks it at boot. `file_blob` stays until a later migration drops it, no sooner than 30 days after a clean verify.
 
 ## Database
 

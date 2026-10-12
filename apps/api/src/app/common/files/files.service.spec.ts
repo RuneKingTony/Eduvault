@@ -41,8 +41,12 @@ class FakeFiles extends FilesRepository {
     return Promise.resolve();
   }
 
-  deleteOrphansUploadedBefore() {
-    return Promise.resolve(0);
+  findOrphansUploadedBefore() {
+    return Promise.resolve([]);
+  }
+
+  listAfter() {
+    return Promise.resolve([]);
   }
 }
 
