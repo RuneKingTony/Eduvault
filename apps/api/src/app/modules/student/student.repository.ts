@@ -24,6 +24,8 @@ export interface StudentListResult {
 }
 
 export abstract class StudentRepository {
+  abstract today(organizationId: string): string;
+
   abstract list(
     organizationId: string,
     scope: StudentVisibility,

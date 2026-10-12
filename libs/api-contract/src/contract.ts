@@ -339,6 +339,12 @@ export const contract = defineContract({
       body: updateStudentSchema,
       response: studentDetailSchema,
     }),
+    resetLogin: defineRoute({
+      method: 'POST',
+      path: '/students/:id/reset-login',
+      params: idParamsSchema,
+      response: resetLoginSchema,
+    }),
     newSchoolYearPreview: defineRoute({
       method: 'GET',
       path: '/students/new-school-year',

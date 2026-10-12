@@ -18,6 +18,11 @@ export const ADMIT_LAST_NAME_REQUIRED = 'Enter the last name.';
 export const ADMIT_DOB_MESSAGE = 'Choose a date of birth on or before today.';
 export const ADMIT_NO_TERM_MESSAGE =
   'Set a current term before admitting students.';
+export const ADMIT_TERM_MESSAGE = 'Choose the current term or the next term.';
+export const STUDENT_NO_LOGIN_MESSAGE =
+  'This student has no portal login to reset.';
+export const STUDENT_SHARED_RESET_MESSAGE =
+  'This login is also used for something else, so it can’t be reset from here.';
 export const ADMIT_NO_CLASSES_MESSAGE =
   'No classes on your campuses yet. Add a class first.';
 export const ADMIT_REQUIRE_GUARDIAN_MESSAGE =
@@ -168,6 +173,7 @@ export const admitStudentSchema = z.object({
   gender: genderSchema,
   dateOfBirth: dateOfBirthSchema,
   classArmId: idSchema,
+  termId: idSchema.optional(),
   guardians: z.array(guardianDraftSchema).max(6).default([]),
 });
 export type AdmitStudentInput = z.input<typeof admitStudentSchema>;
@@ -199,6 +205,7 @@ export const admissionPreviewSchema = z.object({
   nextStudentUsername: z.string(),
   currentTerm: z.object({ id: idSchema, name: z.string() }),
   currentSession: z.object({ id: idSchema, name: z.string() }),
+  nextTerm: z.object({ id: idSchema, name: z.string() }).nullable(),
   maxGuardians: z.number().int().min(1),
   requireGuardian: z.boolean(),
   classes: z.array(admissionClassOptionSchema),

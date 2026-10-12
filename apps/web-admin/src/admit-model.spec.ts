@@ -1,5 +1,7 @@
 import {
   admitBody,
+  admittedToast,
+  chosenTerm,
   addedGuardian,
   canAdmit,
   canRemoveGuardian,
@@ -147,5 +149,86 @@ describe('admitBody', () => {
         { new: { fullName: 'Mrs Udoh', login: { kind: 'username' } } },
       ],
     });
+  });
+});
+
+describe('chosenTerm', () => {
+  const preview = {
+    currentTerm: { id: 't1', name: 'First term' },
+    nextTerm: { id: 't2', name: 'Second term' },
+  };
+
+  it('is the current term until the next one is picked', () => {
+    expect(chosenTerm(preview, { termId: '' })).toEqual({
+      id: 't1',
+      name: 'First term',
+      later: false,
+    });
+    expect(chosenTerm(preview, { termId: 't2' })).toEqual({
+      id: 't2',
+      name: 'Second term',
+      later: true,
+    });
+  });
+
+  it('falls back to the current term when there is no next term', () => {
+    expect(
+      chosenTerm({ ...preview, nextTerm: null }, { termId: 't2' }).later
+    ).toBe(false);
+  });
+});
+
+describe('admitBody term', () => {
+  it('leaves the term out unless one was picked', () => {
+    const form = initialAdmitForm({ canLink: false, canCreate: false });
+    expect(admitBody(form)).not.toHaveProperty('termId');
+    expect(admitBody({ ...form, termId: 't2' })).toMatchObject({
+      termId: 't2',
+    });
+  });
+});
+
+describe('admittedToast', () => {
+  const student = {
+    firstName: 'Peace',
+    lastName: 'Udoh',
+    admissionNumber: 'GF-0234',
+    currentPlacement: null,
+    history: [
+      {
+        sessionId: 's',
+        sessionName: '2026/2027',
+        levelName: 'JSS 2',
+        status: 'active' as const,
+        isNew: true,
+        placements: [
+          {
+            termName: 'Second term',
+            className: 'JSS 2 Gold',
+            campusName: 'Lekki',
+          },
+        ],
+      },
+    ],
+  };
+
+  it('says when the class starts for a student with no class this term', () => {
+    expect(admittedToast(student)).toBe(
+      'Peace Udoh admitted as GF-0234. They have no class until Second term starts.'
+    );
+  });
+
+  it('keeps the plain message for a student placed in the current term', () => {
+    expect(
+      admittedToast({
+        ...student,
+        currentPlacement: {
+          armId: 'a',
+          className: 'JSS 2 Gold',
+          campusId: 'c',
+          campusName: 'Lekki',
+        },
+      })
+    ).toBe('Peace Udoh admitted as GF-0234.');
   });
 });

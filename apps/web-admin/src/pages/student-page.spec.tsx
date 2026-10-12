@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import {
   ApiError,
   type LoginCredential,
@@ -39,6 +39,11 @@ function setup(
     leave: vi.fn().mockResolvedValue(detail),
     undoLeaving: vi.fn().mockResolvedValue(detail),
     place: vi.fn().mockResolvedValue(detail),
+    update: vi.fn().mockResolvedValue(detail),
+    resetLogin: vi.fn().mockResolvedValue({
+      username: 'greenfield-0123',
+      temporaryPassword: 'Temp-Pass-0001',
+    }),
   };
   const api = {
     students,
@@ -457,5 +462,211 @@ describe('StudentPage Record leaving', () => {
     });
     await screen.findByText('Admission no.');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+});
+
+const LEFT = {
+  life: 'left',
+  exit: {
+    kind: 'left',
+    on: '2026-10-02',
+    reason: 'Relocated',
+    note: null,
+    recordedOn: '2026-10-07',
+  },
+} as const;
+
+describe('StudentPage edit details', () => {
+  it('shows Edit details and Reset login with student:update', async () => {
+    setup({ access: accessWith('student:read', 'student:update') });
+    expect(
+      await screen.findByRole('button', { name: 'Edit details' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Reset login' })
+    ).toBeInTheDocument();
+  });
+
+  it('hides both without student:update', async () => {
+    setup({ access: accessWith('student:read') });
+    await screen.findByText('Admission no.');
+    expect(
+      screen.queryByRole('button', { name: 'Edit details' })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Reset login' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('hides both for a student who has left', async () => {
+    setup({
+      student: LEFT,
+      access: accessWith('student:read', 'student:update'),
+    });
+    await screen.findByText('Admission no.');
+    expect(
+      screen.queryByRole('button', { name: 'Edit details' })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Reset login' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('offers no reset when the student has no active login', async () => {
+    setup({
+      student: { portalLogin: null },
+      access: accessWith('student:read', 'student:update'),
+    });
+    await screen.findByRole('button', { name: 'Edit details' });
+    expect(
+      screen.queryByRole('button', { name: 'Reset login' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('opens with the current values and sends only what changed', async () => {
+    const { students } = setup({
+      access: accessWith('student:read', 'student:update'),
+    });
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Edit details' })
+    );
+    expect(await screen.findByLabelText('First name')).toHaveValue('Ada');
+    expect(screen.getByLabelText('Last name')).toHaveValue('Okeke');
+    expect(screen.getByLabelText('Gender')).toHaveValue('F');
+    expect(screen.getByLabelText('Date of birth')).toHaveValue('2014-03-03');
+
+    fireEvent.change(screen.getByLabelText('Last name'), {
+      target: { value: 'Nwosu' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    await waitFor(() => {
+      expect(students.update).toHaveBeenCalledWith({
+        params: { id: '5b0f1e1e-6e53-4c52-9f1c-0a1d7a7f9c11' },
+        body: { lastName: 'Nwosu' },
+      });
+    });
+    await waitFor(() => {
+      expect(screen.queryByLabelText('Last name')).not.toBeInTheDocument();
+    });
+  });
+
+  it('refuses blanks and a future date of birth with the server copy and sends nothing', async () => {
+    const { students } = setup({
+      access: accessWith('student:read', 'student:update'),
+    });
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Edit details' })
+    );
+    fireEvent.change(await screen.findByLabelText('First name'), {
+      target: { value: ' ' },
+    });
+    fireEvent.change(screen.getByLabelText('Date of birth'), {
+      target: { value: '2999-01-01' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    expect(
+      await screen.findByText('Enter the first name.')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Choose a date of birth on or before today.')
+    ).toBeInTheDocument();
+    expect(students.update).not.toHaveBeenCalled();
+  });
+
+  it('closes without a call when nothing changed', async () => {
+    const { students } = setup({
+      access: accessWith('student:read', 'student:update'),
+    });
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Edit details' })
+    );
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Save changes' })
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByLabelText('First name')).not.toBeInTheDocument();
+    });
+    expect(students.update).not.toHaveBeenCalled();
+  });
+
+  it('shows the server message when the save is refused', async () => {
+    const { students } = setup({
+      access: accessWith('student:read', 'student:update'),
+    });
+    students.update.mockRejectedValue(
+      new ApiError(409, {
+        code: 'Conflict',
+        message: 'Ada Okeke is no longer on the roll.',
+      })
+    );
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Edit details' })
+    );
+    fireEvent.change(await screen.findByLabelText('First name'), {
+      target: { value: 'Adaeze' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    expect(
+      await screen.findByText('Ada Okeke is no longer on the roll.')
+    ).toBeInTheDocument();
+  });
+});
+
+describe('StudentPage reset login', () => {
+  it('confirms, resets and shows the new password once in the logins dialog', async () => {
+    const { students } = setup({
+      access: accessWith('student:read', 'student:update'),
+    });
+    fireEvent.click(await screen.findByRole('button', { name: 'Reset login' }));
+    expect(
+      await screen.findByRole('dialog', { name: 'Reset Ada’s login?' })
+    ).toBeInTheDocument();
+    expect(students.resetLogin).not.toHaveBeenCalled();
+
+    fireEvent.click(
+      within(screen.getByRole('dialog')).getByRole('button', {
+        name: 'Reset login',
+      })
+    );
+
+    expect(
+      await screen.findByRole('dialog', { name: 'New login for Ada Okeke' })
+    ).toBeInTheDocument();
+    expect(students.resetLogin).toHaveBeenCalledWith({
+      params: { id: '5b0f1e1e-6e53-4c52-9f1c-0a1d7a7f9c11' },
+    });
+    expect(screen.getAllByText('Temp-Pass-0001').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('greenfield-0123').length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    await waitFor(() => {
+      expect(screen.queryByText('Temp-Pass-0001')).not.toBeInTheDocument();
+    });
+  });
+
+  it('shows the server message and no password when the reset is refused', async () => {
+    const { students } = setup({
+      access: accessWith('student:read', 'student:update'),
+    });
+    students.resetLogin.mockRejectedValue(
+      new ApiError(409, {
+        code: 'Conflict',
+        message: 'This student has no portal login to reset.',
+      })
+    );
+    fireEvent.click(await screen.findByRole('button', { name: 'Reset login' }));
+    fireEvent.click(
+      within(await screen.findByRole('dialog')).getByRole('button', {
+        name: 'Reset login',
+      })
+    );
+
+    expect(
+      await screen.findByText('This student has no portal login to reset.')
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Logins created')).not.toBeInTheDocument();
   });
 });

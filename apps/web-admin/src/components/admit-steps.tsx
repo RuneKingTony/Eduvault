@@ -21,6 +21,7 @@ import {
 import {
   addedGuardian,
   canRemoveGuardian,
+  chosenTerm,
   type AdmitForm,
   type Admitter,
   type StudentErrors,
@@ -114,6 +115,34 @@ export function StudentStep({
   );
 }
 
+function TermPicker({
+  preview,
+  termId,
+  onChange,
+}: {
+  preview: AdmissionPreview;
+  termId: string;
+  onChange: Change;
+}) {
+  if (preview.nextTerm === null) {
+    return null;
+  }
+  return (
+    <SelectField
+      label="Admit for"
+      value={termId}
+      onChange={(event) => {
+        onChange({ termId: event.target.value });
+      }}
+    >
+      <option value={preview.currentTerm.id}>
+        {preview.currentTerm.name} (current)
+      </option>
+      <option value={preview.nextTerm.id}>{preview.nextTerm.name}</option>
+    </SelectField>
+  );
+}
+
 export function ClassStep({
   preview,
   form,
@@ -133,12 +162,14 @@ export function ClassStep({
       </Alert>
     );
   }
+  const term = chosenTerm(preview, form);
   return (
     <div className="flex flex-col gap-3">
+      <TermPicker preview={preview} termId={term.id} onChange={onChange} />
       <SelectField
-        label={`Class for ${preview.currentTerm.name}`}
+        label={`Class for ${term.name}`}
         value={form.classArmId}
-        hint={`Creates their ${preview.currentSession.name} enrolment and a ${preview.currentTerm.name} placement.`}
+        hint={`Creates their ${preview.currentSession.name} enrolment and a ${term.name} placement.`}
         onChange={(event) => {
           onChange({ classArmId: event.target.value });
         }}
@@ -152,7 +183,9 @@ export function ClassStep({
       <Alert>
         <InfoIcon />
         <AlertDescription>
-          Admitted mid-term? The bursar can charge this student on their own.
+          {term.later
+            ? `They will show “No class this term” until ${term.name} starts.`
+            : 'Admitted mid-term? The bursar can charge this student on their own.'}
         </AlertDescription>
       </Alert>
     </div>
@@ -373,6 +406,7 @@ export function ReviewStep({
   matches: AdmissionDuplicates['matches'];
 }) {
   const arm = preview.classes.find((option) => option.id === form.classArmId);
+  const term = chosenTerm(preview, form);
   return (
     <div className="flex flex-col gap-3">
       {matches.length > 0 ? <DuplicateWarning matches={matches} /> : null}
@@ -385,6 +419,7 @@ export function ReviewStep({
         <Pair label="Date of birth">{fmtDate(form.dateOfBirth)}</Pair>
         <Pair label="Gender">{form.gender === 'F' ? 'Female' : 'Male'}</Pair>
         <Pair label="Class">{arm?.label ?? '—'}</Pair>
+        {term.later ? <Pair label="Term">{term.name}</Pair> : null}
         <Pair label="Student login">
           <code className="font-mono">{preview.nextStudentUsername}</code> with
           a temporary password

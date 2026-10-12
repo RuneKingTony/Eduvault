@@ -1,9 +1,11 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import {
+  ADMIT_DOB_MESSAGE,
   STUDENT_NOT_FOUND_MESSAGE,
   contract,
   type RouteQuery,
@@ -74,6 +76,12 @@ export class StudentService {
       throw new ConflictException(
         `${student.firstName} ${student.lastName} is no longer on the roll.`
       );
+    }
+    if (
+      patch.dateOfBirth !== undefined &&
+      patch.dateOfBirth > this.students.today(ctx.organizationId)
+    ) {
+      throw new BadRequestException(ADMIT_DOB_MESSAGE);
     }
     await this.students.update(ctx.organizationId, id, patch);
     return this.get(ctx, id);

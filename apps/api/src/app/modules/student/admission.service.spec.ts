@@ -69,6 +69,15 @@ class FakeAdmissions extends AdmissionRepository {
     return Promise.resolve(this.term);
   }
 
+  next: { id: string; name: string } | undefined = {
+    id: 'term-2',
+    name: 'Second term',
+  };
+
+  nextTerm() {
+    return Promise.resolve(this.next);
+  }
+
   rules() {
     return Promise.resolve({
       maxGuardians: this.maxGuardians,
@@ -272,6 +281,64 @@ describe('AdmissionService.admit validation order', () => {
   });
 });
 
+describe('AdmissionService.admit term', () => {
+  it('places in the current term when no term is named or the current one is', async () => {
+    const { admissions, service } = setup();
+
+    await service.admit(admin, input());
+    await service.admit(admin, input({ termId: 'term-1' }));
+
+    expect(admissions.writes.map((write) => write.term.termId)).toEqual([
+      'term-1',
+      'term-1',
+    ]);
+    expect(admissions.writes.map((write) => write.startsLater)).toEqual([
+      false,
+      false,
+    ]);
+  });
+
+  it('places in the next term of the same session when it is named', async () => {
+    const { admissions, service } = setup();
+
+    await service.admit(admin, input({ termId: 'term-2' }));
+
+    expect(admissions.writes[0]).toMatchObject({
+      startsLater: true,
+      term: {
+        termId: 'term-2',
+        termName: 'Second term',
+        sessionId: 'session-1',
+        sessionName: '2026/2027',
+      },
+    });
+  });
+
+  it('answers 400 for any other term, and for the next term when there is none', async () => {
+    const { admissions, service } = setup();
+
+    await expect(
+      service.admit(admin, input({ termId: crypto.randomUUID() }))
+    ).rejects.toThrow('Choose the current term or the next term.');
+    admissions.next = undefined;
+    await expect(
+      service.admit(admin, input({ termId: 'term-2' }))
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(admissions.writes).toHaveLength(0);
+  });
+
+  it('offers the next term in the preview, or null in the last term of the year', async () => {
+    const { admissions, service } = setup();
+
+    expect((await service.preview(admin)).nextTerm).toEqual({
+      id: 'term-2',
+      name: 'Second term',
+    });
+    admissions.next = undefined;
+    expect((await service.preview(admin)).nextTerm).toBeNull();
+  });
+});
+
 describe('AdmissionService.admit permission matrix', () => {
   it('answers 403 and writes nothing for guardians without guardian:link', async () => {
     const { admissions, service } = setup();
@@ -395,6 +462,7 @@ describe('AdmissionService.preview and duplicates', () => {
       nextStudentUsername: 'greenfield-0234',
       currentTerm: { id: 'term-1', name: 'First term' },
       currentSession: { id: 'session-1', name: '2026/2027' },
+      nextTerm: { id: 'term-2', name: 'Second term' },
       maxGuardians: 2,
       requireGuardian: true,
       classes: [{ id: ARM, label: 'JSS 2 Gold · Lekki', campusId: 'lekki' }],

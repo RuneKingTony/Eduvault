@@ -318,6 +318,90 @@ const toReview = async () => {
   await screen.findByText('Student login');
 };
 
+const SECOND = { id: 't2', name: 'Second term' };
+
+describe('AdmitStudentSheet term picker', () => {
+  it('offers no picker in the last term of the year', async () => {
+    setup();
+    await fillStudent();
+    next();
+    await screen.findByLabelText('Class for First term');
+    expect(screen.queryByLabelText('Admit for')).not.toBeInTheDocument();
+  });
+
+  it('offers the current and the next term, defaulting to the current one', async () => {
+    setup({ preview: preview({ nextTerm: SECOND }) });
+    await fillStudent();
+    next();
+    const picker = await screen.findByLabelText('Admit for');
+    expect(picker).toHaveValue('t1');
+    expect(
+      within(picker)
+        .getAllByRole('option')
+        .map((option) => option.textContent)
+    ).toEqual(['First term (current)', 'Second term']);
+  });
+
+  it('retitles the class step and says the student has no class until the term starts', async () => {
+    setup({ preview: preview({ nextTerm: SECOND }) });
+    await fillStudent();
+    next();
+    fireEvent.change(await screen.findByLabelText('Admit for'), {
+      target: { value: 't2' },
+    });
+    expect(screen.getByLabelText('Class for Second term')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Creates their 2026/2027 enrolment and a Second term placement.'
+      )
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'They will show “No class this term” until Second term starts.'
+      )
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Admitted mid-term/)).not.toBeInTheDocument();
+  });
+
+  it('sends the term id and shows the term in the review', async () => {
+    const create = vi.fn().mockResolvedValue({
+      student: studentDetail(),
+      logins: [],
+    });
+    setup({ preview: preview({ nextTerm: SECOND }), create });
+    await fillStudent();
+    next();
+    fireEvent.change(await screen.findByLabelText('Admit for'), {
+      target: { value: 't2' },
+    });
+    next();
+    fillGuardian();
+    next();
+    await screen.findByText('Student login');
+    expect(screen.getByText('Term')).toBeInTheDocument();
+    expect(screen.getByText('Second term')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Admit and enrol' }));
+    await waitFor(() => {
+      expect(create).toHaveBeenCalled();
+    });
+    expect(create.mock.calls[0]?.[0].body).toMatchObject({ termId: 't2' });
+  });
+
+  it('sends no term id when the current term stays chosen', async () => {
+    const create = vi.fn().mockResolvedValue({
+      student: studentDetail(),
+      logins: [],
+    });
+    setup({ preview: preview({ nextTerm: SECOND }), create });
+    await toReview();
+    fireEvent.click(screen.getByRole('button', { name: 'Admit and enrol' }));
+    await waitFor(() => {
+      expect(create).toHaveBeenCalled();
+    });
+    expect(create.mock.calls[0]?.[0].body).not.toHaveProperty('termId');
+  });
+});
+
 describe('AdmitStudentSheet step 4', () => {
   it('reviews the student, the class, the login and each guardian with its login note', async () => {
     setup();

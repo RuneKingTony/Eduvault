@@ -7,6 +7,7 @@ import {
 import {
   ADMIT_DOB_MESSAGE,
   ADMIT_NO_TERM_MESSAGE,
+  ADMIT_TERM_MESSAGE,
   ADMIT_REQUIRE_GUARDIAN_MESSAGE,
   CLASS_NOT_FOUND_MESSAGE,
   GUARDIAN_NOT_FOUND_MESSAGE,
@@ -77,17 +78,19 @@ export class AdmissionService {
 
   async preview(ctx: OrgContext): Promise<AdmissionPreview> {
     const term = await this.currentTermOrThrow(ctx);
-    const [rules, school, next, classes] = await Promise.all([
+    const [rules, school, next, classes, nextTerm] = await Promise.all([
       this.admissions.rules(ctx.organizationId),
       this.admissions.school(ctx.organizationId),
       this.admissions.nextNumber(ctx.organizationId),
       this.admissions.classes(ctx.organizationId, ctx.campusScope),
+      this.admissions.nextTerm(ctx.organizationId, term.termId),
     ]);
     return {
       nextAdmissionNumber: formatAdmissionNumber(school.prefix, next),
       nextStudentUsername: formatStudentUsername(school.slug, next),
       currentTerm: { id: term.termId, name: term.termName },
       currentSession: { id: term.sessionId, name: term.sessionName },
+      nextTerm: nextTerm ?? null,
       maxGuardians: rules.maxGuardians,
       requireGuardian: rules.requireGuardian,
       classes: classes.map((arm) => ({
@@ -129,7 +132,8 @@ export class AdmissionService {
     if (input.dateOfBirth > this.admissions.today(ctx.organizationId)) {
       throw new BadRequestException(ADMIT_DOB_MESSAGE);
     }
-    const term = await this.currentTermOrThrow(ctx);
+    const current = await this.currentTermOrThrow(ctx);
+    const term = await this.chosenTerm(ctx, current, input.termId);
     const arm = await this.admissions.findClass(ctx.organizationId, {
       campusScope: ctx.campusScope,
       classArmId: input.classArmId,
@@ -155,6 +159,7 @@ export class AdmissionService {
       },
       arm,
       term,
+      startsLater: term.termId !== current.termId,
       school,
       studentPasswordHash: await this.accounts.hashPassword(studentPassword),
       guardians: drafts.map((draft) => draft.write),
@@ -167,6 +172,29 @@ export class AdmissionService {
         studentPassword,
         guardianPasswords: drafts.map((draft) => draft.plain),
       }),
+    };
+  }
+
+  private async chosenTerm(
+    ctx: OrgContext,
+    current: CurrentTerm,
+    termId: string | undefined
+  ): Promise<CurrentTerm> {
+    if (termId === undefined || termId === current.termId) {
+      return current;
+    }
+    const next = await this.admissions.nextTerm(
+      ctx.organizationId,
+      current.termId
+    );
+    if (next?.id !== termId) {
+      throw new BadRequestException(ADMIT_TERM_MESSAGE);
+    }
+    return {
+      termId: next.id,
+      termName: next.name,
+      sessionId: current.sessionId,
+      sessionName: current.sessionName,
     };
   }
 
