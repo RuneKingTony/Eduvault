@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { ENV_TOKEN, type Env } from '../config/env';
 import { FilesRepository } from './files.repository';
+import { FilesService } from './files.service';
 
 export const ORPHAN_AGE_MS = 24 * 60 * 60 * 1000;
 const SWEEP_EVERY_MS = 24 * 60 * 60 * 1000;
@@ -20,6 +21,7 @@ export class FileSweepService
 
   constructor(
     private readonly files: FilesRepository,
+    private readonly service: FilesService,
     @Inject(ENV_TOKEN) private readonly env: Env
   ) {}
 
@@ -46,9 +48,23 @@ export class FileSweepService
     });
   }
 
-  sweep(now: Date): Promise<number> {
-    return this.files.deleteOrphansUploadedBefore(
+  async sweep(now: Date): Promise<number> {
+    const orphans = await this.files.findOrphansUploadedBefore(
       new Date(now.getTime() - ORPHAN_AGE_MS)
     );
+    let discarded = 0;
+    for (const orphan of orphans) {
+      try {
+        if (!(await this.files.isAttached(orphan))) {
+          await this.service.discard(orphan);
+          discarded += 1;
+        }
+      } catch (error) {
+        this.logger.error(
+          `Could not discard orphan file ${orphan.id}: ${error instanceof Error ? error.message : 'unknown error'}`
+        );
+      }
+    }
+    return discarded;
   }
 }

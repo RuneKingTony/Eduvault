@@ -92,6 +92,40 @@
         "cwd": "apps/api"
       }
     },
+    "s3-start": {
+      "executor": "nx:run-commands",
+      "description": "Start MinIO and create the dev bucket (docker compose profile s3, ports 9100 and 9101)",
+      "options": {
+        "commands": [
+          "docker compose --profile s3 up -d --wait minio",
+          "docker compose --profile s3 run --rm minio-init"
+        ],
+        "parallel": false
+      }
+    },
+    "files-copy-build": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["production", "^production"],
+      "outputs": [
+        "{projectRoot}/dist/files-copy.cjs",
+        "{projectRoot}/dist/files-copy.cjs.map"
+      ],
+      "description": "Bundle the files-copy command with SWC (no Nest)",
+      "options": {
+        "command": "vite build --config vite.files-copy.config.mts",
+        "cwd": "apps/api"
+      }
+    },
+    "files-copy": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["env-init", "files-copy-build"],
+      "description": "Copy file bytes between stores and verify their SHA-256: --from=postgres --to=s3 [--apply] (dry run by default)",
+      "options": {
+        "command": "node --env-file-if-exists=.env.local dist/files-copy.cjs",
+        "cwd": "apps/api"
+      }
+    },
     "auth-generate": {
       "executor": "nx:run-commands",
       "description": "Emit Better Auth schema changes as a new dbmate migration and refresh the snapshot",

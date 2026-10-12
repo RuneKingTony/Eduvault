@@ -12,6 +12,7 @@ import {
   FilesRepository,
   type FileRecord,
   type NewFile,
+  type StoredFile,
 } from './files.repository';
 
 type FileEntry = ExpressionBuilder<DB, 'file_object'>;
@@ -99,9 +100,10 @@ export class KyselyFilesRepository extends FilesRepository {
       .execute();
   }
 
-  async deleteOrphansUploadedBefore(cutoff: Date): Promise<number> {
-    const removed = await this.db
-      .deleteFrom('file_object')
+  async findOrphansUploadedBefore(cutoff: Date): Promise<FileRecord[]> {
+    const rows = await this.db
+      .selectFrom('file_object')
+      .selectAll()
       .where('uploaded_at', '<', cutoff)
       .where((eb) =>
         eb.not(
@@ -112,8 +114,20 @@ export class KyselyFilesRepository extends FilesRepository {
           )
         )
       )
-      .returning('id')
+      .orderBy('id')
       .execute();
-    return removed.length;
+    return rows.map((row) => toRecord(row));
+  }
+
+  async listAfter(
+    afterId: string | undefined,
+    limit: number
+  ): Promise<StoredFile[]> {
+    let query = this.db.selectFrom('file_object').selectAll();
+    if (afterId !== undefined) {
+      query = query.where('id', '>', afterId);
+    }
+    const rows = await query.orderBy('id').limit(limit).execute();
+    return rows.map((row) => ({ ...toRecord(row), sha256: row.sha256 }));
   }
 }

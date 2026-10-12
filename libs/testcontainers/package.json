@@ -4,6 +4,8 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@aws-sdk/client-s3": "catalog:aws",
+    "@testcontainers/minio": "catalog:testing",
     "@testcontainers/postgresql": "catalog:testing",
     "dbmate": "catalog:server"
   }

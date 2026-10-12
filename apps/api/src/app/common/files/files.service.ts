@@ -119,7 +119,7 @@ export class FilesService {
     }
   }
 
-  private async discard(file: FileRecord): Promise<void> {
+  async discard(file: FileRecord): Promise<void> {
     await this.store.delete({
       organizationId: file.organizationId,
       key: file.storageKey,

@@ -28,7 +28,7 @@ Before implementing a roadmap slice, read `docs/technical-reference.md` (shared 
 | Regenerate drift files | `pnpm drift:fix`, then review and commit                                 |
 | New Better Auth schema | `nx run api:auth-generate`                                               |
 
-Ports: Postgres 5434, API 3000, web-admin 4200, web-portal 4201. First run copies `apps/api/.env.example` to `.env.local`.
+Ports: Postgres 5434, API 3000, web-admin 4200, web-portal 4201, optional MinIO 9100 (API) and 9101 (console). First run copies `apps/api/.env.example` to `.env.local`.
 Recipe for running everything and signing in: `.claude/skills/run-local/SKILL.md`.
 
 ## Testing
