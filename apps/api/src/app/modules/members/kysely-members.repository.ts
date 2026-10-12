@@ -4,6 +4,7 @@ import {
   DEFAULT_MEMBER_TITLE,
   MEMBER_PAGE_SIZE,
   type SchoolRoleEntry,
+  type TaughtClass,
 } from '@eduvault/api-contract';
 import {
   OWNER_ROLE,
@@ -20,6 +21,7 @@ import {
   MembersRepository,
   type MemberListQuery,
   type MemberRecord,
+  type Viewer,
 } from './members.repository';
 
 interface Row {
@@ -254,5 +256,64 @@ export class KyselyMembersRepository extends MembersRepository {
       .select(['role', 'permission', 'label', 'description', 'source'])
       .execute();
     return rows.map((row) => toSchoolRoleEntry(row));
+  }
+
+  async taughtClasses(
+    organizationId: string,
+    userId: string,
+    viewer: Viewer
+  ): Promise<TaughtClass[]> {
+    const rows = await this.db
+      .selectFrom('class_arm_teacher')
+      .innerJoin('class_arm', (join) =>
+        join
+          .onRef('class_arm.id', '=', 'class_arm_teacher.class_arm_id')
+          .onRef(
+            'class_arm.organization_id',
+            '=',
+            'class_arm_teacher.organization_id'
+          )
+      )
+      .innerJoin('class_level', (join) =>
+        join
+          .onRef('class_level.id', '=', 'class_arm.class_level_id')
+          .onRef(
+            'class_level.organization_id',
+            '=',
+            'class_arm.organization_id'
+          )
+      )
+      .innerJoin('term', (join) =>
+        join
+          .onRef('term.session_id', '=', 'class_arm_teacher.session_id')
+          .onRef(
+            'term.organization_id',
+            '=',
+            'class_arm_teacher.organization_id'
+          )
+      )
+      .where('class_arm_teacher.organization_id', '=', organizationId)
+      .where('class_arm_teacher.user_id', '=', userId)
+      .where('term.is_current', '=', true)
+      .where('class_arm.retired_at', 'is', null)
+      .where((eb) =>
+        inCampusScope(eb, 'class_arm.campus_id', { scope: viewer.campusScope })
+      )
+      .where((eb) =>
+        inCampusScope(eb, 'class_arm.id', { scope: viewer.classScope })
+      )
+      .select([
+        'class_arm.id',
+        'class_arm.name',
+        'class_level.name as level_name',
+      ])
+      .orderBy('class_level.sequence')
+      .orderBy('class_arm.name')
+      .orderBy('class_arm.id')
+      .execute();
+    return rows.map((row) => ({
+      id: row.id,
+      displayName: `${row.level_name} ${row.name}`,
+    }));
   }
 }

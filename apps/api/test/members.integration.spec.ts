@@ -15,6 +15,8 @@ import {
   waitForAuditRows,
   type Fixtures,
 } from './support/base-test';
+import { createSchoolYear } from './support/factories/calendar';
+import { assignClassTeacher, createClass } from './support/factories/classes';
 import {
   twoSchoolsWithoutStudents,
   type TwoSchoolsWithoutStudents,
@@ -104,6 +106,14 @@ const putTitle = (
   actor: Actor,
   { id, title }: { id: string; title: unknown }
 ) => api(actor).put(`/members/${id}/title`).send({ title });
+
+const teachingOf = async (pool: Fixtures['pool'], userId: string) =>
+  (
+    await pool.query<{ class_arm_id: string }>(
+      'SELECT class_arm_id FROM class_arm_teacher WHERE user_id = $1',
+      [userId]
+    )
+  ).rows.map((row) => row.class_arm_id);
 
 const userIds = (list: MemberList) => list.items.map((item) => item.userId);
 
@@ -1327,6 +1337,333 @@ test.describe('members', () => {
         roles: ['teacher'],
         campusIds: [campusB.id],
       }).expect(404);
+    });
+  });
+
+  test.describe('class teaching', () => {
+    test('removing a member deletes their rows for this year and no one else’s', async ({
+      api,
+      app,
+      pool,
+      createUser,
+      addMember,
+      schools: { orgA, orgB, owner, ownerB, lekki, campusB },
+    }) => {
+      await createSchoolYear(app, owner);
+      await createSchoolYear(app, ownerB);
+      const leaver = await addMember(orgA, await createUser(), {
+        roles: ['teacher'],
+        campuses: [lekki],
+      });
+      const stayer = await addMember(orgA, await createUser(), {
+        roles: ['teacher'],
+        campuses: [lekki],
+      });
+      await addMember(orgB, leaver, {
+        roles: ['teacher'],
+        campuses: [campusB],
+      });
+      const gold = await createClass(app, owner, { campusId: lekki.id });
+      const silver = await createClass(app, owner, { campusId: lekki.id });
+      const main = await createClass(app, ownerB, { campusId: campusB.id });
+      await assignClassTeacher(app, owner, {
+        classId: gold.id,
+        userId: leaver.id,
+        role: 'lead',
+      });
+      await assignClassTeacher(app, owner, {
+        classId: silver.id,
+        userId: leaver.id,
+      });
+      await assignClassTeacher(app, owner, {
+        classId: silver.id,
+        userId: stayer.id,
+      });
+      await assignClassTeacher(app, ownerB, {
+        classId: main.id,
+        userId: leaver.id,
+      });
+
+      await api(owner)
+        .delete(`/members/${await idOf(api, owner, leaver.id)}`)
+        .expect(200);
+
+      expect(await teachingOf(pool, leaver.id)).toEqual([main.id]);
+      expect(await teachingOf(pool, stayer.id)).toEqual([silver.id]);
+      const detail = (await api(owner).get(`/classes/${silver.id}`).expect(200))
+        .body as { classTeachers: { userId: string }[] };
+      expect(detail.classTeachers.map((row) => row.userId)).toEqual([
+        stayer.id,
+      ]);
+    });
+
+    test('keeps rows from a year that is not the current one', async ({
+      api,
+      app,
+      pool,
+      createUser,
+      addMember,
+      schools: { orgA, owner, lekki },
+    }) => {
+      await createSchoolYear(app, owner);
+      const leaver = await addMember(orgA, await createUser(), {
+        roles: ['teacher'],
+        campuses: [lekki],
+      });
+      const gold = await createClass(app, owner, { campusId: lekki.id });
+      await assignClassTeacher(app, owner, {
+        classId: gold.id,
+        userId: leaver.id,
+      });
+      await pool.query(
+        'UPDATE term SET is_current = false WHERE organization_id = $1',
+        [orgA.id]
+      );
+
+      await api(owner)
+        .delete(`/members/${await idOf(api, owner, leaver.id)}`)
+        .expect(200);
+
+      expect(await teachingOf(pool, leaver.id)).toEqual([gold.id]);
+    });
+
+    test('leaving a campus deletes only the rows on that campus', async ({
+      api,
+      app,
+      pool,
+      createUser,
+      addMember,
+      schools: { orgA, owner, lekki, ikeja },
+    }) => {
+      await createSchoolYear(app, owner);
+      const teacher = await addMember(orgA, await createUser(), {
+        roles: ['teacher'],
+        campuses: [lekki, ikeja],
+      });
+      const atLekki = await createClass(app, owner, { campusId: lekki.id });
+      const atIkeja = await createClass(app, owner, { campusId: ikeja.id });
+      for (const arm of [atLekki, atIkeja]) {
+        await assignClassTeacher(app, owner, {
+          classId: arm.id,
+          userId: teacher.id,
+        });
+      }
+      const id = await idOf(api, owner, teacher.id);
+
+      await api(owner)
+        .put(`/members/${id}/campuses`)
+        .send({ campusIds: [ikeja.id] })
+        .expect(200);
+
+      expect(await teachingOf(pool, teacher.id)).toEqual([atIkeja.id]);
+      const scope = (await api(teacher).get('/me/permissions').expect(200))
+        .body as { classScope: string[] };
+      expect(scope.classScope).toEqual([atIkeja.id]);
+    });
+
+    test('changing roles and leaving a campus in one save ends that campus’s rows too', async ({
+      api,
+      app,
+      pool,
+      createUser,
+      addMember,
+      schools: { orgA, owner, lekki, ikeja },
+    }) => {
+      await createSchoolYear(app, owner);
+      const teacher = await addMember(orgA, await createUser(), {
+        roles: ['teacher'],
+        campuses: [lekki, ikeja],
+      });
+      const atLekki = await createClass(app, owner, { campusId: lekki.id });
+      const atIkeja = await createClass(app, owner, { campusId: ikeja.id });
+      for (const arm of [atLekki, atIkeja]) {
+        await assignClassTeacher(app, owner, {
+          classId: arm.id,
+          userId: teacher.id,
+        });
+      }
+
+      await putRoles(api, owner, {
+        id: await idOf(api, owner, teacher.id),
+        roles: ['teacher'],
+        campusIds: [lekki.id],
+      }).expect(200);
+
+      expect(await teachingOf(pool, teacher.id)).toEqual([atLekki.id]);
+    });
+
+    test('keeps the rows of someone whose role reaches every campus', async ({
+      api,
+      app,
+      pool,
+      createUser,
+      addMember,
+      schools: { orgA, owner, lekki, ikeja },
+    }) => {
+      await createSchoolYear(app, owner);
+      const principal = await addMember(orgA, await createUser(), {
+        roles: ['principal'],
+        campuses: [lekki, ikeja],
+      });
+      const atLekki = await createClass(app, owner, { campusId: lekki.id });
+      await assignClassTeacher(app, owner, {
+        classId: atLekki.id,
+        userId: principal.id,
+      });
+
+      await api(owner)
+        .put(`/members/${await idOf(api, owner, principal.id)}/campuses`)
+        .send({ campusIds: [ikeja.id] })
+        .expect(200);
+
+      expect(await teachingOf(pool, principal.id)).toEqual([atLekki.id]);
+    });
+
+    test('another school’s owner cannot end a member’s teaching, and nothing is deleted', async ({
+      api,
+      app,
+      pool,
+      createUser,
+      addMember,
+      schools: { orgA, owner, ownerB, lekki, ikeja },
+    }) => {
+      await createSchoolYear(app, owner);
+      const teacher = await addMember(orgA, await createUser(), {
+        roles: ['teacher'],
+        campuses: [lekki, ikeja],
+      });
+      const arm = await createClass(app, owner, { campusId: lekki.id });
+      await assignClassTeacher(app, owner, {
+        classId: arm.id,
+        userId: teacher.id,
+      });
+      const id = await idOf(api, owner, teacher.id);
+
+      await api(ownerB).delete(`/members/${id}`).expect(404);
+      await api(ownerB)
+        .put(`/members/${id}/campuses`)
+        .send({ campusIds: [ikeja.id] })
+        .expect(404);
+
+      expect(await teachingOf(pool, teacher.id)).toEqual([arm.id]);
+    });
+  });
+
+  test.describe('classes on the member page', () => {
+    test('names the classes a teacher teaches this year, in order, and not archived ones', async ({
+      api,
+      app,
+      createUser,
+      addMember,
+      schools: { orgA, owner, lekki },
+    }) => {
+      await createSchoolYear(app, owner);
+      const teacher = await addMember(orgA, await createUser(), {
+        roles: ['teacher'],
+        campuses: [lekki],
+      });
+      const gold = await createClass(app, owner, {
+        campusId: lekki.id,
+        name: 'Gold',
+      });
+      const blue = await createClass(app, owner, {
+        campusId: lekki.id,
+        levelCode: 'JSS2',
+        name: 'Blue',
+      });
+      const old = await createClass(app, owner, {
+        campusId: lekki.id,
+        name: 'Old',
+      });
+      for (const arm of [blue, gold, old]) {
+        await assignClassTeacher(app, owner, {
+          classId: arm.id,
+          userId: teacher.id,
+        });
+      }
+      await api(owner)
+        .patch(`/classes/${old.id}`)
+        .send({ archived: true })
+        .expect(200);
+
+      const id = await idOf(api, owner, teacher.id);
+      const detail = (await api(owner).get(`/members/${id}`).expect(200))
+        .body as MemberDetail;
+      expect(detail.classes).toEqual([
+        { id: gold.id, displayName: gold.displayName },
+        { id: blue.id, displayName: blue.displayName },
+      ]);
+      expect(detail.classScope).toEqual([gold.id, blue.id]);
+    });
+
+    test('a member with no class permission reads every class and none taught', async ({
+      api,
+      schools: { owner, noPermission },
+    }) => {
+      const detail = (
+        await api(owner)
+          .get(`/members/${await idOf(api, owner, noPermission.id)}`)
+          .expect(200)
+      ).body as MemberDetail;
+      expect(detail.classScope).toBe('all');
+      expect(detail.classes).toEqual([]);
+    });
+
+    test('a Lekki-only viewer sees the Lekki classes of a member who also teaches at Ikeja', async ({
+      api,
+      app,
+      createUser,
+      addMember,
+      withPermissions,
+      schools: { orgA, owner, lekki, ikeja },
+    }) => {
+      await createSchoolYear(app, owner);
+      const viewer = await withPermissions(orgA, ['member:read'], {
+        campuses: [lekki],
+      });
+      const teacher = await addMember(orgA, await createUser(), {
+        roles: ['teacher'],
+        campuses: [lekki, ikeja],
+      });
+      const atLekki = await createClass(app, owner, { campusId: lekki.id });
+      const atIkeja = await createClass(app, owner, { campusId: ikeja.id });
+      for (const arm of [atLekki, atIkeja]) {
+        await assignClassTeacher(app, owner, {
+          classId: arm.id,
+          userId: teacher.id,
+        });
+      }
+
+      const id = await idOf(api, owner, teacher.id);
+      const seen = (await api(viewer).get(`/members/${id}`).expect(200))
+        .body as MemberDetail;
+      expect(seen.classes.map((row) => row.id)).toEqual([atLekki.id]);
+      expect(seen.classScope).toEqual([atLekki.id]);
+      const full = (await api(owner).get(`/members/${id}`).expect(200))
+        .body as MemberDetail;
+      expect(full.classes).toHaveLength(2);
+    });
+
+    test('another school’s owner gets 404, never the classes', async ({
+      api,
+      app,
+      createUser,
+      addMember,
+      schools: { orgA, owner, ownerB, lekki },
+    }) => {
+      await createSchoolYear(app, owner);
+      const teacher = await addMember(orgA, await createUser(), {
+        roles: ['teacher'],
+        campuses: [lekki],
+      });
+      const arm = await createClass(app, owner, { campusId: lekki.id });
+      await assignClassTeacher(app, owner, {
+        classId: arm.id,
+        userId: teacher.id,
+      });
+      await api(ownerB)
+        .get(`/members/${await idOf(api, owner, teacher.id)}`)
+        .expect(404);
     });
   });
 

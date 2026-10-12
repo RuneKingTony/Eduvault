@@ -8,6 +8,7 @@ import { OWNER_ROLE, MEMBER_ROLE, splitRoles } from '@eduvault/policy';
 import type { DB } from '../../../db/db-types';
 import type { PlatformAuditEntry } from '../../common/audit';
 import { insertPlatformAudit } from '../../common/audit/kysely-audit.repository';
+import { endClassTeaching } from '../../common/db/end-class-teaching';
 import { escapeLike } from '../../common/db/escape-like';
 import { iso } from '../../common/db/rows';
 import { KYSELY_TOKEN, type Database } from '../../common/db/tokens';
@@ -339,6 +340,7 @@ export class KyselyPlatformRepository extends PlatformRepository {
         .execute();
     }
     await trx.deleteFrom('member').where('id', '=', member.id).execute();
+    await endClassTeaching(trx, { organizationId, userId: member.userId });
   }
 
   async slugTaken(slug: string): Promise<boolean> {

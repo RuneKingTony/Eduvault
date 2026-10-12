@@ -5,7 +5,11 @@ import {
   InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
-import type { MemberSummary, SchoolRoleEntry } from '@eduvault/api-contract';
+import type {
+  MemberSummary,
+  SchoolRoleEntry,
+  TaughtClass,
+} from '@eduvault/api-contract';
 import { toPermissionMap, type PermissionMap } from '@eduvault/policy';
 import type { MemberAdminService, OrgContext } from '../../common/auth';
 import type { CampusService } from '../campus/campus.service';
@@ -13,6 +17,7 @@ import {
   MembersRepository,
   type MemberListQuery,
   type MemberRecord,
+  type Viewer,
 } from './members.repository';
 import { MembersService } from './members.service';
 
@@ -41,6 +46,13 @@ const roleRows: SchoolRoleEntry[] = [
     description: null,
     source: 'starter',
     permissions: toPermissionMap(['campus:readAll', 'student:read']),
+  },
+  {
+    slug: 'form-tutor',
+    label: 'Form tutor',
+    description: null,
+    source: 'custom',
+    permissions: toPermissionMap(['class:read']),
   },
   {
     slug: 'front-desk',
@@ -75,6 +87,8 @@ const person = (
 
 class FakeMembers extends MembersRepository {
   readonly elsewhere = new Set<string>();
+  readonly taught: TaughtClass[] = [];
+  viewer: Viewer | undefined;
 
   constructor(readonly records: MemberRecord[]) {
     super();
@@ -107,6 +121,11 @@ class FakeMembers extends MembersRepository {
       record.title = title;
     }
     return Promise.resolve();
+  }
+
+  taughtClasses(_organizationId: string, _userId: string, viewer: Viewer) {
+    this.viewer = viewer;
+    return Promise.resolve(this.taught);
   }
 
   countOwners() {
@@ -213,6 +232,7 @@ describe('roles', () => {
       'guardian',
       'principal',
       'teacher',
+      'form-tutor',
       'front-desk',
     ]);
   });
@@ -351,10 +371,12 @@ describe('updateRoles', () => {
     });
     expect(admin.setRolesAndCampuses).toHaveBeenCalledWith({
       memberId: 't',
+      organizationId: ORG,
       userId: 'user-t',
       roles: ['member', 'teacher'],
       addCampusIds: [IKEJA],
       removeCampusIds: [LEKKI],
+      keepClassTeaching: false,
     });
   });
 
@@ -366,6 +388,7 @@ describe('updateRoles', () => {
         roles: ['member', 'principal'],
         addCampusIds: [],
         removeCampusIds: [],
+        keepClassTeaching: true,
       })
     );
   });
@@ -378,9 +401,11 @@ describe('updateCampuses', () => {
       campusIds: [LEKKI, 'campus-vi'],
     });
     expect(admin.setCampuses).toHaveBeenCalledWith({
+      organizationId: ORG,
       userId: 'user-t',
       addCampusIds: ['campus-vi'],
       removeCampusIds: [],
+      keepClassTeaching: false,
     });
   });
 
@@ -388,10 +413,22 @@ describe('updateCampuses', () => {
     const { service, admin } = setup([person('t', ['member'], [LEKKI, IKEJA])]);
     await service.updateCampuses(context(), 't', { campusIds: [LEKKI] });
     expect(admin.setCampuses).toHaveBeenCalledWith({
+      organizationId: ORG,
       userId: 'user-t',
       addCampusIds: [],
       removeCampusIds: [IKEJA],
+      keepClassTeaching: false,
     });
+  });
+
+  it('keeps class teaching for someone whose role reaches every campus', async () => {
+    const { service, admin } = setup([
+      person('t', ['member', 'principal'], [LEKKI, IKEJA]),
+    ]);
+    await service.updateCampuses(context(), 't', { campusIds: [LEKKI] });
+    expect(admin.setCampuses).toHaveBeenCalledWith(
+      expect.objectContaining({ keepClassTeaching: true })
+    );
   });
 
   it('answers 404 for a campus out of scope and writes nothing', async () => {
@@ -593,6 +630,29 @@ describe('get', () => {
     });
     expect(detail.campusScope).toBe('all');
     expect(detail.classScope).toBe('all');
+    expect(detail.classes).toEqual([]);
+  });
+
+  it('names the classes a class-scoped member teaches, as the viewer sees them', async () => {
+    const { service, members } = setup([person('t', ['member', 'form-tutor'])]);
+    members.taught.push({ id: 'arm-1', displayName: 'JSS 2 Gold' });
+    const viewer = context({ campusScope: [LEKKI], classScope: ['arm-1'] });
+    const detail = await service.get(viewer, 't');
+    expect(detail.classScope).toEqual(['arm-1']);
+    expect(detail.classes).toEqual([
+      { id: 'arm-1', displayName: 'JSS 2 Gold' },
+    ]);
+    expect(members.viewer).toEqual({
+      campusScope: [LEKKI],
+      classScope: ['arm-1'],
+    });
+  });
+
+  it('gives a class-scoped member who teaches nothing an empty scope', async () => {
+    const { service } = setup([person('t', ['member', 'form-tutor'])]);
+    const detail = await service.get(context(), 't');
+    expect(detail.classScope).toEqual([]);
+    expect(detail.classes).toEqual([]);
   });
 
   it('marks only the school’s sole owner as the last owner', async () => {

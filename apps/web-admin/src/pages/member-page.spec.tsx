@@ -68,6 +68,19 @@ describe('MemberPage', () => {
     ).toBeInTheDocument();
   });
 
+  it('shows the classes a class teacher teaches', async () => {
+    setup({
+      member: detail({
+        permissions: toPermissionMap(['class:read']),
+        classScope: ['arm-1'],
+        classes: [{ id: 'arm-1', displayName: 'JSS 1 Gold' }],
+      }),
+    });
+    expect(
+      await screen.findByText('JSS 1 Gold (classes they teach)')
+    ).toBeInTheDocument();
+  });
+
   it('shows the temporary password callout only when it is passed', async () => {
     setup({ notice: { temporaryPassword: 'placeholder-only' } });
     expect(await screen.findByText(/Account created\./)).toBeInTheDocument();

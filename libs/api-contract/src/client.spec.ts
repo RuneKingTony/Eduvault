@@ -128,6 +128,7 @@ describe('createApiClient', () => {
         permissions: { student: ['read'] },
         campusScope: [campusId],
         classScope: 'all',
+        classes: [],
         lastOwner: false,
       })
     );

@@ -40,6 +40,7 @@ const member = (roles: string[]): MemberDetail => ({
   permissions: {},
   campusScope: ['c1'],
   classScope: 'all',
+  classes: [],
   lastOwner: false,
 });
 

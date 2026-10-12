@@ -456,10 +456,17 @@ export const memberSummarySchema = z.object({
 });
 export type MemberSummary = z.infer<typeof memberSummarySchema>;
 
+export const taughtClassSchema = z.object({
+  id: idSchema,
+  displayName: z.string(),
+});
+export type TaughtClass = z.infer<typeof taughtClassSchema>;
+
 export const memberDetailSchema = memberSummarySchema.extend({
   permissions: permissionMapSchema,
   campusScope: scopeSchema,
   classScope: scopeSchema,
+  classes: z.array(taughtClassSchema),
   lastOwner: z.boolean(),
 });
 export type MemberDetail = z.infer<typeof memberDetailSchema>;
