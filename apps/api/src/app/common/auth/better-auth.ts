@@ -8,6 +8,7 @@ import {
   getPlugins,
   userBaseConfig,
 } from './better-auth-base';
+import { testPassword } from './test-password';
 
 const getTrustedOrigins = (env: Env): string[] =>
   env.NODE_ENV === 'test' ? ['*'] : [env.WEB_ADMIN_URL, env.WEB_PORTAL_URL];
@@ -51,7 +52,10 @@ export function createAuth(pool: Pool, env: Env) {
     baseURL: env.BETTER_AUTH_URL,
     secret: env.BETTER_AUTH_SECRET,
     trustedOrigins: getTrustedOrigins(env),
-    emailAndPassword: emailAndPasswordBaseConfig,
+    emailAndPassword:
+      env.NODE_ENV === 'test'
+        ? { ...emailAndPasswordBaseConfig, password: testPassword }
+        : emailAndPasswordBaseConfig,
     user: userBaseConfig,
     databaseHooks: getDatabaseHooks(pool),
     rateLimit: {
