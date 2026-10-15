@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { PlusIcon } from 'lucide-react';
+import { FEE_INCOME_SYSTEM_KEY } from '@eduvault/api-contract';
 import { Can } from '@eduvault/auth-client';
 import {
   Alert,
@@ -8,8 +9,6 @@ import {
   Button,
   Card,
   CardContent,
-  ErrorMessage,
-  Skeleton,
   Tabs,
   TabsList,
   TabsTrigger,
@@ -19,6 +18,7 @@ import { AddFeeCategoryDialog } from '../components/add-fee-category-dialog';
 import { ChartTable } from '../components/money/chart-table';
 import { JournalTab } from '../components/money/journal-tab';
 import { scopeText } from '../components/money/money-text';
+import { QueryState } from '../components/money/query-state';
 import { campusesQueryOptions, ledgerAccountsQueryOptions } from '../queries';
 
 export type CategoriesTab = 'categories' | 'journal';
@@ -58,26 +58,16 @@ function Header({ onAdd }: { onAdd: () => void }) {
 
 function Chart() {
   const chart = useQuery(ledgerAccountsQueryOptions(useApi()));
-  if (chart.isPending) {
-    return (
-      <div role="status" aria-label="Loading" className="px-4">
-        <Skeleton className="h-48 w-full" />
-      </div>
-    );
-  }
-  if (chart.data === undefined) {
-    return (
-      <div className="px-4">
-        <ErrorMessage error={chart.error} />
-      </div>
-    );
-  }
   return (
-    <ChartTable
-      accounts={chart.data.items}
-      currency={chart.data.currency}
-      scoped={chart.data.scoped}
-    />
+    <QueryState query={chart} skeletonClassName="h-48">
+      {(data) => (
+        <ChartTable
+          accounts={data.items}
+          currency={data.currency}
+          scoped={data.scoped}
+        />
+      )}
+    </QueryState>
   );
 }
 
@@ -117,7 +107,7 @@ export function MoneyCategoriesPage({
       <AddFeeCategoryDialog
         open={adding}
         feeIncome={chart.data?.items.find(
-          (account) => account.systemKey === 'fee_income'
+          (account) => account.systemKey === FEE_INCOME_SYSTEM_KEY
         )}
         onOpenChange={setAdding}
       />

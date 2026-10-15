@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronRightIcon } from 'lucide-react';
 import {
-  FINANCE_PAGE_SIZE,
   JOURNAL_KINDS,
   JOURNAL_RANGE_MESSAGE,
   type JournalEntry,
@@ -17,12 +16,9 @@ import {
   EmptyDescription,
   EmptyHeader,
   EmptyTitle,
-  ErrorMessage,
   FieldError,
   NativeSelectOption,
-  NumberedPager,
   SelectField,
-  Skeleton,
   Table,
   TableBody,
   TableCell,
@@ -33,7 +29,12 @@ import {
 } from '@eduvault/ui';
 import { useApi } from '../../api';
 import { journalQueryOptions } from '../../queries';
-import { JOURNAL_KIND_LABELS, SCHOOL_WIDE_LABEL } from './money-text';
+import {
+  JOURNAL_KIND_LABELS,
+  SCHOOL_WIDE_LABEL,
+  entryCaption,
+} from './money-text';
+import { FinancePager, QueryState } from './query-state';
 
 const ALL_KINDS = 'all';
 
@@ -145,9 +146,7 @@ function EntryRow({
               {JOURNAL_KIND_LABELS[entry.kind]}
             </span>
             <span className="truncate text-xs text-muted-foreground">
-              {entry.memo === null
-                ? entry.reference
-                : `${entry.reference} · ${entry.memo}`}
+              {entryCaption(entry.reference, entry.memo)}
             </span>
           </span>
           <span className="font-medium tabular-nums">
@@ -171,50 +170,35 @@ function EntriesBody({
   page: number;
   onPage: (page: number) => void;
 }) {
-  if (journal.isPending) {
-    return (
-      <div role="status" aria-label="Loading" className="px-4">
-        <Skeleton className="h-24 w-full" />
-      </div>
-    );
-  }
-  if (journal.data === undefined) {
-    return (
-      <div className="px-4">
-        <ErrorMessage error={journal.error} />
-      </div>
-    );
-  }
-  const { items, total, currency } = journal.data;
-  if (items.length === 0) {
-    return (
-      <Empty>
-        <EmptyHeader>
-          <EmptyTitle>No entries yet</EmptyTitle>
-          <EmptyDescription>
-            Charges, payments and opening balances show up here once they are
-            posted.
-          </EmptyDescription>
-        </EmptyHeader>
-      </Empty>
-    );
-  }
   return (
-    <>
-      <ul className="border-t">
-        {items.map((entry) => (
-          <EntryRow key={entry.entryId} entry={entry} currency={currency} />
-        ))}
-      </ul>
-      {total > FINANCE_PAGE_SIZE ? (
-        <NumberedPager
-          page={page}
-          total={total}
-          pageSize={FINANCE_PAGE_SIZE}
-          onPage={onPage}
-        />
-      ) : null}
-    </>
+    <QueryState query={journal}>
+      {({ items, total, currency }) =>
+        items.length === 0 ? (
+          <Empty>
+            <EmptyHeader>
+              <EmptyTitle>No entries yet</EmptyTitle>
+              <EmptyDescription>
+                Charges, payments and opening balances show up here once they
+                are posted.
+              </EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+        ) : (
+          <>
+            <ul className="border-t">
+              {items.map((entry) => (
+                <EntryRow
+                  key={entry.entryId}
+                  entry={entry}
+                  currency={currency}
+                />
+              ))}
+            </ul>
+            <FinancePager page={page} total={total} onPage={onPage} />
+          </>
+        )
+      }
+    </QueryState>
   );
 }
 

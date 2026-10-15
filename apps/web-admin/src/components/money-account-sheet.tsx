@@ -1,6 +1,7 @@
 import { useState, type SubmitEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  CREATABLE_MONEY_ACCOUNT_KINDS,
   MONEY_ACCOUNT_NAME_MAX,
   createMoneyAccountSchema,
   updateMoneyAccountSchema,
@@ -34,8 +35,7 @@ import {
 
 const SCHOOL_WIDE = 'school-wide';
 const CHECK_DETAILS = 'Check the details.';
-const ADDABLE_KINDS = ['bank', 'pos', 'cash'] as const;
-type AddableKind = (typeof ADDABLE_KINDS)[number];
+type AddableKind = (typeof CREATABLE_MONEY_ACCOUNT_KINDS)[number];
 
 const blankToUndefined = (value: string): string | undefined =>
   value === '' ? undefined : value;
@@ -228,7 +228,7 @@ function AddFields({ campuses }: { campuses: readonly Campus[] }) {
           setKind(event.target.value as AddableKind);
         }}
       >
-        {ADDABLE_KINDS.map((option) => (
+        {CREATABLE_MONEY_ACCOUNT_KINDS.map((option) => (
           <NativeSelectOption key={option} value={option}>
             {KIND_LABELS[option]}
           </NativeSelectOption>

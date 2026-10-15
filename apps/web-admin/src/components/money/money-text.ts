@@ -44,6 +44,9 @@ export const ACCOUNTS_TIP =
 export const campusLabel = (campusName: string | null): string =>
   campusName ?? SCHOOL_WIDE_LABEL;
 
+export const entryCaption = (reference: string, memo: string | null): string =>
+  memo === null ? reference : `${reference} · ${memo}`;
+
 export const endingText = (last4: string | null): string =>
   last4 === null ? '' : ` · ending ${last4}`;
 

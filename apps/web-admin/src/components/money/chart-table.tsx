@@ -3,7 +3,6 @@ import { LockIcon } from 'lucide-react';
 import { FINANCE_PAGE_SIZE, type LedgerAccount } from '@eduvault/api-contract';
 import { money } from '@eduvault/shared';
 import {
-  NumberedPager,
   Table,
   TableBody,
   TableCell,
@@ -15,6 +14,7 @@ import {
   TooltipTrigger,
 } from '@eduvault/ui';
 import { BUILT_IN_TIP, TYPE_WORDS } from './money-text';
+import { FinancePager } from './query-state';
 
 function NameCell({ account }: { account: LedgerAccount }) {
   return (
@@ -86,14 +86,7 @@ export function ChartTable({
           ))}
         </TableBody>
       </Table>
-      {accounts.length > FINANCE_PAGE_SIZE ? (
-        <NumberedPager
-          page={page}
-          total={accounts.length}
-          pageSize={FINANCE_PAGE_SIZE}
-          onPage={setPage}
-        />
-      ) : null}
+      <FinancePager page={page} total={accounts.length} onPage={setPage} />
     </>
   );
 }

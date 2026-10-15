@@ -1,6 +1,7 @@
 import {
   campusLabel,
   endingText,
+  entryCaption,
   hiddenAccountsText,
   hiddenFooterText,
   scopeText,
@@ -11,6 +12,11 @@ describe('money text', () => {
   it('names a campus or says school-wide', () => {
     expect(campusLabel('Lekki')).toBe('Lekki');
     expect(campusLabel(null)).toBe('School-wide');
+  });
+
+  it('captions an entry with its reference and memo when there is one', () => {
+    expect(entryCaption('RCT-00001', null)).toBe('RCT-00001');
+    expect(entryCaption('RCT-00001', 'Term 1')).toBe('RCT-00001 · Term 1');
   });
 
   it('adds the last 4 digits only when there are some', () => {

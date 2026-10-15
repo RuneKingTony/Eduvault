@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { PencilIcon } from 'lucide-react';
-import { FINANCE_PAGE_SIZE, type MoneyAccount } from '@eduvault/api-contract';
+import type { MoneyAccount } from '@eduvault/api-contract';
 import { Can } from '@eduvault/auth-client';
 import { fmtDate, money } from '@eduvault/shared';
 import {
@@ -15,9 +15,6 @@ import {
   EmptyDescription,
   EmptyHeader,
   EmptyTitle,
-  ErrorMessage,
-  NumberedPager,
-  Skeleton,
   Table,
   TableBody,
   TableCell,
@@ -27,7 +24,8 @@ import {
 } from '@eduvault/ui';
 import { useApi } from '../../api';
 import { cashBookQueryOptions } from '../../queries';
-import { JOURNAL_KIND_LABELS } from './money-text';
+import { JOURNAL_KIND_LABELS, entryCaption } from './money-text';
+import { FinancePager, QueryState } from './query-state';
 
 function amountOrDash(minor: number, currency: string): string {
   return minor === 0 ? '—' : money(minor, currency);
@@ -62,9 +60,7 @@ function CashBookRows({
                 {JOURNAL_KIND_LABELS[item.kind]}
               </span>
               <span className="block text-xs text-muted-foreground">
-                {item.memo === null
-                  ? item.reference
-                  : `${item.reference} · ${item.memo}`}
+                {entryCaption(item.reference, item.memo)}
               </span>
             </TableCell>
             <TableCell className="text-right tabular-nums">
@@ -98,44 +94,26 @@ function CashBookBody({
   page: number;
   onPage: (page: number) => void;
 }) {
-  if (book.isPending) {
-    return (
-      <div role="status" aria-label="Loading" className="px-4">
-        <Skeleton className="h-24 w-full" />
-      </div>
-    );
-  }
-  if (book.data === undefined) {
-    return (
-      <div className="px-4">
-        <ErrorMessage error={book.error} />
-      </div>
-    );
-  }
-  if (book.data.items.length === 0) {
-    return (
-      <Empty>
-        <EmptyHeader>
-          <EmptyTitle>No movements yet</EmptyTitle>
-          <EmptyDescription>
-            Money in and out of this account will show up here.
-          </EmptyDescription>
-        </EmptyHeader>
-      </Empty>
-    );
-  }
   return (
-    <>
-      <CashBookRows items={book.data.items} currency={currency} />
-      {book.data.total > FINANCE_PAGE_SIZE ? (
-        <NumberedPager
-          page={page}
-          total={book.data.total}
-          pageSize={FINANCE_PAGE_SIZE}
-          onPage={onPage}
-        />
-      ) : null}
-    </>
+    <QueryState query={book}>
+      {({ items, total }) =>
+        items.length === 0 ? (
+          <Empty>
+            <EmptyHeader>
+              <EmptyTitle>No movements yet</EmptyTitle>
+              <EmptyDescription>
+                Money in and out of this account will show up here.
+              </EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+        ) : (
+          <>
+            <CashBookRows items={items} currency={currency} />
+            <FinancePager page={page} total={total} onPage={onPage} />
+          </>
+        )
+      }
+    </QueryState>
   );
 }
 
