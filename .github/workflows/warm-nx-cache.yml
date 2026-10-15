@@ -1,0 +1,35 @@
+name: Warm Nx cache
+
+# A pull request can only read caches saved on main or on its own branch, so
+# this seeds the caches that the Validate PR jobs restore on their first push.
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: warm-nx-cache
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  warm:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - scope: quick
+            targets: typecheck lint
+          - scope: unit
+            targets: test build
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup
+        with:
+          cache-scope: ${{ matrix.scope }}
+      - run: pnpm nx run-many -t ${{ matrix.targets }} --parallel=4
