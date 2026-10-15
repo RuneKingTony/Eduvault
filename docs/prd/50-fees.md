@@ -1,6 +1,6 @@
 # PRD: School fees and other fees
 
-- Status: draft (pre-spec)
+- Status: implemented (M3.2, EDU-34)
 - Source: brand prototype `https://claude.ai/artifact/1hsDyr1KdUaYD2hnuA9sfY`, version `1791539787-0c53`
 - Milestone and slice: `M3.2` (see [roadmap](README.md)); the preview's "Already charged" badge, discount lines and pending-discount callout read charges and `student_discount`, both shipped in `M3.3`, and stay empty until then (see [Dependencies](#dependencies))
 - Related: [data-model-finance.md, Fees and charging](../brainstorming/data-model-finance.md#fees-and-charging), [data-model-overview.md, Rules every table follows](../brainstorming/data-model-overview.md#rules-every-table-follows), [permissions-and-custom-roles.md](../brainstorming/permissions-and-custom-roles.md), [technical reference](../technical-reference.md) decisions [D-001](../technical-reference.md#decision-log), [D-005](../technical-reference.md#decision-log), [D-017](../technical-reference.md#decision-log), [D-024](../technical-reference.md#decision-log), [D-040](../technical-reference.md#decision-log); sibling PRDs [51-charge-students.md](51-charge-students.md), [52-charges.md](52-charges.md)
@@ -164,7 +164,7 @@ The prototype applies optional fees only to students who opted in (seed: Ada, Ch
 8. Fee types: Tuition (4010) is "School fees"; every other child of Fee income is "Other fees". "Other charges" (4060) and Refunds owed (2100) are kept in the books but never listed as fee types (data model, Accounts).
 9. A new fee type is a `ledger_account` under Fee income with code = highest child code + 10, type income. Allowed with `feeLine:create` (this endpoint) or `ledger:manageAccounts` (the M3.1 endpoint). Names are unique among live fee types, case-insensitive (new).
 10. An optional line applies only when the student's enrolment for that school year has an opt-in for the line's fee type ([D-024](../technical-reference.md#decision-log)). Opt-ins carry across the terms of the school year.
-11. Only the current and next term (rule in the Term select) can be picked on these screens. Past terms' fees are read-only ([D-040](../technical-reference.md#decision-log)): writes to a term that has ended answer 400 "This term has ended. Fees for it can’t change." (new copy); reads for any term stay available through the API.
+11. Only the current and next term (rule in the Term select) can be picked on these screens. Past terms' fees are read-only ([D-040](../technical-reference.md#decision-log)): writes to a term that has ended answer 400 "This term has ended. Fees for it can’t change." (new copy, typed with the typographic apostrophe like every message in the contract); reads for any term stay available through the API.
 12. Adding, changing or retiring an **every-campus** line needs `campus:readAll` as well as the `feeLine:*` permission, because it changes what every campus is charged. The service checks it (403); a campus-scoped bursar adds campus overrides instead.
 
 ## Data

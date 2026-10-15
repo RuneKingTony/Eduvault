@@ -17,7 +17,7 @@ export class LedgerController {
   }
 
   @Post('ledger-accounts')
-  @OrganizationAuth('ledger', 'manageAccounts')
+  @OrganizationAuth(['ledger:manageAccounts', 'feeLine:create'])
   create(
     @Org() org: OrgContext,
     @Body(zod(contract.ledgerAccounts.create.body))

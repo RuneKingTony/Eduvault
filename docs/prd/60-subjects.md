@@ -326,7 +326,7 @@ The candidate list endpoint ships with class-teacher assignment in M2.3; this mo
 
 ## Dependencies
 
-None of these exist in code yet; today's migrations hold only `campus`, `school_account`, `fee_schedule` and `student`.
+None of these exist in code yet.
 
 - M1.1: `subject:*` and `class:assignTeacher` in `libs/policy`, the guard, `/me/permissions`, nav gating.
 - M2.1: sessions and terms (current term).

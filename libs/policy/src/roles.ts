@@ -57,6 +57,7 @@ export const STARTER_ROLES: readonly StarterRole[] = [
       'announcement:create',
       'announcement:read',
       'announcement:update',
+      'feeLine:read',
     ],
   },
   {
@@ -74,6 +75,10 @@ export const STARTER_ROLES: readonly StarterRole[] = [
       'student:read',
       'guardian:read',
       'enrollment:read',
+      'feeLine:create',
+      'feeLine:read',
+      'feeLine:update',
+      'feeLine:retire',
       'moneyAccount:read',
       'ledger:read',
     ],

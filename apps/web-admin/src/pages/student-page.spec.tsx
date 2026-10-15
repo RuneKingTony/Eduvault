@@ -1,16 +1,23 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import {
   ApiError,
+  type FeeOption,
   type LoginCredential,
   type MePermissions,
   type StudentDetail,
 } from '@eduvault/api-contract';
 import { toPermissionMap, type Permission } from '@eduvault/policy';
+import { toast } from '@eduvault/ui';
 import { currentCalendar } from '../test-calendar';
 import { classSummary } from '../test-classes';
 import { actingAccess, fakeAccess, renderWithApi } from '../test-utils';
 import { guardianLink, preview, studentDetail } from '../test-students';
 import { StudentPage } from './student-page';
+
+vi.mock('@eduvault/ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@eduvault/ui')>()),
+  toast: { success: vi.fn(), error: vi.fn() },
+}));
 
 const accessWith = (...permissions: Permission[]): MePermissions =>
   fakeAccess({
@@ -26,6 +33,7 @@ function setup(
     access?: MePermissions;
     logins?: LoginCredential[];
     initialDialog?: 'leave';
+    feeOptions?: FeeOption[];
   } = {}
 ) {
   const detail = studentDetail(options.student);
@@ -56,6 +64,10 @@ function setup(
     guardians: { list: vi.fn().mockResolvedValue([]), get: vi.fn() },
     classes: { list: vi.fn().mockResolvedValue([classSummary()]) },
     calendar: { current: vi.fn().mockResolvedValue(currentCalendar()) },
+    feeOptions: {
+      list: vi.fn().mockResolvedValue(options.feeOptions ?? []),
+      set: vi.fn().mockResolvedValue({ feeTypeId: 'bus', optedIn: true }),
+    },
   };
   const onBack = vi.fn();
   const onOpenTab = vi.fn();
@@ -142,6 +154,86 @@ describe('StudentPage', () => {
     expect(
       screen.getByText(/1 Oct 2026 · marked by Tunde Bakare/)
     ).toBeInTheDocument();
+  });
+});
+
+const busOption = (optedIn: boolean): FeeOption => ({
+  feeTypeId: 'bus',
+  name: 'School bus',
+  optedIn,
+});
+
+describe('StudentPage optional fees', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('lists the optional fee types with a switch for each', async () => {
+    setup({ feeOptions: [busOption(true)] });
+    const row = await screen.findByRole('switch', { name: 'School bus' });
+    expect(row).toBeChecked();
+    expect(screen.getByText('Optional fees')).toBeInTheDocument();
+  });
+
+  it('has no card when the student’s level has no optional fee', async () => {
+    const { api } = setup({ feeOptions: [] });
+    await screen.findByRole('heading', { name: /Ada Okeke/ });
+    await waitFor(() => {
+      expect(api.feeOptions.list).toHaveBeenCalledWith({
+        params: { studentId: '5b0f1e1e-6e53-4c52-9f1c-0a1d7a7f9c11' },
+        query: {},
+      });
+    });
+    expect(screen.queryByText('Optional fees')).not.toBeInTheDocument();
+  });
+
+  it('switches a fee on and toasts in the student’s first name', async () => {
+    const { api } = setup({ feeOptions: [busOption(false)] });
+    fireEvent.click(await screen.findByRole('switch', { name: 'School bus' }));
+    await waitFor(() => {
+      expect(api.feeOptions.set).toHaveBeenCalledWith({
+        params: {
+          studentId: '5b0f1e1e-6e53-4c52-9f1c-0a1d7a7f9c11',
+          feeTypeId: 'bus',
+        },
+        body: { optedIn: true },
+      });
+    });
+    await waitFor(() => {
+      expect(toast.success).toHaveBeenCalledWith(
+        'Ada now takes School bus from the next round of charges.'
+      );
+    });
+  });
+
+  it('says no longer takes when switched off', async () => {
+    setup({ feeOptions: [busOption(true)] });
+    fireEvent.click(await screen.findByRole('switch', { name: 'School bus' }));
+    await waitFor(() => {
+      expect(toast.success).toHaveBeenCalledWith(
+        'Ada no longer takes School bus from the next round of charges.'
+      );
+    });
+  });
+
+  it('shows the switches read-only without feeLine:update', async () => {
+    setup({
+      feeOptions: [busOption(true)],
+      access: accessWith('student:read', 'feeLine:read'),
+    });
+    expect(
+      await screen.findByRole('switch', { name: 'School bus' })
+    ).toBeDisabled();
+  });
+
+  it('hides the card without feeLine:read', async () => {
+    const { api } = setup({
+      feeOptions: [busOption(true)],
+      access: accessWith('student:read'),
+    });
+    await screen.findByRole('heading', { name: /Ada Okeke/ });
+    expect(screen.queryByText('Optional fees')).not.toBeInTheDocument();
+    expect(api.feeOptions.list).not.toHaveBeenCalled();
   });
 });
 

@@ -77,7 +77,7 @@ test.describe('authentication', () => {
     for (const path of [
       '/students',
       '/campuses',
-      '/fee-schedules',
+      '/fee-lines',
       '/school-account',
       '/school-settings',
       '/campuses/summary',

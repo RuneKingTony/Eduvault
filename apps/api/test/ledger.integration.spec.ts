@@ -311,7 +311,7 @@ test.describe('adding a fee category', () => {
     }
   });
 
-  test('answers 404 for a parent in another school and 403 without the permission', async ({
+  test('answers 404 for a parent in another school, 403 without the permission and lets a bursar with feeLine:create add one', async ({
     api,
     schools,
   }) => {
@@ -321,12 +321,14 @@ test.describe('adding a fee category', () => {
       .post('/finance/ledger-accounts')
       .send({ parentId: parentA, name: 'Sports' })
       .expect(404);
-    for (const user of [lekkiOnly, noPermission]) {
-      await api(user)
-        .post('/finance/ledger-accounts')
-        .send({ parentId: parentA, name: 'Sports' })
-        .expect(403);
-    }
+    await api(noPermission)
+      .post('/finance/ledger-accounts')
+      .send({ parentId: parentA, name: 'Sports' })
+      .expect(403);
+    await api(lekkiOnly)
+      .post('/finance/ledger-accounts')
+      .send({ parentId: parentA, name: 'Sports' })
+      .expect(201);
   });
 });
 

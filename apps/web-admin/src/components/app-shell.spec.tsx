@@ -127,7 +127,8 @@ async function renderAt(
       child('/announcements', page('Announcements page')),
       child('/students', page('Students page')),
       child('/members', page('Members page')),
-      child('/fees', page('Fees page')),
+      child('/finance/school-fees', page('Fees page')),
+      child('/finance/other-fees', page('Other fees page')),
       child('/calendar', page('Calendar page')),
       child('/campuses', page('Campuses page')),
       child('/roles', page('Roles page')),
@@ -177,7 +178,7 @@ describe('AppShell', () => {
   });
 
   it('shows the grouped nav with the current item marked and Settings alone at the bottom', async () => {
-    await renderAt('/fees');
+    await renderAt('/finance/school-fees');
     const nav = within(sidebarNav());
     expect(nav.getByRole('button', { name: 'Finance' })).toHaveAttribute(
       'aria-expanded',
@@ -476,7 +477,12 @@ describe('AppShell access', () => {
       await screen.findByRole('menuitem', { name: 'Lakeside Academy' })
     );
     await waitFor(() => {
-      expect(linkNames()).toEqual(['Dashboard', 'Approvals', 'Students']);
+      expect(linkNames()).toEqual([
+        'Dashboard',
+        'Approvals',
+        'Students',
+        'Fees',
+      ]);
     });
     expect(permissions).toHaveBeenCalledTimes(2);
   });
@@ -522,9 +528,9 @@ describe('AppShell access', () => {
     ).toHaveAttribute('aria-current', 'page');
   });
 
-  it('shows a bursar Students but no Staff and members, Fees or Settings', async () => {
+  it('shows a bursar Students and Fees but no Staff and members or Settings', async () => {
     await renderAt('/', { access: starterAccess('bursar') });
-    expect(linkNames()).toEqual(['Dashboard', 'Approvals', 'Students']);
+    expect(linkNames()).toEqual(['Dashboard', 'Approvals', 'Students', 'Fees']);
   });
 
   it('shows a member with no roles only Dashboard and Approvals', async () => {
@@ -556,16 +562,31 @@ describe('AppShell access', () => {
     expect(linkNames()).toEqual(['Dashboard', 'Approvals', 'Announcements']);
   });
 
-  it('sends a teacher who types /fees to the Dashboard with no message', async () => {
-    await renderAt('/fees', { access: starterAccess('teacher') });
+  it('sends a teacher who types a fees route to the Dashboard with no message', async () => {
+    await renderAt('/finance/school-fees', {
+      access: starterAccess('teacher'),
+    });
     expect(await screen.findByText('Dashboard page')).toBeInTheDocument();
     expect(screen.queryByText('Fees page')).not.toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(linkNames()).toEqual(['Dashboard', 'Approvals', 'Students']);
   });
 
+  it('sends a teacher who types /finance/other-fees to the Dashboard too', async () => {
+    await renderAt('/finance/other-fees', { access: starterAccess('teacher') });
+    expect(await screen.findByText('Dashboard page')).toBeInTheDocument();
+    expect(screen.queryByText('Other fees page')).not.toBeInTheDocument();
+  });
+
+  it('keeps Fees active on Other fees', async () => {
+    await renderAt('/finance/other-fees');
+    expect(
+      within(sidebarNav()).getByRole('link', { name: 'Fees' })
+    ).toHaveAttribute('aria-current', 'page');
+  });
+
   it('keeps the command menu to what the member can open', async () => {
-    await renderAt('/', { access: starterAccess('bursar') });
+    await renderAt('/', { access: starterAccess('teacher') });
     fireEvent.keyDown(globalThis as unknown as Window, {
       key: 'k',
       ctrlKey: true,
@@ -581,6 +602,35 @@ describe('AppShell access', () => {
     expect(
       screen.getByRole('option', { name: /Students/ })
     ).toBeInTheDocument();
+  });
+
+  it('offers Add a fee we charge with feeLine:create and hides it from an administrator', async () => {
+    await renderAt('/', { access: starterAccess('bursar') });
+    fireEvent.keyDown(globalThis as unknown as Window, {
+      key: 'k',
+      ctrlKey: true,
+    });
+    fireEvent.change(
+      await screen.findByPlaceholderText('Search pages and actions…'),
+      { target: { value: 'add a fee' } }
+    );
+    expect(
+      screen.getByRole('option', { name: /Add a fee we charge/ })
+    ).toBeInTheDocument();
+    cleanup();
+
+    await renderAt('/', { access: starterAccess('administrator') });
+    fireEvent.keyDown(globalThis as unknown as Window, {
+      key: 'k',
+      ctrlKey: true,
+    });
+    fireEvent.change(
+      await screen.findByPlaceholderText('Search pages and actions…'),
+      { target: { value: 'add a fee' } }
+    );
+    expect(
+      screen.queryByRole('option', { name: /Add a fee we charge/ })
+    ).not.toBeInTheDocument();
   });
 
   it('offers Add a staff member only with member:create and opens the add sheet route', async () => {

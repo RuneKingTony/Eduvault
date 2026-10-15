@@ -129,6 +129,19 @@ describe('roles', () => {
     }
   });
 
+  it('gives the bursar every feeLine write, the administrator feeLine:read and nobody feeLine:readOwn yet', () => {
+    expect(starter('bursar').feeLine).toEqual([
+      'create',
+      'read',
+      'update',
+      'retire',
+    ]);
+    expect(starter('administrator').feeLine).toEqual(['read']);
+    for (const slug of ['teacher', 'principal', 'student', 'guardian']) {
+      expect(starter(slug).feeLine).toBeUndefined();
+    }
+  });
+
   it('gives the administrator and principal every announcement permission and nobody else any', () => {
     for (const slug of ['administrator', 'principal']) {
       expect(starter(slug).announcement).toEqual(['create', 'read', 'update']);

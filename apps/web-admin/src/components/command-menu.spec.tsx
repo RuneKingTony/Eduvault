@@ -20,7 +20,7 @@ const pages: CommandEntry[] = [
     id: 'fees',
     label: 'Who owes',
     hint: 'Finance',
-    route: '/fees',
+    route: '/finance/school-fees',
     icon: 'wallet',
     keywords: ['Fees'],
   },

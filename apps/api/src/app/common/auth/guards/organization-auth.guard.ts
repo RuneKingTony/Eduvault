@@ -7,13 +7,15 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { ApiErrorCode } from '@eduvault/api-contract';
-import { can, isPortalOnly } from '@eduvault/policy';
+import { can, canAny, isPortalOnly } from '@eduvault/policy';
 import { isWriteMethod } from '../acting';
 import { AuthContextService } from '../auth-context.service';
 import type { AuthedRequest, OrgContext, SessionContext } from '../auth.types';
 import {
+  ANY_PERMISSION_KEY,
   PERMISSION_KEY,
   STAFF_ONLY_KEY,
+  type AnyPermission,
   type RequiredPermission,
 } from '../decorators/tokens';
 import { assertPasswordSettled } from './password-rule';
@@ -53,6 +55,14 @@ export class OrganizationAuthGuard implements CanActivate {
       throw new ForbiddenException(
         `Missing permission ${required.resource}:${required.action}`
       );
+    }
+
+    const anyOf = this.reflector.get<AnyPermission | undefined>(
+      ANY_PERMISSION_KEY,
+      context.getHandler()
+    );
+    if (anyOf !== undefined && !canAny(org.permissions, anyOf)) {
+      throw new ForbiddenException(`Missing permission ${anyOf.join(' or ')}`);
     }
 
     request.authSession = session;

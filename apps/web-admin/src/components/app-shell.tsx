@@ -98,6 +98,15 @@ const CREATE_ROLE_ACTION: CommandEntry = {
   keywords: ['new', 'role', 'permissions', 'access'],
 };
 
+const ADD_FEE_ACTION: CommandEntry = {
+  id: 'add-fee',
+  label: 'Add a fee we charge',
+  hint: 'Fees',
+  route: '/finance/school-fees?add=1',
+  icon: 'wallet',
+  keywords: ['new', 'fee', 'levy', 'tuition', 'amount', 'charge'],
+};
+
 function commandActions(
   builtRoutes: ReadonlySet<string>,
   access: MePermissions,
@@ -110,6 +119,9 @@ function commandActions(
       ? [ADMIT_STUDENT_ACTION]
       : []),
     ...(allowed('/members', ['member:create']) ? [ADD_MEMBER_ACTION] : []),
+    ...(allowed('/finance/school-fees', ['feeLine:create'])
+      ? [ADD_FEE_ACTION]
+      : []),
     ...(allowed('/roles/new', ['ac:create']) ? [CREATE_ROLE_ACTION] : []),
   ];
 }

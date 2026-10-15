@@ -1,13 +1,12 @@
 import { expect } from './support/base-test';
 import { createAnnouncement } from './support/factories/announcements';
 import { createClass } from './support/factories/classes';
+import { createFeeLine, feeFixture } from './support/factories/fees';
 import { schoolsTest } from './support/two-schools';
 
 const test = schoolsTest;
 
 const names = (rows: { name: string }[]) => rows.map((row) => row.name);
-
-const FEE = { name: 'Tuition', amountMinor: 10_000, currency: 'NGN' };
 
 test.describe('campus summary', () => {
   test('answers 403 without team:read while GET /campuses still answers', async ({
@@ -237,19 +236,25 @@ test.describe('deleting a campus', () => {
     await api(owner).get(`/campuses/${annex.id}`).expect(200);
   });
 
-  test('answers 409 while a fee schedule references it and keeps the team', async ({
+  test('answers 409 while a fee line references it and keeps the team', async ({
     api,
+    app,
     createCampus,
     schools: { owner, orgA },
   }) => {
     const annex = await createCampus(orgA, 'Annex');
-    await api(owner)
-      .post('/fee-schedules')
-      .send({ ...FEE, campusId: annex.id })
-      .expect(201);
+    const fixture = await feeFixture(app, api, owner);
+    const line = await createFeeLine({ app, actor: owner }, fixture, {
+      name: 'Annex tuition',
+      amountMinor: 10_000,
+      campusId: annex.id,
+    });
 
     await api(owner).delete(`/campuses/${annex.id}`).expect(409);
     await api(owner).get(`/campuses/${annex.id}`).expect(200);
+
+    await api(owner).post(`/fee-lines/${line.id}/retire`).expect(201);
+    await api(owner).delete(`/campuses/${annex.id}`).expect(409);
   });
 
   test('removes a campus nothing references', async ({

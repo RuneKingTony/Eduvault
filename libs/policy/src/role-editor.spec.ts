@@ -397,7 +397,7 @@ describe('Advanced grid vocabulary', () => {
   it('puts the access resources under People and access', () => {
     expect(RESOURCE_PILLARS.ac).toBe('People and access');
     expect(RESOURCE_PILLARS.member).toBe('People and access');
-    expect(RESOURCE_PILLARS.feeSchedule).toBe('Finance');
+    expect(RESOURCE_PILLARS.feeLine).toBe('Finance');
   });
 });
 
@@ -412,7 +412,9 @@ describe('capabilityLabel', () => {
   });
 
   it('falls back to the permission label for a legacy permission', () => {
-    expect(capabilityLabel('feeSchedule:create')).toBe('Fee schedules: create');
+    expect(capabilityLabel('feeLine:readOwn')).toBe(
+      'School and other fees: read own'
+    );
   });
 
   it('lists each label once', () => {

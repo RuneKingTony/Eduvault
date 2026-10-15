@@ -17,8 +17,6 @@ import { schoolsTest } from './support/two-schools';
 
 const test = schoolsTest;
 
-const FEE = { name: 'Tuition', amountMinor: 1, currency: 'NGN' };
-
 const rolesOf = async (pool: Pool, organizationId: string) => {
   const { rows } = await pool.query(
     `SELECT role, label, description, permission, source, "editedAt"
@@ -42,7 +40,7 @@ test.describe('guard order', () => {
   }) => {
     const routes = [
       { path: '/students', permission: 'student:read' },
-      { path: '/fee-schedules', permission: 'feeSchedule:read' },
+      { path: '/fee-lines', permission: 'feeLine:read' },
       { path: '/campuses/summary', permission: 'team:read' },
       { path: '/school-years', permission: 'session:read' },
       { path: '/classes', permission: 'class:read' },
@@ -67,7 +65,10 @@ test.describe('guard order', () => {
 
     await api(owner).get(`/students/${randomUUID()}`).expect(404);
     await api(owner).get(`/campuses/${randomUUID()}`).expect(404);
-    await api(owner).get(`/fee-schedules/${randomUUID()}`).expect(404);
+    await api(owner)
+      .patch(`/fee-lines/${randomUUID()}`)
+      .send({ amountMinor: 100 })
+      .expect(404);
     await api(noPermission).get(`/campuses/${lekki.id}`).expect(404);
   });
 
@@ -94,11 +95,16 @@ test.describe('guard order', () => {
       ['post', '/campuses'],
       ['patch', `/campuses/${lekki.id}`],
       ['delete', `/campuses/${lekki.id}`],
-      ['get', '/fee-schedules'],
-      ['get', `/fee-schedules/${id}`],
-      ['post', '/fee-schedules'],
-      ['patch', `/fee-schedules/${id}`],
-      ['delete', `/fee-schedules/${id}`],
+      ['get', '/fee-lines'],
+      ['get', '/fee-lines/grid'],
+      ['get', '/fee-lines/preview'],
+      ['post', '/fee-lines'],
+      ['patch', `/fee-lines/${id}`],
+      ['post', `/fee-lines/${id}/retire`],
+      ['get', '/fee-types'],
+      ['post', '/fee-types'],
+      ['get', `/students/${id}/fee-options`],
+      ['put', `/students/${id}/fee-options/${id}`],
       ['get', '/campuses/summary'],
       ['patch', '/school-account'],
       ['put', '/school-account/logo'],
@@ -148,8 +154,11 @@ test.describe('guard order', () => {
     await api(owner).get('/guardians').expect(200);
     await api(owner).get('/campuses').expect(200);
     await api(owner).post('/campuses').send({ name: 'Annex' }).expect(201);
-    await api(owner).get('/fee-schedules').expect(200);
-    await api(owner).post('/fee-schedules').send(FEE).expect(201);
+    await api(owner).get('/fee-types').expect(200);
+    await api(owner)
+      .post('/fee-types')
+      .send({ name: 'Sports levy' })
+      .expect(201);
     await api(owner).get('/campuses/summary').expect(200);
     await api(owner).get('/school-account').expect(200);
     await api(owner)
@@ -287,50 +296,6 @@ test.describe('campus scope', () => {
       .expect(201);
   });
 
-  test('a fee-schedule campusId filter outside the scope answers 404 "Campus not found"', async ({
-    api,
-    withPermissions,
-    schools: { orgA, lekki, ikeja },
-  }) => {
-    const reader = await withPermissions(orgA, ['feeSchedule:read'], {
-      campuses: [lekki],
-    });
-    const res = await api(reader)
-      .get(`/fee-schedules?campusId=${ikeja.id}`)
-      .expect(404);
-    expect(res.body.message).toBe('Campus not found');
-  });
-
-  test('creating or moving a fee schedule onto a campus outside the scope answers 404 "Campus not found"', async ({
-    api,
-    withPermissions,
-    schools: { owner, orgA, lekki, ikeja },
-  }) => {
-    const clerk = await withPermissions(
-      orgA,
-      ['feeSchedule:create', 'feeSchedule:read', 'feeSchedule:update'],
-      { campuses: [lekki] }
-    );
-    const own = await api(clerk)
-      .post('/fee-schedules')
-      .send({ ...FEE, campusId: lekki.id })
-      .expect(201);
-    const create = await api(clerk)
-      .post('/fee-schedules')
-      .send({ ...FEE, campusId: ikeja.id })
-      .expect(404);
-    expect(create.body.message).toBe('Campus not found');
-    const move = await api(clerk)
-      .patch(`/fee-schedules/${own.body.id}`)
-      .send({ campusId: ikeja.id })
-      .expect(404);
-    expect(move.body.message).toBe('Campus not found');
-    await api(owner)
-      .post('/fee-schedules')
-      .send({ ...FEE, campusId: ikeja.id })
-      .expect(201);
-  });
-
   test('DELETE /students/:id no longer exists', async ({
     api,
     schools: { owner, studentLekki },
@@ -394,6 +359,7 @@ test.describe('/me/permissions', () => {
       student: ['read'],
       guardian: ['read'],
       enrollment: ['read'],
+      feeLine: ['create', 'read', 'update', 'retire'],
       moneyAccount: ['read'],
       ledger: ['read'],
     });

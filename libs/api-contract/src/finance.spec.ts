@@ -1,14 +1,24 @@
 import { contract } from './contract';
 import {
+  FEE_LINE_AMOUNT_MESSAGE,
+  FEE_LINE_NAME_REQUIRED,
+  FEE_TYPE_NAME_REQUIRED,
   JOURNAL_RANGE_MESSAGE,
   MONEY_ACCOUNT_LAST4_MESSAGE,
   MONEY_ACCOUNT_NAME_REQUIRED,
   OPENING_AMOUNT_MESSAGE,
   cashBookQuerySchema,
+  createFeeLineSchema,
+  createFeeTypeSchema,
   createLedgerAccountSchema,
   createMoneyAccountSchema,
+  feeGridQuerySchema,
+  feeLineDuplicateMessage,
+  feeLineListQuerySchema,
   journalQuerySchema,
   openingBalancesSchema,
+  setFeeOptionSchema,
+  updateFeeLineSchema,
   updateMoneyAccountSchema,
 } from './finance';
 
@@ -277,5 +287,122 @@ describe('the finance routes', () => {
       ...Object.values(contract.openingBalances),
     ].map((route) => route.method);
     expect(methods).not.toContain('DELETE');
+  });
+});
+
+const feeLine = {
+  termId: id,
+  classLevelId: other,
+  feeTypeId: id,
+  campusId: null,
+  name: 'Tuition',
+  amountMinor: 1_500_000,
+};
+
+describe('createFeeLineSchema', () => {
+  it('defaults to everyone and not optional', () => {
+    expect(createFeeLineSchema.parse(feeLine)).toMatchObject({
+      appliesTo: 'all',
+      isOptional: false,
+    });
+  });
+
+  it('trims the name and refuses a blank one', () => {
+    expect(
+      createFeeLineSchema.parse({ ...feeLine, name: '  Bus  ' }).name
+    ).toBe('Bus');
+    expect(
+      issueMessages(createFeeLineSchema.safeParse({ ...feeLine, name: ' ' }))
+    ).toEqual([FEE_LINE_NAME_REQUIRED]);
+  });
+
+  it('refuses a zero, negative, fractional or missing amount with one message', () => {
+    for (const amountMinor of [0, -100, 12.5, undefined]) {
+      expect(
+        issueMessages(
+          createFeeLineSchema.safeParse({ ...feeLine, amountMinor })
+        )
+      ).toEqual([FEE_LINE_AMOUNT_MESSAGE]);
+    }
+  });
+
+  it('refuses an unknown appliesTo', () => {
+    expect(
+      createFeeLineSchema.safeParse({ ...feeLine, appliesTo: 'staff' }).success
+    ).toBe(false);
+  });
+});
+
+describe('updateFeeLineSchema', () => {
+  it('takes only a positive amount', () => {
+    expect(updateFeeLineSchema.safeParse({ amountMinor: 100 }).success).toBe(
+      true
+    );
+    expect(updateFeeLineSchema.safeParse({ amountMinor: 0 }).success).toBe(
+      false
+    );
+    expect(
+      updateFeeLineSchema.safeParse({ amountMinor: 100, name: 'x' }).success
+    ).toBe(false);
+  });
+});
+
+describe('createFeeTypeSchema', () => {
+  it('trims the name and refuses a blank one', () => {
+    expect(createFeeTypeSchema.parse({ name: ' Sports levy ' }).name).toBe(
+      'Sports levy'
+    );
+    expect(issueMessages(createFeeTypeSchema.safeParse({ name: '' }))).toEqual([
+      FEE_TYPE_NAME_REQUIRED,
+    ]);
+  });
+});
+
+describe('fee query schemas', () => {
+  it('reads includeRetired from a query string and defaults it to true', () => {
+    expect(feeLineListQuerySchema.parse({ termId: id }).includeRetired).toBe(
+      true
+    );
+    expect(
+      feeLineListQuerySchema.parse({ termId: id, includeRetired: 'false' })
+        .includeRetired
+    ).toBe(false);
+  });
+
+  it('needs a group for the grid', () => {
+    expect(feeGridQuerySchema.safeParse({ termId: id }).success).toBe(false);
+    expect(
+      feeGridQuerySchema.safeParse({ termId: id, group: 'school' }).success
+    ).toBe(true);
+  });
+});
+
+describe('setFeeOptionSchema', () => {
+  it('needs a boolean opt-in', () => {
+    expect(setFeeOptionSchema.safeParse({ optedIn: true }).success).toBe(true);
+    expect(setFeeOptionSchema.safeParse({ optedIn: 'yes' }).success).toBe(
+      false
+    );
+  });
+});
+
+describe('feeLineDuplicateMessage', () => {
+  it('names the fee type, level and campus, or every campus', () => {
+    const parts = { feeType: 'Tuition', level: 'JSS 2', campus: null };
+    expect(feeLineDuplicateMessage(parts)).toBe(
+      'There is already a Tuition fee for JSS 2 on every campus this term. Change its amount instead.'
+    );
+    expect(feeLineDuplicateMessage({ ...parts, campus: 'Ikeja' })).toContain(
+      'on Ikeja this term'
+    );
+  });
+});
+
+describe('the fee routes', () => {
+  it('sit under the fee line, fee type and student option paths', () => {
+    expect(contract.feeLines.grid.path).toBe('/fee-lines/grid');
+    expect(contract.feeLines.retire.method).toBe('POST');
+    expect(contract.feeTypes.create.path).toBe('/fee-types');
+    expect(contract.feeOptions.set.method).toBe('PUT');
   });
 });

@@ -157,15 +157,20 @@ export interface EnrollmentPlacement {
   term_id: string;
 }
 
-export interface FeeSchedule {
+export interface FeeLine {
   amount_minor: Int8;
+  applies_to: Generated<string>;
   campus_id: string | null;
+  class_level_id: string;
   created_at: Generated<Timestamp>;
-  currency: string;
+  created_by: string | null;
   id: Generated<string>;
+  is_optional: Generated<boolean>;
+  ledger_account_id: string;
   name: string;
   organization_id: string;
-  updated_at: Generated<Timestamp>;
+  retired_at: Timestamp | null;
+  term_id: string;
 }
 
 export interface FileBlob {
@@ -398,6 +403,15 @@ export interface StudentEnrollment {
   updated_at: Generated<Timestamp>;
 }
 
+export interface StudentFeeOption {
+  created_at: Generated<Timestamp>;
+  created_by: string | null;
+  enrollment_id: string;
+  id: Generated<string>;
+  ledger_account_id: string;
+  organization_id: string;
+}
+
 export interface Team {
   createdAt: Timestamp;
   id: Generated<string>;
@@ -466,7 +480,7 @@ export interface DB {
   class_level: ClassLevel;
   document_sequence: DocumentSequence;
   enrollment_placement: EnrollmentPlacement;
-  fee_schedule: FeeSchedule;
+  fee_line: FeeLine;
   file_blob: FileBlob;
   file_object: FileObject;
   guardian: Guardian;
@@ -485,6 +499,7 @@ export interface DB {
   session: Session;
   student: Student;
   student_enrollment: StudentEnrollment;
+  student_fee_option: StudentFeeOption;
   team: Team;
   teamMember: TeamMember;
   term: Term;

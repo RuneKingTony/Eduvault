@@ -8,7 +8,7 @@ Dimension: tenancy isolation. Organization = school, team = campus. A user must 
 Look for:
 - A new school-scoped table without organization_id and a foreign key to organization, or a campus reference that is not the composite (campus_id, organization_id) foreign key
 - A Kysely query on a school-scoped table with no filter on ctx.organizationId, including updates, deletes, joins and subqueries (a join can pull in another school's row)
-- A query that ignores the campus scope for a campus-aware table (student, fee_schedule). A null campus_id on fee_schedule means every campus of that school, not every school
+- A query that ignores the campus scope for a campus-aware table (student, fee_line). A null campus_id on fee_line means every campus of that school, not every school
 - Lookups by id alone (findById, where id = $1) with no organization check: an IDOR across schools
 - Out-of-scope rows answering 403 or a message that confirms the row exists, instead of 404
 - organization_id or campus_id taken from the request body, params or query instead of the session context
