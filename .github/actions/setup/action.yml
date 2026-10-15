@@ -1,13 +1,10 @@
 name: Set up Eduvault
-description: pnpm, Node, dependencies and, for jobs that run Nx tasks, the Nx base commit and task cache
+description: pnpm, Node, dependencies and, for jobs that run nx affected, the Nx base commit
 
 inputs:
   nx:
-    description: Set the Nx base commit and restore the Nx task cache; false for jobs that run no cached Nx task
+    description: Set the Nx base commit; false for jobs that run no affected command
     default: 'true'
-  cache-scope:
-    description: Names the Nx cache so jobs that run different tasks do not overwrite each other
-    default: ''
 
 runs:
   using: composite
@@ -21,17 +18,3 @@ runs:
       shell: bash
     - if: inputs.nx == 'true'
       uses: nrwl/nx-set-shas@v5
-    - if: inputs.nx == 'true'
-      id: nx-cache
-      uses: actions/cache@v5
-      with:
-        path: .nx/cache
-        key: nx-${{ inputs.cache-scope }}-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
-        restore-keys: |
-          nx-${{ inputs.cache-scope }}-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
-          nx-${{ inputs.cache-scope }}-${{ runner.os }}-
-    - if: inputs.nx == 'true'
-      shell: bash
-      run: |
-        echo "Nx cache exact match: ${{ steps.nx-cache.outputs.cache-hit || 'no, restored by prefix or not at all' }}"
-        echo "Nx cache dir: $(du -sh .nx/cache 2>/dev/null | cut -f1 || echo empty), $(find .nx/cache -mindepth 1 -maxdepth 1 2>/dev/null | wc -l) entries"

@@ -30,8 +30,6 @@ jobs:
         with:
           fetch-depth: 0
       - uses: ./.github/actions/setup
-        with:
-          cache-scope: quick
       - run: pnpm format:check
       - run: pnpm knip
       - run: pnpm nx affected -t typecheck lint --parallel="$NX_PARALLEL" --nxBail
@@ -53,8 +51,6 @@ jobs:
         with:
           fetch-depth: 0
       - uses: ./.github/actions/setup
-        with:
-          cache-scope: unit
       - run: pnpm nx affected -t test build --parallel="$NX_PARALLEL" --nxBail
 
   integration:
