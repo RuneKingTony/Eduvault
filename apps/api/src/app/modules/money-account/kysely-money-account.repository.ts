@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { sql } from 'kysely';
 import {
+  MONEY_ACCOUNTS_SYSTEM_KEY,
   journalKindSchema,
   moneyAccountKindSchema,
   type CashBookItem,
@@ -11,10 +12,9 @@ import { inCampusScope } from '../../common/db/in-campus-scope';
 import { iso } from '../../common/db/rows';
 import { KYSELY_TOKEN, type Database } from '../../common/db/tokens';
 import {
-  accountClash,
-  MONEY_ACCOUNTS_KEY,
-  nextMoneyAccountCode,
+  insertChildAccount,
   schoolCurrency,
+  transactAccounts,
 } from '../../common/ledger';
 import {
   MoneyAccountRepository,
@@ -220,18 +220,8 @@ export class KyselyMoneyAccountRepository extends MoneyAccountRepository {
     };
   }
 
-  async create(input: NewMoneyAccount): Promise<MoneyAccountOutcome> {
-    try {
-      return await this.db
-        .transaction()
-        .execute((trx) => this.createIn(trx, input));
-    } catch (error) {
-      const outcome = accountClash(error);
-      if (outcome === undefined) {
-        throw error;
-      }
-      return outcome;
-    }
+  create(input: NewMoneyAccount): Promise<MoneyAccountOutcome> {
+    return transactAccounts(this.db, (trx) => this.createIn(trx, input));
   }
 
   private async createIn(
@@ -243,42 +233,21 @@ export class KyselyMoneyAccountRepository extends MoneyAccountRepository {
       .selectFrom('ledger_account')
       .select('id')
       .where('organization_id', '=', organizationId)
-      .where('system_key', '=', MONEY_ACCOUNTS_KEY)
+      .where('system_key', '=', MONEY_ACCOUNTS_SYSTEM_KEY)
       .executeTakeFirstOrThrow();
-    const codes = await trx
-      .selectFrom('ledger_account')
-      .select(['code', 'parent_id', sql<string>`lower(name)`.as('lowered')])
-      .where('organization_id', '=', organizationId)
-      .execute();
-    if (
-      codes.some(
-        (row) =>
-          row.parent_id === parent.id &&
-          row.lowered === input.name.toLowerCase()
-      )
-    ) {
-      return { status: 'name_taken' };
+    const ledger = await insertChildAccount(trx, {
+      organizationId,
+      parentId: parent.id,
+      name: input.name,
+    });
+    if (ledger.status === 'name_taken') {
+      return ledger;
     }
-    const code = nextMoneyAccountCode(
-      codes.filter((row) => row.parent_id === parent.id).map((row) => row.code),
-      codes.map((row) => row.code)
-    );
-    const ledger = await trx
-      .insertInto('ledger_account')
-      .values({
-        organization_id: organizationId,
-        code,
-        name: input.name,
-        type: 'asset',
-        parent_id: parent.id,
-      })
-      .returning('id')
-      .executeTakeFirstOrThrow();
     const created = await trx
       .insertInto('money_account')
       .values({
         organization_id: organizationId,
-        ledger_account_id: ledger.id,
+        ledger_account_id: ledger.row.id,
         campus_id: input.campusId,
         name: input.name,
         kind: input.kind,
@@ -294,22 +263,14 @@ export class KyselyMoneyAccountRepository extends MoneyAccountRepository {
     return { status: 'saved', account: toAccount(row) };
   }
 
-  async update(
+  update(
     scope: MoneyAccountScope,
     id: string,
     change: MoneyAccountChange
   ): Promise<MoneyAccountOutcome | undefined> {
-    try {
-      return await this.db
-        .transaction()
-        .execute((trx) => this.updateIn(trx, { scope, id, change }));
-    } catch (error) {
-      const outcome = accountClash(error);
-      if (outcome === undefined) {
-        throw error;
-      }
-      return outcome;
-    }
+    return transactAccounts(this.db, (trx) =>
+      this.updateIn(trx, { scope, id, change })
+    );
   }
 
   private async updateIn(

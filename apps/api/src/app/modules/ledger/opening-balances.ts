@@ -55,7 +55,6 @@ export function planStudentEntry(
   };
 }
 
-/** What the account held on go-live: Dr the money account, Cr opening balance. */
 export function planMoneyAccountEntry(
   item: OpeningMoneyAccountItem,
   target: MoneyAccountTarget

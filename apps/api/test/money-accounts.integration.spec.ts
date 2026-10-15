@@ -599,6 +599,58 @@ test.describe('the dashboard card', () => {
   });
 });
 
+test.describe('the dashboard card across schools', () => {
+  test('leaves another school’s accounts out of the totals and the counts', async ({
+    api,
+    app,
+    schools,
+  }) => {
+    const { owner, ownerB, campusB } = schools;
+    const mine = await createMoneyAccount(app, owner, bank);
+    const theirs = await createMoneyAccount(app, ownerB, {
+      name: 'B account',
+      kind: 'bank',
+      campusId: campusB.id,
+    });
+    await importOpening(app, owner, {
+      moneyAccounts: [
+        {
+          moneyAccountId: mine.id,
+          amountMinor: 700_000,
+          effectiveOn: '2026-09-01',
+        },
+      ],
+    });
+    await importOpening(app, ownerB, {
+      moneyAccounts: [
+        {
+          moneyAccountId: theirs.id,
+          amountMinor: 3_000_000,
+          effectiveOn: '2026-09-01',
+        },
+      ],
+    });
+    const theirsSchoolWide = await createMoneyAccount(app, ownerB, {
+      name: 'B school-wide',
+      kind: 'cash',
+      campusId: null,
+    });
+
+    const a = (await api(owner).get('/dashboard/money').expect(200))
+      .body as DashboardMoney;
+    expect(a.totalMinor).toBe(700_000);
+    expect(a.accounts.map((item) => item.id)).toEqual([mine.id]);
+    expect(a.hiddenSchoolWide).toBe(0);
+
+    const b = (await api(ownerB).get('/dashboard/money').expect(200))
+      .body as DashboardMoney;
+    expect(b.totalMinor).toBe(3_000_000);
+    expect(b.accounts.map((item) => item.id).toSorted(byName)).toEqual(
+      [theirs.id, theirsSchoolWide.id].toSorted(byName)
+    );
+  });
+});
+
 test.describe('deleting what holds money', () => {
   test('refuses to delete a campus that has a money account, and a school that has one', async ({
     api,

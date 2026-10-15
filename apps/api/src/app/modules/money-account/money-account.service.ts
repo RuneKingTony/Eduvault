@@ -1,12 +1,10 @@
 import {
   BadRequestException,
-  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import {
-  LEDGER_CODE_TAKEN_MESSAGE,
   MONEY_ACCOUNT_BANK_NAME_MESSAGE,
   MONEY_ACCOUNT_NOT_FOUND_MESSAGE,
   MONEY_ACCOUNT_RETIRE_MESSAGE,
@@ -20,6 +18,7 @@ import {
   type UpdateMoneyAccountInput,
 } from '@eduvault/api-contract';
 import type { OrgContext } from '../../common/auth';
+import { accountConflict } from '../../common/ledger';
 import { CampusService } from '../campus/campus.service';
 import {
   MoneyAccountRepository,
@@ -34,17 +33,10 @@ const scopeOf = (ctx: OrgContext): MoneyAccountScope => ({
 });
 
 function accountOf(outcome: MoneyAccountOutcome, name: string): MoneyAccount {
-  switch (outcome.status) {
-    case 'saved': {
-      return outcome.account;
-    }
-    case 'name_taken': {
-      throw new ConflictException(moneyAccountDuplicateMessage(name));
-    }
-    case 'code_taken': {
-      throw new ConflictException(LEDGER_CODE_TAKEN_MESSAGE);
-    }
+  if (outcome.status === 'saved') {
+    return outcome.account;
   }
+  throw accountConflict(outcome.status, moneyAccountDuplicateMessage(name));
 }
 
 @Injectable()

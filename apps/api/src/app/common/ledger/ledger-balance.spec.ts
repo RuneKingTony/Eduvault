@@ -1,6 +1,5 @@
 import {
   nextChildCode,
-  nextMoneyAccountCode,
   naturalBalance,
   rollUpChart,
   visibleChart,
@@ -106,17 +105,15 @@ describe('nextChildCode', () => {
     expect(nextChildCode(4000, [4490], [4500])).toBe(4510);
     expect(nextChildCode(4000, [4480], [4500, 4490])).toBe(4510);
   });
-});
 
-describe('nextMoneyAccountCode', () => {
   it('gives 1210, then 1220, then 1230 under 1200', () => {
     const taken = [1100, 1200, 1300];
-    expect(nextMoneyAccountCode([], taken)).toBe(1210);
-    expect(nextMoneyAccountCode([1210], taken)).toBe(1220);
-    expect(nextMoneyAccountCode([1210, 1220], taken)).toBe(1230);
+    expect(nextChildCode(1200, [], taken)).toBe(1210);
+    expect(nextChildCode(1200, [1210], taken)).toBe(1220);
+    expect(nextChildCode(1200, [1210, 1220], taken)).toBe(1230);
   });
 
   it('steps past Store stock at 1300', () => {
-    expect(nextMoneyAccountCode([1290], [1300])).toBe(1310);
+    expect(nextChildCode(1200, [1290], [1300])).toBe(1310);
   });
 });

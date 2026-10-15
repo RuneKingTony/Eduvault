@@ -27,7 +27,6 @@ const day = sql<string>`to_char(effective_on, 'YYYY-MM-DD')`.as('effective_on');
 
 @Injectable()
 export class LedgerPoster {
-  /** A second post of one reference returns the first entry with `replayed: true` and adds no lines. */
   async post(trx: Kysely<DB>, input: PostInput): Promise<PostResult> {
     assertBalancedLines(input.lines);
     const inserted = await trx

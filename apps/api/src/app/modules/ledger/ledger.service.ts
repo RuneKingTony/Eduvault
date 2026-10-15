@@ -1,13 +1,12 @@
 import {
   BadRequestException,
-  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import {
+  FEE_INCOME_SYSTEM_KEY,
   LEDGER_ACCOUNT_NOT_FOUND_MESSAGE,
   LEDGER_ACCOUNT_PARENT_MESSAGE,
-  LEDGER_CODE_TAKEN_MESSAGE,
   MONEY_ACCOUNT_NOT_FOUND_MESSAGE,
   STUDENT_NOT_FOUND_MESSAGE,
   ledgerAccountDuplicateMessage,
@@ -22,7 +21,7 @@ import {
 import type { OrgContext } from '../../common/auth';
 import { Clock } from '../../common/clock';
 import {
-  FEE_INCOME_KEY,
+  accountConflict,
   naturalBalance,
   rollUpChart,
   visibleChart,
@@ -85,7 +84,7 @@ export class LedgerService {
     if (parent === undefined) {
       throw new NotFoundException(LEDGER_ACCOUNT_NOT_FOUND_MESSAGE);
     }
-    if (parent.systemKey !== FEE_INCOME_KEY) {
+    if (parent.systemKey !== FEE_INCOME_SYSTEM_KEY) {
       throw new BadRequestException(LEDGER_ACCOUNT_PARENT_MESSAGE);
     }
     const name = input.name.trim();
@@ -94,17 +93,10 @@ export class LedgerService {
       parentId: parent.id,
       name,
     });
-    switch (outcome.status) {
-      case 'saved': {
-        return outcome.account;
-      }
-      case 'name_taken': {
-        throw new ConflictException(ledgerAccountDuplicateMessage(name));
-      }
-      case 'code_taken': {
-        throw new ConflictException(LEDGER_CODE_TAKEN_MESSAGE);
-      }
+    if (outcome.status === 'saved') {
+      return outcome.account;
     }
+    throw accountConflict(outcome.status, ledgerAccountDuplicateMessage(name));
   }
 
   journal(ctx: OrgContext, query: JournalQuery): Promise<JournalList> {
@@ -129,7 +121,6 @@ export class LedgerService {
     return { posted: entries.length - skipped.length, skipped };
   }
 
-  /** Every student and account is checked before anything posts, so a refusal posts nothing. */
   private async planOpening(
     ctx: OrgContext,
     input: OpeningBalances

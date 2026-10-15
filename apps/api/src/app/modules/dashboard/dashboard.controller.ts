@@ -10,7 +10,7 @@ type Routes = typeof contract.dashboard;
 export class DashboardController {
   constructor(
     private readonly dashboard: DashboardService,
-    private readonly money: DashboardMoneyService
+    private readonly moneySummary: DashboardMoneyService
   ) {}
 
   @Get('tasks')
@@ -33,7 +33,7 @@ export class DashboardController {
 
   @Get('money')
   @OrganizationAuth('moneyAccount', 'read')
-  moneyAccounts(@Org() org: OrgContext): Promise<RouteOutput<Routes['money']>> {
-    return this.money.money(org);
+  money(@Org() org: OrgContext): Promise<RouteOutput<Routes['money']>> {
+    return this.moneySummary.summary(org);
   }
 }

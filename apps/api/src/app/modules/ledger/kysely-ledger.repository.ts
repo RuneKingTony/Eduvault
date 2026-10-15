@@ -1,23 +1,22 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { sql } from 'kysely';
 import {
+  FEES_RECEIVABLE_SYSTEM_KEY,
+  OPENING_BALANCE_SYSTEM_KEY,
   journalKindSchema,
   ledgerAccountTypeSchema,
   type JournalEntry,
   type JournalList,
   type JournalLine,
   type JournalQuery,
-  type LedgerAccount,
 } from '@eduvault/api-contract';
 import { inCampusScope } from '../../common/db/in-campus-scope';
 import { KYSELY_TOKEN, type Database } from '../../common/db/tokens';
 import {
-  accountClash,
-  FEES_RECEIVABLE_KEY,
   LedgerPoster,
-  OPENING_BALANCE_KEY,
-  nextChildCode,
+  insertChildAccount,
   schoolCurrency,
+  transactAccounts,
   type ChartAccount,
 } from '../../common/ledger';
 import { visibleStudentsCte } from '../../common/students';
@@ -99,7 +98,24 @@ export class KyselyLedgerRepository extends LedgerRepository {
             })
           )
       )
+      .leftJoin('money_account', (join) =>
+        join
+          .onRef('money_account.ledger_account_id', '=', 'ledger_account.id')
+          .onRef(
+            'money_account.organization_id',
+            '=',
+            'ledger_account.organization_id'
+          )
+      )
       .where('ledger_account.organization_id', '=', scope.organizationId)
+      .where((eb) =>
+        eb.or([
+          eb('money_account.id', 'is', null),
+          inCampusScope(eb, 'money_account.campus_id', {
+            scope: scope.campusScope,
+          }),
+        ])
+      )
       .groupBy('ledger_account.id')
       .select([
         'ledger_account.id',
@@ -154,64 +170,25 @@ export class KyselyLedgerRepository extends LedgerRepository {
     parentId: string;
     name: string;
   }): Promise<LedgerOutcome> {
-    try {
-      return await this.db
-        .transaction()
-        .execute((trx) => this.createIn(trx, input));
-    } catch (error) {
-      const outcome = accountClash(error);
-      if (outcome === undefined) {
-        throw error;
+    return transactAccounts(this.db, async (trx): Promise<LedgerOutcome> => {
+      const inserted = await insertChildAccount(trx, input);
+      if (inserted.status === 'name_taken') {
+        return inserted;
       }
-      return outcome;
-    }
-  }
-
-  private async createIn(
-    trx: Database,
-    input: { organizationId: string; parentId: string; name: string }
-  ): Promise<LedgerOutcome> {
-    const { organizationId, parentId, name } = input;
-    const parent = await trx
-      .selectFrom('ledger_account')
-      .select(['code', 'type'])
-      .where('organization_id', '=', organizationId)
-      .where('id', '=', parentId)
-      .executeTakeFirstOrThrow();
-    const accounts = await trx
-      .selectFrom('ledger_account')
-      .select(['code', 'parent_id', sql<string>`lower(name)`.as('lowered')])
-      .where('organization_id', '=', organizationId)
-      .execute();
-    const siblings = accounts.filter((row) => row.parent_id === parentId);
-    if (siblings.some((row) => row.lowered === name.toLowerCase())) {
-      return { status: 'name_taken' };
-    }
-    const created = await trx
-      .insertInto('ledger_account')
-      .values({
-        organization_id: organizationId,
-        code: nextChildCode(
-          parent.code,
-          siblings.map((row) => row.code),
-          accounts.map((row) => row.code)
-        ),
-        name,
-        type: parent.type,
-        parent_id: parentId,
-      })
-      .returning(['id', 'code', 'name', 'type', 'parent_id', 'system_key'])
-      .executeTakeFirstOrThrow();
-    const account: LedgerAccount = {
-      id: created.id,
-      code: created.code,
-      name: created.name,
-      type: ledgerAccountTypeSchema.parse(created.type),
-      parentId: created.parent_id,
-      systemKey: created.system_key,
-      balanceMinor: 0,
-    };
-    return { status: 'saved', account };
+      const { row } = inserted;
+      return {
+        status: 'saved',
+        account: {
+          id: row.id,
+          code: row.code,
+          name: row.name,
+          type: ledgerAccountTypeSchema.parse(row.type),
+          parentId: row.parent_id,
+          systemKey: row.system_key,
+          balanceMinor: 0,
+        },
+      };
+    });
   }
 
   private entries(scope: LedgerScope, query: JournalQuery) {
@@ -392,7 +369,10 @@ export class KyselyLedgerRepository extends LedgerRepository {
       .selectFrom('ledger_account')
       .select(['id', 'system_key'])
       .where('organization_id', '=', organizationId)
-      .where('system_key', 'in', [FEES_RECEIVABLE_KEY, OPENING_BALANCE_KEY])
+      .where('system_key', 'in', [
+        FEES_RECEIVABLE_SYSTEM_KEY,
+        OPENING_BALANCE_SYSTEM_KEY,
+      ])
       .execute();
     const idOf = (key: string) => {
       const found = rows.find((row) => row.system_key === key);
@@ -402,8 +382,8 @@ export class KyselyLedgerRepository extends LedgerRepository {
       return found.id;
     };
     return {
-      receivableId: idOf(FEES_RECEIVABLE_KEY),
-      equityId: idOf(OPENING_BALANCE_KEY),
+      receivableId: idOf(FEES_RECEIVABLE_SYSTEM_KEY),
+      equityId: idOf(OPENING_BALANCE_SYSTEM_KEY),
     };
   }
 

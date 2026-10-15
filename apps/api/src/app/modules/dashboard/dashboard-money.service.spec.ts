@@ -25,7 +25,7 @@ const serviceFor = (list: MoneyAccountList) => {
 
 const ctx = { organizationId: 'school-a' } as OrgContext;
 
-describe('DashboardMoneyService.money', () => {
+describe('DashboardMoneyService.summary', () => {
   it('totals the visible active accounts and passes the hidden count on', async () => {
     const service = serviceFor({
       items: [
@@ -43,7 +43,7 @@ describe('DashboardMoneyService.money', () => {
       hiddenSchoolWideCount: 1,
       currency: 'NGN',
     });
-    expect(await service.money(ctx)).toEqual({
+    expect(await service.summary(ctx)).toEqual({
       currency: 'NGN',
       totalMinor: 10_700_000,
       accounts: [
@@ -81,7 +81,7 @@ describe('DashboardMoneyService.money', () => {
       hiddenSchoolWideCount: 0,
       currency: 'NGN',
     });
-    const money = await service.money(ctx);
+    const money = await service.summary(ctx);
     expect(money.accounts.map((row) => row.id)).toEqual(['ma-1']);
     expect(money.totalMinor).toBe(9_500_000);
   });
@@ -92,7 +92,7 @@ describe('DashboardMoneyService.money', () => {
       items: [],
       hiddenSchoolWideCount: 0,
     });
-    expect(await service.money(ctx)).toEqual({
+    expect(await service.summary(ctx)).toEqual({
       currency: 'NGN',
       totalMinor: 0,
       accounts: [],

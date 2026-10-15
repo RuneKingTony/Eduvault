@@ -1,11 +1,5 @@
 import type { LedgerAccountType } from '@eduvault/api-contract';
 
-const MONEY_ACCOUNTS_CODE = 1200;
-export const FEE_INCOME_KEY = 'fee_income';
-export const MONEY_ACCOUNTS_KEY = 'money_accounts';
-export const OPENING_BALANCE_KEY = 'opening_balance_equity';
-export const FEES_RECEIVABLE_KEY = 'fees_receivable';
-
 const HIDDEN_KEYS: ReadonlySet<string> = new Set([
   'customer_credit_refunds',
   'other_charges',
@@ -35,7 +29,6 @@ function childrenByParent(
   return children;
 }
 
-/** Asset and expense accounts grow with debits; the rest grow with credits. */
 export function naturalBalance(
   type: LedgerAccountType,
   debitMinor: number,
@@ -102,8 +95,3 @@ export function nextChildCode(
   }
   return code;
 }
-
-export const nextMoneyAccountCode = (
-  childCodes: readonly number[],
-  takenCodes: readonly number[]
-): number => nextChildCode(MONEY_ACCOUNTS_CODE, childCodes, takenCodes);

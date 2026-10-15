@@ -1,5 +1,6 @@
 import {
   LEDGER_ACCOUNT_PARENT_MESSAGE,
+  MONEY_ACCOUNT_NOT_FOUND_MESSAGE,
   JOURNAL_RANGE_MESSAGE,
   type JournalList,
   type LedgerAccount,
@@ -7,6 +8,7 @@ import {
   type OpeningBalancesResult,
 } from '@eduvault/api-contract';
 import type { Permission } from '@eduvault/policy';
+import type { PoolClient } from 'pg';
 import {
   acting,
   expect,
@@ -34,6 +36,9 @@ const chartOf = async (api: Api, user: TestUser): Promise<LedgerAccountList> =>
 
 const under = async (api: Api, user: TestUser, code = 4000) =>
   (await chartOf(api, user)).items.find((item) => item.code === code)?.id;
+
+const childNames = (chart: LedgerAccountList) =>
+  chart.items.filter((item) => item.parentId !== null).map((item) => item.name);
 
 const balances = (chart: LedgerAccountList) =>
   Object.fromEntries(chart.items.map((item) => [item.code, item.balanceMinor]));
@@ -157,10 +162,41 @@ test.describe('the money categories', () => {
     expect(balances(chart)).toMatchObject({
       1100: 3_200_000,
       1200: 0,
-      1210: 0,
       3000: 1_200_000,
       4000: 2_000_000,
     });
+  });
+
+  test('leaves other campuses’ and school-wide money accounts out of a campus member’s chart', async ({
+    api,
+    app,
+    schools,
+  }) => {
+    const { owner, lekkiOnly, lekki, ikeja } = schools;
+    await createMoneyAccount(app, owner, {
+      name: 'GTBank current',
+      kind: 'bank',
+      campusId: null,
+    });
+    await createMoneyAccount(app, owner, {
+      name: 'Lekki POS',
+      kind: 'pos',
+      campusId: lekki.id,
+    });
+    await createMoneyAccount(app, owner, {
+      name: 'Ikeja cash',
+      kind: 'cash',
+      campusId: ikeja.id,
+    });
+
+    expect(childNames(await chartOf(api, owner))).toEqual(
+      expect.arrayContaining(['GTBank current', 'Lekki POS', 'Ikeja cash'])
+    );
+    const scoped = await chartOf(api, lekkiOnly);
+    expect(childNames(scoped)).toContain('Lekki POS');
+    expect(childNames(scoped)).not.toContain('GTBank current');
+    expect(childNames(scoped)).not.toContain('Ikeja cash');
+    expect(scoped.items.map((item) => item.code)).toContain(1200);
   });
 });
 
@@ -755,6 +791,106 @@ test.describe('isolation', () => {
       await client.query('ROLLBACK');
       client.release();
     }
+  });
+
+  test('7b: the composite foreign keys refuse a raw reversal, entry and campus from another school', async ({
+    app,
+    pool,
+    schools,
+  }) => {
+    const { orgA, orgB, campusB } = schools;
+    const { entry: theirs } = await postEntry(app, {
+      organizationId: orgB.id,
+      reference: 'B-OPEN',
+      kind: 'opening',
+      effectiveOn: '2026-09-01',
+      postedBy: null,
+      lines: [
+        {
+          ledgerAccountId: await ledgerAccountId(pool, orgB.id, 4010),
+          debitMinor: 100,
+          creditMinor: 0,
+        },
+        {
+          ledgerAccountId: await ledgerAccountId(pool, orgB.id, 3000),
+          debitMinor: 0,
+          creditMinor: 100,
+        },
+      ],
+    });
+    const mine = await ledgerAccountId(pool, orgA.id, 3000);
+
+    const refused = async (
+      work: (client: PoolClient) => Promise<unknown>
+    ): Promise<void> => {
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        await expect(work(client)).rejects.toMatchObject({ code: '23503' });
+      } finally {
+        await client.query('ROLLBACK');
+        client.release();
+      }
+    };
+    const ownEntry = async (client: PoolClient): Promise<string | undefined> =>
+      (
+        await client.query<{ id: string }>(
+          `INSERT INTO journal_entry (organization_id, reference, kind, effective_on)
+           VALUES ($1, 'RAW', 'opening', '2026-09-01') RETURNING id`,
+          [orgA.id]
+        )
+      ).rows[0]?.id;
+
+    await refused((client) =>
+      client.query(
+        `INSERT INTO journal_entry (organization_id, reference, kind, effective_on, reverses_entry_id)
+         VALUES ($1, 'RAW', 'payment_void', '2026-09-01', $2)`,
+        [orgA.id, theirs.id]
+      )
+    );
+    await refused((client) =>
+      client.query(
+        `INSERT INTO journal_line (organization_id, entry_id, ledger_account_id, debit_minor)
+         VALUES ($1, $2, $3, 5)`,
+        [orgA.id, theirs.id, mine]
+      )
+    );
+    await refused(async (client) =>
+      client.query(
+        `INSERT INTO journal_line (organization_id, entry_id, ledger_account_id, campus_id, debit_minor)
+         VALUES ($1, $2, $3, $4, 5)`,
+        [orgA.id, await ownEntry(client), mine, campusB.id]
+      )
+    );
+  });
+
+  test('7c: a money account of another school answers 404 on opening balances and posts nothing', async ({
+    api,
+    app,
+    schools,
+  }) => {
+    const { owner, ownerB, campusB, studentLekki } = schools;
+    const theirs = await createMoneyAccount(app, ownerB, {
+      name: 'B account',
+      kind: 'bank',
+      campusId: campusB.id,
+    });
+    const res = await api(owner)
+      .post('/finance/opening-balances')
+      .send({
+        items: [debt(studentLekki.id, 100, '2026-09-01')],
+        moneyAccounts: [
+          {
+            moneyAccountId: theirs.id,
+            amountMinor: 500,
+            effectiveOn: '2026-09-01',
+          },
+        ],
+      })
+      .expect(404);
+    expect(res.body.message).toBe(MONEY_ACCOUNT_NOT_FOUND_MESSAGE);
+    expect((await journalOf(api, owner)).items).toEqual([]);
+    expect((await journalOf(api, ownerB)).items).toEqual([]);
   });
 
   test('10: an opening balance sent twice leaves one entry and the second answer says already_posted', async ({

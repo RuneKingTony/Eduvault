@@ -8,7 +8,7 @@ export class DashboardMoneyService {
   constructor(private readonly accounts: MoneyAccountService) {}
 
   /** Reads through the money-account list so the visibility rule lives in one place. */
-  async money(ctx: OrgContext): Promise<DashboardMoney> {
+  async summary(ctx: OrgContext): Promise<DashboardMoney> {
     const { currency, items, hiddenSchoolWideCount } =
       await this.accounts.list(ctx);
     const active = items.filter((account) => account.retiredAt === null);
