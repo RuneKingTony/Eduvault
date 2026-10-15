@@ -144,6 +144,36 @@ describe('roles', () => {
     );
   });
 
+  it('gives the bursar money account and ledger reads, the principal money accounts, and nobody else any', () => {
+    expect(starter('bursar').moneyAccount).toEqual(['read']);
+    expect(starter('bursar').ledger).toEqual(['read']);
+    expect(starter('principal').moneyAccount).toEqual(['read']);
+    expect(starter('principal').ledger).toBeUndefined();
+    for (const slug of ['administrator', 'teacher', 'student', 'guardian']) {
+      expect(starter(slug).moneyAccount).toBeUndefined();
+      expect(starter(slug).ledger).toBeUndefined();
+    }
+  });
+
+  it('keeps ledger:manageAccounts and the money account writes out of every starter role', () => {
+    for (const role of STARTER_ROLES) {
+      for (const permission of [
+        'ledger:manageAccounts',
+        'moneyAccount:create',
+        'moneyAccount:update',
+      ] as const) {
+        expect(role.permissions).not.toContain(permission);
+      }
+    }
+  });
+
+  it('counts the money reads in READ_PERMS', () => {
+    expect(READ_PERMS).toEqual(
+      expect.arrayContaining(['ledger:read', 'moneyAccount:read'])
+    );
+    expect(READ_PERMS).not.toContain('ledger:manageAccounts');
+  });
+
   it('keeps ac:create, ac:update and ac:delete out of every starter role', () => {
     for (const role of STARTER_ROLES) {
       for (const action of ['ac:create', 'ac:update', 'ac:delete'] as const) {
@@ -210,6 +240,7 @@ describe('roles', () => {
       team: ['read'],
       campus: ['readAll'],
       announcement: ['create', 'read', 'update'],
+      moneyAccount: ['read'],
     });
   });
 

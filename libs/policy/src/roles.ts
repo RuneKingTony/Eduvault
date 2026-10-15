@@ -70,7 +70,13 @@ export const STARTER_ROLES: readonly StarterRole[] = [
     label: 'Bursar',
     description:
       'Charges fees, records payments and asks for corrections. Cannot approve them.',
-    permissions: ['student:read', 'guardian:read', 'enrollment:read'],
+    permissions: [
+      'student:read',
+      'guardian:read',
+      'enrollment:read',
+      'moneyAccount:read',
+      'ledger:read',
+    ],
   },
   {
     slug: 'principal',
@@ -85,6 +91,7 @@ export const STARTER_ROLES: readonly StarterRole[] = [
       'announcement:create',
       'announcement:read',
       'announcement:update',
+      'moneyAccount:read',
     ],
   },
   {
