@@ -4,6 +4,7 @@ export * from './announcements';
 export * from './calendar';
 export * from './classes';
 export * from './dashboard';
+export * from './finance';
 export * from './guardians';
 export * from './portal';
 export * from './students';
