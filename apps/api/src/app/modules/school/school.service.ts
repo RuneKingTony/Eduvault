@@ -89,7 +89,7 @@ export class SchoolService {
   }
 
   async deletable(ctx: OrgContext): Promise<Deletable> {
-    return (await this.school.hasStudents(ctx.organizationId))
+    return (await this.school.hasRecords(ctx.organizationId))
       ? { ok: false, reason: NOT_DELETABLE_MESSAGE }
       : { ok: true };
   }

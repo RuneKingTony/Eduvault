@@ -33,7 +33,11 @@ test.describe('dev seed', () => {
                 (SELECT count(*) FROM announcement) AS announcement,
                 (SELECT count(*) FROM announcement WHERE status = 'published') AS published_announcement,
                 (SELECT count(*) FROM announcement WHERE pinned) AS pinned_announcement,
-                (SELECT count(*) FROM announcement WHERE campus_id IS NULL) AS everyone_announcement`
+                (SELECT count(*) FROM announcement WHERE campus_id IS NULL) AS everyone_announcement,
+                (SELECT count(*) FROM ledger_account) AS ledger_account,
+                (SELECT count(*) FROM money_account) AS money_account,
+                (SELECT count(*) FROM journal_entry) AS journal_entry,
+                (SELECT count(*) FROM journal_line) AS journal_line`
       );
       return rows[0];
     };
@@ -66,6 +70,10 @@ test.describe('dev seed', () => {
       published_announcement: '4',
       pinned_announcement: '1',
       everyone_announcement: '4',
+      ledger_account: '59',
+      money_account: '2',
+      journal_entry: '5',
+      journal_line: '10',
     });
 
     const scopeOf = async (key: string) => {

@@ -17,6 +17,7 @@ import { PlatformService } from '../../src/app/modules/platform/platform.service
 import { seedAnnouncements } from './announcements';
 import { seedCalendar } from './calendar';
 import { seedClasses } from './classes';
+import { seedFinance } from './finance';
 import { seedStudents } from './student-seed';
 import { orgContextFor } from './actors';
 import { PROTOTYPE_TODAY, seedOffsetDays, shiftDate } from './date-shift';
@@ -246,6 +247,12 @@ export async function runSeed(
     author: await orgContextFor(app, emailOf('tunde')),
     campusIds: created.campusIds,
     today,
+  });
+  await seedFinance(app, {
+    owner: greenfieldOwner,
+    campusIds: created.campusIds,
+    school: GREENFIELD_SLUG,
+    offsetDays,
   });
   await addSupportActivity(app, superAdmin, created.organizationIds);
 

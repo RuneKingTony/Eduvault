@@ -16,5 +16,5 @@ export abstract class SchoolRepository {
 
   abstract schoolName(organizationId: string): Promise<string | undefined>;
 
-  abstract hasStudents(organizationId: string): Promise<boolean>;
+  abstract hasRecords(organizationId: string): Promise<boolean>;
 }
