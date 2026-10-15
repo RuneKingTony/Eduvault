@@ -11,13 +11,25 @@ export interface StartedPostgres {
   stop: () => Promise<void>;
 }
 
-export async function startPostgres(
-  image: string = POSTGRES_IMAGE
-): Promise<StartedPostgres> {
+export interface StartPostgresOptions {
+  image?: string;
+  /** `postgres -c name=value` server settings. */
+  settings?: Record<string, string>;
+}
+
+export async function startPostgres({
+  image = POSTGRES_IMAGE,
+  settings = {},
+}: StartPostgresOptions = {}): Promise<StartedPostgres> {
+  const flags = Object.entries(settings).flatMap(([name, value]) => [
+    '-c',
+    `${name}=${value}`,
+  ]);
   const container = await new PostgreSqlContainer(image)
     .withDatabase('eduvault')
     .withUsername('eduvault')
     .withPassword('eduvault')
+    .withCommand(['postgres', ...flags])
     .start();
   return {
     uri: container.getConnectionUri(),
