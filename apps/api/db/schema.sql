@@ -50,6 +50,144 @@ BEGIN
 END;
 $$;
 
+--
+-- Name: journal_append_only(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.journal_append_only() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  RAISE EXCEPTION '% is append-only', TG_TABLE_NAME
+    USING ERRCODE = 'check_violation', CONSTRAINT = 'journal_append_only';
+END;
+$$;
+
+--
+-- Name: journal_entry_balanced(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.journal_entry_balanced() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+  totals RECORD;
+BEGIN
+  SELECT count(*) AS lines,
+    COALESCE(sum(debit_minor), 0) AS debits,
+    COALESCE(sum(credit_minor), 0) AS credits
+  INTO totals
+  FROM journal_line
+  WHERE entry_id = NEW.entry_id AND organization_id = NEW.organization_id;
+  IF totals.lines < 2 OR totals.debits <> totals.credits THEN
+    RAISE EXCEPTION 'journal entry % is not balanced', NEW.entry_id
+      USING ERRCODE = 'check_violation', CONSTRAINT = 'journal_entry_balanced';
+  END IF;
+  RETURN NULL;
+END;
+$$;
+
+--
+-- Name: journal_entry_not_empty(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.journal_entry_not_empty() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM journal_line
+    WHERE entry_id = NEW.id AND organization_id = NEW.organization_id
+  ) THEN
+    RAISE EXCEPTION 'journal entry % has no lines', NEW.id
+      USING ERRCODE = 'check_violation', CONSTRAINT = 'journal_entry_not_empty';
+  END IF;
+  RETURN NULL;
+END;
+$$;
+
+--
+-- Name: journal_line_requires_student(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.journal_line_requires_student() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  IF NEW.student_id IS NULL AND EXISTS (
+    SELECT 1 FROM ledger_account
+    WHERE id = NEW.ledger_account_id
+      AND organization_id = NEW.organization_id
+      AND requires_student
+  ) THEN
+    RAISE EXCEPTION 'a line on this account needs a student'
+      USING ERRCODE = 'check_violation', CONSTRAINT = 'journal_line_requires_student';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+--
+-- Name: ledger_account_system_fixed(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.ledger_account_system_fixed() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  IF OLD.system_key IS NOT NULL AND (
+    NEW.type IS DISTINCT FROM OLD.type
+    OR NEW.parent_id IS DISTINCT FROM OLD.parent_id
+    OR NEW.system_key IS DISTINCT FROM OLD.system_key
+    OR NEW.retired_at IS DISTINCT FROM OLD.retired_at
+  ) THEN
+    RAISE EXCEPTION 'built-in account % cannot be changed', OLD.code
+      USING ERRCODE = 'check_violation', CONSTRAINT = 'ledger_account_system_fixed';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+--
+-- Name: seed_ledger_accounts(text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.seed_ledger_accounts(org text) RETURNS void
+    LANGUAGE sql
+    AS $$
+  INSERT INTO ledger_account (organization_id, code, name, type, system_key, requires_student)
+  VALUES
+    (org, 1100, 'Fees owed to the school', 'asset', 'fees_receivable', TRUE),
+    (org, 1200, 'Money accounts', 'asset', 'money_accounts', FALSE),
+    (org, 1300, 'Store stock (books and uniforms)', 'asset', 'store_stock', FALSE),
+    (org, 2100, 'Refunds owed to families', 'liability', 'customer_credit_refunds', FALSE),
+    (org, 3000, 'Opening balance', 'equity', 'opening_balance_equity', FALSE),
+    (org, 4000, 'Fee income', 'income', 'fee_income', FALSE),
+    (org, 4500, 'Store sales', 'income', 'store_sales', FALSE),
+    (org, 5000, 'Discounts given', 'expense', 'discounts_given', FALSE),
+    (org, 5100, 'Bad debt', 'expense', 'bad_debt', FALSE),
+    (org, 5200, 'Cost of store items sold', 'expense', 'store_cost', FALSE),
+    (org, 5300, 'Store stock losses', 'expense', 'store_losses', FALSE)
+  ON CONFLICT DO NOTHING;
+
+  INSERT INTO ledger_account (organization_id, code, name, type, parent_id, system_key)
+  SELECT org, fee.code, fee.name, 'income', parent.id, fee.system_key
+  FROM (
+    VALUES
+      (4010, 'Tuition', NULL),
+      (4020, 'PTA fee', NULL),
+      (4030, 'School bus', NULL),
+      (4040, 'Development levy', NULL),
+      (4050, 'Laboratory fee', NULL),
+      (4060, 'Other charges', 'other_charges'),
+      (4070, 'Excursion levy', NULL),
+      (4080, 'Graduation fee', NULL)
+  ) AS fee (code, name, system_key)
+  JOIN ledger_account parent
+    ON parent.organization_id = org AND parent.system_key = 'fee_income'
+  ON CONFLICT DO NOTHING;
+$$;
+
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
@@ -229,7 +367,7 @@ CREATE TABLE public.document_sequence (
     kind text NOT NULL,
     year smallint,
     next_value integer NOT NULL,
-    CONSTRAINT document_sequence_kind_check CHECK ((kind = 'admission'::text)),
+    CONSTRAINT document_sequence_kind_check CHECK ((kind = ANY (ARRAY['admission'::text, 'invoice'::text, 'payment'::text, 'billing_run'::text, 'adjustment'::text, 'store_sale'::text, 'delivery'::text, 'stock_count'::text]))),
     CONSTRAINT document_sequence_next_value_check CHECK ((next_value > 0))
 );
 
@@ -347,6 +485,76 @@ CREATE TABLE public.invitation (
 );
 
 --
+-- Name: journal_entry; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.journal_entry (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id text NOT NULL,
+    reference text NOT NULL,
+    sequence bigint NOT NULL,
+    kind text NOT NULL,
+    source_id uuid,
+    effective_on date NOT NULL,
+    posted_at timestamp with time zone DEFAULT now() NOT NULL,
+    posted_by text,
+    memo text,
+    reverses_entry_id uuid,
+    CONSTRAINT journal_entry_kind_check CHECK ((kind = ANY (ARRAY['invoice'::text, 'adhoc'::text, 'payment'::text, 'payment_void'::text, 'adjustment'::text, 'opening'::text, 'store'::text, 'store_receive'::text, 'store_cost'::text, 'store_count'::text]))),
+    CONSTRAINT journal_entry_memo_check CHECK ((char_length(memo) <= 500)),
+    CONSTRAINT journal_entry_reference_check CHECK ((char_length(btrim(reference)) > 0))
+);
+
+--
+-- Name: journal_entry_sequence_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.journal_entry ALTER COLUMN sequence ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME public.journal_entry_sequence_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+--
+-- Name: journal_line; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.journal_line (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id text NOT NULL,
+    entry_id uuid NOT NULL,
+    ledger_account_id uuid NOT NULL,
+    student_id uuid,
+    campus_id text,
+    debit_minor bigint DEFAULT 0 NOT NULL,
+    credit_minor bigint DEFAULT 0 NOT NULL,
+    CONSTRAINT journal_line_one_side CHECK ((((debit_minor > 0) AND (credit_minor = 0)) OR ((credit_minor > 0) AND (debit_minor = 0))))
+);
+
+--
+-- Name: ledger_account; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ledger_account (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id text NOT NULL,
+    code integer NOT NULL,
+    name text NOT NULL,
+    type text NOT NULL,
+    parent_id uuid,
+    system_key text,
+    requires_student boolean DEFAULT false NOT NULL,
+    retired_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT ledger_account_code_check CHECK ((code > 0)),
+    CONSTRAINT ledger_account_name_check CHECK (((char_length(btrim(name)) >= 1) AND (char_length(btrim(name)) <= 80))),
+    CONSTRAINT ledger_account_type_check CHECK ((type = ANY (ARRAY['asset'::text, 'liability'::text, 'equity'::text, 'income'::text, 'expense'::text])))
+);
+
+--
 -- Name: member; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -357,6 +565,29 @@ CREATE TABLE public.member (
     role text NOT NULL,
     "createdAt" timestamp with time zone NOT NULL,
     title text
+);
+
+--
+-- Name: money_account; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.money_account (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id text NOT NULL,
+    ledger_account_id uuid NOT NULL,
+    campus_id text,
+    name text NOT NULL,
+    kind text NOT NULL,
+    bank_name text,
+    account_last4 text,
+    retired_at timestamp with time zone,
+    created_by text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT money_account_account_last4_check CHECK ((account_last4 ~ '^[0-9]{4}$'::text)),
+    CONSTRAINT money_account_bank_name_check CHECK (((char_length(btrim(bank_name)) >= 1) AND (char_length(btrim(bank_name)) <= 80))),
+    CONSTRAINT money_account_bank_name_for_bank CHECK (((bank_name IS NULL) OR (kind = 'bank'::text))),
+    CONSTRAINT money_account_kind_check CHECK ((kind = ANY (ARRAY['cash'::text, 'bank'::text, 'pos'::text, 'gateway'::text]))),
+    CONSTRAINT money_account_name_check CHECK (((char_length(btrim(name)) >= 1) AND (char_length(btrim(name)) <= 80)))
 );
 
 --
@@ -848,11 +1079,88 @@ ALTER TABLE ONLY public.invitation
     ADD CONSTRAINT invitation_pkey PRIMARY KEY (id);
 
 --
+-- Name: journal_entry journal_entry_id_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.journal_entry
+    ADD CONSTRAINT journal_entry_id_organization_id_key UNIQUE (id, organization_id);
+
+--
+-- Name: journal_entry journal_entry_organization_id_reference_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.journal_entry
+    ADD CONSTRAINT journal_entry_organization_id_reference_key UNIQUE (organization_id, reference);
+
+--
+-- Name: journal_entry journal_entry_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.journal_entry
+    ADD CONSTRAINT journal_entry_pkey PRIMARY KEY (id);
+
+--
+-- Name: journal_line journal_line_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.journal_line
+    ADD CONSTRAINT journal_line_pkey PRIMARY KEY (id);
+
+--
+-- Name: ledger_account ledger_account_id_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ledger_account
+    ADD CONSTRAINT ledger_account_id_organization_id_key UNIQUE (id, organization_id);
+
+--
+-- Name: ledger_account ledger_account_organization_id_code_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ledger_account
+    ADD CONSTRAINT ledger_account_organization_id_code_key UNIQUE (organization_id, code);
+
+--
+-- Name: ledger_account ledger_account_organization_id_system_key_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ledger_account
+    ADD CONSTRAINT ledger_account_organization_id_system_key_key UNIQUE (organization_id, system_key);
+
+--
+-- Name: ledger_account ledger_account_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ledger_account
+    ADD CONSTRAINT ledger_account_pkey PRIMARY KEY (id);
+
+--
 -- Name: member member_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.member
     ADD CONSTRAINT member_pkey PRIMARY KEY (id);
+
+--
+-- Name: money_account money_account_id_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.money_account
+    ADD CONSTRAINT money_account_id_organization_id_key UNIQUE (id, organization_id);
+
+--
+-- Name: money_account money_account_ledger_account_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.money_account
+    ADD CONSTRAINT money_account_ledger_account_id_key UNIQUE (ledger_account_id);
+
+--
+-- Name: money_account money_account_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.money_account
+    ADD CONSTRAINT money_account_pkey PRIMARY KEY (id);
 
 --
 -- Name: organizationRole organizationRole_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -1165,6 +1473,36 @@ CREATE INDEX invitation_email_idx ON public.invitation USING btree (email);
 CREATE INDEX "invitation_organizationId_idx" ON public.invitation USING btree ("organizationId");
 
 --
+-- Name: journal_entry_effective_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX journal_entry_effective_idx ON public.journal_entry USING btree (organization_id, effective_on DESC, sequence DESC);
+
+--
+-- Name: journal_entry_reverses_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX journal_entry_reverses_key ON public.journal_entry USING btree (reverses_entry_id) WHERE (reverses_entry_id IS NOT NULL);
+
+--
+-- Name: journal_line_account_student_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX journal_line_account_student_idx ON public.journal_line USING btree (organization_id, ledger_account_id, student_id);
+
+--
+-- Name: journal_line_entry_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX journal_line_entry_idx ON public.journal_line USING btree (entry_id);
+
+--
+-- Name: ledger_account_sibling_name_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX ledger_account_sibling_name_key ON public.ledger_account USING btree (organization_id, parent_id, lower(name)) NULLS NOT DISTINCT;
+
+--
 -- Name: member_organizationId_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1175,6 +1513,12 @@ CREATE INDEX "member_organizationId_idx" ON public.member USING btree ("organiza
 --
 
 CREATE INDEX "member_userId_idx" ON public.member USING btree ("userId");
+
+--
+-- Name: money_account_campus_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX money_account_campus_idx ON public.money_account USING btree (organization_id, campus_id);
 
 --
 -- Name: organizationRole_organizationId_idx; Type: INDEX; Schema: public; Owner: -
@@ -1271,6 +1615,42 @@ CREATE TRIGGER activity_event_append_only BEFORE DELETE OR UPDATE ON public.acti
 --
 
 CREATE TRIGGER audit_log_append_only BEFORE DELETE OR UPDATE ON public.audit_log FOR EACH ROW EXECUTE FUNCTION public.audit_log_refuse_change();
+
+--
+-- Name: journal_entry journal_entry_append_only; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER journal_entry_append_only BEFORE DELETE OR UPDATE ON public.journal_entry FOR EACH ROW EXECUTE FUNCTION public.journal_append_only();
+
+--
+-- Name: journal_line journal_entry_balanced; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE CONSTRAINT TRIGGER journal_entry_balanced AFTER INSERT ON public.journal_line DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.journal_entry_balanced();
+
+--
+-- Name: journal_entry journal_entry_not_empty; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE CONSTRAINT TRIGGER journal_entry_not_empty AFTER INSERT ON public.journal_entry DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.journal_entry_not_empty();
+
+--
+-- Name: journal_line journal_line_append_only; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER journal_line_append_only BEFORE DELETE OR UPDATE ON public.journal_line FOR EACH ROW EXECUTE FUNCTION public.journal_append_only();
+
+--
+-- Name: journal_line journal_line_requires_student; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER journal_line_requires_student BEFORE INSERT ON public.journal_line FOR EACH ROW EXECUTE FUNCTION public.journal_line_requires_student();
+
+--
+-- Name: ledger_account ledger_account_system_fixed; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER ledger_account_system_fixed BEFORE UPDATE ON public.ledger_account FOR EACH ROW EXECUTE FUNCTION public.ledger_account_system_fixed();
 
 --
 -- Name: academic_session academic_session_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -1581,6 +1961,69 @@ ALTER TABLE ONLY public.invitation
     ADD CONSTRAINT "invitation_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES public.organization(id) ON DELETE CASCADE;
 
 --
+-- Name: journal_entry journal_entry_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.journal_entry
+    ADD CONSTRAINT journal_entry_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE RESTRICT;
+
+--
+-- Name: journal_entry journal_entry_reverses_entry_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.journal_entry
+    ADD CONSTRAINT journal_entry_reverses_entry_id_organization_id_fkey FOREIGN KEY (reverses_entry_id, organization_id) REFERENCES public.journal_entry(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: journal_line journal_line_campus_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.journal_line
+    ADD CONSTRAINT journal_line_campus_id_organization_id_fkey FOREIGN KEY (campus_id, organization_id) REFERENCES public.campus(team_id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: journal_line journal_line_entry_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.journal_line
+    ADD CONSTRAINT journal_line_entry_id_organization_id_fkey FOREIGN KEY (entry_id, organization_id) REFERENCES public.journal_entry(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: journal_line journal_line_ledger_account_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.journal_line
+    ADD CONSTRAINT journal_line_ledger_account_id_organization_id_fkey FOREIGN KEY (ledger_account_id, organization_id) REFERENCES public.ledger_account(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: journal_line journal_line_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.journal_line
+    ADD CONSTRAINT journal_line_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE RESTRICT;
+
+--
+-- Name: journal_line journal_line_student_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.journal_line
+    ADD CONSTRAINT journal_line_student_id_organization_id_fkey FOREIGN KEY (student_id, organization_id) REFERENCES public.student(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: ledger_account ledger_account_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ledger_account
+    ADD CONSTRAINT ledger_account_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE CASCADE;
+
+--
+-- Name: ledger_account ledger_account_parent_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ledger_account
+    ADD CONSTRAINT ledger_account_parent_id_organization_id_fkey FOREIGN KEY (parent_id, organization_id) REFERENCES public.ledger_account(id, organization_id) ON DELETE RESTRICT;
+
+--
 -- Name: member member_organizationId_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1593,6 +2036,34 @@ ALTER TABLE ONLY public.member
 
 ALTER TABLE ONLY public.member
     ADD CONSTRAINT "member_userId_fkey" FOREIGN KEY ("userId") REFERENCES public."user"(id) ON DELETE CASCADE;
+
+--
+-- Name: money_account money_account_campus_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.money_account
+    ADD CONSTRAINT money_account_campus_id_organization_id_fkey FOREIGN KEY (campus_id, organization_id) REFERENCES public.campus(team_id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: money_account money_account_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.money_account
+    ADD CONSTRAINT money_account_created_by_fkey FOREIGN KEY (created_by) REFERENCES public."user"(id) ON DELETE SET NULL;
+
+--
+-- Name: money_account money_account_ledger_account_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.money_account
+    ADD CONSTRAINT money_account_ledger_account_id_organization_id_fkey FOREIGN KEY (ledger_account_id, organization_id) REFERENCES public.ledger_account(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: money_account money_account_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.money_account
+    ADD CONSTRAINT money_account_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE RESTRICT;
 
 --
 -- Name: organizationRole organizationRole_organizationId_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -1812,4 +2283,5 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20261010140000'),
     ('20261011060008'),
     ('20261011090000'),
-    ('20261011100000');
+    ('20261011100000'),
+    ('20261012090000');
