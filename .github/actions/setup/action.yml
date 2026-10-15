@@ -33,5 +33,5 @@ runs:
     - if: inputs.nx == 'true'
       shell: bash
       run: |
-        echo "Nx cache restored from: ${{ steps.nx-cache.outputs.cache-matched-key || 'nothing' }}"
+        echo "Nx cache exact match: ${{ steps.nx-cache.outputs.cache-hit || 'no, restored by prefix or not at all' }}"
         echo "Nx cache dir: $(du -sh .nx/cache 2>/dev/null | cut -f1 || echo empty), $(find .nx/cache -mindepth 1 -maxdepth 1 2>/dev/null | wc -l) entries"
