@@ -168,44 +168,60 @@ export class KyselyCampusRepository extends CampusRepository {
   }
 
   async hasDependents(organizationId: string, id: string): Promise<boolean> {
-    const [arm, student, placement, fee, announcement] = await Promise.all([
-      this.db
-        .selectFrom('class_arm')
-        .select('id')
-        .where('campus_id', '=', id)
-        .where('organization_id', '=', organizationId)
-        .executeTakeFirst(),
-      this.db
-        .selectFrom('student')
-        .select('id')
-        .where('campus_id', '=', id)
-        .where('organization_id', '=', organizationId)
-        .executeTakeFirst(),
-      this.db
-        .selectFrom('enrollment_placement')
-        .select('id')
-        .where('campus_id', '=', id)
-        .where('organization_id', '=', organizationId)
-        .executeTakeFirst(),
-      this.db
-        .selectFrom('fee_schedule')
-        .select('id')
-        .where('campus_id', '=', id)
-        .where('organization_id', '=', organizationId)
-        .executeTakeFirst(),
-      this.db
-        .selectFrom('announcement')
-        .select('id')
-        .where('campus_id', '=', id)
-        .where('organization_id', '=', organizationId)
-        .executeTakeFirst(),
-    ]);
+    const [arm, student, placement, fee, announcement, account, line] =
+      await Promise.all([
+        this.db
+          .selectFrom('class_arm')
+          .select('id')
+          .where('campus_id', '=', id)
+          .where('organization_id', '=', organizationId)
+          .executeTakeFirst(),
+        this.db
+          .selectFrom('student')
+          .select('id')
+          .where('campus_id', '=', id)
+          .where('organization_id', '=', organizationId)
+          .executeTakeFirst(),
+        this.db
+          .selectFrom('enrollment_placement')
+          .select('id')
+          .where('campus_id', '=', id)
+          .where('organization_id', '=', organizationId)
+          .executeTakeFirst(),
+        this.db
+          .selectFrom('fee_schedule')
+          .select('id')
+          .where('campus_id', '=', id)
+          .where('organization_id', '=', organizationId)
+          .executeTakeFirst(),
+        this.db
+          .selectFrom('announcement')
+          .select('id')
+          .where('campus_id', '=', id)
+          .where('organization_id', '=', organizationId)
+          .executeTakeFirst(),
+        this.db
+          .selectFrom('money_account')
+          .select('id')
+          .where('campus_id', '=', id)
+          .where('organization_id', '=', organizationId)
+          .executeTakeFirst(),
+        this.db
+          .selectFrom('journal_line')
+          .select('id')
+          .where('campus_id', '=', id)
+          .where('organization_id', '=', organizationId)
+          .limit(1)
+          .executeTakeFirst(),
+      ]);
     return (
       arm !== undefined ||
       student !== undefined ||
       placement !== undefined ||
       fee !== undefined ||
-      announcement !== undefined
+      announcement !== undefined ||
+      account !== undefined ||
+      line !== undefined
     );
   }
 

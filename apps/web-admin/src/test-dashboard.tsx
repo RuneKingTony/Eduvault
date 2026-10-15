@@ -9,6 +9,7 @@ import {
 import type {
   ActivityPage,
   AnnouncementSummary,
+  DashboardMoney,
   DashboardRoll,
   DashboardTask,
   MePermissions,
@@ -85,6 +86,13 @@ export const announcementSummary = (
 
 const emptyActivity = (): ActivityPage => ({ items: [], total: 0 });
 
+const emptyMoney = (): DashboardMoney => ({
+  currency: 'NGN',
+  totalMinor: 0,
+  accounts: [],
+  hiddenSchoolWide: 0,
+});
+
 export function dashboardApi(
   overrides: {
     calendar?: unknown;
@@ -94,6 +102,7 @@ export function dashboardApi(
     myClasses?: MyClass[];
     activity?: ActivityPage;
     announcements?: AnnouncementSummary[];
+    money?: DashboardMoney;
   } = {}
 ) {
   return {
@@ -107,6 +116,7 @@ export function dashboardApi(
       tasks: vi.fn().mockResolvedValue(overrides.tasks ?? []),
       roll: vi.fn().mockResolvedValue(overrides.roll ?? roll()),
       myClasses: vi.fn().mockResolvedValue(overrides.myClasses ?? []),
+      money: vi.fn().mockResolvedValue(overrides.money ?? emptyMoney()),
     },
     activity: {
       list: vi.fn().mockResolvedValue(overrides.activity ?? emptyActivity()),
@@ -132,6 +142,7 @@ export function renderInRouter(
     '/students/$studentId',
     '/classes',
     '/classes/$classId',
+    '/finance/money-accounts',
     '/members/$memberId',
   ];
   const router = createRouter({

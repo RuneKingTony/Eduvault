@@ -290,7 +290,11 @@ export class KyselyAdmissionRepository extends AdmissionRepository {
   }
 
   nextNumber(organizationId: string): Promise<number> {
-    return peekDocumentNumber(this.db, organizationId, 'admission');
+    return peekDocumentNumber(this.db, {
+      organizationId,
+      kind: 'admission',
+      year: null,
+    });
   }
 
   private arms(organizationId: string, campusScope: CampusScope) {
@@ -406,11 +410,11 @@ export class KyselyAdmissionRepository extends AdmissionRepository {
 
   private admitOnce(write: AdmissionWrite): Promise<AdmissionOutcome> {
     return this.db.transaction().execute(async (trx) => {
-      const number = await allocateDocumentNumber(
-        trx,
-        write.organizationId,
-        'admission'
-      );
+      const number = await allocateDocumentNumber(trx, {
+        organizationId: write.organizationId,
+        kind: 'admission',
+        year: null,
+      });
       const admissionNumber = formatAdmissionNumber(
         write.school.prefix,
         number

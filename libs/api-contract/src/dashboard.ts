@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { idSchema } from './schemas';
+import { moneyAccountKindSchema } from './finance';
+import { currencySchema, idSchema } from './schemas';
 
 export const DASHBOARD_SAMPLE_SIZE = 5;
 export const ACTIVITY_PAGE_SIZE = 10;
@@ -92,3 +93,20 @@ export const activityPageSchema = z.object({
   total: z.number().int().nonnegative(),
 });
 export type ActivityPage = z.infer<typeof activityPageSchema>;
+
+export const dashboardMoneySchema = z.object({
+  currency: currencySchema,
+  totalMinor: z.number().int(),
+  accounts: z.array(
+    z.object({
+      id: idSchema,
+      name: z.string(),
+      kind: moneyAccountKindSchema,
+      campusName: z.string().nullable(),
+      last4: z.string().nullable(),
+      balanceMinor: z.number().int(),
+    })
+  ),
+  hiddenSchoolWide: z.number().int().nonnegative(),
+});
+export type DashboardMoney = z.infer<typeof dashboardMoneySchema>;

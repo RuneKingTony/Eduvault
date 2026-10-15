@@ -1,13 +1,17 @@
 import { Controller, Get } from '@nestjs/common';
 import { contract, type RouteOutput } from '@eduvault/api-contract';
 import { Org, OrganizationAuth, type OrgContext } from '../../common/auth';
+import { DashboardMoneyService } from './dashboard-money.service';
 import { DashboardService } from './dashboard.service';
 
 type Routes = typeof contract.dashboard;
 
 @Controller('dashboard')
 export class DashboardController {
-  constructor(private readonly dashboard: DashboardService) {}
+  constructor(
+    private readonly dashboard: DashboardService,
+    private readonly moneySummary: DashboardMoneyService
+  ) {}
 
   @Get('tasks')
   @OrganizationAuth()
@@ -25,5 +29,11 @@ export class DashboardController {
   @OrganizationAuth('class', 'read')
   myClasses(@Org() org: OrgContext): Promise<RouteOutput<Routes['myClasses']>> {
     return this.dashboard.myClasses(org);
+  }
+
+  @Get('money')
+  @OrganizationAuth('moneyAccount', 'read')
+  money(@Org() org: OrgContext): Promise<RouteOutput<Routes['money']>> {
+    return this.moneySummary.summary(org);
   }
 }

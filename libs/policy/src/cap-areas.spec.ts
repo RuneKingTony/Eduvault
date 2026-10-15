@@ -221,6 +221,8 @@ describe('capSummary', () => {
       'Marks students away',
       'Parents and guardians: add guardians and link them to students',
       'Announcements: write, publish, pin and withdraw announcements',
+      'Bank and POS accounts: add and change bank and POS accounts',
+      'Money categories: change the accountant’s categories',
       'Own records: can see',
     ]);
   });
@@ -252,6 +254,8 @@ describe('capSummary', () => {
     expect(summaryFor('bursar')).toEqual([
       'Students: can see',
       'Parents and guardians: can see',
+      'Bank and POS accounts: can see',
+      'Money categories: can see',
     ]);
   });
 
@@ -263,6 +267,7 @@ describe('capSummary', () => {
       'Sees every class',
       'Students: can see',
       'Announcements: write, publish, pin and withdraw announcements',
+      'Bank and POS accounts: can see',
     ]);
   });
 
@@ -317,6 +322,50 @@ describe('the Announcements area', () => {
       'announcement:update',
     ]);
     expect(announcements.extras).toEqual([]);
+  });
+});
+
+describe('the Money areas', () => {
+  const accounts = area('money-accounts');
+  const categories = area('money-categories');
+
+  it('sit in Money after Announcements and before Own records', () => {
+    const ids = CAP_AREAS.map((candidate) => candidate.id);
+    expect(ids.indexOf('money-accounts')).toBe(
+      ids.indexOf('announcements') + 1
+    );
+    expect(ids.indexOf('money-categories')).toBe(
+      ids.indexOf('money-accounts') + 1
+    );
+    expect(ids.indexOf('portal')).toBe(ids.indexOf('money-categories') + 1);
+    expect(accounts.group).toBe('Money');
+    expect(categories.group).toBe('Money');
+  });
+
+  it('split seeing from changing and flag only the categories as important', () => {
+    expect(accounts.label).toBe('Bank and POS accounts');
+    expect(accounts.see).toEqual(['moneyAccount:read']);
+    expect(accounts.change).toEqual([
+      'moneyAccount:create',
+      'moneyAccount:update',
+    ]);
+    expect(accounts.changeDesc).toBe('Add and change bank and POS accounts');
+    expect(accounts.important).toBe(false);
+    expect(categories.label).toBe('Money categories');
+    expect(categories.see).toEqual(['ledger:read']);
+    expect(categories.change).toEqual(['ledger:manageAccounts']);
+    expect(categories.changeDesc).toBe('Change the accountant’s categories');
+    expect(categories.important).toBe(true);
+  });
+
+  it('is custom for a lone write, and see for ledger:read', () => {
+    expect(capLevel(toPermissionMap(['moneyAccount:update']), accounts)).toBe(
+      'custom'
+    );
+    expect(
+      capLevel(toPermissionMap(['ledger:manageAccounts']), categories)
+    ).toBe('custom');
+    expect(capLevel(toPermissionMap(['ledger:read']), categories)).toBe('see');
   });
 });
 

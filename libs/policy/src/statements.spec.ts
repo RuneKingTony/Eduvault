@@ -50,6 +50,26 @@ describe('statements', () => {
     expect(permLabel('announcement:update')).toBe('Announcements: update');
   });
 
+  it('has the ledger and money account resources, with only manageAccounts sensitive', () => {
+    expect(ALL_PERMISSIONS).toEqual(
+      expect.arrayContaining([
+        'ledger:read',
+        'ledger:manageAccounts',
+        'moneyAccount:create',
+        'moneyAccount:read',
+        'moneyAccount:update',
+      ])
+    );
+    expect(SENSITIVE).toContain('ledger:manageAccounts');
+    expect(SENSITIVE).not.toContain('ledger:read');
+    expect(SENSITIVE).not.toContain('moneyAccount:create');
+    expect(permLabel('ledger:manageAccounts')).toBe(
+      'Money categories: manage accounts'
+    );
+    expect(permLabel('moneyAccount:read')).toBe('Bank and POS accounts: read');
+    expect(PERM_HELP['ledger:manageAccounts']).toBeDefined();
+  });
+
   it('has the member resource and marks adding and removing sensitive', () => {
     expect(ALL_PERMISSIONS).toEqual(
       expect.arrayContaining([

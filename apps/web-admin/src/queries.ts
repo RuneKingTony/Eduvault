@@ -453,3 +453,65 @@ export async function invalidateYearStart(
     invalidateCalendar(queryClient),
   ]);
 }
+
+const MONEY_ACCOUNTS_KEY = ['money-accounts'] as const;
+const LEDGER_KEY = ['ledger'] as const;
+
+type JournalFilters = Partial<
+  Pick<RouteQuery<typeof contract.journal.list>, 'from' | 'to' | 'kind'>
+> & { page?: number };
+
+export const moneyAccountsQueryOptions = (api: Api) =>
+  queryOptions({
+    queryKey: [...MONEY_ACCOUNTS_KEY, 'list'],
+    queryFn: () => api.moneyAccounts.list({}),
+  });
+
+export const cashBookQueryOptions = (api: Api, id: string, page: number) =>
+  queryOptions({
+    queryKey: [...MONEY_ACCOUNTS_KEY, 'cash-book', id, page],
+    queryFn: () =>
+      api.moneyAccounts.cashBook({ params: { id }, query: { page } }),
+    placeholderData: keepPreviousData,
+  });
+
+export const ledgerAccountsQueryOptions = (api: Api) =>
+  queryOptions({
+    queryKey: [...LEDGER_KEY, 'accounts'],
+    queryFn: () => api.ledgerAccounts.list({}),
+  });
+
+export const journalQueryOptions = (
+  api: Api,
+  { from, to, kind, page = 1 }: JournalFilters = {}
+) =>
+  queryOptions({
+    queryKey: [...LEDGER_KEY, 'journal', { from, to, kind, page }],
+    queryFn: () => api.journal.list({ query: { from, to, kind, page } }),
+    placeholderData: keepPreviousData,
+  });
+
+export const dashboardMoneyQueryOptions = (api: Api) =>
+  queryOptions({
+    queryKey: [...DASHBOARD_KEY, 'money'],
+    queryFn: () => api.dashboard.money({}),
+  });
+
+/** A money account is also a ledger account, so the chart and journal move with it. */
+export async function invalidateMoneyAccounts(
+  queryClient: QueryClient
+): Promise<void> {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: MONEY_ACCOUNTS_KEY }),
+    queryClient.invalidateQueries({ queryKey: LEDGER_KEY }),
+    queryClient.invalidateQueries({
+      queryKey: [...DASHBOARD_KEY, 'money'],
+    }),
+  ]);
+}
+
+export async function invalidateLedger(
+  queryClient: QueryClient
+): Promise<void> {
+  await queryClient.invalidateQueries({ queryKey: LEDGER_KEY });
+}

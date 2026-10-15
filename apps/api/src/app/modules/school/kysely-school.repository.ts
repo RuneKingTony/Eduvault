@@ -66,13 +66,29 @@ export class KyselySchoolRepository extends SchoolRepository {
     return row?.name;
   }
 
-  async hasStudents(organizationId: string): Promise<boolean> {
-    const row = await this.db
-      .selectFrom('student')
-      .select('id')
-      .where('organization_id', '=', organizationId)
-      .limit(1)
-      .executeTakeFirst();
-    return row !== undefined;
+  async hasRecords(organizationId: string): Promise<boolean> {
+    const [student, account, entry] = await Promise.all([
+      this.db
+        .selectFrom('student')
+        .select('id')
+        .where('organization_id', '=', organizationId)
+        .limit(1)
+        .executeTakeFirst(),
+      this.db
+        .selectFrom('money_account')
+        .select('id')
+        .where('organization_id', '=', organizationId)
+        .limit(1)
+        .executeTakeFirst(),
+      this.db
+        .selectFrom('journal_entry')
+        .select('id')
+        .where('organization_id', '=', organizationId)
+        .limit(1)
+        .executeTakeFirst(),
+    ]);
+    return (
+      student !== undefined || account !== undefined || entry !== undefined
+    );
   }
 }

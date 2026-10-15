@@ -17,6 +17,7 @@ import {
   BANNED_USER_MESSAGE,
   PASSWORD_MIN_LENGTH,
 } from '@eduvault/api-contract';
+import { seedLedgerAccounts } from '../ledger/seed-ledger-accounts';
 import { insertDefaultLevels } from './default-levels';
 import { assertCampusNameFree, ownerRule } from './organization-hooks';
 import { syncStarterRoles } from './starter-roles';
@@ -55,6 +56,7 @@ const getOrganizationHooks = (pool: Pool) =>
     afterCreateOrganization: async ({ organization: school }) => {
       await syncStarterRoles(pool, school.id);
       await insertDefaultLevels(pool, school.id);
+      await seedLedgerAccounts(pool, school.id);
       await pool.query(
         `INSERT INTO school_setting (organization_id) VALUES ($1)
          ON CONFLICT DO NOTHING`,

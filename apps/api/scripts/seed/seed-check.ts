@@ -4,11 +4,19 @@ import { AnnouncementService } from '../../src/app/modules/announcement/announce
 import { CalendarService } from '../../src/app/modules/calendar/calendar.service';
 import { CampusService } from '../../src/app/modules/campus/campus.service';
 import { ClassService } from '../../src/app/modules/class/class.service';
+import { LedgerService } from '../../src/app/modules/ledger/ledger.service';
+import { MoneyAccountService } from '../../src/app/modules/money-account/money-account.service';
 import { StudentService } from '../../src/app/modules/student/student.service';
 import { orgContextFor } from './actors';
 import { SEEDED_ACTING_REASON } from './acting-requests';
 import { SEED_ANNOUNCEMENTS } from './announcements';
 import { CURRENT_CLASS_TEACHERS, SEED_CLASSES } from './classes';
+import {
+  OPENING_CREDIT_MINOR,
+  OPENING_DEBT_MINOR,
+  SEED_MONEY_ACCOUNTS,
+  SEED_OPENING_BALANCES,
+} from './finance';
 import { shiftDate } from './date-shift';
 import { emailOf, SUPER_ADMIN_EMAIL } from './members';
 import {
@@ -370,6 +378,41 @@ async function checkAnnouncements(app: INestApplicationContext, check: Check) {
   );
 }
 
+async function checkFinance(app: INestApplicationContext, check: Check) {
+  const funmi = await orgContextFor(app, emailOf('funmi'));
+  const { items: accounts } = await app
+    .get(MoneyAccountService, { strict: false })
+    .list(funmi);
+  check('money accounts', accounts.length, SEED_MONEY_ACCOUNTS.length);
+  check(
+    'money account names',
+    accounts.map((account) => account.name).join(', '),
+    SEED_MONEY_ACCOUNTS.map((account) => account.name).join(', ')
+  );
+  check(
+    'school-wide money accounts',
+    accounts.filter((account) => account.campusId === null).length,
+    SEED_MONEY_ACCOUNTS.filter((account) => account.campus === null).length
+  );
+
+  const ledger = app.get(LedgerService, { strict: false });
+  const chart = await ledger.listAccounts(funmi);
+  const balanceOf = (code: number) =>
+    chart.items.find((item) => item.code === code)?.balanceMinor;
+  check(
+    'fees owed to the school',
+    balanceOf(1100) ?? 'missing',
+    OPENING_DEBT_MINOR - OPENING_CREDIT_MINOR
+  );
+  check(
+    'opening balance',
+    balanceOf(3000) ?? 'missing',
+    OPENING_DEBT_MINOR - OPENING_CREDIT_MINOR
+  );
+  const journal = await ledger.journal(funmi, { page: 1, pageSize: 50 });
+  check('opening entries', journal.total, SEED_OPENING_BALANCES.length);
+}
+
 export async function runSeedCheck(
   app: INestApplicationContext,
   offsetDays: number
@@ -412,6 +455,7 @@ export async function runSeedCheck(
   await checkClasses(app, db, check);
   await checkStudents(app, db, check);
   await checkAnnouncements(app, check);
+  await checkFinance(app, check);
 
   for (const [key, expected] of Object.entries(visibleStudents)) {
     const ctx = await orgContextFor(app, emailOf(key));

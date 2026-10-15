@@ -224,6 +224,44 @@ export interface Invitation {
   teamId: string | null;
 }
 
+export interface JournalEntry {
+  effective_on: Timestamp;
+  id: Generated<string>;
+  kind: string;
+  memo: string | null;
+  organization_id: string;
+  posted_at: Generated<Timestamp>;
+  posted_by: string | null;
+  reference: string;
+  reverses_entry_id: string | null;
+  sequence: Generated<Int8>;
+  source_id: string | null;
+}
+
+export interface JournalLine {
+  campus_id: string | null;
+  credit_minor: Generated<Int8>;
+  debit_minor: Generated<Int8>;
+  entry_id: string;
+  id: Generated<string>;
+  ledger_account_id: string;
+  organization_id: string;
+  student_id: string | null;
+}
+
+export interface LedgerAccount {
+  code: number;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  name: string;
+  organization_id: string;
+  parent_id: string | null;
+  requires_student: Generated<boolean>;
+  retired_at: Timestamp | null;
+  system_key: string | null;
+  type: string;
+}
+
 export interface Member {
   createdAt: Timestamp;
   id: Generated<string>;
@@ -231,6 +269,20 @@ export interface Member {
   role: string;
   title: string | null;
   userId: string;
+}
+
+export interface MoneyAccount {
+  account_last4: string | null;
+  bank_name: string | null;
+  campus_id: string | null;
+  created_at: Generated<Timestamp>;
+  created_by: string | null;
+  id: Generated<string>;
+  kind: string;
+  ledger_account_id: string;
+  name: string;
+  organization_id: string;
+  retired_at: Timestamp | null;
 }
 
 export interface Organization {
@@ -420,7 +472,11 @@ export interface DB {
   guardian: Guardian;
   guardian_student: GuardianStudent;
   invitation: Invitation;
+  journal_entry: JournalEntry;
+  journal_line: JournalLine;
+  ledger_account: LedgerAccount;
   member: Member;
+  money_account: MoneyAccount;
   organization: Organization;
   organizationRole: OrganizationRole;
   school_account: SchoolAccount;
