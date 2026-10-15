@@ -4,6 +4,10 @@ import { currencySchema, idSchema } from './schemas';
 export const MONEY_ACCOUNT_NAME_MAX = 80;
 export const MONEY_ACCOUNT_KINDS = ['cash', 'bank', 'pos', 'gateway'] as const;
 export const CREATABLE_MONEY_ACCOUNT_KINDS = ['bank', 'pos', 'cash'] as const;
+export const FEE_INCOME_SYSTEM_KEY = 'fee_income';
+export const MONEY_ACCOUNTS_SYSTEM_KEY = 'money_accounts';
+export const OPENING_BALANCE_SYSTEM_KEY = 'opening_balance_equity';
+export const FEES_RECEIVABLE_SYSTEM_KEY = 'fees_receivable';
 export const LEDGER_ACCOUNT_TYPES = [
   'asset',
   'liability',
