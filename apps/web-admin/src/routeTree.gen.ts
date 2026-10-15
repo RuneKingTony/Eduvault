@@ -23,6 +23,8 @@ import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as StudentsRouteImport } from './routes/students'
 import { Route as ClassesClassIdRouteImport } from './routes/classes_.$classId'
 import { Route as DevUiRouteImport } from './routes/dev/ui'
+import { Route as FinanceLedgerRouteImport } from './routes/finance/ledger'
+import { Route as FinanceMoneyAccountsRouteImport } from './routes/finance/money-accounts'
 import { Route as MembersMemberIdRouteImport } from './routes/members_.$memberId'
 import { Route as PlatformIndexRouteImport } from './routes/platform.index'
 import { Route as PlatformAuditRouteImport } from './routes/platform.audit'
@@ -107,6 +109,16 @@ const DevUiRoute = DevUiRouteImport.update({
   path: '/dev/ui',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FinanceLedgerRoute = FinanceLedgerRouteImport.update({
+  id: '/finance/ledger',
+  path: '/finance/ledger',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FinanceMoneyAccountsRoute = FinanceMoneyAccountsRouteImport.update({
+  id: '/finance/money-accounts',
+  path: '/finance/money-accounts',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const MembersMemberIdRoute = MembersMemberIdRouteImport.update({
   id: '/members_/$memberId',
   path: '/members/$memberId',
@@ -188,6 +200,8 @@ export interface FileRoutesByFullPath {
   '/students': typeof StudentsRoute
   '/classes/$classId': typeof ClassesClassIdRoute
   '/dev/ui': typeof DevUiRoute
+  '/finance/ledger': typeof FinanceLedgerRoute
+  '/finance/money-accounts': typeof FinanceMoneyAccountsRoute
   '/members/$memberId': typeof MembersMemberIdRoute
   '/platform/audit': typeof PlatformAuditRoute
   '/roles/$roleSlug': typeof RolesRoleSlugRoute
@@ -215,6 +229,8 @@ export interface FileRoutesByTo {
   '/students': typeof StudentsRoute
   '/classes/$classId': typeof ClassesClassIdRoute
   '/dev/ui': typeof DevUiRoute
+  '/finance/ledger': typeof FinanceLedgerRoute
+  '/finance/money-accounts': typeof FinanceMoneyAccountsRoute
   '/members/$memberId': typeof MembersMemberIdRoute
   '/platform/audit': typeof PlatformAuditRoute
   '/roles/$roleSlug': typeof RolesRoleSlugRoute
@@ -245,6 +261,8 @@ export interface FileRoutesById {
   '/students': typeof StudentsRoute
   '/classes_/$classId': typeof ClassesClassIdRoute
   '/dev/ui': typeof DevUiRoute
+  '/finance/ledger': typeof FinanceLedgerRoute
+  '/finance/money-accounts': typeof FinanceMoneyAccountsRoute
   '/members_/$memberId': typeof MembersMemberIdRoute
   '/platform/audit': typeof PlatformAuditRoute
   '/roles_/$roleSlug': typeof RolesRoleSlugRoute
@@ -276,6 +294,8 @@ export interface FileRouteTypes {
     | '/students'
     | '/classes/$classId'
     | '/dev/ui'
+    | '/finance/ledger'
+    | '/finance/money-accounts'
     | '/members/$memberId'
     | '/platform/audit'
     | '/roles/$roleSlug'
@@ -303,6 +323,8 @@ export interface FileRouteTypes {
     | '/students'
     | '/classes/$classId'
     | '/dev/ui'
+    | '/finance/ledger'
+    | '/finance/money-accounts'
     | '/members/$memberId'
     | '/platform/audit'
     | '/roles/$roleSlug'
@@ -332,6 +354,8 @@ export interface FileRouteTypes {
     | '/students'
     | '/classes_/$classId'
     | '/dev/ui'
+    | '/finance/ledger'
+    | '/finance/money-accounts'
     | '/members_/$memberId'
     | '/platform/audit'
     | '/roles_/$roleSlug'
@@ -362,6 +386,8 @@ export interface RootRouteChildren {
   StudentsRoute: typeof StudentsRoute
   ClassesClassIdRoute: typeof ClassesClassIdRoute
   DevUiRoute: typeof DevUiRoute
+  FinanceLedgerRoute: typeof FinanceLedgerRoute
+  FinanceMoneyAccountsRoute: typeof FinanceMoneyAccountsRoute
   MembersMemberIdRoute: typeof MembersMemberIdRoute
   RolesRoleSlugRoute: typeof RolesRoleSlugRoute
   RolesNewRoute: typeof RolesNewRoute
@@ -466,6 +492,20 @@ declare module '@tanstack/react-router' {
       path: '/dev/ui'
       fullPath: '/dev/ui'
       preLoaderRoute: typeof DevUiRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/finance/ledger': {
+      id: '/finance/ledger'
+      path: '/finance/ledger'
+      fullPath: '/finance/ledger'
+      preLoaderRoute: typeof FinanceLedgerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/finance/money-accounts': {
+      id: '/finance/money-accounts'
+      path: '/finance/money-accounts'
+      fullPath: '/finance/money-accounts'
+      preLoaderRoute: typeof FinanceMoneyAccountsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/members_/$memberId': {
@@ -615,6 +655,8 @@ const rootRouteChildren: RootRouteChildren = {
   StudentsRoute: StudentsRoute,
   ClassesClassIdRoute: ClassesClassIdRoute,
   DevUiRoute: DevUiRoute,
+  FinanceLedgerRoute: FinanceLedgerRoute,
+  FinanceMoneyAccountsRoute: FinanceMoneyAccountsRoute,
   MembersMemberIdRoute: MembersMemberIdRoute,
   RolesRoleSlugRoute: RolesRoleSlugRoute,
   RolesNewRoute: RolesNewRoute,

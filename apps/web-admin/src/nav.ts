@@ -134,6 +134,8 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         pageTitle: 'Money accounts',
         route: '/finance/money-accounts',
         icon: 'landmark',
+        alsoActiveFor: ['/finance/ledger'],
+        gate: ['moneyAccount:read', 'ledger:read'],
       },
     ],
   },
@@ -247,6 +249,7 @@ const ROUTE_GATES = new Map<string, Gate>([
     entry.gate === undefined ? [] : [[entry.route, entry.gate]]
   ),
   ['/roles/new', ['ac:create']],
+  ['/finance/ledger', ['ledger:read']],
 ]);
 
 export const routeGate = (route: string): Gate | undefined =>
