@@ -3,6 +3,7 @@ name: Validate PR
 on:
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
 
 concurrency:
   group: validate-${{ github.ref }}
@@ -16,7 +17,8 @@ env:
   INTEGRATION_SHARDS: 4
 
 jobs:
-  # The cheap checks run first; every other job waits for them.
+  # Cheap checks run first and every other job waits for them. A draft stops after
+  # `quick` and `unit`; integration and drift start when it is marked ready.
   quick:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -58,7 +60,7 @@ jobs:
 
   integration:
     needs: quick
-    if: needs.quick.outputs.api == 'true'
+    if: needs.quick.outputs.api == 'true' && !github.event.pull_request.draft
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
@@ -76,7 +78,7 @@ jobs:
 
   drift:
     needs: quick
-    if: needs.quick.outputs.drift == 'true'
+    if: needs.quick.outputs.drift == 'true' && !github.event.pull_request.draft
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -94,6 +96,8 @@ jobs:
     needs: [quick, unit, integration, drift]
     runs-on: ubuntu-latest
     steps:
+      - if: github.event.pull_request.draft
+        run: echo "::notice::Draft PR, so integration and drift were not run. They start when it is marked ready for review."
       - run: |
           echo '${{ toJSON(needs) }}'
           if [[ '${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}' == 'true' ]]; then
