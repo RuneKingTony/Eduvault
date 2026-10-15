@@ -217,6 +217,8 @@ export const RESOURCE_PILLARS: Record<Resource, Pillar> = {
   class: 'Foundation',
   announcement: 'Foundation',
   feeSchedule: 'Finance',
+  ledger: 'Finance',
+  moneyAccount: 'Finance',
 };
 
 export const ACTION_WORDS: Record<Action, string> = {
@@ -232,6 +234,7 @@ export const ACTION_WORDS: Record<Action, string> = {
   link: 'link to students',
   archive: 'record leavers and graduates',
   markAway: 'mark away',
+  manageAccounts: 'manage accounts',
 };
 
 export function capabilityLabel(permission: Permission): string {

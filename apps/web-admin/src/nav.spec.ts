@@ -22,6 +22,8 @@ const built = new Set([
   '/students',
   '/members',
   '/fees',
+  '/finance/money-accounts',
+  '/finance/ledger',
   '/classes',
   '/calendar',
   '/campuses',
@@ -78,6 +80,7 @@ describe('nav model', () => {
       '/members',
       '/classes',
       '/fees',
+      '/finance/money-accounts',
       '/settings/profile',
     ]);
   });
@@ -372,5 +375,32 @@ describe('settingsLanding', () => {
     expect(
       landing.kind === 'list' && landing.items.map((item) => item.label)
     ).toEqual(['School years and terms']);
+  });
+});
+
+const accounts = (permissions: Parameters<typeof visibleNav>[2]) =>
+  routesFor(permissions).includes('/finance/money-accounts');
+const held = (...permissions: Parameters<typeof toPermissionMap>[0]) =>
+  toPermissionMap(permissions);
+
+describe('the Accounts item', () => {
+  it('shows for either money permission and for nobody else', () => {
+    expect(accounts(held('moneyAccount:read'))).toBe(true);
+    expect(accounts(held('ledger:read'))).toBe(true);
+    expect(accounts(held('student:read'))).toBe(false);
+    expect(accounts(starter('bursar'))).toBe(true);
+    expect(accounts(starter('principal'))).toBe(true);
+    expect(accounts(starter('teacher'))).toBe(false);
+  });
+
+  it('gates both money pages and keeps the item active on the categories page', () => {
+    expect(routeGate('/finance/money-accounts')).toEqual([
+      'moneyAccount:read',
+      'ledger:read',
+    ]);
+    expect(routeGate('/finance/ledger')).toEqual(['ledger:read']);
+    expect(findCurrent(NAV_GROUPS, '/finance/ledger')?.item.id).toBe(
+      'accounts'
+    );
   });
 });

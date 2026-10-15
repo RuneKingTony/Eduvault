@@ -20,6 +20,7 @@ import { DashboardHeader } from '../components/dashboard/dashboard-header';
 import { selectDashboardView } from '../components/dashboard/dashboard-view';
 import { MyClassesCard } from '../components/dashboard/my-classes-card';
 import { RollCard, StudentsStat } from '../components/dashboard/roll-card';
+import { SchoolAccountCard } from '../components/dashboard/school-account-card';
 import {
   MyClassesStat,
   MyStudentsStat,
@@ -87,6 +88,7 @@ function StaffDashboard() {
   const today = useToday();
   const term = useTermState();
   const canReadStudents = useCan('student', 'read');
+  const canReadMoney = useCan('moneyAccount', 'read');
   return (
     <section className="flex flex-col gap-4">
       <DashboardHeader />
@@ -102,6 +104,7 @@ function StaffDashboard() {
           {term === 'ready' && canReadStudents ? <RollCard /> : null}
         </div>
         <div className="flex flex-col gap-4">
+          {canReadMoney ? <SchoolAccountCard /> : null}
           {term === 'missing' ? null : <TermSlot today={today} />}
         </div>
       </div>

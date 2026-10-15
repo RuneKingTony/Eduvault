@@ -10,6 +10,8 @@ export const statements = {
   class: ['create', 'read', 'readAll', 'update', 'assignTeacher'],
   feeSchedule: ['create', 'read', 'update', 'delete'],
   announcement: ['create', 'read', 'update'],
+  ledger: ['read', 'manageAccounts'],
+  moneyAccount: ['create', 'read', 'update'],
   member: ['create', 'read', 'update', 'delete'],
   ac: ['create', 'read', 'update', 'delete'],
 } as const;
@@ -50,6 +52,7 @@ export const SENSITIVE: readonly Permission[] = [
   'ac:delete',
   'organization:update',
   'organization:delete',
+  'ledger:manageAccounts',
 ];
 
 export const PERM_HELP: Partial<Record<Permission, string>> = {
@@ -75,6 +78,13 @@ export const PERM_HELP: Partial<Record<Permission, string>> = {
     'Marks students not seen since a date, and back in school.',
   'student:readOwn':
     'Students see their own records. Guardians see their own children.',
+  'ledger:read': 'Sees the money categories and the journal.',
+  'ledger:manageAccounts':
+    'Adds fee categories and loads opening balances into the books.',
+  'moneyAccount:create':
+    'Adds bank, POS and cash accounts. A school-wide account needs every campus.',
+  'moneyAccount:read':
+    'Sees money accounts. School-wide accounts need every campus.',
 };
 
 const RESOURCE_LABELS: Record<Resource, string> = {
@@ -89,6 +99,8 @@ const RESOURCE_LABELS: Record<Resource, string> = {
   class: 'Classes',
   feeSchedule: 'Fee schedules',
   announcement: 'Announcements',
+  ledger: 'Money categories',
+  moneyAccount: 'Bank and POS accounts',
   member: 'Staff',
   ac: 'Roles',
 };

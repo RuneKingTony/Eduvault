@@ -361,6 +361,7 @@ test.describe('/me/permissions', () => {
         team: ['read'],
         campus: ['readAll'],
         announcement: ['create', 'read', 'update'],
+        moneyAccount: ['read'],
       },
       campusScope: 'all',
       classScope: 'all',
@@ -393,6 +394,8 @@ test.describe('/me/permissions', () => {
       student: ['read'],
       guardian: ['read'],
       enrollment: ['read'],
+      moneyAccount: ['read'],
+      ledger: ['read'],
     });
   });
 

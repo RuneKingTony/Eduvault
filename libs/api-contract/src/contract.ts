@@ -44,10 +44,26 @@ import {
 import {
   activityPageSchema,
   activityQuerySchema,
+  dashboardMoneySchema,
   dashboardRollSchema,
   dashboardTaskSchema,
   myClassSchema,
 } from './dashboard';
+import {
+  cashBookQuerySchema,
+  cashBookSchema,
+  createLedgerAccountSchema,
+  createMoneyAccountSchema,
+  journalListSchema,
+  journalQuerySchema,
+  ledgerAccountListSchema,
+  ledgerAccountSchema,
+  moneyAccountListSchema,
+  moneyAccountSchema,
+  openingBalancesResultSchema,
+  openingBalancesSchema,
+  updateMoneyAccountSchema,
+} from './finance';
 import {
   editGuardianSchema,
   guardianDetailSchema,
@@ -636,6 +652,67 @@ export const contract = defineContract({
       method: 'GET',
       path: '/dashboard/my-classes',
       response: z.array(myClassSchema),
+    }),
+    money: defineRoute({
+      method: 'GET',
+      path: '/dashboard/money',
+      response: dashboardMoneySchema,
+    }),
+  },
+  moneyAccounts: {
+    list: defineRoute({
+      method: 'GET',
+      path: '/finance/money-accounts',
+      response: moneyAccountListSchema,
+    }),
+    cashBook: defineRoute({
+      method: 'GET',
+      path: '/finance/money-accounts/:id/cash-book',
+      params: idParamsSchema,
+      query: cashBookQuerySchema,
+      response: cashBookSchema,
+    }),
+    create: defineRoute({
+      method: 'POST',
+      path: '/finance/money-accounts',
+      body: createMoneyAccountSchema,
+      response: moneyAccountSchema,
+    }),
+    update: defineRoute({
+      method: 'PATCH',
+      path: '/finance/money-accounts/:id',
+      params: idParamsSchema,
+      body: updateMoneyAccountSchema,
+      response: moneyAccountSchema,
+    }),
+  },
+  ledgerAccounts: {
+    list: defineRoute({
+      method: 'GET',
+      path: '/finance/ledger-accounts',
+      response: ledgerAccountListSchema,
+    }),
+    create: defineRoute({
+      method: 'POST',
+      path: '/finance/ledger-accounts',
+      body: createLedgerAccountSchema,
+      response: ledgerAccountSchema,
+    }),
+  },
+  journal: {
+    list: defineRoute({
+      method: 'GET',
+      path: '/finance/journal',
+      query: journalQuerySchema,
+      response: journalListSchema,
+    }),
+  },
+  openingBalances: {
+    post: defineRoute({
+      method: 'POST',
+      path: '/finance/opening-balances',
+      body: openingBalancesSchema,
+      response: openingBalancesResultSchema,
     }),
   },
   portal: {

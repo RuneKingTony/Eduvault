@@ -19,6 +19,8 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { GuardianModule } from './modules/guardian/guardian.module';
 import { FeeScheduleModule } from './modules/fee-schedule/fee-schedule.module';
 import { HealthModule } from './modules/health/health.module';
+import { MoneyAccountModule } from './modules/money-account/money-account.module';
+import { LedgerModule } from './modules/ledger/ledger.module';
 import { MembersModule } from './modules/members/members.module';
 import { MeModule } from './modules/me/me.module';
 import { RolesModule } from './modules/roles/roles.module';
@@ -51,6 +53,8 @@ import { StudentModule } from './modules/student/student.module';
     DashboardModule,
     AnnouncementModule,
     PortalModule,
+    MoneyAccountModule,
+    LedgerModule,
   ],
 })
 export class AppModule implements NestModule {
