@@ -12,11 +12,12 @@ concurrency:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   warm:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
