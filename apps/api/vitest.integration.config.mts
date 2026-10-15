@@ -1,6 +1,7 @@
 import { defineConfig } from 'vitest/config';
 import { nxViteTsPaths } from '@nx/vite/plugins/nx-tsconfig-paths.plugin';
 import swc from 'unplugin-swc';
+import { WORKER_COUNT } from './test/setup/workers';
 
 export default defineConfig({
   root: import.meta.dirname,
@@ -12,9 +13,10 @@ export default defineConfig({
     environment: 'node',
     include: ['test/**/*.integration.spec.ts'],
     globalSetup: ['./test/setup/global-setup.ts'],
+    setupFiles: ['./test/setup/worker-database.ts'],
     testTimeout: 30_000,
     hookTimeout: 120_000,
-    fileParallelism: false,
+    maxWorkers: WORKER_COUNT,
     env: {
       NODE_ENV: 'test',
       BETTER_AUTH_SECRET: 'integration-test-secret-at-least-32-characters',

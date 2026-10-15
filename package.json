@@ -25,7 +25,7 @@
     "ui:localize": "tsx --tsconfig scripts/tsconfig.json scripts/ui-localize-imports.ts && pnpm install && prettier --write libs/ui",
     "drift": "tsx --tsconfig scripts/tsconfig.json scripts/drift-check.ts",
     "validate:quick": "nx affected -t lint typecheck test",
-    "validate": "pnpm format:check && nx run-many -t lint && nx run-many -t typecheck && pnpm knip && pnpm drift && nx run-many -t test && nx run api:test-integration && nx run-many -t build",
+    "validate": "pnpm format:check && pnpm knip && nx run-many -t typecheck lint --nxBail && nx run-many -t test build --nxBail && pnpm drift && nx run api:test-integration",
     "drift:fix": "tsx --tsconfig scripts/tsconfig.json scripts/drift-check.ts --write",
     "db:migrate:up": "nx run api:db-migrate-up"
   },

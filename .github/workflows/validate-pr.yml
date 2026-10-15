@@ -3,21 +3,103 @@ name: Validate PR
 on:
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
 
 concurrency:
   group: validate-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
+env:
+  NX_PARALLEL: 4
+  INTEGRATION_SHARDS: 4
+
 jobs:
-  validate:
+  # Cheap checks run first and every other job waits for them. A draft stops after
+  # `quick` and `unit`; integration and drift start when it is marked ready.
+  quick:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 15
+    outputs:
+      api: ${{ steps.scope.outputs.api }}
+      drift: ${{ steps.scope.outputs.drift }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
         with:
-          node-version-file: .nvmrc
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm validate
+          fetch-depth: 0
+      - uses: ./.github/actions/setup
+        with:
+          cache-scope: quick
+      - run: pnpm format:check
+      - run: pnpm knip
+      - run: pnpm nx affected -t typecheck lint --parallel="$NX_PARALLEL" --nxBail
+      - id: scope
+        run: |
+          affected=$(pnpm --silent nx show projects --affected --json)
+          echo "api=$(jq 'index("api") != null' <<<"$affected")" >> "$GITHUB_OUTPUT"
+          if git diff --name-only "$NX_BASE" "$NX_HEAD" | grep -qE '^(apps/api/db/|apps/api/src/db/|apps/api/auth\.ts|apps/api/src/app/common/auth/better-auth-base\.ts|scripts/(drift-check|auth-sql|paths)\.ts|libs/testcontainers/|pnpm-lock\.yaml)'; then
+            echo "drift=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "drift=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  unit:
+    needs: quick
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup
+        with:
+          cache-scope: unit
+      - run: pnpm nx affected -t test build --parallel="$NX_PARALLEL" --nxBail
+
+  integration:
+    needs: quick
+    if: needs.quick.outputs.api == 'true' && !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup
+        with:
+          cache-scope: integration
+      - run: pnpm nx run api:test-integration -- --shard="${{ matrix.shard }}/$INTEGRATION_SHARDS"
+
+  drift:
+    needs: quick
+    if: needs.quick.outputs.drift == 'true' && !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup
+        with:
+          cache-scope: drift
+      - run: pnpm drift
+
+  # The one required check: it names the jobs above so branch rules need only this.
+  validate:
+    if: always()
+    needs: [quick, unit, integration, drift]
+    runs-on: ubuntu-latest
+    steps:
+      - if: github.event.pull_request.draft
+        run: echo "::notice::Draft PR, so integration and drift were not run. They start when it is marked ready for review."
+      - run: |
+          echo '${{ toJSON(needs) }}'
+          if [[ '${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}' == 'true' ]]; then
+            exit 1
+          fi
