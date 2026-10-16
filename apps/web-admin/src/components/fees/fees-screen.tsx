@@ -28,8 +28,8 @@ import type { FeesSearch } from '../../fees-search';
 import {
   feeGridQueryOptions,
   feeLinesQueryOptions,
+  feeSetupQueryOptions,
   feeTypesQueryOptions,
-  schoolYearsQueryOptions,
 } from '../../queries';
 import { NoCurrentTermCallout } from '../no-current-term-callout';
 import { AddFeeSheet } from './add-fee-sheet';
@@ -244,25 +244,25 @@ function useChips(group: FeeGroup) {
   );
 }
 
-function useYears() {
-  return useQuery(schoolYearsQueryOptions(useApi(), 1));
+function useSetup() {
+  return useQuery(feeSetupQueryOptions(useApi()));
 }
 
 function Content({
   group,
-  years,
+  setup,
   term,
   chipId,
 }: {
   group: FeeGroup;
-  years: ReturnType<typeof useYears>;
+  setup: ReturnType<typeof useSetup>;
   term: FeeTermOption | undefined;
   chipId: string | undefined;
 }) {
-  if (years.isError) {
-    return <ErrorMessage error={years.error} />;
+  if (setup.isError) {
+    return <ErrorMessage error={setup.error} />;
   }
-  if (years.data === undefined) {
+  if (setup.data === undefined) {
     return <Loading />;
   }
   return term === undefined ? (
@@ -281,9 +281,9 @@ export function FeesScreen({
   search: FeesSearch;
   onSearchChange: (next: FeesSearch) => void;
 }) {
-  const years = useYears();
+  const setup = useSetup();
   const chips = useChips(group);
-  const options = feeTermOptions(years.data?.items ?? []);
+  const options = feeTermOptions(setup.data?.terms ?? []);
   const term = chosenTerm(options, search.term);
   const chipId = chips.find((chip) => chip.id === search.type)?.id;
   const change = (next: Partial<FeesSearch>) => {
@@ -312,7 +312,7 @@ export function FeesScreen({
           }}
         />
       ) : null}
-      <Content group={group} years={years} term={term} chipId={chipId} />
+      <Content group={group} setup={setup} term={term} chipId={chipId} />
       {term === undefined ? null : (
         <AddFeeSheet
           open={search.add === 1}

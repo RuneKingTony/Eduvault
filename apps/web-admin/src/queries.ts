@@ -527,6 +527,12 @@ export const feeCandidatesQueryOptions = (
     placeholderData: keepPreviousData,
   });
 
+export const feeSetupQueryOptions = (api: Api) =>
+  queryOptions({
+    queryKey: [...FEES_KEY, 'setup'],
+    queryFn: () => api.feeLines.setup({}),
+  });
+
 export const feeLinesQueryOptions = (
   api: Api,
   termId: string,

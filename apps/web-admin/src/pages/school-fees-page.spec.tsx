@@ -217,7 +217,7 @@ describe('SchoolFeesPage', () => {
     api.feeLines.update.mockRejectedValue(
       new ApiError(400, {
         code: 'BadRequest',
-        message: 'This term has ended. Fees for it can’t change.',
+        message: "This term has ended. Fees for it can't change.",
       })
     );
     fireEvent.click(
@@ -229,7 +229,7 @@ describe('SchoolFeesPage', () => {
     );
     await waitFor(() => {
       expect(toast.error).toHaveBeenCalledWith(
-        'This term has ended. Fees for it can’t change.'
+        "This term has ended. Fees for it can't change."
       );
     });
   });
@@ -359,7 +359,7 @@ describe('SchoolFeesPage', () => {
 
   it('shows the no-school-year callout without a current term', async () => {
     const api = feesApi();
-    api.schoolYears.list.mockResolvedValue({ items: [], total: 0 });
+    api.feeLines.setup.mockResolvedValue({ terms: [], levels: [] });
     renderFees(<SchoolFeesPage search={{}} onSearchChange={vi.fn()} />, api);
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Create the first school year'

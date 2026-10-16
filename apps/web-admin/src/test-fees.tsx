@@ -15,6 +15,7 @@ import type {
   FeeLine,
   FeeCandidates,
   FeePreview,
+  FeeSetup,
   FeeType,
   MePermissions,
 } from '@eduvault/api-contract';
@@ -22,9 +23,7 @@ import { PermissionsProvider } from '@eduvault/auth-client';
 import { TooltipProvider } from '@eduvault/ui';
 import { ApiProvider, type Api } from './api';
 import { parseFeesSearch } from './fees-search';
-import { schoolYear, term } from './test-calendar';
 import { IKEJA, LEKKI, campus } from './test-announcements';
-import { classLevel } from './test-classes';
 import { ownerAccess } from './test-utils';
 
 const uuid = (n: number) =>
@@ -33,7 +32,7 @@ const uuid = (n: number) =>
 export const TERM_1 = uuid(0x1_01);
 export const TERM_2 = uuid(0x1_02);
 export const JSS1 = uuid(0x2_01);
-export const JSS2 = uuid(0x2_02);
+const JSS2 = uuid(0x2_02);
 
 export const TUITION: FeeType = {
   id: uuid(0x3_01),
@@ -47,16 +46,25 @@ export const BUS: FeeType = {
   name: 'School bus',
 };
 
-export const feeYears = () => ({
-  items: [
-    schoolYear({
-      terms: [
-        term({ id: TERM_1, isCurrent: true }),
-        term({ id: TERM_2, sequence: 2, name: 'Second term' }),
-      ],
-    }),
+const feeSetup = (): FeeSetup => ({
+  terms: [
+    {
+      id: TERM_1,
+      name: 'First term',
+      schoolYearName: '2026/2027',
+      isCurrent: true,
+    },
+    {
+      id: TERM_2,
+      name: 'Second term',
+      schoolYearName: '2026/2027',
+      isCurrent: false,
+    },
   ],
-  total: 1,
+  levels: [
+    { id: JSS1, name: 'JSS 1', sequence: 7 },
+    { id: JSS2, name: 'JSS 2', sequence: 8 },
+  ],
 });
 
 export const feeLine = (overrides: Partial<FeeLine> = {}): FeeLine => ({
@@ -107,9 +115,7 @@ export const feeGrid = (overrides: Partial<FeeGrid> = {}): FeeGrid => ({
   ...overrides,
 });
 
-export const candidates = (
-  overrides: Partial<FeeCandidates> = {}
-): FeeCandidates => ({
+const candidates = (overrides: Partial<FeeCandidates> = {}): FeeCandidates => ({
   items: [
     {
       id: 'st-1',
@@ -163,7 +169,7 @@ export const preview = (overrides: Partial<FeePreview> = {}): FeePreview => ({
   ...overrides,
 });
 
-export interface FeesApiOptions {
+interface FeesApiOptions {
   lines?: FeeLine[];
   grid?: FeeGrid;
   types?: FeeType[];
@@ -171,14 +177,6 @@ export interface FeesApiOptions {
 }
 
 const pickerApi = () => ({
-  classLevels: {
-    list: vi
-      .fn()
-      .mockResolvedValue([
-        classLevel({ id: JSS1, code: 'JSS1', name: 'JSS 1', sequence: 7 }),
-        classLevel({ id: JSS2, code: 'JSS2', name: 'JSS 2', sequence: 8 }),
-      ]),
-  },
   campuses: {
     list: vi
       .fn()
@@ -194,8 +192,8 @@ export function feesApi(options: FeesApiOptions = {}) {
   const lines = options.lines ?? [feeLine()];
   return {
     ...pickerApi(),
-    schoolYears: { list: vi.fn().mockResolvedValue(feeYears()) },
     feeLines: {
+      setup: vi.fn().mockResolvedValue(feeSetup()),
       list: vi.fn().mockResolvedValue(lines),
       grid: vi.fn().mockResolvedValue(options.grid ?? feeGrid()),
       preview: vi.fn().mockResolvedValue(options.preview ?? preview()),

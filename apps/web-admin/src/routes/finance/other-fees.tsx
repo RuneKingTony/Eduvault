@@ -2,7 +2,7 @@ import { createFileRoute } from '@tanstack/react-router';
 import { requireGate } from '../../access';
 import { parseFeesSearch } from '../../fees-search';
 import { OtherFeesPage } from '../../pages/other-fees-page';
-import { schoolYearsQueryOptions } from '../../queries';
+import { feeSetupQueryOptions } from '../../queries';
 
 export const Route = createFileRoute('/finance/other-fees')({
   validateSearch: parseFeesSearch,
@@ -11,7 +11,7 @@ export const Route = createFileRoute('/finance/other-fees')({
   },
   loader: async ({ context: { queryClient, api } }) => {
     await queryClient.query({
-      ...schoolYearsQueryOptions(api, 1),
+      ...feeSetupQueryOptions(api),
       staleTime: 'static',
     });
   },

@@ -4,8 +4,8 @@ import { PlusIcon } from 'lucide-react';
 import {
   FEE_LINE_NAME_MAX,
   type Campus,
-  type ClassLevel,
   type FeeGroup,
+  type FeeSetupLevel,
   type FeeType,
 } from '@eduvault/api-contract';
 import { useCan } from '@eduvault/auth-client';
@@ -28,7 +28,7 @@ import {
 import { useApi } from '../../api';
 import {
   campusesQueryOptions,
-  classLevelsQueryOptions,
+  feeSetupQueryOptions,
   feeTypesQueryOptions,
   invalidateFees,
 } from '../../queries';
@@ -107,7 +107,7 @@ function OptionalField({
 }
 
 interface AddFeeData {
-  levels: readonly ClassLevel[];
+  levels: readonly FeeSetupLevel[];
   feeTypes: readonly FeeType[];
   campuses: readonly Campus[];
 }
@@ -258,7 +258,7 @@ export function AddFeeSheet({
   onOpenChange: (open: boolean) => void;
 }) {
   const api = useApi();
-  const levels = useQuery({ ...classLevelsQueryOptions(api), enabled: open });
+  const setup = useQuery({ ...feeSetupQueryOptions(api), enabled: open });
   const feeTypes = useQuery({ ...feeTypesQueryOptions(api), enabled: open });
   const campuses = useQuery({ ...campusesQueryOptions(api), enabled: open });
   return (
@@ -272,7 +272,7 @@ export function AddFeeSheet({
             For {termLabel}. It applies from the next round of charges.
           </SheetDescription>
         </SheetHeader>
-        {levels.data === undefined ||
+        {setup.data === undefined ||
         feeTypes.data === undefined ||
         campuses.data === undefined ? null : (
           <SheetForm
@@ -280,7 +280,7 @@ export function AddFeeSheet({
             group={group}
             chipId={chipId}
             data={{
-              levels: levels.data,
+              levels: setup.data.levels,
               feeTypes: feeTypes.data,
               campuses: campuses.data,
             }}
