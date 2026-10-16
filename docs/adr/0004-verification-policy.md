@@ -48,8 +48,8 @@ Replaces the "Opt-in browser e2e is allowed" paragraph above.
 
 Replaces "`.github/workflows/validate-pr.yml` runs `pnpm validate`" above; D-205 in the technical reference.
 
-- **Same checks, split into jobs.** `quick` (format, knip, typecheck, lint) runs first and gates `unit` (test, build), four `integration` shards and `drift`, so a cheap failure stops the expensive jobs before they start. A final `validate` job aggregates them and is the one check a branch rule needs.
+- **Same checks, split into jobs.** `quick` (format, knip, typecheck, lint) and `unit` (test, build) run side by side; `quick` gates four `integration` shards and `drift`, so a cheap failure stops the expensive jobs before they start (D-207). A final `validate` job aggregates them and is the one check a branch rule needs.
 - **Affected projects only.** CI runs `nx affected` against the merge base, and the integration shards run only when `api` is affected. `drift` runs only when migrations, the generated schema files, the Better Auth options, the drift scripts, `libs/testcontainers` or the lockfile change.
 - **`pnpm validate` is unchanged in scope** and is still the single definition of green: every check, on every project, stopping at the first failure. Its order is now format, knip, typecheck and lint, test and build, drift, then integration.
 - **Drafts get the fast checks only.** A draft pull request runs `quick` and `unit`; integration and drift start when it is marked ready for review, and on every push after that. A green draft is therefore not a full pass, and `validate` says so in a notice (D-206).
-- Nx caches typecheck, lint, test and build in CI. `api:test-integration` is never cached.
+- CI does not share Nx's local cache between runs: Nx 22 will not restore it on a fresh runner (D-209). Sharing results needs Nx Cloud's remote cache.

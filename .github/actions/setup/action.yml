@@ -1,10 +1,10 @@
 name: Set up Eduvault
-description: pnpm, Node, dependencies, the Nx base commit and the Nx task cache
+description: pnpm, Node, dependencies and, for jobs that run nx affected, the Nx base commit
 
 inputs:
-  cache-scope:
-    description: Names the Nx cache so jobs that run different tasks do not overwrite each other
-    required: true
+  nx:
+    description: Set the Nx base commit; false for jobs that run no affected command
+    default: 'true'
 
 runs:
   using: composite
@@ -16,11 +16,5 @@ runs:
         cache: pnpm
     - run: pnpm install --frozen-lockfile
       shell: bash
-    - uses: nrwl/nx-set-shas@v5
-    - uses: actions/cache@v5
-      with:
-        path: .nx/cache
-        key: nx-${{ inputs.cache-scope }}-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
-        restore-keys: |
-          nx-${{ inputs.cache-scope }}-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
-          nx-${{ inputs.cache-scope }}-${{ runner.os }}-
+    - if: inputs.nx == 'true'
+      uses: nrwl/nx-set-shas@v5

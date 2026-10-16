@@ -17,11 +17,11 @@ env:
   INTEGRATION_SHARDS: 4
 
 jobs:
-  # Cheap checks run first and every other job waits for them. A draft stops after
-  # `quick` and `unit`; integration and drift start when it is marked ready.
+  # `quick` and `unit` run side by side and are all a draft gets. The expensive
+  # jobs wait for `quick` and start only once the PR is marked ready.
   quick:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     outputs:
       api: ${{ steps.scope.outputs.api }}
       drift: ${{ steps.scope.outputs.drift }}
@@ -30,8 +30,6 @@ jobs:
         with:
           fetch-depth: 0
       - uses: ./.github/actions/setup
-        with:
-          cache-scope: quick
       - run: pnpm format:check
       - run: pnpm knip
       - run: pnpm nx affected -t typecheck lint --parallel="$NX_PARALLEL" --nxBail
@@ -39,41 +37,36 @@ jobs:
         run: |
           affected=$(pnpm --silent nx show projects --affected --json)
           echo "api=$(jq 'index("api") != null' <<<"$affected")" >> "$GITHUB_OUTPUT"
-          if git diff --name-only "$NX_BASE" "$NX_HEAD" | grep -qE '^(apps/api/db/|apps/api/src/db/|apps/api/auth\.ts|apps/api/src/app/common/auth/better-auth-base\.ts|scripts/(drift-check|auth-sql|paths)\.ts|libs/testcontainers/|pnpm-lock\.yaml)'; then
+          if git diff --name-only "$NX_BASE" "$NX_HEAD" | grep -qE '^(apps/api/db/|apps/api/src/db/|apps/api/auth\.ts|apps/api/src/app/common/auth/|scripts/(drift-check|auth-sql|paths)\.ts|libs/testcontainers/|pnpm-lock\.yaml)'; then
             echo "drift=true" >> "$GITHUB_OUTPUT"
           else
             echo "drift=false" >> "$GITHUB_OUTPUT"
           fi
 
   unit:
-    needs: quick
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - uses: ./.github/actions/setup
-        with:
-          cache-scope: unit
       - run: pnpm nx affected -t test build --parallel="$NX_PARALLEL" --nxBail
 
   integration:
     needs: quick
     if: needs.quick.outputs.api == 'true' && !github.event.pull_request.draft
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
         shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
       - uses: ./.github/actions/setup
         with:
-          cache-scope: integration
+          nx: false
       - run: pnpm nx run api:test-integration -- --shard="${{ matrix.shard }}/$INTEGRATION_SHARDS"
 
   drift:
@@ -83,11 +76,9 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
       - uses: ./.github/actions/setup
         with:
-          cache-scope: drift
+          nx: false
       - run: pnpm drift
 
   # The one required check: it names the jobs above so branch rules need only this.

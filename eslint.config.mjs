@@ -327,6 +327,9 @@ export default [
       'unicorn/prevent-abbreviations': 'off',
       'sonarjs/no-unused-vars': 'off',
       'sonarjs/prefer-read-only-props': 'off',
+      // The first repeats @typescript-eslint/no-deprecated; the second is for AWS code.
+      'sonarjs/deprecation': 'off',
+      'sonarjs/aws-restricted-ip-admin-access': 'off',
       'no-restricted-syntax': ['error', noEnum, ...noColourLiterals],
       '@typescript-eslint/consistent-type-definitions': ['error', 'interface'],
       '@typescript-eslint/consistent-type-exports': 'error',
