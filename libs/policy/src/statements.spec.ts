@@ -37,6 +37,23 @@ describe('statements', () => {
     );
   });
 
+  it('has the feeLine resource, with no feeSchedule and none sensitive', () => {
+    expect(ALL_PERMISSIONS).toEqual(
+      expect.arrayContaining([
+        'feeLine:create',
+        'feeLine:read',
+        'feeLine:readOwn',
+        'feeLine:update',
+        'feeLine:retire',
+      ])
+    );
+    expect(ALL_PERMISSIONS.some((p) => p.startsWith('feeSchedule'))).toBe(
+      false
+    );
+    expect(SENSITIVE.some((p) => p.startsWith('feeLine'))).toBe(false);
+    expect(permLabel('feeLine:retire')).toBe('School and other fees: retire');
+  });
+
   it('has announcement create, read and update, with no delete and none sensitive', () => {
     expect(ALL_PERMISSIONS).toEqual(
       expect.arrayContaining([
@@ -68,6 +85,20 @@ describe('statements', () => {
     );
     expect(permLabel('moneyAccount:read')).toBe('Bank and POS accounts: read');
     expect(PERM_HELP['ledger:manageAccounts']).toBeDefined();
+  });
+
+  it('has the subject resource with no sensitive action', () => {
+    expect(ALL_PERMISSIONS).toEqual(
+      expect.arrayContaining([
+        'subject:create',
+        'subject:read',
+        'subject:update',
+      ])
+    );
+    expect(ALL_PERMISSIONS).not.toContain('subject:delete');
+    expect(SENSITIVE.filter((item) => item.startsWith('subject:'))).toEqual([]);
+    expect(permLabel('subject:update')).toBe('Subjects: update');
+    expect(PERM_HELP['subject:update']).toBeDefined();
   });
 
   it('has the member resource and marks adding and removing sensitive', () => {

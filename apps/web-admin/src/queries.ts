@@ -6,6 +6,7 @@ import {
 import type {
   AnnouncementStatus,
   ClassStatus,
+  FeeGroup,
   RouteQuery,
   contract,
 } from '@eduvault/api-contract';
@@ -206,12 +207,6 @@ export const invalidateCampuses = (queryClient: QueryClient) =>
     queryClient.invalidateQueries({ queryKey: ME_PERMISSIONS_KEY }),
   ]);
 
-export const feeSchedulesQueryOptions = (api: Api) =>
-  queryOptions({
-    queryKey: ['fee-schedules'],
-    queryFn: () => api.feeSchedules.list({ query: {} }),
-  });
-
 const MEMBERS_KEY = ['members'] as const;
 
 const memberKey = (id: string) => [...MEMBERS_KEY, id] as const;
@@ -400,8 +395,53 @@ export const classQueryOptions = (api: Api, id: string) =>
 export const teacherCandidatesQueryOptions = (api: Api, id: string) =>
   queryOptions({
     queryKey: [...CLASSES_KEY, 'candidates', id],
-    queryFn: () => api.classes.teacherCandidates({ params: { id } }),
+    queryFn: () => api.classes.teacherCandidates({ params: { id }, query: {} }),
   });
+
+export const subjectCandidatesQueryOptions = (api: Api, id: string) =>
+  queryOptions({
+    queryKey: [...CLASSES_KEY, 'subject-candidates', id],
+    queryFn: () =>
+      api.classes.teacherCandidates({
+        params: { id },
+        query: { for: 'subject' },
+      }),
+  });
+
+const SUBJECTS_KEY = ['subjects'] as const;
+
+export const subjectsQueryOptions = (api: Api, page: number) =>
+  queryOptions({
+    queryKey: [...SUBJECTS_KEY, 'list', page],
+    queryFn: () => api.subjects.list({ query: { page } }),
+  });
+
+export const levelSubjectsQueryOptions = (api: Api) =>
+  queryOptions({
+    queryKey: [...SUBJECTS_KEY, 'levels'],
+    queryFn: () => api.levelSubjects.list({ query: {} }),
+  });
+
+export const subjectTeachersQueryOptions = (api: Api) =>
+  queryOptions({
+    queryKey: [...SUBJECTS_KEY, 'teachers'],
+    queryFn: () => api.subjectTeachers.list({}),
+  });
+
+export async function invalidateSubjects(
+  queryClient: QueryClient
+): Promise<void> {
+  await queryClient.invalidateQueries({ queryKey: SUBJECTS_KEY });
+}
+
+export async function invalidateSubjectTeachers(
+  queryClient: QueryClient
+): Promise<void> {
+  await Promise.all([
+    invalidateSubjects(queryClient),
+    invalidateClassTeachers(queryClient),
+  ]);
+}
 
 export async function invalidateLevels(
   queryClient: QueryClient
@@ -514,4 +554,77 @@ export async function invalidateLedger(
   queryClient: QueryClient
 ): Promise<void> {
   await queryClient.invalidateQueries({ queryKey: LEDGER_KEY });
+}
+
+const FEES_KEY = ['fees'] as const;
+
+export const feeCandidatesQueryOptions = (
+  api: Api,
+  termId: string,
+  q: string
+) =>
+  queryOptions({
+    queryKey: [...STUDENTS_KEY, 'fee-candidates', termId, q],
+    queryFn: () =>
+      api.feeLines.candidates({
+        query: { termId, q: q === '' ? undefined : q },
+      }),
+    placeholderData: keepPreviousData,
+  });
+
+export const feeSetupQueryOptions = (api: Api) =>
+  queryOptions({
+    queryKey: [...FEES_KEY, 'setup'],
+    queryFn: () => api.feeLines.setup({}),
+  });
+
+export const feeLinesQueryOptions = (
+  api: Api,
+  termId: string,
+  group: FeeGroup
+) =>
+  queryOptions({
+    queryKey: [...FEES_KEY, 'lines', termId, group],
+    queryFn: () => api.feeLines.list({ query: { termId, group } }),
+  });
+
+export const feeGridQueryOptions = (
+  api: Api,
+  query: { termId: string; group: FeeGroup; feeTypeId?: string }
+) =>
+  queryOptions({
+    queryKey: [
+      ...FEES_KEY,
+      'grid',
+      query.termId,
+      query.group,
+      query.feeTypeId ?? '',
+    ],
+    queryFn: () => api.feeLines.grid({ query }),
+  });
+
+export const feeTypesQueryOptions = (api: Api) =>
+  queryOptions({
+    queryKey: [...FEES_KEY, 'types'],
+    queryFn: () => api.feeTypes.list({}),
+  });
+
+export const feePreviewQueryOptions = (
+  api: Api,
+  termId: string,
+  studentId: string
+) =>
+  queryOptions({
+    queryKey: [...FEES_KEY, 'preview', termId, studentId],
+    queryFn: () => api.feeLines.preview({ query: { termId, studentId } }),
+  });
+
+export const feeOptionsQueryOptions = (api: Api, studentId: string) =>
+  queryOptions({
+    queryKey: [...FEES_KEY, 'options', studentId],
+    queryFn: () => api.feeOptions.list({ params: { studentId }, query: {} }),
+  });
+
+export async function invalidateFees(queryClient: QueryClient): Promise<void> {
+  await queryClient.invalidateQueries({ queryKey: FEES_KEY });
 }

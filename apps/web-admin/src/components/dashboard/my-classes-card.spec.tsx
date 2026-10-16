@@ -45,6 +45,23 @@ describe('MyClassesCard', () => {
     expect(screen.queryByText('Class teacher')).not.toBeInTheDocument();
   });
 
+  it('shows the subjects a subject-only teacher teaches as badges', async () => {
+    renderInRouter(
+      <MyClassesCard />,
+      dashboardApi({
+        myClasses: [
+          myClass({
+            isClassTeacher: false,
+            subjects: ['Mathematics', 'French'],
+          }),
+        ],
+      })
+    );
+    expect(await screen.findByText('Mathematics')).toBeInTheDocument();
+    expect(screen.getByText('French')).toBeInTheDocument();
+    expect(screen.queryByText('Class teacher')).not.toBeInTheDocument();
+  });
+
   it('shows the empty state', async () => {
     renderInRouter(<MyClassesCard />, dashboardApi());
     expect(await screen.findByText('No classes yet')).toBeInTheDocument();

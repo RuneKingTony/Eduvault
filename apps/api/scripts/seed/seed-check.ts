@@ -7,6 +7,8 @@ import { ClassService } from '../../src/app/modules/class/class.service';
 import { LedgerService } from '../../src/app/modules/ledger/ledger.service';
 import { MoneyAccountService } from '../../src/app/modules/money-account/money-account.service';
 import { StudentService } from '../../src/app/modules/student/student.service';
+import { SubjectService } from '../../src/app/modules/subject/subject.service';
+import { SubjectTeacherService } from '../../src/app/modules/subject/subject-teacher.service';
 import { orgContextFor } from './actors';
 import { SEEDED_ACTING_REASON } from './acting-requests';
 import { SEED_ANNOUNCEMENTS } from './announcements';
@@ -18,6 +20,12 @@ import {
   SEED_OPENING_BALANCES,
 } from './finance';
 import { shiftDate } from './date-shift';
+import {
+  CURRENT_SUBJECT_TEACHERS,
+  RETIRED_SUBJECT,
+  SEED_LEVEL_SUBJECTS,
+  SEED_SUBJECTS,
+} from './subjects';
 import { emailOf, SUPER_ADMIN_EMAIL } from './members';
 import {
   GREENFIELD_SLUG,
@@ -33,14 +41,14 @@ import {
   students,
 } from './students';
 
-// Emeka is scoped to JSS 3 Gold, where Bola Johnson sits, but Bola has left and is only on the Left tab.
+// Bola Johnson (JSS 3 Gold) has left and is only on the Left tab.
 export const visibleStudents: Record<string, number> = {
   funmi: 21,
   tunde: 21,
   grace: 21,
   chika: 18,
   yemi: 3,
-  emeka: 0,
+  emeka: 7,
   kola: 0,
 };
 
@@ -185,6 +193,29 @@ async function checkCalendar(
   check('Greenfield school days', now.schoolDays, 67);
 }
 
+const byName = (a: string, b: string) => a.localeCompare(b);
+
+type CountedTable =
+  | 'level_subject'
+  | 'student_subject'
+  | 'student_enrollment'
+  | 'enrollment_placement'
+  | 'guardian'
+  | 'guardian_student';
+
+async function countRows(
+  db: Database,
+  table: CountedTable,
+  organizationId: string
+): Promise<number> {
+  const row = await db
+    .selectFrom(table)
+    .where('organization_id', '=', organizationId)
+    .select((eb) => eb.fn.countAll<string>().as('total'))
+    .executeTakeFirstOrThrow();
+  return Number(row.total);
+}
+
 async function checkClasses(
   app: INestApplicationContext,
   db: Database,
@@ -216,15 +247,63 @@ async function checkClasses(
   );
 
   const emeka = await orgContextFor(app, emailOf('emeka'));
-  const jss3Gold = everyClass.find((row) => row.displayName === 'JSS 3 Gold');
+  const taught = ['JSS 2 Gold', 'JSS 3 Gold'].map(
+    (name) =>
+      everyClass.find((row) => row.displayName === name)?.id ?? 'missing'
+  );
   check(
     'Emeka class scope',
-    emeka.classScope === 'all' ? 'all' : emeka.classScope.join(','),
-    jss3Gold?.id ?? 'missing'
+    emeka.classScope === 'all'
+      ? 'all'
+      : emeka.classScope.toSorted(byName).join(','),
+    taught.toSorted(byName).join(',')
   );
 }
 
-const byName = (a: string, b: string) => a.localeCompare(b);
+async function checkSubjects(
+  app: INestApplicationContext,
+  db: Database,
+  check: Check
+) {
+  const funmi = await orgContextFor(app, emailOf('funmi'));
+  const organizationId = funmi.organizationId;
+  const subjects = await app
+    .get(SubjectService, { strict: false })
+    .list(funmi, { page: 1, includeRetired: true });
+  check('Greenfield subjects', subjects.total, SEED_SUBJECTS.length);
+  const retired = subjects.items.filter((row) => row.retiredAt !== null);
+  check(
+    'Greenfield retired subjects',
+    retired.map((row) => row.code).join(','),
+    RETIRED_SUBJECT.code
+  );
+  const count = (table: 'level_subject' | 'student_subject') =>
+    countRows(db, table, organizationId);
+  check(
+    'Greenfield level subjects',
+    await count('level_subject'),
+    Object.values(SEED_LEVEL_SUBJECTS).reduce(
+      (total, list) => total + list.length,
+      0
+    )
+  );
+  check(
+    'Greenfield French takers',
+    (await count('student_subject')) > 0 ? 'some' : 'none',
+    'some'
+  );
+  const teachers = await app
+    .get(SubjectTeacherService, { strict: false })
+    .list(funmi);
+  const assigned = teachers.arms
+    .flatMap((arm) => arm.subjects)
+    .filter((row) => row.teacher !== null).length;
+  check(
+    'Greenfield subject teachers',
+    assigned,
+    CURRENT_SUBJECT_TEACHERS.length
+  );
+}
 
 async function checkRoll(
   app: INestApplicationContext,
@@ -233,20 +312,13 @@ async function checkRoll(
 ) {
   const funmi = await orgContextFor(app, emailOf('funmi'));
   const organizationId = funmi.organizationId;
-  const count = async (
+  const count = (
     table:
       | 'student_enrollment'
       | 'enrollment_placement'
       | 'guardian'
       | 'guardian_student'
-  ) => {
-    const row = await db
-      .selectFrom(table)
-      .where('organization_id', '=', organizationId)
-      .select((eb) => eb.fn.countAll<string>().as('total'))
-      .executeTakeFirstOrThrow();
-    return Number(row.total);
-  };
+  ) => countRows(db, table, organizationId);
   check(
     'Greenfield enrolments',
     await count('student_enrollment'),
@@ -453,6 +525,7 @@ export async function runSeedCheck(
 
   await checkCalendar(app, db, check);
   await checkClasses(app, db, check);
+  await checkSubjects(app, db, check);
   await checkStudents(app, db, check);
   await checkAnnouncements(app, check);
   await checkFinance(app, check);

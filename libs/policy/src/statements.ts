@@ -8,10 +8,11 @@ export const statements = {
   guardian: ['create', 'read', 'update', 'link'],
   session: ['create', 'read', 'update', 'setCurrent'],
   class: ['create', 'read', 'readAll', 'update', 'assignTeacher'],
-  feeSchedule: ['create', 'read', 'update', 'delete'],
+  feeLine: ['create', 'read', 'readOwn', 'update', 'retire'],
   announcement: ['create', 'read', 'update'],
   ledger: ['read', 'manageAccounts'],
   moneyAccount: ['create', 'read', 'update'],
+  subject: ['create', 'read', 'update'],
   member: ['create', 'read', 'update', 'delete'],
   ac: ['create', 'read', 'update', 'delete'],
 } as const;
@@ -85,6 +86,14 @@ export const PERM_HELP: Partial<Record<Permission, string>> = {
     'Adds bank, POS and cash accounts. A school-wide account needs every campus.',
   'moneyAccount:read':
     'Sees money accounts. School-wide accounts need every campus.',
+  'feeLine:read': 'Sees what each class level pays, and the fee types.',
+  'feeLine:create':
+    'Adds fees and fee types. A fee for every campus needs every campus.',
+  'feeLine:update':
+    'Changes a fee amount and sets which students take optional fees.',
+  'feeLine:retire': 'Retires a fee. A fee for every campus needs every campus.',
+  'subject:create': 'Adds subjects to the school. A code never changes.',
+  'subject:update': 'Renames, retires and restores subjects.',
 };
 
 const RESOURCE_LABELS: Record<Resource, string> = {
@@ -97,10 +106,11 @@ const RESOURCE_LABELS: Record<Resource, string> = {
   guardian: 'Guardians',
   session: 'School years and terms',
   class: 'Classes',
-  feeSchedule: 'Fee schedules',
+  feeLine: 'School and other fees',
   announcement: 'Announcements',
   ledger: 'Money categories',
   moneyAccount: 'Bank and POS accounts',
+  subject: 'Subjects',
   member: 'Staff',
   ac: 'Roles',
 };

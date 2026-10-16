@@ -1,3 +1,5 @@
+import { parsePage } from './search-page';
+
 interface CalendarSearch {
   page?: number;
   dialog?: 'new-year';
@@ -7,9 +9,8 @@ interface CalendarSearch {
 export function parseCalendarSearch(
   search: Record<string, unknown>
 ): CalendarSearch {
-  const page = Number(search['page']);
   return {
-    page: Number.isInteger(page) && page > 1 ? page : undefined,
+    page: parsePage(search),
     dialog: search['dialog'] === 'new-year' ? 'new-year' : undefined,
   };
 }

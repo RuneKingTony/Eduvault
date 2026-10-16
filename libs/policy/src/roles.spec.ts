@@ -3,6 +3,7 @@ import {
   READ_PERMS,
   STARTER_ROLES,
   can,
+  canAll,
   canAny,
   parsePermissionMap,
   resolvePermissions,
@@ -129,6 +130,19 @@ describe('roles', () => {
     }
   });
 
+  it('gives the bursar every feeLine write, the administrator feeLine:read and nobody feeLine:readOwn yet', () => {
+    expect(starter('bursar').feeLine).toEqual([
+      'create',
+      'read',
+      'update',
+      'retire',
+    ]);
+    expect(starter('administrator').feeLine).toEqual(['read']);
+    for (const slug of ['teacher', 'principal', 'student', 'guardian']) {
+      expect(starter(slug).feeLine).toBeUndefined();
+    }
+  });
+
   it('gives the administrator and principal every announcement permission and nobody else any', () => {
     for (const slug of ['administrator', 'principal']) {
       expect(starter(slug).announcement).toEqual(['create', 'read', 'update']);
@@ -165,6 +179,38 @@ describe('roles', () => {
         expect(role.permissions).not.toContain(permission);
       }
     }
+  });
+
+  it('gives the administrator every subject permission, the principal and teacher subject:read, and the rest none', () => {
+    expect(starter('administrator').subject).toEqual([
+      'create',
+      'read',
+      'update',
+    ]);
+    expect(starter('principal').subject).toEqual(['read']);
+    expect(starter('teacher').subject).toEqual(['read']);
+    for (const slug of ['bursar', 'student', 'guardian']) {
+      expect(starter(slug).subject).toBeUndefined();
+    }
+  });
+
+  it('gates the subject routes on subject permissions and assigning on class:assignTeacher', () => {
+    const administrator = starter('administrator');
+    expect(can(administrator, 'subject', 'create')).toBe(true);
+    expect(can(administrator, 'class', 'assignTeacher')).toBe(true);
+    const teacher = starter('teacher');
+    expect(can(teacher, 'subject', 'read')).toBe(true);
+    expect(can(teacher, 'subject', 'create')).toBe(false);
+    expect(can(teacher, 'subject', 'update')).toBe(false);
+    expect(can(teacher, 'class', 'assignTeacher')).toBe(false);
+    expect(can(starter('principal'), 'class', 'assignTeacher')).toBe(false);
+    expect(can(starter('bursar'), 'subject', 'read')).toBe(false);
+  });
+
+  it('counts subject:read in READ_PERMS and leaves the writes out', () => {
+    expect(READ_PERMS).toContain('subject:read');
+    expect(READ_PERMS).not.toContain('subject:create');
+    expect(READ_PERMS).not.toContain('subject:update');
   });
 
   it('counts the money reads in READ_PERMS', () => {
@@ -237,6 +283,7 @@ describe('roles', () => {
     expect(permissions).toEqual({
       student: ['read', 'markAway'],
       class: ['read', 'readAll'],
+      subject: ['read'],
       team: ['read'],
       campus: ['readAll'],
       announcement: ['create', 'read', 'update'],
@@ -258,6 +305,15 @@ describe('roles', () => {
       false
     );
     expect(canAny(permissions, [])).toBe(false);
+  });
+
+  it('passes canAll only with every permission', () => {
+    const permissions = starter('bursar');
+    expect(canAll(permissions, ['feeLine:read', 'student:read'])).toBe(true);
+    expect(canAll(permissions, ['student:read', 'schoolAccount:read'])).toBe(
+      false
+    );
+    expect(canAll(permissions, [])).toBe(true);
   });
 
   it('parses a stored permission column and drops unknown entries', () => {

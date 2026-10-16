@@ -262,88 +262,6 @@ test.describe('campuses', () => {
       await api().delete(`/campuses/${lekki.id}`).expect(401);
     });
   });
-
-  test('fee schedules: school-wide ones reach every campus, campus ones do not leak', async ({
-    api,
-    createUser,
-    createOrganization,
-    createCampus,
-    withPermissions,
-  }) => {
-    const owner = await createUser();
-    const org = await createOrganization(owner);
-    const campus1 = await createCampus(org, 'Campus 1');
-    const campus2 = await createCampus(org, 'Campus 2');
-    const post = (body: object) =>
-      api(owner).post('/fee-schedules').send(body).expect(201);
-    await post({ name: 'Everyone', amountMinor: 1, currency: 'NGN' });
-    await post({
-      name: 'Only 1',
-      amountMinor: 2,
-      currency: 'NGN',
-      campusId: campus1.id,
-    });
-    await post({
-      name: 'Only 2',
-      amountMinor: 3,
-      currency: 'NGN',
-      campusId: campus2.id,
-    });
-    const reader = await withPermissions(org, ['feeSchedule:read'], {
-      campuses: [campus1],
-    });
-
-    const seen = (await api(reader).get('/fee-schedules').expect(200)).body;
-    expect(seen.map((f: { name: string }) => f.name)).toEqual([
-      'Everyone',
-      'Only 1',
-    ]);
-  });
-});
-
-test.describe('fee schedules', () => {
-  test.describe('isolation', () => {
-    test('1 and 2: another school reads and updates by id as 404 and lists hold none of it', async ({
-      api,
-      schools: { owner, ownerB },
-    }) => {
-      const fee = (
-        await api(owner)
-          .post('/fee-schedules')
-          .send({ name: 'Tuition', amountMinor: 1, currency: 'NGN' })
-          .expect(201)
-      ).body;
-      await api(ownerB).get(`/fee-schedules/${fee.id}`).expect(404);
-      await api(ownerB)
-        .patch(`/fee-schedules/${fee.id}`)
-        .send({ name: 'x' })
-        .expect(404);
-      await api(ownerB).delete(`/fee-schedules/${fee.id}`).expect(404);
-      expect(
-        (await api(ownerB).get('/fee-schedules').expect(200)).body
-      ).toEqual([]);
-    });
-
-    test('2: a campus filter naming another school answers 404', async ({
-      api,
-      schools: { owner, campusB },
-    }) => {
-      await api(owner).get(`/fee-schedules?campusId=${campusB.id}`).expect(404);
-    });
-
-    test('5: members without the feeSchedule permission get 403', async ({
-      api,
-      schools: { noPermission, lekkiOnly },
-    }) => {
-      for (const user of [noPermission, lekkiOnly]) {
-        await api(user).get('/fee-schedules').expect(403);
-      }
-    });
-
-    test('6: no session answers 401', async ({ api }) => {
-      await api().get('/fee-schedules').expect(401);
-    });
-  });
 });
 
 test.describe('school account', () => {
@@ -519,7 +437,7 @@ test.describe('role per school', () => {
     const learner = await addMember(org, await createUser(), {
       roles: ['student'],
     });
-    await api(learner).get('/fee-schedules').expect(403);
+    await api(learner).get('/fee-lines').expect(403);
     await api(learner).get('/students').expect(403);
     await api(learner).get('/campuses/summary').expect(403);
   });

@@ -7,7 +7,7 @@ interface ClassTeachingEnd {
   campusIds?: readonly string[];
 }
 
-/** Deletes the person's class-teacher rows for the current school year; earlier years stay as history. */
+/** Covers class-teacher and subject-teacher rows; earlier years' and terms' rows stay as history. */
 export async function endClassTeaching(
   db: Database,
   { organizationId, userId, campusIds }: ClassTeachingEnd
@@ -15,6 +15,12 @@ export async function endClassTeaching(
   if (campusIds?.length === 0) {
     return;
   }
+  const campusArms = () =>
+    db
+      .selectFrom('class_arm')
+      .select('class_arm.id')
+      .where('class_arm.organization_id', '=', organizationId)
+      .where('class_arm.campus_id', 'in', [...(campusIds ?? [])]);
   await db
     .deleteFrom('class_arm_teacher')
     .where('organization_id', '=', organizationId)
@@ -29,15 +35,24 @@ export async function endClassTeaching(
         .where('term.is_current', '=', true)
     )
     .$if(campusIds !== undefined, (qb) =>
-      qb.where(
-        'class_arm_id',
-        'in',
-        db
-          .selectFrom('class_arm')
-          .select('class_arm.id')
-          .where('class_arm.organization_id', '=', organizationId)
-          .where('class_arm.campus_id', 'in', [...(campusIds ?? [])])
-      )
+      qb.where('class_arm_id', 'in', campusArms())
+    )
+    .execute();
+  await db
+    .deleteFrom('subject_teacher')
+    .where('organization_id', '=', organizationId)
+    .where('user_id', '=', userId)
+    .where(
+      'term_id',
+      'in',
+      db
+        .selectFrom('term')
+        .select('term.id')
+        .where('term.organization_id', '=', organizationId)
+        .where('term.is_current', '=', true)
+    )
+    .$if(campusIds !== undefined, (qb) =>
+      qb.where('class_arm_id', 'in', campusArms())
     )
     .execute();
 }

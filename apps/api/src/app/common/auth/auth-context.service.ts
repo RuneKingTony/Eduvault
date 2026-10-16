@@ -213,18 +213,35 @@ export class AuthContextService {
       return [];
     }
     const rows = await this.pool.query<{ class_arm_id: string }>(
-      `SELECT DISTINCT teacher.class_arm_id
-       FROM class_arm_teacher teacher
+      `SELECT taught.class_arm_id
+       FROM (
+         SELECT teacher.class_arm_id, teacher.organization_id
+         FROM class_arm_teacher teacher
+         JOIN term current_term
+           ON current_term.session_id = teacher.session_id
+          AND current_term.organization_id = teacher.organization_id
+          AND current_term.is_current
+         WHERE teacher.organization_id = $1 AND teacher.user_id = $2
+         UNION
+         SELECT subject_row.class_arm_id, subject_row.organization_id
+         FROM subject_teacher subject_row
+         JOIN term current_term
+           ON current_term.id = subject_row.term_id
+          AND current_term.organization_id = subject_row.organization_id
+          AND current_term.is_current
+         JOIN class_arm subject_arm
+           ON subject_arm.id = subject_row.class_arm_id
+          AND subject_arm.organization_id = subject_row.organization_id
+         JOIN level_subject
+           ON level_subject.class_level_id = subject_arm.class_level_id
+          AND level_subject.subject_id = subject_row.subject_id
+          AND level_subject.organization_id = subject_row.organization_id
+         WHERE subject_row.organization_id = $1 AND subject_row.user_id = $2
+       ) taught
        JOIN class_arm arm
-         ON arm.id = teacher.class_arm_id
-        AND arm.organization_id = teacher.organization_id
-       JOIN term current_term
-         ON current_term.session_id = teacher.session_id
-        AND current_term.organization_id = teacher.organization_id
-        AND current_term.is_current
-       WHERE teacher.organization_id = $1
-         AND teacher.user_id = $2
-         AND arm.retired_at IS NULL`,
+         ON arm.id = taught.class_arm_id
+        AND arm.organization_id = taught.organization_id
+       WHERE arm.retired_at IS NULL`,
       [organizationId, userId]
     );
     return rows.rows.map((row) => row.class_arm_id);

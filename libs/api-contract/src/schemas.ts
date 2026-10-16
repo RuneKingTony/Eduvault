@@ -277,26 +277,6 @@ export type Deletable = z.infer<typeof deletableSchema>;
 
 export const deleteSchoolSchema = z.object({ confirmName: z.string() });
 
-export const feeScheduleSchema = z.object({
-  id: idSchema,
-  organizationId: idSchema,
-  campusId: idSchema.nullable(),
-  name: z.string(),
-  amountMinor: z.number().int().nonnegative(),
-  currency: currencySchema,
-  createdAt: timestamp,
-});
-export type FeeSchedule = z.infer<typeof feeScheduleSchema>;
-export const createFeeScheduleSchema = z.object({
-  campusId: idSchema.nullish(),
-  name: z.string().trim().min(1).max(120),
-  amountMinor: z.number().int().nonnegative(),
-  currency: currencySchema,
-});
-export const updateFeeScheduleSchema = createFeeScheduleSchema.partial();
-
-export const campusFilterSchema = z.object({ campusId: idSchema.optional() });
-
 export const platformSchoolIdParamsSchema = z.object({ id: z.string().min(1) });
 
 export const schoolStatusSchema = z.enum(['active', 'suspended']);

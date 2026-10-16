@@ -15,16 +15,18 @@ import { Route as ApprovalsRouteImport } from './routes/approvals'
 import { Route as CalendarRouteImport } from './routes/calendar'
 import { Route as CampusesRouteImport } from './routes/campuses'
 import { Route as ClassesRouteImport } from './routes/classes'
-import { Route as FeesRouteImport } from './routes/fees'
 import { Route as MembersRouteImport } from './routes/members'
 import { Route as PlatformRouteImport } from './routes/platform'
 import { Route as RolesRouteImport } from './routes/roles'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as StudentsRouteImport } from './routes/students'
+import { Route as SubjectsRouteImport } from './routes/subjects'
 import { Route as ClassesClassIdRouteImport } from './routes/classes_.$classId'
 import { Route as DevUiRouteImport } from './routes/dev/ui'
 import { Route as FinanceLedgerRouteImport } from './routes/finance/ledger'
 import { Route as FinanceMoneyAccountsRouteImport } from './routes/finance/money-accounts'
+import { Route as FinanceOtherFeesRouteImport } from './routes/finance/other-fees'
+import { Route as FinanceSchoolFeesRouteImport } from './routes/finance/school-fees'
 import { Route as MembersMemberIdRouteImport } from './routes/members_.$memberId'
 import { Route as PlatformIndexRouteImport } from './routes/platform.index'
 import { Route as PlatformAuditRouteImport } from './routes/platform.audit'
@@ -69,11 +71,6 @@ const ClassesRoute = ClassesRouteImport.update({
   path: '/classes',
   getParentRoute: () => rootRouteImport,
 } as any)
-const FeesRoute = FeesRouteImport.update({
-  id: '/fees',
-  path: '/fees',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const MembersRoute = MembersRouteImport.update({
   id: '/members',
   path: '/members',
@@ -99,6 +96,11 @@ const StudentsRoute = StudentsRouteImport.update({
   path: '/students',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SubjectsRoute = SubjectsRouteImport.update({
+  id: '/subjects',
+  path: '/subjects',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ClassesClassIdRoute = ClassesClassIdRouteImport.update({
   id: '/classes_/$classId',
   path: '/classes/$classId',
@@ -117,6 +119,16 @@ const FinanceLedgerRoute = FinanceLedgerRouteImport.update({
 const FinanceMoneyAccountsRoute = FinanceMoneyAccountsRouteImport.update({
   id: '/finance/money-accounts',
   path: '/finance/money-accounts',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FinanceOtherFeesRoute = FinanceOtherFeesRouteImport.update({
+  id: '/finance/other-fees',
+  path: '/finance/other-fees',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FinanceSchoolFeesRoute = FinanceSchoolFeesRouteImport.update({
+  id: '/finance/school-fees',
+  path: '/finance/school-fees',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MembersMemberIdRoute = MembersMemberIdRouteImport.update({
@@ -192,16 +204,18 @@ export interface FileRoutesByFullPath {
   '/calendar': typeof CalendarRoute
   '/campuses': typeof CampusesRoute
   '/classes': typeof ClassesRoute
-  '/fees': typeof FeesRoute
   '/members': typeof MembersRoute
   '/platform': typeof PlatformRouteWithChildren
   '/roles': typeof RolesRoute
   '/settings': typeof SettingsRouteWithChildren
   '/students': typeof StudentsRoute
+  '/subjects': typeof SubjectsRoute
   '/classes/$classId': typeof ClassesClassIdRoute
   '/dev/ui': typeof DevUiRoute
   '/finance/ledger': typeof FinanceLedgerRoute
   '/finance/money-accounts': typeof FinanceMoneyAccountsRoute
+  '/finance/other-fees': typeof FinanceOtherFeesRoute
+  '/finance/school-fees': typeof FinanceSchoolFeesRoute
   '/members/$memberId': typeof MembersMemberIdRoute
   '/platform/audit': typeof PlatformAuditRoute
   '/roles/$roleSlug': typeof RolesRoleSlugRoute
@@ -223,14 +237,16 @@ export interface FileRoutesByTo {
   '/calendar': typeof CalendarRoute
   '/campuses': typeof CampusesRoute
   '/classes': typeof ClassesRoute
-  '/fees': typeof FeesRoute
   '/members': typeof MembersRoute
   '/roles': typeof RolesRoute
   '/students': typeof StudentsRoute
+  '/subjects': typeof SubjectsRoute
   '/classes/$classId': typeof ClassesClassIdRoute
   '/dev/ui': typeof DevUiRoute
   '/finance/ledger': typeof FinanceLedgerRoute
   '/finance/money-accounts': typeof FinanceMoneyAccountsRoute
+  '/finance/other-fees': typeof FinanceOtherFeesRoute
+  '/finance/school-fees': typeof FinanceSchoolFeesRoute
   '/members/$memberId': typeof MembersMemberIdRoute
   '/platform/audit': typeof PlatformAuditRoute
   '/roles/$roleSlug': typeof RolesRoleSlugRoute
@@ -253,16 +269,18 @@ export interface FileRoutesById {
   '/calendar': typeof CalendarRoute
   '/campuses': typeof CampusesRoute
   '/classes': typeof ClassesRoute
-  '/fees': typeof FeesRoute
   '/members': typeof MembersRoute
   '/platform': typeof PlatformRouteWithChildren
   '/roles': typeof RolesRoute
   '/settings': typeof SettingsRouteWithChildren
   '/students': typeof StudentsRoute
+  '/subjects': typeof SubjectsRoute
   '/classes_/$classId': typeof ClassesClassIdRoute
   '/dev/ui': typeof DevUiRoute
   '/finance/ledger': typeof FinanceLedgerRoute
   '/finance/money-accounts': typeof FinanceMoneyAccountsRoute
+  '/finance/other-fees': typeof FinanceOtherFeesRoute
+  '/finance/school-fees': typeof FinanceSchoolFeesRoute
   '/members_/$memberId': typeof MembersMemberIdRoute
   '/platform/audit': typeof PlatformAuditRoute
   '/roles_/$roleSlug': typeof RolesRoleSlugRoute
@@ -286,16 +304,18 @@ export interface FileRouteTypes {
     | '/calendar'
     | '/campuses'
     | '/classes'
-    | '/fees'
     | '/members'
     | '/platform'
     | '/roles'
     | '/settings'
     | '/students'
+    | '/subjects'
     | '/classes/$classId'
     | '/dev/ui'
     | '/finance/ledger'
     | '/finance/money-accounts'
+    | '/finance/other-fees'
+    | '/finance/school-fees'
     | '/members/$memberId'
     | '/platform/audit'
     | '/roles/$roleSlug'
@@ -317,14 +337,16 @@ export interface FileRouteTypes {
     | '/calendar'
     | '/campuses'
     | '/classes'
-    | '/fees'
     | '/members'
     | '/roles'
     | '/students'
+    | '/subjects'
     | '/classes/$classId'
     | '/dev/ui'
     | '/finance/ledger'
     | '/finance/money-accounts'
+    | '/finance/other-fees'
+    | '/finance/school-fees'
     | '/members/$memberId'
     | '/platform/audit'
     | '/roles/$roleSlug'
@@ -346,16 +368,18 @@ export interface FileRouteTypes {
     | '/calendar'
     | '/campuses'
     | '/classes'
-    | '/fees'
     | '/members'
     | '/platform'
     | '/roles'
     | '/settings'
     | '/students'
+    | '/subjects'
     | '/classes_/$classId'
     | '/dev/ui'
     | '/finance/ledger'
     | '/finance/money-accounts'
+    | '/finance/other-fees'
+    | '/finance/school-fees'
     | '/members_/$memberId'
     | '/platform/audit'
     | '/roles_/$roleSlug'
@@ -378,16 +402,18 @@ export interface RootRouteChildren {
   CalendarRoute: typeof CalendarRoute
   CampusesRoute: typeof CampusesRoute
   ClassesRoute: typeof ClassesRoute
-  FeesRoute: typeof FeesRoute
   MembersRoute: typeof MembersRoute
   PlatformRoute: typeof PlatformRouteWithChildren
   RolesRoute: typeof RolesRoute
   SettingsRoute: typeof SettingsRouteWithChildren
   StudentsRoute: typeof StudentsRoute
+  SubjectsRoute: typeof SubjectsRoute
   ClassesClassIdRoute: typeof ClassesClassIdRoute
   DevUiRoute: typeof DevUiRoute
   FinanceLedgerRoute: typeof FinanceLedgerRoute
   FinanceMoneyAccountsRoute: typeof FinanceMoneyAccountsRoute
+  FinanceOtherFeesRoute: typeof FinanceOtherFeesRoute
+  FinanceSchoolFeesRoute: typeof FinanceSchoolFeesRoute
   MembersMemberIdRoute: typeof MembersMemberIdRoute
   RolesRoleSlugRoute: typeof RolesRoleSlugRoute
   RolesNewRoute: typeof RolesNewRoute
@@ -438,13 +464,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ClassesRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/fees': {
-      id: '/fees'
-      path: '/fees'
-      fullPath: '/fees'
-      preLoaderRoute: typeof FeesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/members': {
       id: '/members'
       path: '/members'
@@ -480,6 +499,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StudentsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/subjects': {
+      id: '/subjects'
+      path: '/subjects'
+      fullPath: '/subjects'
+      preLoaderRoute: typeof SubjectsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/classes_/$classId': {
       id: '/classes_/$classId'
       path: '/classes/$classId'
@@ -506,6 +532,20 @@ declare module '@tanstack/react-router' {
       path: '/finance/money-accounts'
       fullPath: '/finance/money-accounts'
       preLoaderRoute: typeof FinanceMoneyAccountsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/finance/other-fees': {
+      id: '/finance/other-fees'
+      path: '/finance/other-fees'
+      fullPath: '/finance/other-fees'
+      preLoaderRoute: typeof FinanceOtherFeesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/finance/school-fees': {
+      id: '/finance/school-fees'
+      path: '/finance/school-fees'
+      fullPath: '/finance/school-fees'
+      preLoaderRoute: typeof FinanceSchoolFeesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/members_/$memberId': {
@@ -647,16 +687,18 @@ const rootRouteChildren: RootRouteChildren = {
   CalendarRoute: CalendarRoute,
   CampusesRoute: CampusesRoute,
   ClassesRoute: ClassesRoute,
-  FeesRoute: FeesRoute,
   MembersRoute: MembersRoute,
   PlatformRoute: PlatformRouteWithChildren,
   RolesRoute: RolesRoute,
   SettingsRoute: SettingsRouteWithChildren,
   StudentsRoute: StudentsRoute,
+  SubjectsRoute: SubjectsRoute,
   ClassesClassIdRoute: ClassesClassIdRoute,
   DevUiRoute: DevUiRoute,
   FinanceLedgerRoute: FinanceLedgerRoute,
   FinanceMoneyAccountsRoute: FinanceMoneyAccountsRoute,
+  FinanceOtherFeesRoute: FinanceOtherFeesRoute,
+  FinanceSchoolFeesRoute: FinanceSchoolFeesRoute,
   MembersMemberIdRoute: MembersMemberIdRoute,
   RolesRoleSlugRoute: RolesRoleSlugRoute,
   RolesNewRoute: RolesNewRoute,

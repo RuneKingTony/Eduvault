@@ -1,8 +1,11 @@
-import type { LedgerAccountType } from '@eduvault/api-contract';
+import {
+  OTHER_CHARGES_SYSTEM_KEY,
+  type LedgerAccountType,
+} from '@eduvault/api-contract';
 
 const HIDDEN_KEYS: ReadonlySet<string> = new Set([
   'customer_credit_refunds',
-  'other_charges',
+  OTHER_CHARGES_SYSTEM_KEY,
 ]);
 const CODE_STEP = 10;
 

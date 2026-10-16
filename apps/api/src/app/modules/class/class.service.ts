@@ -26,6 +26,7 @@ import {
   type ClassTeacherRemoved,
   type CreateClassInput,
   type TeacherCandidate,
+  type TeacherCandidatesQuery,
   type UpdateClassInput,
 } from '@eduvault/api-contract';
 import { can } from '@eduvault/policy';
@@ -51,6 +52,24 @@ const everything: Visibility = { campusScope: 'all', classScope: 'all' };
 
 const displayOf = (record: ClassRecord): string =>
   classDisplayName(record.levelName, record.name);
+
+export interface ClassRef {
+  id: string;
+  displayName: string;
+  levelId: string;
+  campusId: string;
+  campusName: string;
+  retiredAt: string | null;
+}
+
+const toRef = (record: ClassRecord): ClassRef => ({
+  id: record.id,
+  displayName: displayOf(record),
+  levelId: record.levelId,
+  campusId: record.campusId,
+  campusName: record.campusName,
+  retiredAt: record.retiredAt,
+});
 
 @Injectable()
 export class ClassService {
@@ -213,19 +232,66 @@ export class ClassService {
 
   async teacherCandidates(
     ctx: OrgContext,
-    id: string
+    id: string,
+    query: TeacherCandidatesQuery = {}
   ): Promise<TeacherCandidate[]> {
     const record = await this.requireClass(ctx, id);
-    const current = await this.teachersOf(ctx, [id]);
-    const [members, custom] = await Promise.all([
-      this.classes.listMembers(ctx.organizationId, record.campusId),
-      this.classes.rolePermissions(ctx.organizationId),
-    ]);
+    const current =
+      query.for === 'subject' ? [] : await this.teachersOf(ctx, [id]);
+    const { members, custom } = await this.membersAndRoles(
+      ctx,
+      record.campusId
+    );
     return teacherCandidates(
       members,
       custom,
       new Set(current.map((teacher) => teacher.userId))
     ).map(({ userId, name }) => ({ userId, name }));
+  }
+
+  async requireVisible(ctx: OrgContext, id: string): Promise<ClassRef> {
+    return toRef(await this.requireClass(ctx, id));
+  }
+
+  async listVisible(ctx: OrgContext): Promise<ClassRef[]> {
+    const records = await this.classes.listClasses(ctx.organizationId, {
+      ...this.visibility(ctx),
+      status: 'active',
+    });
+    return records.map((record) => toRef(record));
+  }
+
+  async checkTeacher(
+    ctx: OrgContext,
+    campusId: string,
+    userId: string
+  ): Promise<{ name: string; candidate: boolean } | undefined> {
+    const { members, custom } = await this.membersAndRoles(ctx, campusId);
+    const member = members.find((candidate) => candidate.userId === userId);
+    if (member === undefined) {
+      return undefined;
+    }
+    return {
+      name: member.name,
+      candidate: teacherCandidates([member], custom, new Set()).length > 0,
+    };
+  }
+
+  async candidateIds(ctx: OrgContext, campusId: string): Promise<Set<string>> {
+    const { members, custom } = await this.membersAndRoles(ctx, campusId);
+    return new Set(
+      teacherCandidates(members, custom, new Set()).map(
+        (candidate) => candidate.userId
+      )
+    );
+  }
+
+  private async membersAndRoles(ctx: OrgContext, campusId: string) {
+    const [members, custom] = await Promise.all([
+      this.classes.listMembers(ctx.organizationId, campusId),
+      this.classes.rolePermissions(ctx.organizationId),
+    ]);
+    return { members, custom };
   }
 
   assignTeacher(

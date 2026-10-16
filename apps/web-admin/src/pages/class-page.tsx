@@ -52,6 +52,7 @@ import { useApi } from '../api';
 import { AddClassTeacherDialog } from '../components/add-class-teacher-dialog';
 import { ROLE_LABELS } from '../components/class-text';
 import { GraduateClassDialog } from '../components/graduate-class-dialog';
+import { ClassSubjectTeachers } from '../components/subjects/class-subject-teachers';
 import {
   classQueryOptions,
   currentTermQueryOptions,
@@ -225,6 +226,7 @@ function TeachersCard({
             )}
           </>
         )}
+        <ClassSubjectTeachers classId={classRow.id} />
       </CardContent>
     </Card>
   );

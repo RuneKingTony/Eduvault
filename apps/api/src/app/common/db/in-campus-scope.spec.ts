@@ -19,9 +19,9 @@ const db = new Kysely<DB>({
 
 const compile = (options: InCampusScopeOptions) =>
   db
-    .selectFrom('fee_schedule')
+    .selectFrom('announcement')
     .select('id')
-    .where((eb) => inCampusScope(eb, 'fee_schedule.campus_id', options))
+    .where((eb) => inCampusScope(eb, 'announcement.campus_id', options))
     .compile();
 
 describe('inCampusScope', () => {
@@ -33,7 +33,7 @@ describe('inCampusScope', () => {
 
   it('keeps only rows on the listed campuses', () => {
     const query = compile({ scope: ['a', 'b'] });
-    expect(query.sql).toContain('"fee_schedule"."campus_id" in ($1, $2)');
+    expect(query.sql).toContain('"announcement"."campus_id" in ($1, $2)');
     expect(query.parameters).toEqual(['a', 'b']);
   });
 
@@ -50,13 +50,13 @@ describe('inCampusScope', () => {
 
   it('shows null-campus rows to a campus scope when null means all', () => {
     const query = compile({ scope: ['a'], nullMeans: 'all' });
-    expect(query.sql).toContain('"fee_schedule"."campus_id" is null');
-    expect(query.sql).toContain('"fee_schedule"."campus_id" in ($1)');
+    expect(query.sql).toContain('"announcement"."campus_id" is null');
+    expect(query.sql).toContain('"announcement"."campus_id" in ($1)');
   });
 
   it('shows null-campus rows to an empty scope when null means all', () => {
     const query = compile({ scope: [], nullMeans: 'all' });
-    expect(query.sql).toContain('"fee_schedule"."campus_id" is null');
+    expect(query.sql).toContain('"announcement"."campus_id" is null');
     expect(query.parameters).toEqual([false]);
   });
 });

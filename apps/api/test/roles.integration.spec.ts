@@ -654,6 +654,7 @@ test.describe('roles', () => {
         'student:read',
         'student:markAway',
         'class:read',
+        'subject:read',
       ]);
       expect((await roleOf(api, editor, 'wide')).editable).toBe(false);
       expect((await roleOf(api, editor, 'teacher')).editable).toBe(true);
@@ -753,6 +754,10 @@ test.describe('roles', () => {
           'student:read',
           'guardian:read',
           'enrollment:read',
+          'feeLine:create',
+          'feeLine:read',
+          'feeLine:update',
+          'feeLine:retire',
           'moneyAccount:read',
           'ledger:read',
         ],
@@ -779,6 +784,10 @@ test.describe('roles', () => {
         'student:read',
         'guardian:read',
         'enrollment:read',
+        'feeLine:create',
+        'feeLine:read',
+        'feeLine:update',
+        'feeLine:retire',
         'moneyAccount:read',
         'ledger:read',
       ]);

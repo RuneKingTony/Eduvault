@@ -1,4 +1,4 @@
-import type { ActionOf, Resource } from '@eduvault/policy';
+import type { ActionOf, Permission, Resource } from '@eduvault/policy';
 
 export const PERMISSION_KEY = 'eduvault:permission';
 
@@ -6,6 +6,12 @@ export interface RequiredPermission<R extends Resource = Resource> {
   resource: R;
   action: ActionOf<R>;
 }
+
+export const ANY_PERMISSION_KEY = 'eduvault:any-permission';
+
+export type AnyPermission = readonly Permission[];
+
+export const ALL_PERMISSIONS_KEY = 'eduvault:all-permissions';
 
 export const STAFF_ONLY_KEY = 'eduvault:staff-only';
 

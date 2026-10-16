@@ -75,7 +75,7 @@ sequenceDiagram
 
 - **Organization = school.** `member.role` is the role in that school, so one user can be a teacher in one school and an admin in another. `session.activeOrganizationId` selects the school.
 - **Team = campus.** `teamMember` says where someone works; `session.activeTeamId` selects the campus. Details beyond a name are in the `campus` table (`team_id` primary key and foreign key to `team.id`).
-- **School level:** `school_account` (one per school). **Campus aware:** `fee_schedule` (null `campus_id` = every campus) and `student`.
+- **School level:** `school_account` (one per school). **Campus aware:** `fee_line` (null `campus_id` = every campus) and `student`.
 - Every school-scoped table carries `organization_id`; campus references are composite `(campus_id, organization_id)` foreign keys, so a row cannot reference another school's campus.
 - Decisions and out-of-scope cases: [ADR 0005](adr/0005-tenancy.md).
 
@@ -126,7 +126,7 @@ All under `/api/auth/*`, mounted by `@thallesp/nestjs-better-auth`. SPAs reach t
 ### Ownership boundary
 
 - **Better Auth owns** the tables and endpoints above, password hashing, sessions and cookies. Invitations are off (D-094).
-- **Eduvault owns** the domain tables (`campus`, `school_account`, `fee_schedule`, `student`), the role permissions (`libs/policy`), the guards, and the active-school and active-campus scoping of every query.
+- **Eduvault owns** the domain tables (`campus`, `school_account`, `fee_line`, `student`), the role permissions (`libs/policy`), the guards, and the active-school and active-campus scoping of every query.
 - Eduvault never writes Better Auth's tables except through `AuthService.api` or, for member and campus-seat writes, Better Auth's organization adapter inside one transaction (D-093); creating a campus calls `createTeam` and the `campus` row is ours. It reads them in the session hook, which uses SQL for the first membership.
 
 ### Workflow

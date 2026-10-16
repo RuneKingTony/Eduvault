@@ -97,12 +97,40 @@ describe('the School years and terms area', () => {
   });
 });
 
+describe('the Subjects area', () => {
+  const subjects = area('subjects');
+
+  it('sits in School between Classes and Students and describes its changes', () => {
+    const ids = CAP_AREAS.map((candidate) => candidate.id);
+    expect(ids.indexOf('subjects')).toBe(ids.indexOf('students') - 1);
+    expect(subjects.group).toBe('School');
+    expect(subjects.label).toBe('Subjects');
+    expect(subjects.important).toBe(false);
+    expect(subjects.see).toEqual(['subject:read']);
+    expect(subjects.change).toEqual(['subject:create', 'subject:update']);
+    expect(subjects.changeDesc).toBe('Add and change subjects');
+    expect(subjects.extras).toEqual([]);
+  });
+
+  it('is see for subject:read alone and custom for a lone subject:update', () => {
+    expect(capLevel(toPermissionMap(['subject:read']), subjects)).toBe('see');
+    expect(capLevel(toPermissionMap(['subject:update']), subjects)).toBe(
+      'custom'
+    );
+  });
+
+  it('keeps choosing teachers in the Classes area', () => {
+    expect(subjects.change).not.toContain('class:assignTeacher');
+    expect(area('classes').change).toContain('class:assignTeacher');
+  });
+});
+
 describe('the Classes area', () => {
   const classes = area('classes');
 
-  it('sits in School before Students and splits seeing from changing', () => {
+  it('sits in School before Subjects and splits seeing from changing', () => {
     const ids = CAP_AREAS.map((candidate) => candidate.id);
-    expect(ids.indexOf('classes')).toBe(ids.indexOf('students') - 1);
+    expect(ids.indexOf('classes')).toBe(ids.indexOf('subjects') - 1);
     expect(classes.group).toBe('School');
     expect(classes.label).toBe('Classes');
     expect(classes.see).toEqual(['class:read']);
@@ -216,11 +244,13 @@ describe('capSummary', () => {
       'School years and terms: add school years, holidays and set the current term',
       'Classes: add, archive and restore classes, change levels and name class teachers',
       'Sees every class',
+      'Subjects: add and change subjects',
       'Students: admit students, update them and put them in classes',
       'Records leavers and graduates',
       'Marks students away',
       'Parents and guardians: add guardians and link them to students',
       'Announcements: write, publish, pin and withdraw announcements',
+      'Fees: set and change what each class pays',
       'Bank and POS accounts: add and change bank and POS accounts',
       'Money categories: change the accountant’s categories',
       'Own records: can see',
@@ -237,23 +267,27 @@ describe('capSummary', () => {
       'School years and terms: add school years, holidays and set the current term',
       'Classes: add, archive and restore classes, change levels and name class teachers',
       'Sees every class',
+      'Subjects: add and change subjects',
       'Students: admit students, update them and put them in classes',
       'Records leavers and graduates',
       'Marks students away',
       'Parents and guardians: add guardians and link them to students',
       'Announcements: write, publish, pin and withdraw announcements',
+      'Fees: can see',
     ]);
   });
 
   it('describes the teacher and bursar', () => {
     expect(summaryFor('teacher')).toEqual([
       'Classes: can see',
+      'Subjects: can see',
       'Students: can see',
       'Marks students away',
     ]);
     expect(summaryFor('bursar')).toEqual([
       'Students: can see',
       'Parents and guardians: can see',
+      'Fees: set and change what each class pays',
       'Bank and POS accounts: can see',
       'Money categories: can see',
     ]);
@@ -265,6 +299,7 @@ describe('capSummary', () => {
       'Sees every campus',
       'Classes: can see',
       'Sees every class',
+      'Subjects: can see',
       'Students: can see',
       'Announcements: write, publish, pin and withdraw announcements',
       'Bank and POS accounts: can see',
@@ -325,15 +360,52 @@ describe('the Announcements area', () => {
   });
 });
 
+describe('the Fees area', () => {
+  const fees = area('fees');
+
+  it('sits in Money after Announcements and splits seeing from changing', () => {
+    const ids = CAP_AREAS.map((candidate) => candidate.id);
+    expect(ids.indexOf('fees')).toBe(ids.indexOf('announcements') + 1);
+    expect(fees.group).toBe('Money');
+    expect(fees.label).toBe('Fees');
+    expect(fees.see).toEqual(['feeLine:read']);
+    expect(fees.change).toEqual([
+      'feeLine:create',
+      'feeLine:update',
+      'feeLine:retire',
+    ]);
+    expect(fees.changeDesc).toBe('Set and change what each class pays');
+    expect(fees.important).toBe(false);
+  });
+
+  it('is see for feeLine:read, change for all four and custom for a lone create', () => {
+    expect(capLevel(toPermissionMap(['feeLine:read']), fees)).toBe('see');
+    expect(
+      capLevel(
+        toPermissionMap([
+          'feeLine:read',
+          'feeLine:create',
+          'feeLine:update',
+          'feeLine:retire',
+        ]),
+        fees
+      )
+    ).toBe('change');
+    expect(capLevel(toPermissionMap(['feeLine:create']), fees)).toBe('custom');
+  });
+
+  it('keeps feeLine:readOwn out of the area until the portal grants it', () => {
+    expect(LEGACY_PERMISSIONS).toContain('feeLine:readOwn');
+  });
+});
+
 describe('the Money areas', () => {
   const accounts = area('money-accounts');
   const categories = area('money-categories');
 
-  it('sit in Money after Announcements and before Own records', () => {
+  it('sit in Money after Fees and before Own records', () => {
     const ids = CAP_AREAS.map((candidate) => candidate.id);
-    expect(ids.indexOf('money-accounts')).toBe(
-      ids.indexOf('announcements') + 1
-    );
+    expect(ids.indexOf('money-accounts')).toBe(ids.indexOf('fees') + 1);
     expect(ids.indexOf('money-categories')).toBe(
       ids.indexOf('money-accounts') + 1
     );

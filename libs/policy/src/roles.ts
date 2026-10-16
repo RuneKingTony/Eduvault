@@ -54,16 +54,25 @@ export const STARTER_ROLES: readonly StarterRole[] = [
       'class:readAll',
       'class:update',
       'class:assignTeacher',
+      'subject:create',
+      'subject:read',
+      'subject:update',
       'announcement:create',
       'announcement:read',
       'announcement:update',
+      'feeLine:read',
     ],
   },
   {
     slug: 'teacher',
     label: 'Teacher',
     description: 'Teaches their own classes. Sees only those classes.',
-    permissions: ['student:read', 'student:markAway', 'class:read'],
+    permissions: [
+      'student:read',
+      'student:markAway',
+      'class:read',
+      'subject:read',
+    ],
   },
   {
     slug: 'bursar',
@@ -74,6 +83,10 @@ export const STARTER_ROLES: readonly StarterRole[] = [
       'student:read',
       'guardian:read',
       'enrollment:read',
+      'feeLine:create',
+      'feeLine:read',
+      'feeLine:update',
+      'feeLine:retire',
       'moneyAccount:read',
       'ledger:read',
     ],
@@ -88,6 +101,7 @@ export const STARTER_ROLES: readonly StarterRole[] = [
       'student:read',
       'class:read',
       'class:readAll',
+      'subject:read',
       'announcement:create',
       'announcement:read',
       'announcement:update',
@@ -212,4 +226,8 @@ export function can<R extends Resource>(
 
 export function canAny(permissions: PermissionMap, gate: Gate): boolean {
   return gate.some((permission) => holds(permissions, permission));
+}
+
+export function canAll(permissions: PermissionMap, gate: Gate): boolean {
+  return gate.every((permission) => holds(permissions, permission));
 }

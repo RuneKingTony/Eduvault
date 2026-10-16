@@ -157,15 +157,20 @@ export interface EnrollmentPlacement {
   term_id: string;
 }
 
-export interface FeeSchedule {
+export interface FeeLine {
   amount_minor: Int8;
+  applies_to: Generated<string>;
   campus_id: string | null;
+  class_level_id: string;
   created_at: Generated<Timestamp>;
-  currency: string;
+  created_by: string | null;
   id: Generated<string>;
+  is_optional: Generated<boolean>;
+  ledger_account_id: string;
   name: string;
   organization_id: string;
-  updated_at: Generated<Timestamp>;
+  retired_at: Timestamp | null;
+  term_id: string;
 }
 
 export interface FileBlob {
@@ -260,6 +265,17 @@ export interface LedgerAccount {
   retired_at: Timestamp | null;
   system_key: string | null;
   type: string;
+}
+
+export interface LevelSubject {
+  class_level_id: string;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  kind: string;
+  organization_id: string;
+  sequence: number;
+  subject_id: string;
+  updated_at: Generated<Timestamp>;
 }
 
 export interface Member {
@@ -398,6 +414,47 @@ export interface StudentEnrollment {
   updated_at: Generated<Timestamp>;
 }
 
+export interface StudentFeeOption {
+  created_at: Generated<Timestamp>;
+  created_by: string | null;
+  enrollment_id: string;
+  id: Generated<string>;
+  ledger_account_id: string;
+  organization_id: string;
+}
+
+export interface StudentSubject {
+  created_at: Generated<Timestamp>;
+  enrollment_id: string;
+  id: Generated<string>;
+  organization_id: string;
+  subject_id: string;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface Subject {
+  code: string;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  name: string;
+  organization_id: string;
+  retired_at: Timestamp | null;
+  retired_by: string | null;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface SubjectTeacher {
+  assigned_by: string | null;
+  class_arm_id: string;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  organization_id: string;
+  subject_id: string;
+  term_id: string;
+  updated_at: Generated<Timestamp>;
+  user_id: string;
+}
+
 export interface Team {
   createdAt: Timestamp;
   id: Generated<string>;
@@ -466,7 +523,7 @@ export interface DB {
   class_level: ClassLevel;
   document_sequence: DocumentSequence;
   enrollment_placement: EnrollmentPlacement;
-  fee_schedule: FeeSchedule;
+  fee_line: FeeLine;
   file_blob: FileBlob;
   file_object: FileObject;
   guardian: Guardian;
@@ -475,6 +532,7 @@ export interface DB {
   journal_entry: JournalEntry;
   journal_line: JournalLine;
   ledger_account: LedgerAccount;
+  level_subject: LevelSubject;
   member: Member;
   money_account: MoneyAccount;
   organization: Organization;
@@ -485,6 +543,10 @@ export interface DB {
   session: Session;
   student: Student;
   student_enrollment: StudentEnrollment;
+  student_fee_option: StudentFeeOption;
+  student_subject: StudentSubject;
+  subject: Subject;
+  subject_teacher: SubjectTeacher;
   team: Team;
   teamMember: TeamMember;
   term: Term;

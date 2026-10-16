@@ -189,7 +189,7 @@ export class KyselyCampusRepository extends CampusRepository {
           .where('organization_id', '=', organizationId)
           .executeTakeFirst(),
         this.db
-          .selectFrom('fee_schedule')
+          .selectFrom('fee_line')
           .select('id')
           .where('campus_id', '=', id)
           .where('organization_id', '=', organizationId)

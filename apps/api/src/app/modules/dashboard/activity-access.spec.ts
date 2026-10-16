@@ -46,7 +46,7 @@ describe('activityAccess', () => {
       'student:read',
       'session:read',
       'member:read',
-      'feeSchedule:read',
+      'feeLine:read',
       'schoolAccount:read'
     );
     expect(everything.pillars).not.toContain('finance');

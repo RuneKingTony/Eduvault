@@ -30,10 +30,10 @@ const PORTAL_ITEMS: PortalNavItem[] = [
     current: true,
   },
   {
-    id: 'fees',
-    label: 'Fees',
-    href: '/fees',
-    icon: <NavIcon name="wallet" />,
+    id: 'announcements',
+    label: 'Announcements',
+    href: '/announcements',
+    icon: <NavIcon name="megaphone" />,
     current: false,
   },
 ];

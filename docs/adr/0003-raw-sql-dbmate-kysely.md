@@ -24,4 +24,4 @@ We want the schema to be plain, reviewable SQL, queries to be type-checked, and 
 ## Consequences
 
 - The drift gate needs Docker.
-- Foreign keys carry tenancy: `student` and `fee_schedule` reference `campus (team_id, organization_id)`, so a row can never point at another school's campus.
+- Foreign keys carry tenancy: `student` and `fee_line` reference `campus (team_id, organization_id)`, so a row can never point at another school's campus.

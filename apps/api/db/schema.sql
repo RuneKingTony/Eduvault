@@ -51,6 +51,30 @@ END;
 $$;
 
 --
+-- Name: fee_line_fee_income_child(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.fee_line_fee_income_child() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM ledger_account child
+    JOIN ledger_account parent
+      ON parent.id = child.parent_id AND parent.organization_id = child.organization_id
+    WHERE child.id = NEW.ledger_account_id
+      AND child.organization_id = NEW.organization_id
+      AND parent.system_key = 'fee_income'
+  ) THEN
+    RAISE EXCEPTION 'a fee line needs a fee type under Fee income'
+      USING ERRCODE = 'check_violation', CONSTRAINT = 'fee_line_fee_income_child';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+--
 -- Name: journal_append_only(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -387,19 +411,26 @@ CREATE TABLE public.enrollment_placement (
 );
 
 --
--- Name: fee_schedule; Type: TABLE; Schema: public; Owner: -
+-- Name: fee_line; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.fee_schedule (
+CREATE TABLE public.fee_line (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     organization_id text NOT NULL,
+    term_id uuid NOT NULL,
+    class_level_id uuid NOT NULL,
+    ledger_account_id uuid NOT NULL,
     campus_id text,
     name text NOT NULL,
     amount_minor bigint NOT NULL,
-    currency character(3) NOT NULL,
+    applies_to text DEFAULT 'all'::text NOT NULL,
+    is_optional boolean DEFAULT false NOT NULL,
+    retired_at timestamp with time zone,
+    created_by text,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT fee_schedule_amount_minor_check CHECK ((amount_minor >= 0))
+    CONSTRAINT fee_line_amount_positive CHECK ((amount_minor > 0)),
+    CONSTRAINT fee_line_applies_to_check CHECK ((applies_to = ANY (ARRAY['all'::text, 'new'::text, 'returning'::text]))),
+    CONSTRAINT fee_line_name_check CHECK (((char_length(btrim(name)) >= 1) AND (char_length(btrim(name)) <= 80)))
 );
 
 --
@@ -552,6 +583,23 @@ CREATE TABLE public.ledger_account (
     CONSTRAINT ledger_account_code_check CHECK ((code > 0)),
     CONSTRAINT ledger_account_name_check CHECK (((char_length(btrim(name)) >= 1) AND (char_length(btrim(name)) <= 80))),
     CONSTRAINT ledger_account_type_check CHECK ((type = ANY (ARRAY['asset'::text, 'liability'::text, 'equity'::text, 'income'::text, 'expense'::text])))
+);
+
+--
+-- Name: level_subject; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.level_subject (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id text NOT NULL,
+    class_level_id uuid NOT NULL,
+    subject_id uuid NOT NULL,
+    kind text NOT NULL,
+    sequence integer NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT level_subject_kind_check CHECK ((kind = ANY (ARRAY['core'::text, 'elective'::text]))),
+    CONSTRAINT level_subject_sequence_check CHECK ((sequence >= 1))
 );
 
 --
@@ -760,6 +808,65 @@ CREATE TABLE public.student_enrollment (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT student_enrollment_status_check CHECK ((status = ANY (ARRAY['active'::text, 'withdrawn'::text, 'completed'::text])))
+);
+
+--
+-- Name: student_fee_option; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.student_fee_option (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id text NOT NULL,
+    enrollment_id uuid NOT NULL,
+    ledger_account_id uuid NOT NULL,
+    created_by text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+--
+-- Name: student_subject; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.student_subject (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id text NOT NULL,
+    enrollment_id uuid NOT NULL,
+    subject_id uuid NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+--
+-- Name: subject; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.subject (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id text NOT NULL,
+    code text NOT NULL,
+    name text NOT NULL,
+    retired_at timestamp with time zone,
+    retired_by text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT subject_code_check CHECK ((code ~ '^[A-Z]{1,5}$'::text)),
+    CONSTRAINT subject_name_check CHECK (((char_length(btrim(name)) >= 1) AND (char_length(btrim(name)) <= 80)))
+);
+
+--
+-- Name: subject_teacher; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.subject_teacher (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id text NOT NULL,
+    class_arm_id uuid NOT NULL,
+    subject_id uuid NOT NULL,
+    term_id uuid NOT NULL,
+    user_id text NOT NULL,
+    assigned_by text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 --
@@ -1002,11 +1109,18 @@ ALTER TABLE ONLY public.enrollment_placement
     ADD CONSTRAINT enrollment_placement_pkey PRIMARY KEY (id);
 
 --
--- Name: fee_schedule fee_schedule_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: fee_line fee_line_id_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.fee_schedule
-    ADD CONSTRAINT fee_schedule_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.fee_line
+    ADD CONSTRAINT fee_line_id_organization_id_key UNIQUE (id, organization_id);
+
+--
+-- Name: fee_line fee_line_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.fee_line
+    ADD CONSTRAINT fee_line_pkey PRIMARY KEY (id);
 
 --
 -- Name: file_blob file_blob_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -1133,6 +1247,27 @@ ALTER TABLE ONLY public.ledger_account
 
 ALTER TABLE ONLY public.ledger_account
     ADD CONSTRAINT ledger_account_pkey PRIMARY KEY (id);
+
+--
+-- Name: level_subject level_subject_id_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.level_subject
+    ADD CONSTRAINT level_subject_id_organization_id_key UNIQUE (id, organization_id);
+
+--
+-- Name: level_subject level_subject_level_subject_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.level_subject
+    ADD CONSTRAINT level_subject_level_subject_key UNIQUE (class_level_id, subject_id);
+
+--
+-- Name: level_subject level_subject_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.level_subject
+    ADD CONSTRAINT level_subject_pkey PRIMARY KEY (id);
 
 --
 -- Name: member member_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -1268,6 +1403,20 @@ ALTER TABLE ONLY public.student_enrollment
     ADD CONSTRAINT student_enrollment_student_session_key UNIQUE (student_id, session_id);
 
 --
+-- Name: student_fee_option student_fee_option_enrollment_account_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.student_fee_option
+    ADD CONSTRAINT student_fee_option_enrollment_account_key UNIQUE (enrollment_id, ledger_account_id);
+
+--
+-- Name: student_fee_option student_fee_option_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.student_fee_option
+    ADD CONSTRAINT student_fee_option_pkey PRIMARY KEY (id);
+
+--
 -- Name: student student_id_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1294,6 +1443,69 @@ ALTER TABLE ONLY public.student
 
 ALTER TABLE ONLY public.student
     ADD CONSTRAINT student_pkey PRIMARY KEY (id);
+
+--
+-- Name: student_subject student_subject_enrollment_subject_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.student_subject
+    ADD CONSTRAINT student_subject_enrollment_subject_key UNIQUE (enrollment_id, subject_id);
+
+--
+-- Name: student_subject student_subject_id_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.student_subject
+    ADD CONSTRAINT student_subject_id_organization_id_key UNIQUE (id, organization_id);
+
+--
+-- Name: student_subject student_subject_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.student_subject
+    ADD CONSTRAINT student_subject_pkey PRIMARY KEY (id);
+
+--
+-- Name: subject subject_code_unique; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.subject
+    ADD CONSTRAINT subject_code_unique UNIQUE (organization_id, code);
+
+--
+-- Name: subject subject_id_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.subject
+    ADD CONSTRAINT subject_id_organization_id_key UNIQUE (id, organization_id);
+
+--
+-- Name: subject subject_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.subject
+    ADD CONSTRAINT subject_pkey PRIMARY KEY (id);
+
+--
+-- Name: subject_teacher subject_teacher_arm_subject_term_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.subject_teacher
+    ADD CONSTRAINT subject_teacher_arm_subject_term_key UNIQUE (class_arm_id, subject_id, term_id);
+
+--
+-- Name: subject_teacher subject_teacher_id_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.subject_teacher
+    ADD CONSTRAINT subject_teacher_id_organization_id_key UNIQUE (id, organization_id);
+
+--
+-- Name: subject_teacher subject_teacher_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.subject_teacher
+    ADD CONSTRAINT subject_teacher_pkey PRIMARY KEY (id);
 
 --
 -- Name: teamMember teamMember_membershipKey_key; Type: CONSTRAINT; Schema: public; Owner: -
@@ -1431,10 +1643,28 @@ CREATE INDEX enrollment_placement_arm_idx ON public.enrollment_placement USING b
 CREATE INDEX enrollment_placement_campus_idx ON public.enrollment_placement USING btree (organization_id, term_id, campus_id);
 
 --
--- Name: fee_schedule_organization_campus_idx; Type: INDEX; Schema: public; Owner: -
+-- Name: fee_line_campus_idx; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX fee_schedule_organization_campus_idx ON public.fee_schedule USING btree (organization_id, campus_id);
+CREATE INDEX fee_line_campus_idx ON public.fee_line USING btree (organization_id, campus_id);
+
+--
+-- Name: fee_line_ledger_account_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX fee_line_ledger_account_idx ON public.fee_line USING btree (organization_id, ledger_account_id);
+
+--
+-- Name: fee_line_live_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX fee_line_live_key ON public.fee_line USING btree (organization_id, term_id, class_level_id, ledger_account_id, COALESCE(campus_id, ''::text)) WHERE (retired_at IS NULL);
+
+--
+-- Name: fee_line_term_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX fee_line_term_idx ON public.fee_line USING btree (organization_id, term_id, class_level_id);
 
 --
 -- Name: file_object_organization_uploaded_idx; Type: INDEX; Schema: public; Owner: -
@@ -1503,6 +1733,12 @@ CREATE INDEX journal_line_entry_idx ON public.journal_line USING btree (entry_id
 CREATE UNIQUE INDEX ledger_account_sibling_name_key ON public.ledger_account USING btree (organization_id, parent_id, lower(name)) NULLS NOT DISTINCT;
 
 --
+-- Name: level_subject_subject_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX level_subject_subject_idx ON public.level_subject USING btree (organization_id, subject_id);
+
+--
 -- Name: member_organizationId_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1557,6 +1793,12 @@ CREATE INDEX student_duplicate_idx ON public.student USING btree (organization_i
 CREATE INDEX student_enrollment_session_idx ON public.student_enrollment USING btree (organization_id, session_id);
 
 --
+-- Name: student_fee_option_org_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX student_fee_option_org_idx ON public.student_fee_option USING btree (organization_id, ledger_account_id);
+
+--
 -- Name: student_organization_campus_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1567,6 +1809,24 @@ CREATE INDEX student_organization_campus_idx ON public.student USING btree (orga
 --
 
 CREATE INDEX student_organization_name_idx ON public.student USING btree (organization_id, last_name, first_name);
+
+--
+-- Name: student_subject_subject_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX student_subject_subject_idx ON public.student_subject USING btree (organization_id, subject_id);
+
+--
+-- Name: subject_teacher_arm_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX subject_teacher_arm_idx ON public.subject_teacher USING btree (organization_id, class_arm_id, term_id);
+
+--
+-- Name: subject_teacher_scope_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX subject_teacher_scope_idx ON public.subject_teacher USING btree (organization_id, term_id, user_id);
 
 --
 -- Name: teamMember_teamId_idx; Type: INDEX; Schema: public; Owner: -
@@ -1615,6 +1875,12 @@ CREATE TRIGGER activity_event_append_only BEFORE DELETE OR UPDATE ON public.acti
 --
 
 CREATE TRIGGER audit_log_append_only BEFORE DELETE OR UPDATE ON public.audit_log FOR EACH ROW EXECUTE FUNCTION public.audit_log_refuse_change();
+
+--
+-- Name: fee_line fee_line_fee_income_child; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER fee_line_fee_income_child BEFORE INSERT ON public.fee_line FOR EACH ROW EXECUTE FUNCTION public.fee_line_fee_income_child();
 
 --
 -- Name: journal_entry journal_entry_append_only; Type: TRIGGER; Schema: public; Owner: -
@@ -1856,18 +2122,46 @@ ALTER TABLE ONLY public.enrollment_placement
     ADD CONSTRAINT enrollment_placement_term_id_organization_id_fkey FOREIGN KEY (term_id, organization_id) REFERENCES public.term(id, organization_id);
 
 --
--- Name: fee_schedule fee_schedule_campus_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: fee_line fee_line_campus_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.fee_schedule
-    ADD CONSTRAINT fee_schedule_campus_id_organization_id_fkey FOREIGN KEY (campus_id, organization_id) REFERENCES public.campus(team_id, organization_id);
+ALTER TABLE ONLY public.fee_line
+    ADD CONSTRAINT fee_line_campus_id_organization_id_fkey FOREIGN KEY (campus_id, organization_id) REFERENCES public.campus(team_id, organization_id) ON DELETE RESTRICT;
 
 --
--- Name: fee_schedule fee_schedule_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: fee_line fee_line_class_level_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.fee_schedule
-    ADD CONSTRAINT fee_schedule_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.fee_line
+    ADD CONSTRAINT fee_line_class_level_id_organization_id_fkey FOREIGN KEY (class_level_id, organization_id) REFERENCES public.class_level(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: fee_line fee_line_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.fee_line
+    ADD CONSTRAINT fee_line_created_by_fkey FOREIGN KEY (created_by) REFERENCES public."user"(id) ON DELETE SET NULL;
+
+--
+-- Name: fee_line fee_line_ledger_account_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.fee_line
+    ADD CONSTRAINT fee_line_ledger_account_id_organization_id_fkey FOREIGN KEY (ledger_account_id, organization_id) REFERENCES public.ledger_account(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: fee_line fee_line_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.fee_line
+    ADD CONSTRAINT fee_line_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE RESTRICT;
+
+--
+-- Name: fee_line fee_line_term_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.fee_line
+    ADD CONSTRAINT fee_line_term_id_organization_id_fkey FOREIGN KEY (term_id, organization_id) REFERENCES public.term(id, organization_id) ON DELETE RESTRICT;
 
 --
 -- Name: file_blob file_blob_file_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -2022,6 +2316,27 @@ ALTER TABLE ONLY public.ledger_account
 
 ALTER TABLE ONLY public.ledger_account
     ADD CONSTRAINT ledger_account_parent_id_organization_id_fkey FOREIGN KEY (parent_id, organization_id) REFERENCES public.ledger_account(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: level_subject level_subject_class_level_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.level_subject
+    ADD CONSTRAINT level_subject_class_level_id_organization_id_fkey FOREIGN KEY (class_level_id, organization_id) REFERENCES public.class_level(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: level_subject level_subject_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.level_subject
+    ADD CONSTRAINT level_subject_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE RESTRICT;
+
+--
+-- Name: level_subject level_subject_subject_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.level_subject
+    ADD CONSTRAINT level_subject_subject_id_organization_id_fkey FOREIGN KEY (subject_id, organization_id) REFERENCES public.subject(id, organization_id) ON DELETE RESTRICT;
 
 --
 -- Name: member member_organizationId_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -2199,6 +2514,34 @@ ALTER TABLE ONLY public.student_enrollment
     ADD CONSTRAINT student_enrollment_student_id_organization_id_fkey FOREIGN KEY (student_id, organization_id) REFERENCES public.student(id, organization_id) ON DELETE RESTRICT;
 
 --
+-- Name: student_fee_option student_fee_option_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.student_fee_option
+    ADD CONSTRAINT student_fee_option_created_by_fkey FOREIGN KEY (created_by) REFERENCES public."user"(id) ON DELETE SET NULL;
+
+--
+-- Name: student_fee_option student_fee_option_enrollment_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.student_fee_option
+    ADD CONSTRAINT student_fee_option_enrollment_id_organization_id_fkey FOREIGN KEY (enrollment_id, organization_id) REFERENCES public.student_enrollment(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: student_fee_option student_fee_option_ledger_account_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.student_fee_option
+    ADD CONSTRAINT student_fee_option_ledger_account_id_organization_id_fkey FOREIGN KEY (ledger_account_id, organization_id) REFERENCES public.ledger_account(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: student_fee_option student_fee_option_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.student_fee_option
+    ADD CONSTRAINT student_fee_option_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE RESTRICT;
+
+--
 -- Name: student student_graduated_session_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2220,11 +2563,88 @@ ALTER TABLE ONLY public.student
     ADD CONSTRAINT student_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE RESTRICT;
 
 --
+-- Name: student_subject student_subject_enrollment_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.student_subject
+    ADD CONSTRAINT student_subject_enrollment_id_organization_id_fkey FOREIGN KEY (enrollment_id, organization_id) REFERENCES public.student_enrollment(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: student_subject student_subject_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.student_subject
+    ADD CONSTRAINT student_subject_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE RESTRICT;
+
+--
+-- Name: student_subject student_subject_subject_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.student_subject
+    ADD CONSTRAINT student_subject_subject_id_organization_id_fkey FOREIGN KEY (subject_id, organization_id) REFERENCES public.subject(id, organization_id) ON DELETE RESTRICT;
+
+--
 -- Name: student student_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.student
     ADD CONSTRAINT student_user_id_fkey FOREIGN KEY (user_id) REFERENCES public."user"(id) ON DELETE SET NULL;
+
+--
+-- Name: subject subject_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.subject
+    ADD CONSTRAINT subject_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE RESTRICT;
+
+--
+-- Name: subject subject_retired_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.subject
+    ADD CONSTRAINT subject_retired_by_fkey FOREIGN KEY (retired_by) REFERENCES public."user"(id) ON DELETE SET NULL;
+
+--
+-- Name: subject_teacher subject_teacher_assigned_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.subject_teacher
+    ADD CONSTRAINT subject_teacher_assigned_by_fkey FOREIGN KEY (assigned_by) REFERENCES public."user"(id) ON DELETE SET NULL;
+
+--
+-- Name: subject_teacher subject_teacher_class_arm_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.subject_teacher
+    ADD CONSTRAINT subject_teacher_class_arm_id_organization_id_fkey FOREIGN KEY (class_arm_id, organization_id) REFERENCES public.class_arm(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: subject_teacher subject_teacher_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.subject_teacher
+    ADD CONSTRAINT subject_teacher_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE RESTRICT;
+
+--
+-- Name: subject_teacher subject_teacher_subject_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.subject_teacher
+    ADD CONSTRAINT subject_teacher_subject_id_organization_id_fkey FOREIGN KEY (subject_id, organization_id) REFERENCES public.subject(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: subject_teacher subject_teacher_term_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.subject_teacher
+    ADD CONSTRAINT subject_teacher_term_id_organization_id_fkey FOREIGN KEY (term_id, organization_id) REFERENCES public.term(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: subject_teacher subject_teacher_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.subject_teacher
+    ADD CONSTRAINT subject_teacher_user_id_fkey FOREIGN KEY (user_id) REFERENCES public."user"(id) ON DELETE CASCADE;
 
 --
 -- Name: teamMember teamMember_teamId_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -2284,4 +2704,8 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20261011060008'),
     ('20261011090000'),
     ('20261011100000'),
-    ('20261012090000');
+    ('20261012090000'),
+    ('20261013090000'),
+    ('20261013090100'),
+    ('20261013090200'),
+    ('20261015090000');

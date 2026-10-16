@@ -17,7 +17,7 @@ import { CampusModule } from './modules/campus/campus.module';
 import { ClassModule } from './modules/class/class.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { GuardianModule } from './modules/guardian/guardian.module';
-import { FeeScheduleModule } from './modules/fee-schedule/fee-schedule.module';
+import { FeeLineModule } from './modules/fee-line/fee-line.module';
 import { HealthModule } from './modules/health/health.module';
 import { MoneyAccountModule } from './modules/money-account/money-account.module';
 import { LedgerModule } from './modules/ledger/ledger.module';
@@ -28,6 +28,7 @@ import { PlatformModule } from './modules/platform/platform.module';
 import { SchoolAccountModule } from './modules/school-account/school-account.module';
 import { SchoolModule } from './modules/school/school.module';
 import { StudentModule } from './modules/student/student.module';
+import { SubjectModule } from './modules/subject/subject.module';
 
 @Module({
   imports: [
@@ -45,11 +46,12 @@ import { StudentModule } from './modules/student/student.module';
     CampusModule,
     SchoolAccountModule,
     SchoolModule,
-    FeeScheduleModule,
+    FeeLineModule,
     StudentModule,
     GuardianModule,
     CalendarModule,
     ClassModule,
+    SubjectModule,
     DashboardModule,
     AnnouncementModule,
     PortalModule,

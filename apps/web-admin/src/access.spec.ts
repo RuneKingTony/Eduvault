@@ -18,7 +18,7 @@ describe('requireGate', () => {
 
   it('sends a member without it to the Dashboard', () => {
     const thrown = redirected(() =>
-      requireGate(starterAccess('teacher'), '/fees')
+      requireGate(starterAccess('teacher'), '/finance/school-fees')
     ) as { options: { to: string } };
     expect(thrown.options.to).toBe('/');
   });
@@ -34,7 +34,13 @@ describe('requireGate', () => {
   });
 
   it('sends a member with no permissions away from every gated route', () => {
-    for (const route of ['/students', '/campuses', '/fees', '/calendar']) {
+    for (const route of [
+      '/students',
+      '/campuses',
+      '/finance/school-fees',
+      '/finance/other-fees',
+      '/calendar',
+    ]) {
       expect(redirected(() => requireGate(fakeAccess(), route))).toBeDefined();
     }
   });
