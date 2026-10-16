@@ -289,7 +289,7 @@ describe('RolePage Advanced grid', () => {
     const filter = screen.getByLabelText('Filter permissions');
     fireEvent.change(filter, { target: { value: 'fee' } });
     expect(
-      screen.getByRole('button', { name: 'Fee schedules: see' })
+      screen.getByRole('button', { name: 'School and other fees: see' })
     ).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'Staff: see' })

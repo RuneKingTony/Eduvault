@@ -21,7 +21,8 @@ const built = new Set([
   '/announcements',
   '/students',
   '/members',
-  '/fees',
+  '/finance/school-fees',
+  '/finance/other-fees',
   '/finance/money-accounts',
   '/finance/ledger',
   '/classes',
@@ -79,7 +80,7 @@ describe('nav model', () => {
       '/students',
       '/members',
       '/classes',
-      '/fees',
+      '/finance/school-fees',
       '/finance/money-accounts',
       '/settings/profile',
     ]);
@@ -252,12 +253,24 @@ describe('nav gates', () => {
     );
   });
 
-  it('shows a bursar Students but no Fees or Settings', () => {
+  it('shows a member with only student:read Students but no Fees or Settings', () => {
     expect(routesFor({ student: ['read'] })).toEqual([
       '/',
       '/approvals',
       '/students',
     ]);
+  });
+
+  it('shows Fees to a bursar and an administrator, not to a teacher or principal', () => {
+    for (const slug of ['bursar', 'administrator']) {
+      expect(routesFor(starter(slug))).toContain('/finance/school-fees');
+    }
+    for (const slug of ['teacher', 'principal']) {
+      expect(routesFor(starter(slug))).not.toContain('/finance/school-fees');
+    }
+    expect(routesFor(toPermissionMap(['feeLine:create']))).not.toContain(
+      '/finance/school-fees'
+    );
   });
 
   it('hides Staff and members from a bursar and shows it with member:read', () => {
@@ -302,7 +315,8 @@ describe('nav gates', () => {
   it('reads the route gate from the same declaration as the nav', () => {
     expect(routeGate('/students')).toEqual(['student:read']);
     expect(routeGate('/members')).toEqual(['member:read']);
-    expect(routeGate('/fees')).toEqual(['feeSchedule:read']);
+    expect(routeGate('/finance/school-fees')).toEqual(['feeLine:read']);
+    expect(routeGate('/finance/other-fees')).toEqual(['feeLine:read']);
     expect(routeGate('/campuses')).toEqual(['team:read']);
     expect(routeGate('/')).toBeUndefined();
     expect(routeGate('/approvals')).toBeUndefined();
@@ -337,7 +351,14 @@ describe('findCurrent', () => {
   });
 
   it('reports the group so the breadcrumb can name it', () => {
-    expect(findCurrent(groups, '/fees')?.group.label).toBe('Finance');
+    expect(findCurrent(groups, '/finance/school-fees')?.group.label).toBe(
+      'Finance'
+    );
+  });
+
+  it('keeps Fees active on Other fees', () => {
+    expect(current('/finance/school-fees')).toBe('fees');
+    expect(current('/finance/other-fees')).toBe('fees');
   });
 });
 

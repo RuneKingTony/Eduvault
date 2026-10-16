@@ -1,6 +1,6 @@
 # Money correctness (sonnet)
 
-Also pass `CONTEXT.md`. Relevant paths: anything touching `school_account`, `fee_schedule`, wallet, ledger, payment, fee code, and their migrations and tests.
+Also pass `CONTEXT.md`. Relevant paths: anything touching `school_account`, `fee_line`, wallet, ledger, payment, fee code, and their migrations and tests.
 
 ```
 Dimension: money correctness. Money is moved by a payment carrying a unique reference, applied at most once. Undoing a payment is a void: the row is kept and marked, and the reversal is a new movement. Payment, result and student records are never deleted.

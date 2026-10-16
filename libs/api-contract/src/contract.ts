@@ -52,8 +52,25 @@ import {
 import {
   cashBookQuerySchema,
   cashBookSchema,
+  createFeeLineSchema,
+  createFeeTypeSchema,
   createLedgerAccountSchema,
   createMoneyAccountSchema,
+  feeGridQuerySchema,
+  feeGridSchema,
+  feeSetupSchema,
+  feeLineListQuerySchema,
+  feeLineSchema,
+  feeOptionParamsSchema,
+  feeOptionResultSchema,
+  feeOptionSchema,
+  feeOptionsParamsSchema,
+  feeOptionsQuerySchema,
+  feeCandidatesQuerySchema,
+  feeCandidatesSchema,
+  feePreviewQuerySchema,
+  feePreviewSchema,
+  feeTypeSchema,
   journalListSchema,
   journalQuerySchema,
   ledgerAccountListSchema,
@@ -62,6 +79,8 @@ import {
   moneyAccountSchema,
   openingBalancesResultSchema,
   openingBalancesSchema,
+  setFeeOptionSchema,
+  updateFeeLineSchema,
   updateMoneyAccountSchema,
 } from './finance';
 import {
@@ -107,11 +126,9 @@ import {
   updateStudentSchema,
 } from './students';
 import {
-  campusFilterSchema,
   campusSchema,
   campusSummarySchema,
   createCampusSchema,
-  createFeeScheduleSchema,
   createMemberResultSchema,
   createMemberSchema,
   createRoleSchema,
@@ -131,7 +148,6 @@ import {
   uploadFileBodySchema,
   auditListQuerySchema,
   auditListSchema,
-  feeScheduleSchema,
   healthSchema,
   idParamsSchema,
   mePermissionsSchema,
@@ -155,7 +171,6 @@ import {
   schoolRoleSchema,
   setPasswordSchema,
   updateCampusSchema,
-  updateFeeScheduleSchema,
   updateMemberCampusesSchema,
   updateMemberRolesSchema,
   updateMemberTitleSchema,
@@ -179,12 +194,6 @@ const crudWithoutRemove = <
   create: Create;
   update: Update;
 }) => ({
-  list: defineRoute({
-    method: 'GET',
-    path: base,
-    query: campusFilterSchema,
-    response: z.array(item),
-  }),
   get: defineRoute({
     method: 'GET',
     path: `${base}/:id`,
@@ -323,12 +332,6 @@ export const contract = defineContract({
       response: z.array(campusSummarySchema),
     }),
   },
-  feeSchedules: crud({
-    base: '/fee-schedules',
-    item: feeScheduleSchema,
-    create: createFeeScheduleSchema,
-    update: updateFeeScheduleSchema,
-  }),
   students: {
     list: defineRoute({
       method: 'GET',
@@ -713,6 +716,85 @@ export const contract = defineContract({
       path: '/finance/opening-balances',
       body: openingBalancesSchema,
       response: openingBalancesResultSchema,
+    }),
+  },
+  feeLines: {
+    list: defineRoute({
+      method: 'GET',
+      path: '/fee-lines',
+      query: feeLineListQuerySchema,
+      response: z.array(feeLineSchema),
+    }),
+    setup: defineRoute({
+      method: 'GET',
+      path: '/fee-lines/setup',
+      response: feeSetupSchema,
+    }),
+    grid: defineRoute({
+      method: 'GET',
+      path: '/fee-lines/grid',
+      query: feeGridQuerySchema,
+      response: feeGridSchema,
+    }),
+    preview: defineRoute({
+      method: 'GET',
+      path: '/fee-lines/preview',
+      query: feePreviewQuerySchema,
+      response: feePreviewSchema,
+    }),
+    candidates: defineRoute({
+      method: 'GET',
+      path: '/fee-lines/candidates',
+      query: feeCandidatesQuerySchema,
+      response: feeCandidatesSchema,
+    }),
+    create: defineRoute({
+      method: 'POST',
+      path: '/fee-lines',
+      body: createFeeLineSchema,
+      response: feeLineSchema,
+    }),
+    update: defineRoute({
+      method: 'PATCH',
+      path: '/fee-lines/:id',
+      params: idParamsSchema,
+      body: updateFeeLineSchema,
+      response: feeLineSchema,
+    }),
+    retire: defineRoute({
+      method: 'POST',
+      path: '/fee-lines/:id/retire',
+      params: idParamsSchema,
+      response: feeLineSchema,
+    }),
+  },
+  feeTypes: {
+    list: defineRoute({
+      method: 'GET',
+      path: '/fee-types',
+      response: z.array(feeTypeSchema),
+    }),
+    create: defineRoute({
+      method: 'POST',
+      path: '/fee-types',
+      body: createFeeTypeSchema,
+      response: feeTypeSchema,
+    }),
+  },
+  feeOptions: {
+    list: defineRoute({
+      method: 'GET',
+      path: '/students/:studentId/fee-options',
+      params: feeOptionsParamsSchema,
+      query: feeOptionsQuerySchema,
+      response: z.array(feeOptionSchema),
+    }),
+    set: defineRoute({
+      method: 'PUT',
+      path: '/students/:studentId/fee-options/:feeTypeId',
+      params: feeOptionParamsSchema,
+      body: setFeeOptionSchema,
+      response: feeOptionResultSchema,
     }),
   },
   portal: {

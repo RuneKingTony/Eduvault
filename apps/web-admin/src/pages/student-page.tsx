@@ -49,6 +49,7 @@ import {
   TableRow,
 } from '@eduvault/ui';
 import { useApi } from '../api';
+import { OptionalFeesCard } from '../components/fees/optional-fees-card';
 import { AddGuardianButton, GuardianLines } from '../components/guardian-lines';
 import type { GuardianAction } from '../components/guardian-actions';
 import { GuardianDialogs } from '../components/guardian-dialogs';
@@ -469,6 +470,12 @@ function StudentBody(props: BodyProps) {
             <GuardiansCard student={student} onAction={setAction} />
           </Can>
         ) : null}
+        <Can permission="feeLine:read">
+          <OptionalFeesCard
+            studentId={student.id}
+            firstName={student.firstName}
+          />
+        </Can>
         <HistoryCard student={student} />
       </div>
       <GuardianDialogs

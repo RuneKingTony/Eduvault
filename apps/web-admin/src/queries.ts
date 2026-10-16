@@ -6,6 +6,7 @@ import {
 import type {
   AnnouncementStatus,
   ClassStatus,
+  FeeGroup,
   RouteQuery,
   contract,
 } from '@eduvault/api-contract';
@@ -205,12 +206,6 @@ export const invalidateCampuses = (queryClient: QueryClient) =>
     queryClient.invalidateQueries({ queryKey: CAMPUSES_KEY }),
     queryClient.invalidateQueries({ queryKey: ME_PERMISSIONS_KEY }),
   ]);
-
-export const feeSchedulesQueryOptions = (api: Api) =>
-  queryOptions({
-    queryKey: ['fee-schedules'],
-    queryFn: () => api.feeSchedules.list({ query: {} }),
-  });
 
 const MEMBERS_KEY = ['members'] as const;
 
@@ -514,4 +509,77 @@ export async function invalidateLedger(
   queryClient: QueryClient
 ): Promise<void> {
   await queryClient.invalidateQueries({ queryKey: LEDGER_KEY });
+}
+
+const FEES_KEY = ['fees'] as const;
+
+export const feeCandidatesQueryOptions = (
+  api: Api,
+  termId: string,
+  q: string
+) =>
+  queryOptions({
+    queryKey: [...STUDENTS_KEY, 'fee-candidates', termId, q],
+    queryFn: () =>
+      api.feeLines.candidates({
+        query: { termId, q: q === '' ? undefined : q },
+      }),
+    placeholderData: keepPreviousData,
+  });
+
+export const feeSetupQueryOptions = (api: Api) =>
+  queryOptions({
+    queryKey: [...FEES_KEY, 'setup'],
+    queryFn: () => api.feeLines.setup({}),
+  });
+
+export const feeLinesQueryOptions = (
+  api: Api,
+  termId: string,
+  group: FeeGroup
+) =>
+  queryOptions({
+    queryKey: [...FEES_KEY, 'lines', termId, group],
+    queryFn: () => api.feeLines.list({ query: { termId, group } }),
+  });
+
+export const feeGridQueryOptions = (
+  api: Api,
+  query: { termId: string; group: FeeGroup; feeTypeId?: string }
+) =>
+  queryOptions({
+    queryKey: [
+      ...FEES_KEY,
+      'grid',
+      query.termId,
+      query.group,
+      query.feeTypeId ?? '',
+    ],
+    queryFn: () => api.feeLines.grid({ query }),
+  });
+
+export const feeTypesQueryOptions = (api: Api) =>
+  queryOptions({
+    queryKey: [...FEES_KEY, 'types'],
+    queryFn: () => api.feeTypes.list({}),
+  });
+
+export const feePreviewQueryOptions = (
+  api: Api,
+  termId: string,
+  studentId: string
+) =>
+  queryOptions({
+    queryKey: [...FEES_KEY, 'preview', termId, studentId],
+    queryFn: () => api.feeLines.preview({ query: { termId, studentId } }),
+  });
+
+export const feeOptionsQueryOptions = (api: Api, studentId: string) =>
+  queryOptions({
+    queryKey: [...FEES_KEY, 'options', studentId],
+    queryFn: () => api.feeOptions.list({ params: { studentId }, query: {} }),
+  });
+
+export async function invalidateFees(queryClient: QueryClient): Promise<void> {
+  await queryClient.invalidateQueries({ queryKey: FEES_KEY });
 }

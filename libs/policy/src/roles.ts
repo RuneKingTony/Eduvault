@@ -57,6 +57,7 @@ export const STARTER_ROLES: readonly StarterRole[] = [
       'announcement:create',
       'announcement:read',
       'announcement:update',
+      'feeLine:read',
     ],
   },
   {
@@ -74,6 +75,10 @@ export const STARTER_ROLES: readonly StarterRole[] = [
       'student:read',
       'guardian:read',
       'enrollment:read',
+      'feeLine:create',
+      'feeLine:read',
+      'feeLine:update',
+      'feeLine:retire',
       'moneyAccount:read',
       'ledger:read',
     ],
@@ -212,4 +217,8 @@ export function can<R extends Resource>(
 
 export function canAny(permissions: PermissionMap, gate: Gate): boolean {
   return gate.some((permission) => holds(permissions, permission));
+}
+
+export function canAll(permissions: PermissionMap, gate: Gate): boolean {
+  return gate.every((permission) => holds(permissions, permission));
 }

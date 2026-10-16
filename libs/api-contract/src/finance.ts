@@ -5,6 +5,7 @@ export const MONEY_ACCOUNT_NAME_MAX = 80;
 export const MONEY_ACCOUNT_KINDS = ['cash', 'bank', 'pos', 'gateway'] as const;
 export const CREATABLE_MONEY_ACCOUNT_KINDS = ['bank', 'pos', 'cash'] as const;
 export const FEE_INCOME_SYSTEM_KEY = 'fee_income';
+export const OTHER_CHARGES_SYSTEM_KEY = 'other_charges';
 export const MONEY_ACCOUNTS_SYSTEM_KEY = 'money_accounts';
 export const OPENING_BALANCE_SYSTEM_KEY = 'opening_balance_equity';
 export const FEES_RECEIVABLE_SYSTEM_KEY = 'fees_receivable';
@@ -268,3 +269,272 @@ export const openingBalancesResultSchema = z.object({
   ),
 });
 export type OpeningBalancesResult = z.infer<typeof openingBalancesResultSchema>;
+
+export const TUITION_FEE_CODE = 4010;
+export const FEE_LINE_NAME_MAX = 80;
+export const FEE_APPLIES_TO = ['all', 'new', 'returning'] as const;
+export const FEE_GROUPS = ['school', 'other'] as const;
+
+export const FEE_LINE_AMOUNT_MESSAGE = 'Enter an amount.';
+export const FEE_LINE_NAME_REQUIRED = 'Give the fee a name.';
+export const FEE_LINE_NOT_FOUND_MESSAGE = 'Fee not found';
+export const FEE_LINE_RETIRED_MESSAGE = 'This fee is retired. It can’t change.';
+export const FEE_LINE_ALREADY_RETIRED_MESSAGE = 'This fee is already retired.';
+export const FEE_TERM_ENDED_MESSAGE =
+  "This term has ended. Fees for it can't change.";
+export const FEE_EVERY_CAMPUS_MESSAGE =
+  'Only someone who sees every campus can change a fee for every campus.';
+export const FEE_TYPE_INVALID_MESSAGE =
+  'Pick a fee type that sits under Fee income.';
+export const FEE_TYPE_NOT_FOUND_MESSAGE = 'Fee type not found';
+export const FEE_SESSION_NOT_FOUND_MESSAGE = 'School year not found';
+export const FEE_TYPE_NAME_REQUIRED = 'Give the fee type a name.';
+export const FEE_OPTION_NOT_OPTIONAL_MESSAGE =
+  'This class level has no optional fee of that type.';
+export const FEE_TERM_NOT_FOUND_MESSAGE = 'Term not found';
+export const FEE_LEVEL_NOT_FOUND_MESSAGE = 'Class level not found';
+export const FEE_PREVIEW_STUDENT_MESSAGE = 'Student not found for that term';
+export const feeLineDuplicateMessage = (parts: {
+  feeType: string;
+  level: string;
+  campus: string | null;
+}): string => {
+  const fee = /\bfee$/i.test(parts.feeType)
+    ? parts.feeType
+    : `${parts.feeType} fee`;
+  return `There is already a ${fee} for ${parts.level} on ${parts.campus ?? 'every campus'} this term. Change its amount instead.`;
+};
+export const feeTypeDuplicateMessage = (name: string): string =>
+  `A fee type called ${name} already exists.`;
+
+export const feeAppliesToSchema = z.enum(FEE_APPLIES_TO);
+export type FeeAppliesTo = z.infer<typeof feeAppliesToSchema>;
+
+export const feeGroupSchema = z.enum(FEE_GROUPS);
+export type FeeGroup = z.infer<typeof feeGroupSchema>;
+
+export const feeTypeSchema = z.object({
+  id: idSchema,
+  code: z.number().int().positive(),
+  name: z.string(),
+});
+export type FeeType = z.infer<typeof feeTypeSchema>;
+
+export const createFeeTypeSchema = z.object({
+  name: nameOf(FEE_TYPE_NAME_REQUIRED),
+});
+export type CreateFeeTypeInput = z.input<typeof createFeeTypeSchema>;
+
+const feeAmountSchema = z
+  .number({ error: FEE_LINE_AMOUNT_MESSAGE })
+  .int(FEE_LINE_AMOUNT_MESSAGE)
+  .positive(FEE_LINE_AMOUNT_MESSAGE);
+
+export const feeLineSchema = z.object({
+  id: idSchema,
+  termId: idSchema,
+  classLevelId: idSchema,
+  levelName: z.string(),
+  levelSequence: z.number().int().positive(),
+  feeTypeId: idSchema,
+  feeTypeCode: z.number().int().positive(),
+  feeTypeName: z.string(),
+  campusId: idSchema.nullable(),
+  campusName: z.string().nullable(),
+  name: z.string(),
+  amountMinor: minorSchema.positive(),
+  appliesTo: feeAppliesToSchema,
+  isOptional: z.boolean(),
+  retiredAt: z.iso.datetime({ offset: true }).nullable(),
+  createdAt: z.iso.datetime({ offset: true }),
+});
+export type FeeLine = z.infer<typeof feeLineSchema>;
+
+const queryFlagSchema = z.union([z.boolean(), z.stringbool()]);
+
+export const feeLineListQuerySchema = z.object({
+  termId: idSchema,
+  group: feeGroupSchema.optional(),
+  feeTypeId: idSchema.optional(),
+  includeRetired: queryFlagSchema.default(true),
+});
+export type FeeLineListQuery = z.output<typeof feeLineListQuerySchema>;
+
+export const feeSetupTermSchema = z.object({
+  id: idSchema,
+  name: z.string(),
+  schoolYearName: z.string(),
+  isCurrent: z.boolean(),
+});
+export type FeeSetupTerm = z.infer<typeof feeSetupTermSchema>;
+
+export const feeSetupLevelSchema = z.object({
+  id: idSchema,
+  name: z.string(),
+  sequence: z.number().int().positive(),
+});
+export type FeeSetupLevel = z.infer<typeof feeSetupLevelSchema>;
+
+export const feeSetupSchema = z.object({
+  terms: z.array(feeSetupTermSchema),
+  levels: z.array(feeSetupLevelSchema),
+});
+export type FeeSetup = z.infer<typeof feeSetupSchema>;
+
+export const feeGridQuerySchema = z.object({
+  termId: idSchema,
+  group: feeGroupSchema,
+  feeTypeId: idSchema.optional(),
+});
+export type FeeGridQuery = z.output<typeof feeGridQuerySchema>;
+
+export const feeGridAmountSchema = z.object({
+  feeLineId: idSchema,
+  amountMinor: minorSchema.positive(),
+  appliesTo: feeAppliesToSchema,
+  isOptional: z.boolean(),
+});
+export type FeeGridAmount = z.infer<typeof feeGridAmountSchema>;
+
+export const feeGridOverrideSchema = feeGridAmountSchema.extend({
+  campusId: idSchema,
+  campusName: z.string(),
+});
+export type FeeGridOverride = z.infer<typeof feeGridOverrideSchema>;
+
+export const feeGridCellSchema = z.object({
+  feeTypeId: idSchema,
+  base: feeGridAmountSchema.nullable(),
+  overrides: z.array(feeGridOverrideSchema),
+});
+export type FeeGridCell = z.infer<typeof feeGridCellSchema>;
+
+export const feeGridRowSchema = z.object({
+  level: z.object({
+    id: idSchema,
+    name: z.string(),
+    sequence: z.number().int().positive(),
+  }),
+  cells: z.array(feeGridCellSchema),
+  typicalTotalMinor: minorSchema.nonnegative().nullable(),
+});
+export type FeeGridRow = z.infer<typeof feeGridRowSchema>;
+
+export const feeGridSchema = z.object({
+  currency: currencySchema,
+  feeTypes: z.array(feeTypeSchema),
+  rows: z.array(feeGridRowSchema),
+});
+export type FeeGrid = z.infer<typeof feeGridSchema>;
+
+export const createFeeLineSchema = z.object({
+  termId: idSchema,
+  classLevelId: idSchema,
+  feeTypeId: idSchema,
+  campusId: idSchema.nullable(),
+  name: z
+    .string({ error: FEE_LINE_NAME_REQUIRED })
+    .trim()
+    .min(1, FEE_LINE_NAME_REQUIRED)
+    .max(FEE_LINE_NAME_MAX, `Use ${FEE_LINE_NAME_MAX} characters or fewer.`),
+  amountMinor: feeAmountSchema,
+  appliesTo: feeAppliesToSchema.default('all'),
+  isOptional: z.boolean().default(false),
+});
+export type CreateFeeLineInput = z.input<typeof createFeeLineSchema>;
+
+export const updateFeeLineSchema = z.strictObject({
+  amountMinor: feeAmountSchema,
+});
+export type UpdateFeeLineInput = z.input<typeof updateFeeLineSchema>;
+
+export const feePreviewQuerySchema = z.object({
+  termId: idSchema,
+  studentId: idSchema,
+});
+export type FeePreviewQuery = z.output<typeof feePreviewQuerySchema>;
+
+export const FEE_CANDIDATE_LIMIT = 100;
+
+export const feeCandidatesQuerySchema = z.object({
+  termId: idSchema,
+  q: z.string().trim().max(120).optional(),
+});
+export type FeeCandidatesQuery = z.output<typeof feeCandidatesQuerySchema>;
+
+export const feeCandidateSchema = z.object({
+  id: idSchema,
+  name: z.string(),
+  admissionNumber: z.string(),
+  levelName: z.string(),
+});
+export type FeeCandidate = z.infer<typeof feeCandidateSchema>;
+
+export const feeCandidatesSchema = z.object({
+  items: z.array(feeCandidateSchema),
+  total: z.number().int().nonnegative(),
+});
+export type FeeCandidates = z.infer<typeof feeCandidatesSchema>;
+
+export const feePreviewLineSchema = z.object({
+  feeLineId: idSchema,
+  description: z.string(),
+  feeTypeName: z.string(),
+  amountMinor: minorSchema,
+  optedIn: z.boolean(),
+  campusName: z.string().nullable(),
+});
+export type FeePreviewLine = z.infer<typeof feePreviewLineSchema>;
+
+export const feePreviewSchema = z.object({
+  currency: currencySchema,
+  student: z.object({
+    id: idSchema,
+    name: z.string(),
+    armName: z.string().nullable(),
+    levelName: z.string(),
+    campusId: idSchema,
+    campusName: z.string(),
+    isNew: z.boolean(),
+  }),
+  charged: z
+    .object({
+      status: z.enum(['draft', 'sent']),
+      number: z.string().nullable(),
+    })
+    .nullable(),
+  lines: z.array(feePreviewLineSchema),
+  totalMinor: minorSchema,
+  pendingDiscounts: z.array(z.string()),
+});
+export type FeePreview = z.infer<typeof feePreviewSchema>;
+
+export const feeOptionParamsSchema = z.object({
+  studentId: idSchema,
+  feeTypeId: idSchema,
+});
+
+export const feeOptionsParamsSchema = z.object({ studentId: idSchema });
+
+export const feeOptionsQuerySchema = z.object({
+  sessionId: idSchema.optional(),
+});
+
+export const feeOptionSchema = z.object({
+  feeTypeId: idSchema,
+  name: z.string(),
+  optedIn: z.boolean(),
+});
+export type FeeOption = z.infer<typeof feeOptionSchema>;
+
+export const setFeeOptionSchema = z.object({
+  optedIn: z.boolean(),
+  sessionId: idSchema.optional(),
+});
+export type SetFeeOptionInput = z.input<typeof setFeeOptionSchema>;
+
+export const feeOptionResultSchema = z.object({
+  feeTypeId: idSchema,
+  optedIn: z.boolean(),
+});
+export type FeeOptionResult = z.infer<typeof feeOptionResultSchema>;

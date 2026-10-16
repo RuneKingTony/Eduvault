@@ -3,6 +3,7 @@ import {
   READ_PERMS,
   STARTER_ROLES,
   can,
+  canAll,
   canAny,
   parsePermissionMap,
   resolvePermissions,
@@ -126,6 +127,19 @@ describe('roles', () => {
     }
     for (const slug of ['administrator', 'teacher', 'bursar', 'principal']) {
       expect(starter(slug).student ?? []).not.toContain('readOwn');
+    }
+  });
+
+  it('gives the bursar every feeLine write, the administrator feeLine:read and nobody feeLine:readOwn yet', () => {
+    expect(starter('bursar').feeLine).toEqual([
+      'create',
+      'read',
+      'update',
+      'retire',
+    ]);
+    expect(starter('administrator').feeLine).toEqual(['read']);
+    for (const slug of ['teacher', 'principal', 'student', 'guardian']) {
+      expect(starter(slug).feeLine).toBeUndefined();
     }
   });
 
@@ -258,6 +272,15 @@ describe('roles', () => {
       false
     );
     expect(canAny(permissions, [])).toBe(false);
+  });
+
+  it('passes canAll only with every permission', () => {
+    const permissions = starter('bursar');
+    expect(canAll(permissions, ['feeLine:read', 'student:read'])).toBe(true);
+    expect(canAll(permissions, ['student:read', 'schoolAccount:read'])).toBe(
+      false
+    );
+    expect(canAll(permissions, [])).toBe(true);
   });
 
   it('parses a stored permission column and drops unknown entries', () => {

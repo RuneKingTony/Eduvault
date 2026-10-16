@@ -110,9 +110,10 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         id: 'fees',
         label: 'Fees',
         pageTitle: 'Fees',
-        route: '/fees',
+        route: '/finance/school-fees',
         icon: 'wallet',
-        gate: ['feeSchedule:read'],
+        alsoActiveFor: ['/finance/other-fees'],
+        gate: ['feeLine:read'],
       },
       {
         id: 'payments',
@@ -250,6 +251,7 @@ const ROUTE_GATES = new Map<string, Gate>([
   ),
   ['/roles/new', ['ac:create']],
   ['/finance/ledger', ['ledger:read']],
+  ['/finance/other-fees', ['feeLine:read']],
 ]);
 
 export const routeGate = (route: string): Gate | undefined =>

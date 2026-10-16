@@ -19,7 +19,7 @@ jq -c '.[]|select(.kind=="campus")' "$LEDGER" | while read -r e; do
   code=$(req DELETE "/campuses/$id")
   case "$code" in
     2*) echo "deleted campus $id" ;;
-    409) echo "kept campus $id: it still has classes, students or fee schedules" ;;
+    409) echo "kept campus $id: it still has classes, students or fee lines" ;;
     *) echo "FAILED $code campus $id" ;;
   esac
 done

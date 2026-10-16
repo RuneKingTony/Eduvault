@@ -564,7 +564,7 @@ Not designed:
 
 ## Dependencies
 
-None of these exist in code yet; today's migrations hold only `campus`, `school_account`, `fee_schedule` and `student`.
+None of these exist in code yet.
 
 - M1.1: `store:*` and `adjustment:approve` in `libs/policy`, the guard, nav gating, `/me/permissions`.
 - M2.1 terms (current term); M2.2 campuses (a store per campus); M2.4 students, enrolment, placement, guardians (payer); M2.5 student lifecycle (active check).

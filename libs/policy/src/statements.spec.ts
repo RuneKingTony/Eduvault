@@ -37,6 +37,23 @@ describe('statements', () => {
     );
   });
 
+  it('has the feeLine resource, with no feeSchedule and none sensitive', () => {
+    expect(ALL_PERMISSIONS).toEqual(
+      expect.arrayContaining([
+        'feeLine:create',
+        'feeLine:read',
+        'feeLine:readOwn',
+        'feeLine:update',
+        'feeLine:retire',
+      ])
+    );
+    expect(ALL_PERMISSIONS.some((p) => p.startsWith('feeSchedule'))).toBe(
+      false
+    );
+    expect(SENSITIVE.some((p) => p.startsWith('feeLine'))).toBe(false);
+    expect(permLabel('feeLine:retire')).toBe('School and other fees: retire');
+  });
+
   it('has announcement create, read and update, with no delete and none sensitive', () => {
     expect(ALL_PERMISSIONS).toEqual(
       expect.arrayContaining([
