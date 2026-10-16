@@ -1,10 +1,5 @@
+import { Injectable, NotFoundException } from '@nestjs/common';
 import {
-  ForbiddenException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
-import {
-  FEE_PREVIEW_FORBIDDEN_MESSAGE,
   FEE_PREVIEW_STUDENT_MESSAGE,
   FEE_TERM_NOT_FOUND_MESSAGE,
   type FeeCandidates,
@@ -13,16 +8,16 @@ import {
   type FeePreviewLine,
   type FeePreviewQuery,
 } from '@eduvault/api-contract';
-import { can } from '@eduvault/policy';
 import type { OrgContext } from '../../common/auth';
 import { applicableLines } from '../../common/fees';
 import {
   FeeLineRepository,
   FeeOptionRepository,
+  FeeStudentRepository,
   type StudentFeeContext,
   type TermRef,
 } from './fee-line.repository';
-import { feeScopeOf } from './fee-line.service';
+import { feeScopeOf } from './fee-scope';
 
 type EnrolledStudent = StudentFeeContext & {
   enrollment: NonNullable<StudentFeeContext['enrollment']>;
@@ -38,11 +33,11 @@ interface PriceFor {
 export class FeePreviewService {
   constructor(
     private readonly lines: FeeLineRepository,
-    private readonly options: FeeOptionRepository
+    private readonly options: FeeOptionRepository,
+    private readonly students: FeeStudentRepository
   ) {}
 
   async preview(ctx: OrgContext, query: FeePreviewQuery): Promise<FeePreview> {
-    this.assertCanSeeStudents(ctx);
     const term = await this.lines.findTerm(ctx.organizationId, query.termId);
     if (term === undefined) {
       throw new NotFoundException(FEE_TERM_NOT_FOUND_MESSAGE);
@@ -72,21 +67,14 @@ export class FeePreviewService {
     ctx: OrgContext,
     query: FeeCandidatesQuery
   ): Promise<FeeCandidates> {
-    this.assertCanSeeStudents(ctx);
     const term = await this.lines.findTerm(ctx.organizationId, query.termId);
     if (term === undefined) {
       throw new NotFoundException(FEE_TERM_NOT_FOUND_MESSAGE);
     }
-    return this.options.candidates(feeScopeOf(ctx), {
+    return this.students.candidates(feeScopeOf(ctx), {
       sessionId: term.sessionId,
       q: query.q,
     });
-  }
-
-  private assertCanSeeStudents(ctx: OrgContext): void {
-    if (!can(ctx.permissions, 'student', 'read')) {
-      throw new ForbiddenException(FEE_PREVIEW_FORBIDDEN_MESSAGE);
-    }
   }
 
   private async enrolledStudent(
@@ -94,7 +82,7 @@ export class FeePreviewService {
     studentId: string,
     term: TermRef
   ): Promise<EnrolledStudent> {
-    const student = await this.options.findStudent(feeScopeOf(ctx), {
+    const student = await this.students.findStudent(feeScopeOf(ctx), {
       studentId,
       sessionId: term.sessionId,
       termId: term.id,

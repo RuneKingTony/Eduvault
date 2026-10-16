@@ -11,6 +11,8 @@ export const ANY_PERMISSION_KEY = 'eduvault:any-permission';
 
 export type AnyPermission = readonly Permission[];
 
+export const ALL_PERMISSIONS_KEY = 'eduvault:all-permissions';
+
 export const STAFF_ONLY_KEY = 'eduvault:staff-only';
 
 export const ALLOW_TEMPORARY_PASSWORD_KEY = 'eduvault:allow-temporary-password';

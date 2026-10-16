@@ -6,6 +6,7 @@ import { FeeLineController } from './fee-line.controller';
 import {
   FeeLineRepository,
   FeeOptionRepository,
+  FeeStudentRepository,
   FeeTypeRepository,
 } from './fee-line.repository';
 import { FeeLineService } from './fee-line.service';
@@ -16,6 +17,7 @@ import { FeeTypeController } from './fee-type.controller';
 import { FeeTypeService } from './fee-type.service';
 import { KyselyFeeLineRepository } from './kysely-fee-line.repository';
 import { KyselyFeeOptionRepository } from './kysely-fee-option.repository';
+import { KyselyFeeStudentRepository } from './kysely-fee-student.repository';
 import { KyselyFeeTypeRepository } from './kysely-fee-type.repository';
 
 @Module({
@@ -30,6 +32,7 @@ import { KyselyFeeTypeRepository } from './kysely-fee-type.repository';
     { provide: FeeLineRepository, useClass: KyselyFeeLineRepository },
     { provide: FeeTypeRepository, useClass: KyselyFeeTypeRepository },
     { provide: FeeOptionRepository, useClass: KyselyFeeOptionRepository },
+    { provide: FeeStudentRepository, useClass: KyselyFeeStudentRepository },
   ],
 })
 export class FeeLineModule {}

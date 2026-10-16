@@ -16,7 +16,7 @@ interface Actor {
   cookie: string;
 }
 
-export interface FeeFixture {
+interface FeeFixture {
   termId: string;
   sessionId: string;
   levelId: (code: string) => string;

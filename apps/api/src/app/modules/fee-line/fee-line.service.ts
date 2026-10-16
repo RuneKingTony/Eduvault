@@ -14,33 +14,19 @@ import {
   FEE_TERM_ENDED_MESSAGE,
   FEE_TERM_NOT_FOUND_MESSAGE,
   FEE_TYPE_INVALID_MESSAGE,
-  TUITION_FEE_CODE,
+  FEE_TYPE_NOT_FOUND_MESSAGE,
   feeLineDuplicateMessage,
   type CreateFeeLineInput,
-  type FeeGroup,
   type FeeLine,
   type FeeLineListQuery,
+  type FeeSetup,
   type UpdateFeeLineInput,
 } from '@eduvault/api-contract';
 import type { OrgContext } from '../../common/auth';
 import { Clock, schoolToday } from '../../common/clock';
 import { CampusService } from '../campus/campus.service';
-import {
-  FeeLineRepository,
-  type FeeScope,
-  type TermRef,
-} from './fee-line.repository';
-
-export const feeScopeOf = (ctx: OrgContext): FeeScope => ({
-  organizationId: ctx.organizationId,
-  campusScope: ctx.campusScope,
-});
-
-export const inFeeGroup = (
-  code: number,
-  group: FeeGroup | undefined
-): boolean =>
-  group === undefined || (group === 'school') === (code === TUITION_FEE_CODE);
+import { FeeLineRepository, type TermRef } from './fee-line.repository';
+import { feeScopeOf, inFeeGroup } from './fee-scope';
 
 function assertEveryCampusWrite(ctx: OrgContext, campusId: string | null) {
   if (campusId === null && ctx.campusScope !== 'all') {
@@ -55,6 +41,10 @@ export class FeeLineService {
     private readonly campuses: CampusService,
     private readonly clock: Clock
   ) {}
+
+  setup(ctx: OrgContext): Promise<FeeSetup> {
+    return this.lines.setup(ctx.organizationId);
+  }
 
   async list(ctx: OrgContext, query: FeeLineListQuery): Promise<FeeLine[]> {
     await this.requireTerm(ctx, query.termId);
@@ -86,7 +76,7 @@ export class FeeLineService {
       throw new NotFoundException(FEE_LEVEL_NOT_FOUND_MESSAGE);
     }
     if (feeType === undefined) {
-      throw new BadRequestException(FEE_TYPE_INVALID_MESSAGE);
+      throw await this.feeTypeRefusal(ctx, input.feeTypeId);
     }
     this.assertTermOpen(ctx, term);
     const outcome = await this.lines.create({
@@ -155,6 +145,15 @@ export class FeeLineService {
       throw new ConflictException(retiredMessage);
     }
     return line;
+  }
+
+  private async feeTypeRefusal(
+    ctx: OrgContext,
+    feeTypeId: string
+  ): Promise<Error> {
+    return (await this.lines.hasLedgerAccount(ctx.organizationId, feeTypeId))
+      ? new BadRequestException(FEE_TYPE_INVALID_MESSAGE)
+      : new NotFoundException(FEE_TYPE_NOT_FOUND_MESSAGE);
   }
 
   private async requireTerm(ctx: OrgContext, termId: string): Promise<TermRef> {

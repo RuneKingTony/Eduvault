@@ -3,6 +3,7 @@ import { sql } from 'kysely';
 import {
   feeAppliesToSchema,
   type FeeLine,
+  type FeeSetup,
   type FeeType,
 } from '@eduvault/api-contract';
 import { inCampusScope } from '../../common/db/in-campus-scope';
@@ -165,6 +166,56 @@ export class KyselyFeeLineRepository extends FeeLineRepository {
     return schoolCurrency(this.db, organizationId);
   }
 
+  async setup(organizationId: string): Promise<FeeSetup> {
+    const [terms, levels] = await Promise.all([
+      this.db
+        .selectFrom('term')
+        .innerJoin('academic_session', (join) =>
+          join
+            .onRef('academic_session.id', '=', 'term.session_id')
+            .onRef(
+              'academic_session.organization_id',
+              '=',
+              'term.organization_id'
+            )
+        )
+        .select([
+          'term.id',
+          'term.name',
+          'academic_session.name as school_year_name',
+          'term.is_current',
+        ])
+        .where('term.organization_id', '=', organizationId)
+        .where(
+          'term.starts_on',
+          '>=',
+          this.db
+            .selectFrom('term as current')
+            .select('current.starts_on')
+            .where('current.organization_id', '=', organizationId)
+            .where('current.is_current', '=', true)
+        )
+        .orderBy('term.starts_on')
+        .limit(2)
+        .execute(),
+      this.db
+        .selectFrom('class_level')
+        .select(['id', 'name', 'sequence'])
+        .where('organization_id', '=', organizationId)
+        .orderBy('sequence')
+        .execute(),
+    ]);
+    return {
+      terms: terms.map((term) => ({
+        id: term.id,
+        name: term.name,
+        schoolYearName: term.school_year_name,
+        isCurrent: term.is_current,
+      })),
+      levels,
+    };
+  }
+
   findFeeType(
     organizationId: string,
     id: string
@@ -172,6 +223,16 @@ export class KyselyFeeLineRepository extends FeeLineRepository {
     return feeTypeQuery(this.db, organizationId)
       .where('ledger_account.id', '=', id)
       .executeTakeFirst();
+  }
+
+  async hasLedgerAccount(organizationId: string, id: string): Promise<boolean> {
+    const row = await this.db
+      .selectFrom('ledger_account')
+      .select('id')
+      .where('organization_id', '=', organizationId)
+      .where('id', '=', id)
+      .executeTakeFirst();
+    return row !== undefined;
   }
 
   findLevel(organizationId: string, id: string): Promise<LevelRef | undefined> {

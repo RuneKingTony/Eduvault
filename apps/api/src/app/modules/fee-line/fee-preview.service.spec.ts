@@ -1,11 +1,9 @@
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
-import {
-  FEE_PREVIEW_FORBIDDEN_MESSAGE,
-  type FeeLine,
-} from '@eduvault/api-contract';
+import { NotFoundException } from '@nestjs/common';
+import type { FeeLine } from '@eduvault/api-contract';
 import type { OrgContext } from '../../common/auth';
 import {
   FakeFeeLineRepository,
+  FakeFeeStudentRepository,
   FakeFeeOptionRepository,
 } from './fake-fee-line.repository';
 import type { StudentFeeContext } from './fee-line.repository';
@@ -62,8 +60,13 @@ function setup(rows: FeeLine[], context: StudentFeeContext | undefined) {
     endsOn: '2026-12-18',
   });
   const options = new FakeFeeOptionRepository();
-  options.student = context;
-  return { options, service: new FeePreviewService(lines, options) };
+  const students = new FakeFeeStudentRepository();
+  students.student = context;
+  return {
+    options,
+    students,
+    service: new FeePreviewService(lines, options, students),
+  };
 }
 
 describe('FeePreviewService.preview', () => {
@@ -158,24 +161,10 @@ describe('FeePreviewService.preview', () => {
   });
 });
 
-describe('FeePreviewService without student access', () => {
-  const blind = { ...ctx, permissions: { feeLine: ['read'] } } as OrgContext;
-
-  it('refuses the preview and the candidates with 403', async () => {
-    const { service } = setup([], student());
-    await expect(service.preview(blind, query)).rejects.toBeInstanceOf(
-      ForbiddenException
-    );
-    await expect(
-      service.candidates(blind, { termId: 'term-1' })
-    ).rejects.toThrow(FEE_PREVIEW_FORBIDDEN_MESSAGE);
-  });
-});
-
 describe('FeePreviewService.candidates', () => {
   it('lists the candidates of the term’s school year', async () => {
-    const { service, options } = setup([], student());
-    options.candidateList = {
+    const { service, students } = setup([], student());
+    students.candidateList = {
       items: [
         {
           id: 'ada',
@@ -187,7 +176,7 @@ describe('FeePreviewService.candidates', () => {
       total: 1,
     };
     expect(await service.candidates(ctx, { termId: 'term-1' })).toEqual(
-      options.candidateList
+      students.candidateList
     );
   });
 

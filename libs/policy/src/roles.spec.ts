@@ -3,6 +3,7 @@ import {
   READ_PERMS,
   STARTER_ROLES,
   can,
+  canAll,
   canAny,
   parsePermissionMap,
   resolvePermissions,
@@ -271,6 +272,15 @@ describe('roles', () => {
       false
     );
     expect(canAny(permissions, [])).toBe(false);
+  });
+
+  it('passes canAll only with every permission', () => {
+    const permissions = starter('bursar');
+    expect(canAll(permissions, ['feeLine:read', 'student:read'])).toBe(true);
+    expect(canAll(permissions, ['student:read', 'schoolAccount:read'])).toBe(
+      false
+    );
+    expect(canAll(permissions, [])).toBe(true);
   });
 
   it('parses a stored permission column and drops unknown entries', () => {

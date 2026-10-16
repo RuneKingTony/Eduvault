@@ -12,6 +12,7 @@ import { OrganizationAuthGuard } from '../guards/organization-auth.guard';
 import { PlatformAuthGuard } from '../guards/platform-auth.guard';
 import { SessionAuthGuard } from '../guards/session-auth.guard';
 import {
+  ALL_PERMISSIONS_KEY,
   ALLOW_TEMPORARY_PASSWORD_KEY,
   ANY_PERMISSION_KEY,
   PERMISSION_KEY,
@@ -35,23 +36,25 @@ export const PlatformAuth = () => UseGuards(PlatformAuthGuard);
 
 /**
  * Requires a signed-in user acting in a school, and — when given — that their
- * role there grants the permission, or any one of a list of permissions.
- * Put it on each handler, not the class, so the guard runs once per request.
+ * role there grants the permission. Put it on each handler, not the class, so
+ * the guard runs once per request.
  */
 export function OrganizationAuth(
-  anyOf?: readonly Permission[]
+  gate?: readonly Permission[] | { allOf: readonly Permission[] }
 ): MethodDecorator;
 export function OrganizationAuth<R extends Resource>(
   resource: R,
   action: ActionOf<R>
 ): MethodDecorator;
 export function OrganizationAuth<R extends Resource>(
-  first?: R | readonly Permission[],
+  first?: R | readonly Permission[] | { allOf: readonly Permission[] },
   action?: ActionOf<R>
 ): MethodDecorator {
   const anyOf = Array.isArray(first)
     ? (first as readonly Permission[])
     : undefined;
+  const allOf =
+    typeof first === 'object' && 'allOf' in first ? first.allOf : undefined;
   const resource = typeof first === 'string' ? first : undefined;
   return applyDecorators(
     SetMetadata(
@@ -61,6 +64,7 @@ export function OrganizationAuth<R extends Resource>(
         : undefined
     ),
     SetMetadata(ANY_PERMISSION_KEY, anyOf),
+    SetMetadata(ALL_PERMISSIONS_KEY, allOf),
     UseGuards(OrganizationAuthGuard)
   );
 }

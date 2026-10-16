@@ -3,6 +3,7 @@ import type {
   FeeCandidates,
   FeeLine,
   FeeOption,
+  FeeSetup,
   FeeType,
 } from '@eduvault/api-contract';
 import type { CampusScope } from '../../common/campus-scope';
@@ -59,10 +60,17 @@ export abstract class FeeLineRepository {
 
   abstract currency(organizationId: string): Promise<string>;
 
+  abstract setup(organizationId: string): Promise<FeeSetup>;
+
   abstract findFeeType(
     organizationId: string,
     id: string
   ): Promise<FeeType | undefined>;
+
+  abstract hasLedgerAccount(
+    organizationId: string,
+    id: string
+  ): Promise<boolean>;
 
   abstract findLevel(
     organizationId: string,
@@ -118,7 +126,7 @@ export interface OptionChange {
   optedIn: boolean;
 }
 
-export abstract class FeeOptionRepository {
+export abstract class FeeStudentRepository {
   /** Undefined unless the student is on a campus in the caller's scope; class scope never applies to finance. */
   abstract findStudent(
     scope: FeeScope,
@@ -129,11 +137,14 @@ export abstract class FeeOptionRepository {
     }
   ): Promise<StudentFeeContext | undefined>;
 
-  /** Active students in the caller's campus scope with an active enrolment in the school year, by name. */
   abstract candidates(
     scope: FeeScope,
     query: { sessionId: string; q: string | undefined }
   ): Promise<FeeCandidates>;
+}
+
+export abstract class FeeOptionRepository {
+  abstract hasSession(organizationId: string, id: string): Promise<boolean>;
 
   abstract currentSessionId(
     organizationId: string

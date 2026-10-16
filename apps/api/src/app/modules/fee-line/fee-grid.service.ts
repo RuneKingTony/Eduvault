@@ -7,7 +7,7 @@ import {
 import type { OrgContext } from '../../common/auth';
 import { buildFeeGrid } from '../../common/fees';
 import { FeeLineRepository, FeeTypeRepository } from './fee-line.repository';
-import { feeScopeOf, inFeeGroup } from './fee-line.service';
+import { feeScopeOf, inFeeGroup } from './fee-scope';
 
 @Injectable()
 export class FeeGridService {

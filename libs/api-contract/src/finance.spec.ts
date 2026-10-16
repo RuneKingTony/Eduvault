@@ -396,6 +396,18 @@ describe('feeLineDuplicateMessage', () => {
       'on Ikeja this term'
     );
   });
+
+  it('does not repeat fee when the fee type already ends in it', () => {
+    expect(
+      feeLineDuplicateMessage({
+        feeType: 'Laboratory fee',
+        level: 'JSS 2',
+        campus: null,
+      })
+    ).toBe(
+      'There is already a Laboratory fee for JSS 2 on every campus this term. Change its amount instead.'
+    );
+  });
 });
 
 describe('the fee routes', () => {

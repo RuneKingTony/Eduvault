@@ -1,8 +1,14 @@
-import type { FeeCandidates, FeeLine, FeeType } from '@eduvault/api-contract';
+import type {
+  FeeCandidates,
+  FeeLine,
+  FeeSetup,
+  FeeType,
+} from '@eduvault/api-contract';
 import { canSeeCampus } from '../../common/campus-scope';
 import {
   FeeLineRepository,
   FeeOptionRepository,
+  FeeStudentRepository,
   FeeTypeRepository,
   type FeeLineOutcome,
   type FeeScope,
@@ -19,8 +25,10 @@ export class FakeFeeLineRepository extends FeeLineRepository {
   terms = new Map<string, TermRef>();
   levels = new Map<string, LevelRef>();
   feeTypes = new Map<string, FeeType>();
+  otherAccounts = new Set<string>();
   created: NewFeeLine[] = [];
   duplicate = false;
+  setupResult: FeeSetup = { terms: [], levels: [] };
 
   private visible(scope: FeeScope): FeeLine[] {
     return this.rows.filter(
@@ -60,6 +68,10 @@ export class FakeFeeLineRepository extends FeeLineRepository {
     return Promise.resolve(this.feeTypes.get(id));
   }
 
+  hasLedgerAccount(_organizationId: string, id: string): Promise<boolean> {
+    return Promise.resolve(this.feeTypes.has(id) || this.otherAccounts.has(id));
+  }
+
   findLevel(
     _organizationId: string,
     id: string
@@ -69,6 +81,10 @@ export class FakeFeeLineRepository extends FeeLineRepository {
 
   currency(): Promise<string> {
     return Promise.resolve('NGN');
+  }
+
+  setup(): Promise<FeeSetup> {
+    return Promise.resolve(this.setupResult);
   }
 
   create(input: NewFeeLine): Promise<FeeLineOutcome> {
@@ -145,13 +161,9 @@ export class FakeFeeTypeRepository extends FeeTypeRepository {
   }
 }
 
-export class FakeFeeOptionRepository extends FeeOptionRepository {
+export class FakeFeeStudentRepository extends FeeStudentRepository {
   student: StudentFeeContext | undefined;
-  session: string | undefined = 'session-1';
-  optedIn: string[] = [];
   candidateList: FeeCandidates = { items: [], total: 0 };
-  optional: { feeTypeId: string; name: string }[] = [];
-  changes: OptionChange[] = [];
 
   findStudent(): Promise<StudentFeeContext | undefined> {
     return Promise.resolve(this.student);
@@ -159,6 +171,18 @@ export class FakeFeeOptionRepository extends FeeOptionRepository {
 
   candidates(): Promise<FeeCandidates> {
     return Promise.resolve(this.candidateList);
+  }
+}
+
+export class FakeFeeOptionRepository extends FeeOptionRepository {
+  session: string | undefined = 'session-1';
+  sessions = new Set(['session-1']);
+  optedIn: string[] = [];
+  optional: { feeTypeId: string; name: string }[] = [];
+  changes: OptionChange[] = [];
+
+  hasSession(_organizationId: string, id: string): Promise<boolean> {
+    return Promise.resolve(this.sessions.has(id));
   }
 
   currentSessionId(): Promise<string | undefined> {

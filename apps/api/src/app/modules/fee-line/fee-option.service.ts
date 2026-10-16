@@ -5,15 +5,17 @@ import {
 } from '@nestjs/common';
 import {
   FEE_OPTION_NOT_OPTIONAL_MESSAGE,
+  FEE_SESSION_NOT_FOUND_MESSAGE,
   STUDENT_NOT_FOUND_MESSAGE,
   type FeeOption,
   type FeeOptionResult,
   type SetFeeOptionInput,
 } from '@eduvault/api-contract';
 import type { OrgContext } from '../../common/auth';
-import { feeScopeOf } from './fee-line.service';
+import { feeScopeOf } from './fee-scope';
 import {
   FeeOptionRepository,
+  FeeStudentRepository,
   type StudentFeeContext,
 } from './fee-line.repository';
 
@@ -23,7 +25,10 @@ type EnrolledStudent = StudentFeeContext & {
 
 @Injectable()
 export class FeeOptionService {
-  constructor(private readonly options: FeeOptionRepository) {}
+  constructor(
+    private readonly options: FeeOptionRepository,
+    private readonly students: FeeStudentRepository
+  ) {}
 
   async list(
     ctx: OrgContext,
@@ -105,9 +110,15 @@ export class FeeOptionService {
     studentId: string,
     requested: string | undefined
   ): Promise<{ student: StudentFeeContext; sessionId: string | undefined }> {
+    if (
+      requested !== undefined &&
+      !(await this.options.hasSession(ctx.organizationId, requested))
+    ) {
+      throw new NotFoundException(FEE_SESSION_NOT_FOUND_MESSAGE);
+    }
     const sessionId =
       requested ?? (await this.options.currentSessionId(ctx.organizationId));
-    const student = await this.options.findStudent(feeScopeOf(ctx), {
+    const student = await this.students.findStudent(feeScopeOf(ctx), {
       studentId,
       sessionId,
     });

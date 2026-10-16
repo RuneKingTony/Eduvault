@@ -58,6 +58,7 @@ import {
   createMoneyAccountSchema,
   feeGridQuerySchema,
   feeGridSchema,
+  feeSetupSchema,
   feeLineListQuerySchema,
   feeLineSchema,
   feeOptionParamsSchema,
@@ -723,6 +724,11 @@ export const contract = defineContract({
       path: '/fee-lines',
       query: feeLineListQuerySchema,
       response: z.array(feeLineSchema),
+    }),
+    setup: defineRoute({
+      method: 'GET',
+      path: '/fee-lines/setup',
+      response: feeSetupSchema,
     }),
     grid: defineRoute({
       method: 'GET',

@@ -218,3 +218,7 @@ export function can<R extends Resource>(
 export function canAny(permissions: PermissionMap, gate: Gate): boolean {
   return gate.some((permission) => holds(permissions, permission));
 }
+
+export function canAll(permissions: PermissionMap, gate: Gate): boolean {
+  return gate.every((permission) => holds(permissions, permission));
+}

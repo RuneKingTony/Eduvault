@@ -34,6 +34,12 @@ export class FeeLineController {
     return this.fees.list(org, query);
   }
 
+  @Get('setup')
+  @OrganizationAuth('feeLine', 'read')
+  setup(@Org() org: OrgContext): Promise<RouteOutput<typeof routes.setup>> {
+    return this.fees.setup(org);
+  }
+
   @Get('grid')
   @OrganizationAuth('feeLine', 'read')
   grid(
@@ -45,7 +51,7 @@ export class FeeLineController {
   }
 
   @Get('candidates')
-  @OrganizationAuth('feeLine', 'read')
+  @OrganizationAuth({ allOf: ['feeLine:read', 'student:read'] })
   candidates(
     @Org() org: OrgContext,
     @Query(zod(routes.candidates.query))
@@ -55,7 +61,7 @@ export class FeeLineController {
   }
 
   @Get('preview')
-  @OrganizationAuth('feeLine', 'read')
+  @OrganizationAuth({ allOf: ['feeLine:read', 'student:read'] })
   preview(
     @Org() org: OrgContext,
     @Query(zod(routes.preview.query))

@@ -1,7 +1,10 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { FEE_OPTION_NOT_OPTIONAL_MESSAGE } from '@eduvault/api-contract';
 import type { OrgContext } from '../../common/auth';
-import { FakeFeeOptionRepository } from './fake-fee-line.repository';
+import {
+  FakeFeeOptionRepository,
+  FakeFeeStudentRepository,
+} from './fake-fee-line.repository';
 import type { StudentFeeContext } from './fee-line.repository';
 import { FeeOptionService } from './fee-option.service';
 
@@ -27,9 +30,14 @@ const student: StudentFeeContext = {
 
 function setup() {
   const repository = new FakeFeeOptionRepository();
-  repository.student = student;
+  const students = new FakeFeeStudentRepository();
+  students.student = student;
   repository.optional = [{ feeTypeId: 'bus', name: 'School bus' }];
-  return { repository, service: new FeeOptionService(repository) };
+  return {
+    repository,
+    students,
+    service: new FeeOptionService(repository, students),
+  };
 }
 
 describe('FeeOptionService.list', () => {
@@ -46,18 +54,25 @@ describe('FeeOptionService.list', () => {
   });
 
   it('answers 404 for a student outside the finance scope', async () => {
-    const { service, repository } = setup();
-    repository.student = undefined;
+    const { service, students } = setup();
+    students.student = undefined;
     await expect(service.list(ctx, 'ada')).rejects.toBeInstanceOf(
       NotFoundException
     );
   });
 
+  it('answers 404 for a school year that is not in the school', async () => {
+    const { service } = setup();
+    await expect(service.list(ctx, 'ada', 'elsewhere')).rejects.toBeInstanceOf(
+      NotFoundException
+    );
+  });
+
   it('is empty without an enrolment or a current school year', async () => {
-    const { service, repository } = setup();
-    repository.student = { ...student, enrollment: null };
+    const { service, repository, students } = setup();
+    students.student = { ...student, enrollment: null };
     expect(await service.list(ctx, 'ada')).toEqual([]);
-    repository.student = student;
+    students.student = student;
     repository.session = undefined;
     expect(await service.list(ctx, 'ada')).toEqual([]);
   });
@@ -107,9 +122,21 @@ describe('FeeOptionService.set', () => {
     expect(repository.changes).toEqual([]);
   });
 
-  it('answers 400 for a student with no enrolment in the school year', async () => {
+  it('answers 404 for a school year that is not in the school', async () => {
     const { service, repository } = setup();
-    repository.student = { ...student, enrollment: null };
+    await expect(
+      service.set(
+        ctx,
+        { studentId: 'ada', feeTypeId: 'bus' },
+        { optedIn: true, sessionId: 'elsewhere' }
+      )
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(repository.changes).toEqual([]);
+  });
+
+  it('answers 400 for a student with no enrolment in the school year', async () => {
+    const { service, students } = setup();
+    students.student = { ...student, enrollment: null };
     await expect(
       service.set(
         ctx,
@@ -120,8 +147,8 @@ describe('FeeOptionService.set', () => {
   });
 
   it('answers 404 for a student outside the finance scope', async () => {
-    const { service, repository } = setup();
-    repository.student = undefined;
+    const { service, students } = setup();
+    students.student = undefined;
     await expect(
       service.set(
         ctx,

@@ -5,21 +5,22 @@ import {
   FEE_LINE_ALREADY_RETIRED_MESSAGE,
   FEE_LINE_AMOUNT_MESSAGE,
   FEE_LINE_RETIRED_MESSAGE,
-  FEE_PREVIEW_FORBIDDEN_MESSAGE,
   FEE_TERM_ENDED_MESSAGE,
   FEE_TYPE_INVALID_MESSAGE,
+  FEE_TYPE_NOT_FOUND_MESSAGE,
   type FeeCandidates,
   type FeeGrid,
   type FeeLine,
   type FeePreview,
+  type FeeSetup,
   type FeeType,
 } from '@eduvault/api-contract';
 import { acting, expect } from './support/base-test';
 import { createSchoolYear, YEAR_2027 } from './support/factories/calendar';
 import { createFeeLine, feeFixture } from './support/factories/fees';
 import { ledgerAccountId } from './support/factories/finance';
-import { termOf } from './support/factories/terms';
-import { schoolsTest as test } from './support/two-schools';
+import { makeCurrent, termOf } from './support/factories/terms';
+import { bareSchoolsTest, schoolsTest as test } from './support/two-schools';
 
 const levelOf = async (pool: Pool, studentId: string): Promise<string> => {
   const { rows } = await pool.query<{ class_level_id: string }>(
@@ -74,6 +75,9 @@ const tuitionBody = (
   amountMinor: 18_000_000,
   ...over,
 });
+
+const termNames = (setup: FeeSetup) =>
+  setup.terms.map((term) => `${term.name}, ${term.schoolYearName}`);
 
 test.describe('fee lines', () => {
   test.describe('isolation', () => {
@@ -200,6 +204,7 @@ test.describe('fee lines', () => {
       const id = randomUUID();
       const routes = [
         ['get', `/fee-lines?termId=${id}`],
+        ['get', '/fee-lines/setup'],
         ['get', `/fee-lines/grid?termId=${id}&group=school`],
         ['get', `/fee-lines/preview?termId=${id}&studentId=${id}`],
         ['get', `/fee-lines/candidates?termId=${id}`],
@@ -262,6 +267,7 @@ test.describe('fee lines', () => {
       const id = randomUUID();
       const routes = [
         ['get', `/fee-lines?termId=${id}`],
+        ['get', '/fee-lines/setup'],
         ['get', `/fee-lines/grid?termId=${id}&group=school`],
         ['get', `/fee-lines/preview?termId=${id}&studentId=${id}`],
         ['get', `/fee-lines/candidates?termId=${id}`],
@@ -304,8 +310,8 @@ test.describe('fee lines', () => {
         .send(
           tuitionBody(fixture, { feeTypeId: fixtureB.feeTypeId('Tuition') })
         )
-        .expect(400);
-      expect(foreignType.body.message).toBe(FEE_TYPE_INVALID_MESSAGE);
+        .expect(404);
+      expect(foreignType.body.message).toBe(FEE_TYPE_NOT_FOUND_MESSAGE);
 
       const base = {
         organizationId: orgA.id,
@@ -680,6 +686,88 @@ test.describe('fee lines', () => {
     });
   });
 
+  test.describe('setup', () => {
+    test('gives a bursar with only fee permissions the current and next term and every level, without session:read', async ({
+      api,
+      app,
+      schools: { owner, lekkiOnly },
+    }) => {
+      const fixture = await feeFixture(app, api, owner);
+      await api(lekkiOnly).get('/school-years').expect(403);
+
+      const setup = (await api(lekkiOnly).get('/fee-lines/setup').expect(200))
+        .body as FeeSetup;
+      expect(termNames(setup)).toEqual([
+        'First term, 2026/2027',
+        'Second term, 2026/2027',
+      ]);
+      expect(setup.terms.map((term) => term.isCurrent)).toEqual([true, false]);
+      expect(setup.terms[0]?.id).toBe(fixture.termId);
+      expect(setup.levels.map((level) => level.id)).toContain(
+        fixture.levelId('JSS2')
+      );
+      expect(setup.levels.map((level) => level.sequence)).toEqual(
+        setup.levels.map((level) => level.sequence).toSorted((a, b) => a - b)
+      );
+    });
+
+    test('answers 200 for a member holding only feeLine:read and 403 without it', async ({
+      api,
+      app,
+      withPermissions,
+      schools: { owner, orgA, noPermission },
+    }) => {
+      await feeFixture(app, api, owner);
+      const reader = await withPermissions(orgA, ['feeLine:read']);
+      await api(reader).get('/fee-lines/setup').expect(200);
+      await api(noPermission).get('/fee-lines/setup').expect(403);
+      const other = await withPermissions(orgA, ['session:read']);
+      await api(other).get('/fee-lines/setup').expect(403);
+    });
+
+    test('moves to the next year’s first term from the third term once that year exists', async ({
+      api,
+      app,
+      schools: { owner, lekkiOnly },
+    }) => {
+      await feeFixture(app, api, owner);
+      await makeCurrent(api, owner, { year: '2026/2027', sequence: 3 });
+      const alone = (await api(lekkiOnly).get('/fee-lines/setup').expect(200))
+        .body as FeeSetup;
+      expect(termNames(alone)).toEqual(['Third term, 2026/2027']);
+
+      await createSchoolYear(app, owner, YEAR_2027);
+      const crossing = (
+        await api(lekkiOnly).get('/fee-lines/setup').expect(200)
+      ).body as FeeSetup;
+      expect(termNames(crossing)).toEqual([
+        'Third term, 2026/2027',
+        'First term, 2027/2028',
+      ]);
+    });
+
+    test('shows each school only its own terms and levels', async ({
+      api,
+      app,
+      schools: { owner, ownerB },
+    }) => {
+      const fixtureA = await feeFixture(app, api, owner);
+      const fixtureB = await feeFixture(app, api, ownerB);
+      const setupOf = async (user: typeof owner) =>
+        (await api(user).get('/fee-lines/setup').expect(200)).body as FeeSetup;
+      const [a, b] = [await setupOf(owner), await setupOf(ownerB)];
+
+      expect(a.terms.map((term) => term.id)).toContain(fixtureA.termId);
+      expect(a.terms.map((term) => term.id)).not.toContain(fixtureB.termId);
+      expect(b.terms.map((term) => term.id)).toEqual(
+        expect.arrayContaining([fixtureB.termId])
+      );
+      expect(b.terms.map((term) => term.id)).not.toContain(fixtureA.termId);
+      const levelIdsA = new Set(a.levels.map((level) => level.id));
+      expect(b.levels.some((level) => levelIdsA.has(level.id))).toBe(false);
+    });
+  });
+
   test.describe('grid', () => {
     test('shows tuition with campus overrides and the typical total, and the other fee types on the other grid', async ({
       api,
@@ -1032,7 +1120,7 @@ test.describe('fee lines', () => {
           `/fee-lines/preview?termId=${fixture.termId}&studentId=${studentLekki.id}`
         )
         .expect(403);
-      expect(refused.body.message).toBe(FEE_PREVIEW_FORBIDDEN_MESSAGE);
+      expect(refused.body.message).toBe('Missing permission student:read');
       await api(reader)
         .get(`/fee-lines/candidates?termId=${fixture.termId}`)
         .expect(403);
@@ -1154,6 +1242,37 @@ test.describe('fee lines', () => {
       expect(rows).toHaveLength(0);
     });
 
+    test('stores nothing for an opt-out of a fee type that was never optional and answers 404 for a school year that is not the school’s', async ({
+      api,
+      app,
+      pool,
+      schools: { owner, studentLekki },
+    }) => {
+      const fixture = await feeFixture(app, api, owner);
+      const ptaId = fixture.feeTypeId('PTA fee');
+      const optionUrl = `/students/${studentLekki.id}/fee-options/${ptaId}`;
+
+      const off = await api(owner)
+        .put(optionUrl)
+        .send({ optedIn: false })
+        .expect(200);
+      expect(off.body).toEqual({ feeTypeId: ptaId, optedIn: false });
+      const { rows } = await pool.query(
+        'SELECT 1 FROM student_fee_option WHERE ledger_account_id = $1',
+        [ptaId]
+      );
+      expect(rows).toHaveLength(0);
+
+      await api(owner)
+        .put(optionUrl)
+        .send({ optedIn: false, sessionId: randomUUID() })
+        .expect(404);
+      await api(owner)
+        .get(`/students/${studentLekki.id}/fee-options`)
+        .query({ sessionId: randomUUID() })
+        .expect(404);
+    });
+
     test('offers only the optional fee types of the student’s campus and of every campus', async ({
       api,
       app,
@@ -1223,4 +1342,15 @@ test.describe('fee lines', () => {
         .expect(404);
     });
   });
+});
+
+bareSchoolsTest.describe('fee setup before a school year exists', () => {
+  bareSchoolsTest(
+    'answers with no terms while the school has no current term',
+    async ({ api, schools: { ownerB } }) => {
+      const setup = (await api(ownerB).get('/fee-lines/setup').expect(200))
+        .body as FeeSetup;
+      expect(setup.terms).toEqual([]);
+    }
+  );
 });

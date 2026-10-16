@@ -281,25 +281,29 @@ export const FEE_LINE_NOT_FOUND_MESSAGE = 'Fee not found';
 export const FEE_LINE_RETIRED_MESSAGE = 'This fee is retired. It can’t change.';
 export const FEE_LINE_ALREADY_RETIRED_MESSAGE = 'This fee is already retired.';
 export const FEE_TERM_ENDED_MESSAGE =
-  'This term has ended. Fees for it can’t change.';
+  "This term has ended. Fees for it can't change.";
 export const FEE_EVERY_CAMPUS_MESSAGE =
   'Only someone who sees every campus can change a fee for every campus.';
 export const FEE_TYPE_INVALID_MESSAGE =
   'Pick a fee type that sits under Fee income.';
+export const FEE_TYPE_NOT_FOUND_MESSAGE = 'Fee type not found';
+export const FEE_SESSION_NOT_FOUND_MESSAGE = 'School year not found';
 export const FEE_TYPE_NAME_REQUIRED = 'Give the fee type a name.';
 export const FEE_OPTION_NOT_OPTIONAL_MESSAGE =
   'This class level has no optional fee of that type.';
 export const FEE_TERM_NOT_FOUND_MESSAGE = 'Term not found';
 export const FEE_LEVEL_NOT_FOUND_MESSAGE = 'Class level not found';
 export const FEE_PREVIEW_STUDENT_MESSAGE = 'Student not found for that term';
-export const FEE_PREVIEW_FORBIDDEN_MESSAGE =
-  'You need access to students to preview a student’s fees.';
 export const feeLineDuplicateMessage = (parts: {
   feeType: string;
   level: string;
   campus: string | null;
-}): string =>
-  `There is already a ${parts.feeType} fee for ${parts.level} on ${parts.campus ?? 'every campus'} this term. Change its amount instead.`;
+}): string => {
+  const fee = /\bfee$/i.test(parts.feeType)
+    ? parts.feeType
+    : `${parts.feeType} fee`;
+  return `There is already a ${fee} for ${parts.level} on ${parts.campus ?? 'every campus'} this term. Change its amount instead.`;
+};
 export const feeTypeDuplicateMessage = (name: string): string =>
   `A fee type called ${name} already exists.`;
 
@@ -355,6 +359,27 @@ export const feeLineListQuerySchema = z.object({
   includeRetired: queryFlagSchema.default(true),
 });
 export type FeeLineListQuery = z.output<typeof feeLineListQuerySchema>;
+
+export const feeSetupTermSchema = z.object({
+  id: idSchema,
+  name: z.string(),
+  schoolYearName: z.string(),
+  isCurrent: z.boolean(),
+});
+export type FeeSetupTerm = z.infer<typeof feeSetupTermSchema>;
+
+export const feeSetupLevelSchema = z.object({
+  id: idSchema,
+  name: z.string(),
+  sequence: z.number().int().positive(),
+});
+export type FeeSetupLevel = z.infer<typeof feeSetupLevelSchema>;
+
+export const feeSetupSchema = z.object({
+  terms: z.array(feeSetupTermSchema),
+  levels: z.array(feeSetupLevelSchema),
+});
+export type FeeSetup = z.infer<typeof feeSetupSchema>;
 
 export const feeGridQuerySchema = z.object({
   termId: idSchema,

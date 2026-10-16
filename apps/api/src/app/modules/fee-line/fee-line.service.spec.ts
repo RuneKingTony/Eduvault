@@ -77,6 +77,7 @@ function setup(...seeded: FeeLine[]) {
   lines.levels.set('jss2', { id: 'jss2', name: 'JSS 2' });
   lines.feeTypes.set('tuition', { id: 'tuition', code: 4010, name: 'Tuition' });
   lines.feeTypes.set('pta', { id: 'pta', code: 4020, name: 'PTA fee' });
+  lines.otherAccounts.add('rent');
   const campuses = {
     get: vi
       .fn()
@@ -147,6 +148,14 @@ describe('FeeLineService.create', () => {
     const refused = service.create(everyone, input({ feeTypeId: 'rent' }));
     await expect(refused).rejects.toBeInstanceOf(BadRequestException);
     await expect(refused).rejects.toThrow(FEE_TYPE_INVALID_MESSAGE);
+  });
+
+  it('answers 404 for a fee type that is not in the school', async () => {
+    const { service, lines } = setup();
+    await expect(
+      service.create(everyone, input({ feeTypeId: 'elsewhere' }))
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(lines.created).toEqual([]);
   });
 
   it('answers 400 for a term that has ended', async () => {
