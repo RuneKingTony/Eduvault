@@ -20,6 +20,7 @@ import { Route as PlatformRouteImport } from './routes/platform'
 import { Route as RolesRouteImport } from './routes/roles'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as StudentsRouteImport } from './routes/students'
+import { Route as SubjectsRouteImport } from './routes/subjects'
 import { Route as ClassesClassIdRouteImport } from './routes/classes_.$classId'
 import { Route as DevUiRouteImport } from './routes/dev/ui'
 import { Route as FinanceLedgerRouteImport } from './routes/finance/ledger'
@@ -93,6 +94,11 @@ const SettingsRoute = SettingsRouteImport.update({
 const StudentsRoute = StudentsRouteImport.update({
   id: '/students',
   path: '/students',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SubjectsRoute = SubjectsRouteImport.update({
+  id: '/subjects',
+  path: '/subjects',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ClassesClassIdRoute = ClassesClassIdRouteImport.update({
@@ -203,6 +209,7 @@ export interface FileRoutesByFullPath {
   '/roles': typeof RolesRoute
   '/settings': typeof SettingsRouteWithChildren
   '/students': typeof StudentsRoute
+  '/subjects': typeof SubjectsRoute
   '/classes/$classId': typeof ClassesClassIdRoute
   '/dev/ui': typeof DevUiRoute
   '/finance/ledger': typeof FinanceLedgerRoute
@@ -233,6 +240,7 @@ export interface FileRoutesByTo {
   '/members': typeof MembersRoute
   '/roles': typeof RolesRoute
   '/students': typeof StudentsRoute
+  '/subjects': typeof SubjectsRoute
   '/classes/$classId': typeof ClassesClassIdRoute
   '/dev/ui': typeof DevUiRoute
   '/finance/ledger': typeof FinanceLedgerRoute
@@ -266,6 +274,7 @@ export interface FileRoutesById {
   '/roles': typeof RolesRoute
   '/settings': typeof SettingsRouteWithChildren
   '/students': typeof StudentsRoute
+  '/subjects': typeof SubjectsRoute
   '/classes_/$classId': typeof ClassesClassIdRoute
   '/dev/ui': typeof DevUiRoute
   '/finance/ledger': typeof FinanceLedgerRoute
@@ -300,6 +309,7 @@ export interface FileRouteTypes {
     | '/roles'
     | '/settings'
     | '/students'
+    | '/subjects'
     | '/classes/$classId'
     | '/dev/ui'
     | '/finance/ledger'
@@ -330,6 +340,7 @@ export interface FileRouteTypes {
     | '/members'
     | '/roles'
     | '/students'
+    | '/subjects'
     | '/classes/$classId'
     | '/dev/ui'
     | '/finance/ledger'
@@ -362,6 +373,7 @@ export interface FileRouteTypes {
     | '/roles'
     | '/settings'
     | '/students'
+    | '/subjects'
     | '/classes_/$classId'
     | '/dev/ui'
     | '/finance/ledger'
@@ -395,6 +407,7 @@ export interface RootRouteChildren {
   RolesRoute: typeof RolesRoute
   SettingsRoute: typeof SettingsRouteWithChildren
   StudentsRoute: typeof StudentsRoute
+  SubjectsRoute: typeof SubjectsRoute
   ClassesClassIdRoute: typeof ClassesClassIdRoute
   DevUiRoute: typeof DevUiRoute
   FinanceLedgerRoute: typeof FinanceLedgerRoute
@@ -484,6 +497,13 @@ declare module '@tanstack/react-router' {
       path: '/students'
       fullPath: '/students'
       preLoaderRoute: typeof StudentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/subjects': {
+      id: '/subjects'
+      path: '/subjects'
+      fullPath: '/subjects'
+      preLoaderRoute: typeof SubjectsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/classes_/$classId': {
@@ -672,6 +692,7 @@ const rootRouteChildren: RootRouteChildren = {
   RolesRoute: RolesRoute,
   SettingsRoute: SettingsRouteWithChildren,
   StudentsRoute: StudentsRoute,
+  SubjectsRoute: SubjectsRoute,
   ClassesClassIdRoute: ClassesClassIdRoute,
   DevUiRoute: DevUiRoute,
   FinanceLedgerRoute: FinanceLedgerRoute,

@@ -96,9 +96,10 @@ export const NAV_GROUPS: readonly NavGroup[] = [
       {
         id: 'subjects',
         label: 'Subjects',
-        pageTitle: 'Subjects',
+        pageTitle: 'Subjects and teachers',
         route: '/subjects',
         icon: 'book-marked',
+        gate: ['subject:read'],
       },
     ],
   },
