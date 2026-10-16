@@ -52,8 +52,46 @@ interface MyClassRow {
   campus_name: string;
   student_count: number;
   is_class_teacher: boolean;
+  subjects: string[];
   samples: Named[] | null;
 }
+
+const teachesClass = (userId: string) => sql`EXISTS (
+  SELECT 1 FROM class_arm_teacher ct
+  WHERE ct.class_arm_id = a.id
+    AND ct.session_id = cur.session_id
+    AND ct.organization_id = a.organization_id
+    AND ct.user_id = ${userId}
+)`;
+
+const teachesSubject = (userId: string) => sql`EXISTS (
+  SELECT 1 FROM subject_teacher st
+  JOIN level_subject ls
+    ON ls.subject_id = st.subject_id
+    AND ls.class_level_id = a.class_level_id
+    AND ls.organization_id = st.organization_id
+  WHERE st.class_arm_id = a.id
+    AND st.term_id = cur.term_id
+    AND st.organization_id = a.organization_id
+    AND st.user_id = ${userId}
+)`;
+
+const taughtSubjects = (userId: string) => sql`COALESCE((
+  SELECT json_agg(taught.name ORDER BY taught.sequence, taught.name)
+  FROM (
+    SELECT s.name, ls.sequence
+    FROM subject_teacher st
+    JOIN subject s ON s.id = st.subject_id AND s.organization_id = st.organization_id
+    JOIN level_subject ls
+      ON ls.subject_id = st.subject_id
+      AND ls.class_level_id = a.class_level_id
+      AND ls.organization_id = st.organization_id
+    WHERE st.class_arm_id = a.id
+      AND st.term_id = cur.term_id
+      AND st.organization_id = a.organization_id
+      AND st.user_id = ${userId}
+  ) taught
+), '[]'::json)`;
 
 const fullName = (row: PersonRow): Named => ({
   id: row.id,
@@ -284,7 +322,8 @@ export class KyselyDashboardRepository extends DashboardRepository {
         l.name || ' ' || a.name AS name,
         campus.name AS campus_name,
         (SELECT count(*) FROM visible v WHERE v.arm_id = a.id AND v.life = 'active')::int AS student_count,
-        TRUE AS is_class_teacher,
+        ${teachesClass(userId)} AS is_class_teacher,
+        ${taughtSubjects(userId)} AS subjects,
         (
           SELECT json_agg(json_build_object('id', picked.id, 'name', picked.full_name) ORDER BY picked.last_name, picked.first_name, picked.id)
           FROM (
@@ -299,13 +338,9 @@ export class KyselyDashboardRepository extends DashboardRepository {
       JOIN class_level l ON l.id = a.class_level_id AND l.organization_id = a.organization_id
       JOIN team campus ON campus.id = a.campus_id
       JOIN cur ON TRUE
-      JOIN class_arm_teacher ct
-        ON ct.class_arm_id = a.id
-        AND ct.session_id = cur.session_id
-        AND ct.organization_id = a.organization_id
-        AND ct.user_id = ${userId}
       WHERE a.organization_id = ${scope.organizationId}
         AND a.retired_at IS NULL
+        AND (${teachesClass(userId)} OR ${teachesSubject(userId)})
         AND ${inScope(sql`a.campus_id`, scope.campusScope)}
       ORDER BY l.sequence, a.name, a.id`.execute(this.db);
     return rows.map((row) => ({
@@ -314,7 +349,7 @@ export class KyselyDashboardRepository extends DashboardRepository {
       campusName: row.campus_name,
       studentCount: row.student_count,
       isClassTeacher: row.is_class_teacher,
-      subjects: [],
+      subjects: row.subjects,
       sampleStudents: row.samples ?? [],
     }));
   }

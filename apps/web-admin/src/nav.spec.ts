@@ -26,6 +26,7 @@ const built = new Set([
   '/finance/money-accounts',
   '/finance/ledger',
   '/classes',
+  '/subjects',
   '/calendar',
   '/campuses',
   '/roles',
@@ -80,6 +81,7 @@ describe('nav model', () => {
       '/students',
       '/members',
       '/classes',
+      '/subjects',
       '/finance/school-fees',
       '/finance/money-accounts',
       '/settings/profile',
@@ -189,6 +191,12 @@ describe('settings sections', () => {
   it('gates Classes and Levels on class:read', () => {
     expect(routeGate('/classes')).toEqual(['class:read']);
     expect(routeGate('/settings/levels')).toEqual(['class:read']);
+  });
+
+  it('gates Subjects on subject:read and hides it from a bursar', () => {
+    expect(routeGate('/subjects')).toEqual(['subject:read']);
+    expect(routesFor(starter('bursar'))).not.toContain('/subjects');
+    expect(routesFor(starter('teacher'))).toContain('/subjects');
   });
 
   it('shows a bursar no Settings at all', () => {

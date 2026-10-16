@@ -36,6 +36,11 @@ function ClassRow({ row }: { row: MyClass }) {
           <span className="flex items-center gap-2 font-medium">
             {row.name}
             {row.isClassTeacher ? <Badge>Class teacher</Badge> : null}
+            {row.subjects.map((subject) => (
+              <Badge key={subject} variant="secondary">
+                {subject}
+              </Badge>
+            ))}
           </span>
           <span className="text-sm text-muted-foreground">
             {countOf(row.studentCount, 'student', 'students')} ·{' '}

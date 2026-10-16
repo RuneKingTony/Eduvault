@@ -395,8 +395,53 @@ export const classQueryOptions = (api: Api, id: string) =>
 export const teacherCandidatesQueryOptions = (api: Api, id: string) =>
   queryOptions({
     queryKey: [...CLASSES_KEY, 'candidates', id],
-    queryFn: () => api.classes.teacherCandidates({ params: { id } }),
+    queryFn: () => api.classes.teacherCandidates({ params: { id }, query: {} }),
   });
+
+export const subjectCandidatesQueryOptions = (api: Api, id: string) =>
+  queryOptions({
+    queryKey: [...CLASSES_KEY, 'subject-candidates', id],
+    queryFn: () =>
+      api.classes.teacherCandidates({
+        params: { id },
+        query: { for: 'subject' },
+      }),
+  });
+
+const SUBJECTS_KEY = ['subjects'] as const;
+
+export const subjectsQueryOptions = (api: Api, page: number) =>
+  queryOptions({
+    queryKey: [...SUBJECTS_KEY, 'list', page],
+    queryFn: () => api.subjects.list({ query: { page } }),
+  });
+
+export const levelSubjectsQueryOptions = (api: Api) =>
+  queryOptions({
+    queryKey: [...SUBJECTS_KEY, 'levels'],
+    queryFn: () => api.levelSubjects.list({ query: {} }),
+  });
+
+export const subjectTeachersQueryOptions = (api: Api) =>
+  queryOptions({
+    queryKey: [...SUBJECTS_KEY, 'teachers'],
+    queryFn: () => api.subjectTeachers.list({}),
+  });
+
+export async function invalidateSubjects(
+  queryClient: QueryClient
+): Promise<void> {
+  await queryClient.invalidateQueries({ queryKey: SUBJECTS_KEY });
+}
+
+export async function invalidateSubjectTeachers(
+  queryClient: QueryClient
+): Promise<void> {
+  await Promise.all([
+    invalidateSubjects(queryClient),
+    invalidateClassTeachers(queryClient),
+  ]);
+}
 
 export async function invalidateLevels(
   queryClient: QueryClient

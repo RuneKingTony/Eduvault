@@ -87,6 +87,20 @@ describe('statements', () => {
     expect(PERM_HELP['ledger:manageAccounts']).toBeDefined();
   });
 
+  it('has the subject resource with no sensitive action', () => {
+    expect(ALL_PERMISSIONS).toEqual(
+      expect.arrayContaining([
+        'subject:create',
+        'subject:read',
+        'subject:update',
+      ])
+    );
+    expect(ALL_PERMISSIONS).not.toContain('subject:delete');
+    expect(SENSITIVE.filter((item) => item.startsWith('subject:'))).toEqual([]);
+    expect(permLabel('subject:update')).toBe('Subjects: update');
+    expect(PERM_HELP['subject:update']).toBeDefined();
+  });
+
   it('has the member resource and marks adding and removing sensitive', () => {
     expect(ALL_PERMISSIONS).toEqual(
       expect.arrayContaining([

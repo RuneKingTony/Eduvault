@@ -75,6 +75,7 @@ const MANAGER = [
   'student:read',
   'student:markAway',
   'class:read',
+  'subject:read',
 ] as const;
 
 const putRoles = (

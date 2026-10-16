@@ -1,3 +1,4 @@
+import { parsePage } from './search-page';
 import { STUDENT_TABS, type StudentTab } from '@eduvault/api-contract';
 
 export interface StudentsSearch {
@@ -25,13 +26,12 @@ const tabOf = (value: unknown): StudentTab | undefined =>
 export function parseStudentsSearch(
   search: Record<string, unknown>
 ): StudentsSearch {
-  const page = Number(search['page']);
   return {
     tab: tabOf(search['tab']),
     q: textOf(search['q']),
     campusId: textOf(search['campusId']),
     levelId: textOf(search['levelId']),
-    page: Number.isInteger(page) && page > 1 ? page : undefined,
+    page: parsePage(search),
     admit: textOf(search['admit']) === '1' ? 1 : undefined,
     dialog: search['dialog'] === 'start-year' ? 'start-year' : undefined,
   };

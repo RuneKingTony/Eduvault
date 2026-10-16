@@ -181,6 +181,38 @@ describe('roles', () => {
     }
   });
 
+  it('gives the administrator every subject permission, the principal and teacher subject:read, and the rest none', () => {
+    expect(starter('administrator').subject).toEqual([
+      'create',
+      'read',
+      'update',
+    ]);
+    expect(starter('principal').subject).toEqual(['read']);
+    expect(starter('teacher').subject).toEqual(['read']);
+    for (const slug of ['bursar', 'student', 'guardian']) {
+      expect(starter(slug).subject).toBeUndefined();
+    }
+  });
+
+  it('gates the subject routes on subject permissions and assigning on class:assignTeacher', () => {
+    const administrator = starter('administrator');
+    expect(can(administrator, 'subject', 'create')).toBe(true);
+    expect(can(administrator, 'class', 'assignTeacher')).toBe(true);
+    const teacher = starter('teacher');
+    expect(can(teacher, 'subject', 'read')).toBe(true);
+    expect(can(teacher, 'subject', 'create')).toBe(false);
+    expect(can(teacher, 'subject', 'update')).toBe(false);
+    expect(can(teacher, 'class', 'assignTeacher')).toBe(false);
+    expect(can(starter('principal'), 'class', 'assignTeacher')).toBe(false);
+    expect(can(starter('bursar'), 'subject', 'read')).toBe(false);
+  });
+
+  it('counts subject:read in READ_PERMS and leaves the writes out', () => {
+    expect(READ_PERMS).toContain('subject:read');
+    expect(READ_PERMS).not.toContain('subject:create');
+    expect(READ_PERMS).not.toContain('subject:update');
+  });
+
   it('counts the money reads in READ_PERMS', () => {
     expect(READ_PERMS).toEqual(
       expect.arrayContaining(['ledger:read', 'moneyAccount:read'])
@@ -251,6 +283,7 @@ describe('roles', () => {
     expect(permissions).toEqual({
       student: ['read', 'markAway'],
       class: ['read', 'readAll'],
+      subject: ['read'],
       team: ['read'],
       campus: ['readAll'],
       announcement: ['create', 'read', 'update'],

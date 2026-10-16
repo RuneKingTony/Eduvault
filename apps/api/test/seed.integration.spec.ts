@@ -25,6 +25,11 @@ test.describe('dev seed', () => {
                 (SELECT count(*) FROM class_arm) AS class_arm,
                 (SELECT count(*) FROM class_arm WHERE retired_at IS NOT NULL) AS retired_class_arm,
                 (SELECT count(*) FROM class_arm_teacher) AS class_arm_teacher,
+                (SELECT count(*) FROM subject) AS subject,
+                (SELECT count(*) FROM subject WHERE retired_at IS NOT NULL) AS retired_subject,
+                (SELECT count(*) FROM level_subject) AS level_subject,
+                (SELECT count(*) FROM subject_teacher) AS subject_teacher,
+                (SELECT count(*) FROM student_subject) AS student_subject,
                 (SELECT count(*) FROM student_enrollment) AS student_enrollment,
                 (SELECT count(*) FROM enrollment_placement) AS enrollment_placement,
                 (SELECT count(*) FROM guardian) AS guardian,
@@ -61,6 +66,11 @@ test.describe('dev seed', () => {
       class_arm: '10',
       retired_class_arm: '1',
       class_arm_teacher: '5',
+      subject: '10',
+      retired_subject: '1',
+      level_subject: '25',
+      subject_teacher: '9',
+      student_subject: '7',
       student_enrollment: '36',
       enrollment_placement: '68',
       guardian: '6',
@@ -91,14 +101,32 @@ test.describe('dev seed', () => {
       `SELECT a.id FROM class_arm a JOIN class_level l ON l.id = a.class_level_id
        WHERE l.name = 'JSS 3' AND a.name = 'Gold'`
     );
-    expect(await scopeOf('emeka')).toEqual([jss3[0]?.id]);
+    const { rows: arms } = await pool.query<{ id: string; name: string }>(
+      `SELECT a.id, l.name || ' ' || a.name AS name
+       FROM class_arm a JOIN class_level l ON l.id = a.class_level_id`
+    );
+    const armIds = (...names: string[]) =>
+      names
+        .map((name) => arms.find((arm) => arm.name === name)?.id ?? '')
+        .toSorted((a, b) => a.localeCompare(b));
+    const sorted = async (key: string) => {
+      const scope = await scopeOf(key);
+      return scope === 'all'
+        ? scope
+        : scope.toSorted((a, b) => a.localeCompare(b));
+    };
+    expect(await sorted('emeka')).toEqual(armIds('JSS 2 Gold', 'JSS 3 Gold'));
+    expect(jss3).toHaveLength(1);
     expect(await scopeOf('tunde')).toBe('all');
     expect(await scopeOf('grace')).toBe('all');
     const { rows: jss2 } = await pool.query<{ id: string }>(
       `SELECT a.id FROM class_arm a JOIN class_level l ON l.id = a.class_level_id
        WHERE l.name = 'JSS 2' AND a.name = 'Gold'`
     );
-    expect(await scopeOf('ayo')).toEqual([jss2[0]?.id]);
+    expect(jss2).toHaveLength(1);
+    expect(await sorted('ayo')).toEqual(
+      armIds('JSS 2 Gold', 'JSS 2 Silver', 'Primary 4 Blue')
+    );
 
     const { rows: titled } = await pool.query<{ title: string | null }>(
       `SELECT m.title FROM member m JOIN "user" u ON u.id = m."userId"

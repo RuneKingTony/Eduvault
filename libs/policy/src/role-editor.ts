@@ -219,6 +219,7 @@ export const RESOURCE_PILLARS: Record<Resource, Pillar> = {
   feeLine: 'Finance',
   ledger: 'Finance',
   moneyAccount: 'Finance',
+  subject: 'Foundation',
 };
 
 export const ACTION_WORDS: Record<Action, string> = {

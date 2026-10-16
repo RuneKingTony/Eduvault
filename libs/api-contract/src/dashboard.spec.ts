@@ -56,6 +56,22 @@ describe('dashboardTaskSchema', () => {
   });
 });
 
+describe('myClassSchema', () => {
+  it('takes a subject-teacher row that is not a class teacher, with its subjects', () => {
+    const parsed = myClassSchema.safeParse({
+      armId: id(9),
+      name: 'JSS 2 Gold',
+      campusName: 'Lekki',
+      studentCount: 0,
+      isClassTeacher: false,
+      subjects: ['Mathematics', 'English Language'],
+      sampleStudents: [],
+    });
+    expect(parsed.success).toBe(true);
+    expect(parsed.data?.subjects).toEqual(['Mathematics', 'English Language']);
+  });
+});
+
 describe('activityQuerySchema', () => {
   it('defaults to page 1, coerces the string and refuses page 0', () => {
     expect(activityQuerySchema.parse({})).toEqual({ page: 1 });

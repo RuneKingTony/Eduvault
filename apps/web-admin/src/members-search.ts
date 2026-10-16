@@ -1,3 +1,5 @@
+import { parsePage } from './search-page';
+
 export interface MembersSearch {
   q?: string;
   role?: string;
@@ -17,11 +19,10 @@ const textOf = (value: unknown): string | undefined => {
 export function parseMembersSearch(
   search: Record<string, unknown>
 ): MembersSearch {
-  const page = Number(search['page']);
   return {
     q: textOf(search['q']),
     role: textOf(search['role']),
-    page: Number.isInteger(page) && page > 1 ? page : undefined,
+    page: parsePage(search),
     add: textOf(search['add']) === '1' ? 1 : undefined,
   };
 }

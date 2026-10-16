@@ -112,6 +112,16 @@ export const CAP_AREAS: readonly CapArea[] = [
     ],
   },
   {
+    id: 'subjects',
+    group: 'School',
+    label: 'Subjects',
+    important: false,
+    see: ['subject:read'],
+    change: ['subject:create', 'subject:update'],
+    changeDesc: 'Add and change subjects',
+    extras: [],
+  },
+  {
     id: 'students',
     group: 'School',
     label: 'Students',

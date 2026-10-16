@@ -4,7 +4,7 @@ import { classTeacherRoleSchema, type RosterRow } from '@eduvault/api-contract';
 import { splitRoles, type PermissionMap } from '@eduvault/policy';
 import { customRolePermissions } from '../../common/auth';
 import { inCampusScope } from '../../common/db/in-campus-scope';
-import { iso } from '../../common/db/rows';
+import { isoOrNull } from '../../common/db/rows';
 import { KYSELY_TOKEN, type Database } from '../../common/db/tokens';
 import { placedNow } from '../../common/students';
 import {
@@ -58,7 +58,7 @@ const toClass = (row: ClassRow): ClassRecord => ({
   levelNextLevelId: row.level_next_level_id,
   campusId: row.campus_id,
   campusName: row.campus_name,
-  retiredAt: row.retired_at === null ? null : iso(row.retired_at),
+  retiredAt: isoOrNull(row.retired_at),
 });
 
 const inClassScope = inCampusScope;

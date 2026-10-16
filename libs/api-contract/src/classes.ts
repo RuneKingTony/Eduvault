@@ -119,6 +119,13 @@ export const teacherCandidateSchema = z.object({
 });
 export type TeacherCandidate = z.infer<typeof teacherCandidateSchema>;
 
+export const teacherCandidatesQuerySchema = z.object({
+  for: z.enum(['class', 'subject']).default('class'),
+});
+export type TeacherCandidatesQuery = z.input<
+  typeof teacherCandidatesQuerySchema
+>;
+
 export const classStatusSchema = z.enum(['active', 'archived', 'all']);
 export type ClassStatus = z.infer<typeof classStatusSchema>;
 

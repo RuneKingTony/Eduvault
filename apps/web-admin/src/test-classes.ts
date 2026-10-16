@@ -5,7 +5,7 @@ import type {
   ClassTeacher,
 } from '@eduvault/api-contract';
 
-const uuid = (n: number): string =>
+export const uuid = (n: number): string =>
   `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 
 export const IDS = {

@@ -323,6 +323,7 @@ test.describe('/me/permissions', () => {
       permissions: {
         student: ['read', 'markAway'],
         class: ['read', 'readAll'],
+        subject: ['read'],
         team: ['read'],
         campus: ['readAll'],
         announcement: ['create', 'read', 'update'],
@@ -462,6 +463,7 @@ test.describe('isolation', () => {
     expect(parsePermissionMap(teacherA?.permission ?? '')).toEqual({
       student: ['read', 'markAway'],
       class: ['read'],
+      subject: ['read'],
     });
   });
 });
@@ -517,6 +519,7 @@ test.describe('starter roles', () => {
     expect(parsePermissionMap(permissionOf('teacher') ?? '')).toEqual({
       student: ['read', 'markAway'],
       class: ['read'],
+      subject: ['read'],
     });
     expect(permissionOf('bursar')).toBe('{}');
     expect(permissionOf('guardian')).toBeDefined();
