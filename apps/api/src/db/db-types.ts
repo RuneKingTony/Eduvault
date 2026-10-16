@@ -96,6 +96,23 @@ export interface AuditLog {
   status: number;
 }
 
+export interface BillingRun {
+  cancelled_at: Timestamp | null;
+  cancelled_by: string | null;
+  created_at: Generated<Timestamp>;
+  created_by: string | null;
+  id: Generated<string>;
+  issued_at: Timestamp | null;
+  issued_by: string | null;
+  number: string;
+  organization_id: string;
+  scope: string;
+  scope_campus_id: string | null;
+  scope_class_level_id: string | null;
+  status: Generated<string>;
+  term_id: string;
+}
+
 export interface Campus {
   address: string | null;
   created_at: Generated<Timestamp>;
@@ -171,6 +188,7 @@ export interface FeeLine {
   organization_id: string;
   retired_at: Timestamp | null;
   term_id: string;
+  updated_at: Generated<Timestamp>;
 }
 
 export interface FileBlob {
@@ -227,6 +245,35 @@ export interface Invitation {
   role: string | null;
   status: string;
   teamId: string | null;
+}
+
+export interface Invoice {
+  billing_run_id: string | null;
+  campus_id: string;
+  created_at: Generated<Timestamp>;
+  created_by: string | null;
+  id: Generated<string>;
+  issued_at: Timestamp | null;
+  issued_by: string | null;
+  journal_entry_id: string | null;
+  kind: string;
+  number: string | null;
+  organization_id: string;
+  status: Generated<string>;
+  student_id: string;
+  term_id: string;
+}
+
+export interface InvoiceLine {
+  amount_minor: Int8;
+  created_at: Generated<Timestamp>;
+  description: string;
+  fee_line_id: string | null;
+  id: Generated<string>;
+  invoice_id: string;
+  ledger_account_id: string;
+  organization_id: string;
+  student_discount_id: string | null;
 }
 
 export interface JournalEntry {
@@ -401,6 +448,28 @@ export interface Student {
   user_id: string | null;
 }
 
+export interface StudentDiscount {
+  approved_at: Timestamp | null;
+  approved_by: string | null;
+  created_at: Generated<Timestamp>;
+  created_by: string | null;
+  ended_at: Timestamp | null;
+  ended_by: string | null;
+  from_term_id: string;
+  id: Generated<string>;
+  kind: string;
+  ledger_account_id: string | null;
+  organization_id: string;
+  reason: string;
+  rejected_at: Timestamp | null;
+  rejected_by: string | null;
+  rejection_reason: string | null;
+  status: Generated<string>;
+  student_id: string;
+  to_term_id: string | null;
+  value: Int8;
+}
+
 export interface StudentEnrollment {
   class_level_id: string;
   created_at: Generated<Timestamp>;
@@ -517,6 +586,7 @@ export interface DB {
   activity_event: ActivityEvent;
   announcement: Announcement;
   audit_log: AuditLog;
+  billing_run: BillingRun;
   campus: Campus;
   class_arm: ClassArm;
   class_arm_teacher: ClassArmTeacher;
@@ -529,6 +599,8 @@ export interface DB {
   guardian: Guardian;
   guardian_student: GuardianStudent;
   invitation: Invitation;
+  invoice: Invoice;
+  invoice_line: InvoiceLine;
   journal_entry: JournalEntry;
   journal_line: JournalLine;
   ledger_account: LedgerAccount;
@@ -542,6 +614,7 @@ export interface DB {
   school_setting: SchoolSetting;
   session: Session;
   student: Student;
+  student_discount: StudentDiscount;
   student_enrollment: StudentEnrollment;
   student_fee_option: StudentFeeOption;
   student_subject: StudentSubject;
