@@ -9,6 +9,7 @@ export const OTHER_CHARGES_SYSTEM_KEY = 'other_charges';
 export const MONEY_ACCOUNTS_SYSTEM_KEY = 'money_accounts';
 export const OPENING_BALANCE_SYSTEM_KEY = 'opening_balance_equity';
 export const FEES_RECEIVABLE_SYSTEM_KEY = 'fees_receivable';
+export const DISCOUNTS_GIVEN_SYSTEM_KEY = 'discounts_given';
 export const LEDGER_ACCOUNT_TYPES = [
   'asset',
   'liability',
@@ -477,7 +478,7 @@ export const feeCandidatesSchema = z.object({
 export type FeeCandidates = z.infer<typeof feeCandidatesSchema>;
 
 export const feePreviewLineSchema = z.object({
-  feeLineId: idSchema,
+  feeLineId: idSchema.nullable(),
   description: z.string(),
   feeTypeName: z.string(),
   amountMinor: minorSchema,
@@ -502,7 +503,8 @@ export const feePreviewSchema = z.object({
       status: z.enum(['draft', 'sent']),
       number: z.string().nullable(),
     })
-    .nullable(),
+    .nullable()
+    .optional(),
   lines: z.array(feePreviewLineSchema),
   totalMinor: minorSchema,
   pendingDiscounts: z.array(z.string()),
