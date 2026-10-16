@@ -3,7 +3,7 @@
 - Status: draft (pre-spec)
 - Source: brand prototype `https://claude.ai/artifact/1hsDyr1KdUaYD2hnuA9sfY`, version `1791539787-0c53` (script 3836–3918; seed `seedSubjects` 1417–1449; candidates `teacherCandidates` 1063; class scope 188–200)
 - Milestone and slice: `M4.1` (catalogue, subject teachers); `M4.2` (level-subject editor and per-session elective picker) (see [roadmap](README.md))
-- Amended by [D-207 to D-213](../technical-reference.md#decision-log): validation answers 400, not 422, and the arm routes live under `/classes/:id/...`.
+- Amended by [D-210 to D-216](../technical-reference.md#decision-log): validation answers 400, not 422, and the arm routes live under `/classes/:id/...`.
 - Related: [data-model-grading.md, Curriculum (F2)](../brainstorming/data-model-grading.md#curriculum-f2), [data-model-overview.md, Class scope](../brainstorming/data-model-overview.md#class-scope) and [Permission list](../brainstorming/data-model-overview.md#permission-list), [permissions-and-custom-roles.md](../brainstorming/permissions-and-custom-roles.md), [technical reference](../technical-reference.md) decisions [D-001](../technical-reference.md#decision-log), [D-005](../technical-reference.md#decision-log), [D-006](../technical-reference.md#decision-log)
 
 ## Summary
