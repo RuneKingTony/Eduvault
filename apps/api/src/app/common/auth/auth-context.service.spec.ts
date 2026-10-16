@@ -198,6 +198,20 @@ describe('AuthContextService.resolveOrganization', () => {
     expect(taughtQueries()).toHaveLength(1);
   });
 
+  it('unions this term’s subject-teacher rows with the class-teacher rows in one query', async () => {
+    const { service, taughtQueries } = setupMember(
+      'member,teacher',
+      { teacher: { class: ['read'] } },
+      ['arm-1', 'arm-2']
+    );
+    const ctx = await service.resolveOrganization(memberSession());
+    expect(ctx?.classScope).toEqual(['arm-1', 'arm-2']);
+    const [sql] = taughtQueries()[0] ?? [''];
+    expect(sql).toContain('FROM subject_teacher');
+    expect(sql).toContain('UNION');
+    expect(sql).toContain('JOIN level_subject');
+  });
+
   it('gives a class-scoped member who teaches nothing, such as with no current term, an empty scope', async () => {
     const { service } = setupMember('member,teacher', {
       teacher: { class: ['read'] },

@@ -19,6 +19,7 @@ import { seedCalendar } from './calendar';
 import { seedClasses } from './classes';
 import { seedFinance } from './finance';
 import { seedStudents } from './student-seed';
+import { seedSubjects } from './subjects';
 import { orgContextFor } from './actors';
 import { PROTOTYPE_TODAY, seedOffsetDays, shiftDate } from './date-shift';
 import {
@@ -241,6 +242,11 @@ export async function runSeed(
   await seedStudents(app, {
     owner: await orgContextFor(app, emailOf('tunde')),
     today,
+    offsetDays,
+  });
+  await seedSubjects(app, {
+    owner: greenfieldOwner,
+    userIds: created.userIds,
     offsetDays,
   });
   await seedAnnouncements(app, {

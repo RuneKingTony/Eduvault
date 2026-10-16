@@ -63,9 +63,11 @@ export class ClassesController {
   @OrganizationAuth('class', 'assignTeacher')
   teacherCandidates(
     @Org() org: OrgContext,
-    @Param(zod(routes.teacherCandidates.params)) params: { id: string }
+    @Param(zod(routes.teacherCandidates.params)) params: { id: string },
+    @Query(zod(routes.teacherCandidates.query))
+    query: Parameters<ClassService['teacherCandidates']>[2]
   ): Promise<RouteOutput<typeof routes.teacherCandidates>> {
-    return this.classes.teacherCandidates(org, params.id);
+    return this.classes.teacherCandidates(org, params.id, query);
   }
 
   @Post(':id/teachers')
