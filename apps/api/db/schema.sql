@@ -75,6 +75,70 @@ END;
 $$;
 
 --
+-- Name: invoice_immutable(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.invoice_immutable() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  IF TG_OP = 'DELETE' THEN
+    RAISE EXCEPTION 'a charge is never deleted'
+      USING ERRCODE = 'check_violation', CONSTRAINT = 'invoice_never_deleted';
+  END IF;
+  IF OLD.status <> 'draft' THEN
+    RAISE EXCEPTION 'a sent or cancelled charge cannot change'
+      USING ERRCODE = 'check_violation', CONSTRAINT = 'invoice_frozen';
+  END IF;
+  IF NEW.id IS DISTINCT FROM OLD.id
+    OR NEW.organization_id IS DISTINCT FROM OLD.organization_id
+    OR NEW.student_id IS DISTINCT FROM OLD.student_id
+    OR NEW.term_id IS DISTINCT FROM OLD.term_id
+    OR NEW.campus_id IS DISTINCT FROM OLD.campus_id
+    OR NEW.billing_run_id IS DISTINCT FROM OLD.billing_run_id
+    OR NEW.kind IS DISTINCT FROM OLD.kind
+    OR NEW.created_by IS DISTINCT FROM OLD.created_by
+    OR NEW.created_at IS DISTINCT FROM OLD.created_at
+  THEN
+    RAISE EXCEPTION 'only the status, number and issue details of a draft charge can change'
+      USING ERRCODE = 'check_violation', CONSTRAINT = 'invoice_frozen_fields';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+--
+-- Name: invoice_line_draft_only(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.invoice_line_draft_only() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+  parent_id UUID;
+  parent_status TEXT;
+BEGIN
+  parent_id := CASE WHEN TG_OP = 'INSERT' THEN NEW.invoice_id ELSE OLD.invoice_id END;
+  SELECT status INTO parent_status
+  FROM invoice
+  WHERE id = parent_id
+    AND organization_id = CASE WHEN TG_OP = 'INSERT' THEN NEW.organization_id ELSE OLD.organization_id END;
+  IF parent_status IS NOT NULL AND parent_status <> 'draft' THEN
+    RAISE EXCEPTION 'the lines of a sent or cancelled charge cannot change'
+      USING ERRCODE = 'check_violation', CONSTRAINT = 'invoice_line_frozen';
+  END IF;
+  IF TG_OP = 'DELETE' THEN
+    RETURN OLD;
+  END IF;
+  IF TG_OP = 'UPDATE' AND (NEW.invoice_id <> OLD.invoice_id OR NEW.organization_id <> OLD.organization_id) THEN
+    RAISE EXCEPTION 'a charge line cannot move to another charge'
+      USING ERRCODE = 'check_violation', CONSTRAINT = 'invoice_line_frozen';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+--
 -- Name: journal_append_only(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -320,6 +384,33 @@ CREATE TABLE public.audit_log (
 );
 
 --
+-- Name: billing_run; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.billing_run (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id text NOT NULL,
+    number text NOT NULL,
+    term_id uuid NOT NULL,
+    scope text NOT NULL,
+    scope_campus_id text,
+    scope_class_level_id uuid,
+    status text DEFAULT 'draft'::text NOT NULL,
+    created_by text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    issued_by text,
+    issued_at timestamp with time zone,
+    cancelled_by text,
+    cancelled_at timestamp with time zone,
+    CONSTRAINT billing_run_cancelled_columns CHECK (((status = 'cancelled'::text) = (cancelled_at IS NOT NULL))),
+    CONSTRAINT billing_run_issued_columns CHECK (((status = 'issued'::text) = (issued_at IS NOT NULL))),
+    CONSTRAINT billing_run_number_check CHECK ((char_length(btrim(number)) > 0)),
+    CONSTRAINT billing_run_scope_check CHECK ((scope = ANY (ARRAY['school'::text, 'campus'::text, 'level'::text]))),
+    CONSTRAINT billing_run_scope_matches CHECK ((((scope = 'school'::text) AND (scope_campus_id IS NULL) AND (scope_class_level_id IS NULL)) OR ((scope = 'campus'::text) AND (scope_campus_id IS NOT NULL) AND (scope_class_level_id IS NULL)) OR ((scope = 'level'::text) AND (scope_campus_id IS NULL) AND (scope_class_level_id IS NOT NULL)))),
+    CONSTRAINT billing_run_status_check CHECK ((status = ANY (ARRAY['draft'::text, 'issued'::text, 'cancelled'::text])))
+);
+
+--
 -- Name: campus; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -428,6 +519,7 @@ CREATE TABLE public.fee_line (
     retired_at timestamp with time zone,
     created_by text,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT fee_line_amount_positive CHECK ((amount_minor > 0)),
     CONSTRAINT fee_line_applies_to_check CHECK ((applies_to = ANY (ARRAY['all'::text, 'new'::text, 'returning'::text]))),
     CONSTRAINT fee_line_name_check CHECK (((char_length(btrim(name)) >= 1) AND (char_length(btrim(name)) <= 80)))
@@ -513,6 +605,51 @@ CREATE TABLE public.invitation (
     "expiresAt" timestamp with time zone NOT NULL,
     "createdAt" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     "inviterId" text NOT NULL
+);
+
+--
+-- Name: invoice; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.invoice (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id text NOT NULL,
+    student_id uuid NOT NULL,
+    term_id uuid NOT NULL,
+    campus_id text NOT NULL,
+    billing_run_id uuid,
+    kind text NOT NULL,
+    number text,
+    status text DEFAULT 'draft'::text NOT NULL,
+    created_by text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    issued_at timestamp with time zone,
+    issued_by text,
+    journal_entry_id uuid,
+    CONSTRAINT invoice_issued_columns CHECK ((((status = 'issued'::text) AND (number IS NOT NULL) AND (issued_at IS NOT NULL) AND (journal_entry_id IS NOT NULL)) OR ((status <> 'issued'::text) AND (number IS NULL) AND (issued_at IS NULL) AND (journal_entry_id IS NULL)))),
+    CONSTRAINT invoice_kind_check CHECK ((kind = ANY (ARRAY['term'::text, 'store'::text, 'adhoc'::text]))),
+    CONSTRAINT invoice_number_check CHECK ((char_length(btrim(number)) > 0)),
+    CONSTRAINT invoice_status_check CHECK ((status = ANY (ARRAY['draft'::text, 'issued'::text, 'cancelled'::text]))),
+    CONSTRAINT invoice_term_in_round CHECK (((kind <> 'term'::text) OR (billing_run_id IS NOT NULL)))
+);
+
+--
+-- Name: invoice_line; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.invoice_line (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id text NOT NULL,
+    invoice_id uuid NOT NULL,
+    fee_line_id uuid,
+    student_discount_id uuid,
+    ledger_account_id uuid NOT NULL,
+    description text NOT NULL,
+    amount_minor bigint NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT invoice_line_amount_nonzero CHECK ((amount_minor <> 0)),
+    CONSTRAINT invoice_line_description_check CHECK (((char_length(btrim(description)) >= 1) AND (char_length(btrim(description)) <= 300))),
+    CONSTRAINT invoice_line_discount_negative CHECK (((student_discount_id IS NOT NULL) = (amount_minor < 0)))
 );
 
 --
@@ -793,6 +930,42 @@ CREATE TABLE public.student (
 );
 
 --
+-- Name: student_discount; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.student_discount (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id text NOT NULL,
+    student_id uuid NOT NULL,
+    kind text NOT NULL,
+    value bigint NOT NULL,
+    ledger_account_id uuid,
+    reason text NOT NULL,
+    from_term_id uuid NOT NULL,
+    to_term_id uuid,
+    status text DEFAULT 'submitted'::text NOT NULL,
+    created_by text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    approved_by text,
+    approved_at timestamp with time zone,
+    rejected_by text,
+    rejected_at timestamp with time zone,
+    rejection_reason text,
+    ended_at timestamp with time zone,
+    ended_by text,
+    CONSTRAINT student_discount_approved_columns CHECK (((status = 'approved'::text) = (approved_at IS NOT NULL))),
+    CONSTRAINT student_discount_approved_not_self CHECK (((approved_by IS NULL) OR (approved_by <> created_by))),
+    CONSTRAINT student_discount_kind_check CHECK ((kind = ANY (ARRAY['percent'::text, 'fixed'::text]))),
+    CONSTRAINT student_discount_percent_range CHECK (((kind <> 'percent'::text) OR (value <= 100))),
+    CONSTRAINT student_discount_reason_check CHECK (((char_length(btrim(reason)) >= 1) AND (char_length(btrim(reason)) <= 200))),
+    CONSTRAINT student_discount_rejected_columns CHECK (((status = 'rejected'::text) = ((rejected_at IS NOT NULL) AND (rejected_by IS NOT NULL) AND (rejection_reason IS NOT NULL)))),
+    CONSTRAINT student_discount_rejected_not_self CHECK (((rejected_by IS NULL) OR (rejected_by <> created_by))),
+    CONSTRAINT student_discount_rejection_reason_check CHECK (((char_length(btrim(rejection_reason)) >= 1) AND (char_length(btrim(rejection_reason)) <= 500))),
+    CONSTRAINT student_discount_status_check CHECK ((status = ANY (ARRAY['submitted'::text, 'approved'::text, 'rejected'::text]))),
+    CONSTRAINT student_discount_value_positive CHECK ((value > 0))
+);
+
+--
 -- Name: student_enrollment; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1004,6 +1177,27 @@ ALTER TABLE ONLY public.audit_log
     ADD CONSTRAINT audit_log_pkey PRIMARY KEY (id);
 
 --
+-- Name: billing_run billing_run_id_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.billing_run
+    ADD CONSTRAINT billing_run_id_organization_id_key UNIQUE (id, organization_id);
+
+--
+-- Name: billing_run billing_run_organization_id_number_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.billing_run
+    ADD CONSTRAINT billing_run_organization_id_number_key UNIQUE (organization_id, number);
+
+--
+-- Name: billing_run billing_run_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.billing_run
+    ADD CONSTRAINT billing_run_pkey PRIMARY KEY (id);
+
+--
 -- Name: campus campus_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1193,6 +1387,34 @@ ALTER TABLE ONLY public.invitation
     ADD CONSTRAINT invitation_pkey PRIMARY KEY (id);
 
 --
+-- Name: invoice invoice_id_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.invoice
+    ADD CONSTRAINT invoice_id_organization_id_key UNIQUE (id, organization_id);
+
+--
+-- Name: invoice_line invoice_line_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.invoice_line
+    ADD CONSTRAINT invoice_line_pkey PRIMARY KEY (id);
+
+--
+-- Name: invoice invoice_organization_id_number_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.invoice
+    ADD CONSTRAINT invoice_organization_id_number_key UNIQUE (organization_id, number);
+
+--
+-- Name: invoice invoice_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.invoice
+    ADD CONSTRAINT invoice_pkey PRIMARY KEY (id);
+
+--
 -- Name: journal_entry journal_entry_id_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1380,6 +1602,20 @@ ALTER TABLE ONLY public.session
 
 ALTER TABLE ONLY public.session
     ADD CONSTRAINT session_token_key UNIQUE (token);
+
+--
+-- Name: student_discount student_discount_id_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.student_discount
+    ADD CONSTRAINT student_discount_id_organization_id_key UNIQUE (id, organization_id);
+
+--
+-- Name: student_discount student_discount_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.student_discount
+    ADD CONSTRAINT student_discount_pkey PRIMARY KEY (id);
 
 --
 -- Name: student_enrollment student_enrollment_id_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
@@ -1607,6 +1843,24 @@ CREATE INDEX audit_log_created_idx ON public.audit_log USING btree (created_at D
 CREATE INDEX audit_log_organization_created_idx ON public.audit_log USING btree (organization_id, created_at DESC);
 
 --
+-- Name: billing_run_created_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX billing_run_created_idx ON public.billing_run USING btree (organization_id, created_at DESC);
+
+--
+-- Name: billing_run_scope_campus_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX billing_run_scope_campus_idx ON public.billing_run USING btree (organization_id, scope_campus_id);
+
+--
+-- Name: billing_run_term_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX billing_run_term_idx ON public.billing_run USING btree (organization_id, term_id);
+
+--
 -- Name: campus_organization_id_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1703,6 +1957,60 @@ CREATE INDEX invitation_email_idx ON public.invitation USING btree (email);
 CREATE INDEX "invitation_organizationId_idx" ON public.invitation USING btree ("organizationId");
 
 --
+-- Name: invoice_campus_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX invoice_campus_idx ON public.invoice USING btree (organization_id, campus_id);
+
+--
+-- Name: invoice_journal_entry_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX invoice_journal_entry_key ON public.invoice USING btree (journal_entry_id) WHERE (journal_entry_id IS NOT NULL);
+
+--
+-- Name: invoice_line_discount_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX invoice_line_discount_idx ON public.invoice_line USING btree (organization_id, student_discount_id);
+
+--
+-- Name: invoice_line_fee_line_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX invoice_line_fee_line_idx ON public.invoice_line USING btree (organization_id, fee_line_id);
+
+--
+-- Name: invoice_line_invoice_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX invoice_line_invoice_idx ON public.invoice_line USING btree (organization_id, invoice_id);
+
+--
+-- Name: invoice_run_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX invoice_run_idx ON public.invoice USING btree (organization_id, billing_run_id);
+
+--
+-- Name: invoice_student_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX invoice_student_idx ON public.invoice USING btree (organization_id, student_id, created_at DESC);
+
+--
+-- Name: invoice_term_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX invoice_term_idx ON public.invoice USING btree (organization_id, term_id, status);
+
+--
+-- Name: invoice_term_student_live_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX invoice_term_student_live_key ON public.invoice USING btree (student_id, term_id) WHERE ((kind = 'term'::text) AND (status <> 'cancelled'::text));
+
+--
 -- Name: journal_entry_effective_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1779,6 +2087,18 @@ CREATE INDEX "organizationRole_role_idx" ON public."organizationRole" USING btre
 --
 
 CREATE INDEX "session_userId_idx" ON public.session USING btree ("userId");
+
+--
+-- Name: student_discount_ledger_account_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX student_discount_ledger_account_idx ON public.student_discount USING btree (organization_id, ledger_account_id);
+
+--
+-- Name: student_discount_student_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX student_discount_student_idx ON public.student_discount USING btree (organization_id, student_id, status);
 
 --
 -- Name: student_duplicate_idx; Type: INDEX; Schema: public; Owner: -
@@ -1883,6 +2203,18 @@ CREATE TRIGGER audit_log_append_only BEFORE DELETE OR UPDATE ON public.audit_log
 CREATE TRIGGER fee_line_fee_income_child BEFORE INSERT ON public.fee_line FOR EACH ROW EXECUTE FUNCTION public.fee_line_fee_income_child();
 
 --
+-- Name: invoice invoice_immutable; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER invoice_immutable BEFORE DELETE OR UPDATE ON public.invoice FOR EACH ROW EXECUTE FUNCTION public.invoice_immutable();
+
+--
+-- Name: invoice_line invoice_line_draft_only; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER invoice_line_draft_only BEFORE INSERT OR DELETE OR UPDATE ON public.invoice_line FOR EACH ROW EXECUTE FUNCTION public.invoice_line_draft_only();
+
+--
 -- Name: journal_entry journal_entry_append_only; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -1980,6 +2312,55 @@ ALTER TABLE ONLY public.announcement
 
 ALTER TABLE ONLY public.audit_log
     ADD CONSTRAINT audit_log_actor_user_id_fkey FOREIGN KEY (actor_user_id) REFERENCES public."user"(id) ON DELETE RESTRICT;
+
+--
+-- Name: billing_run billing_run_cancelled_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.billing_run
+    ADD CONSTRAINT billing_run_cancelled_by_fkey FOREIGN KEY (cancelled_by) REFERENCES public."user"(id) ON DELETE SET NULL;
+
+--
+-- Name: billing_run billing_run_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.billing_run
+    ADD CONSTRAINT billing_run_created_by_fkey FOREIGN KEY (created_by) REFERENCES public."user"(id) ON DELETE SET NULL;
+
+--
+-- Name: billing_run billing_run_issued_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.billing_run
+    ADD CONSTRAINT billing_run_issued_by_fkey FOREIGN KEY (issued_by) REFERENCES public."user"(id) ON DELETE SET NULL;
+
+--
+-- Name: billing_run billing_run_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.billing_run
+    ADD CONSTRAINT billing_run_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE RESTRICT;
+
+--
+-- Name: billing_run billing_run_scope_campus_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.billing_run
+    ADD CONSTRAINT billing_run_scope_campus_id_organization_id_fkey FOREIGN KEY (scope_campus_id, organization_id) REFERENCES public.campus(team_id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: billing_run billing_run_scope_class_level_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.billing_run
+    ADD CONSTRAINT billing_run_scope_class_level_id_organization_id_fkey FOREIGN KEY (scope_class_level_id, organization_id) REFERENCES public.class_level(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: billing_run billing_run_term_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.billing_run
+    ADD CONSTRAINT billing_run_term_id_organization_id_fkey FOREIGN KEY (term_id, organization_id) REFERENCES public.term(id, organization_id) ON DELETE RESTRICT;
 
 --
 -- Name: campus campus_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -2255,6 +2636,97 @@ ALTER TABLE ONLY public.invitation
     ADD CONSTRAINT "invitation_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES public.organization(id) ON DELETE CASCADE;
 
 --
+-- Name: invoice invoice_billing_run_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.invoice
+    ADD CONSTRAINT invoice_billing_run_id_organization_id_fkey FOREIGN KEY (billing_run_id, organization_id) REFERENCES public.billing_run(id, organization_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+
+--
+-- Name: invoice invoice_campus_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.invoice
+    ADD CONSTRAINT invoice_campus_id_organization_id_fkey FOREIGN KEY (campus_id, organization_id) REFERENCES public.campus(team_id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: invoice invoice_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.invoice
+    ADD CONSTRAINT invoice_created_by_fkey FOREIGN KEY (created_by) REFERENCES public."user"(id) ON DELETE SET NULL;
+
+--
+-- Name: invoice invoice_issued_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.invoice
+    ADD CONSTRAINT invoice_issued_by_fkey FOREIGN KEY (issued_by) REFERENCES public."user"(id) ON DELETE SET NULL;
+
+--
+-- Name: invoice invoice_journal_entry_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.invoice
+    ADD CONSTRAINT invoice_journal_entry_id_organization_id_fkey FOREIGN KEY (journal_entry_id, organization_id) REFERENCES public.journal_entry(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: invoice_line invoice_line_fee_line_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.invoice_line
+    ADD CONSTRAINT invoice_line_fee_line_id_organization_id_fkey FOREIGN KEY (fee_line_id, organization_id) REFERENCES public.fee_line(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: invoice_line invoice_line_invoice_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.invoice_line
+    ADD CONSTRAINT invoice_line_invoice_id_organization_id_fkey FOREIGN KEY (invoice_id, organization_id) REFERENCES public.invoice(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: invoice_line invoice_line_ledger_account_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.invoice_line
+    ADD CONSTRAINT invoice_line_ledger_account_id_organization_id_fkey FOREIGN KEY (ledger_account_id, organization_id) REFERENCES public.ledger_account(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: invoice_line invoice_line_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.invoice_line
+    ADD CONSTRAINT invoice_line_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE RESTRICT;
+
+--
+-- Name: invoice_line invoice_line_student_discount_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.invoice_line
+    ADD CONSTRAINT invoice_line_student_discount_id_organization_id_fkey FOREIGN KEY (student_discount_id, organization_id) REFERENCES public.student_discount(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: invoice invoice_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.invoice
+    ADD CONSTRAINT invoice_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE RESTRICT;
+
+--
+-- Name: invoice invoice_student_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.invoice
+    ADD CONSTRAINT invoice_student_id_organization_id_fkey FOREIGN KEY (student_id, organization_id) REFERENCES public.student(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: invoice invoice_term_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.invoice
+    ADD CONSTRAINT invoice_term_id_organization_id_fkey FOREIGN KEY (term_id, organization_id) REFERENCES public.term(id, organization_id) ON DELETE RESTRICT;
+
+--
 -- Name: journal_entry journal_entry_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2477,6 +2949,69 @@ ALTER TABLE ONLY public.student
 
 ALTER TABLE ONLY public.student
     ADD CONSTRAINT student_created_by_fkey FOREIGN KEY (created_by) REFERENCES public."user"(id) ON DELETE SET NULL;
+
+--
+-- Name: student_discount student_discount_approved_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.student_discount
+    ADD CONSTRAINT student_discount_approved_by_fkey FOREIGN KEY (approved_by) REFERENCES public."user"(id) ON DELETE SET NULL;
+
+--
+-- Name: student_discount student_discount_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.student_discount
+    ADD CONSTRAINT student_discount_created_by_fkey FOREIGN KEY (created_by) REFERENCES public."user"(id) ON DELETE SET NULL;
+
+--
+-- Name: student_discount student_discount_ended_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.student_discount
+    ADD CONSTRAINT student_discount_ended_by_fkey FOREIGN KEY (ended_by) REFERENCES public."user"(id) ON DELETE SET NULL;
+
+--
+-- Name: student_discount student_discount_from_term_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.student_discount
+    ADD CONSTRAINT student_discount_from_term_id_organization_id_fkey FOREIGN KEY (from_term_id, organization_id) REFERENCES public.term(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: student_discount student_discount_ledger_account_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.student_discount
+    ADD CONSTRAINT student_discount_ledger_account_id_organization_id_fkey FOREIGN KEY (ledger_account_id, organization_id) REFERENCES public.ledger_account(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: student_discount student_discount_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.student_discount
+    ADD CONSTRAINT student_discount_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE RESTRICT;
+
+--
+-- Name: student_discount student_discount_rejected_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.student_discount
+    ADD CONSTRAINT student_discount_rejected_by_fkey FOREIGN KEY (rejected_by) REFERENCES public."user"(id) ON DELETE SET NULL;
+
+--
+-- Name: student_discount student_discount_student_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.student_discount
+    ADD CONSTRAINT student_discount_student_id_organization_id_fkey FOREIGN KEY (student_id, organization_id) REFERENCES public.student(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: student_discount student_discount_to_term_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.student_discount
+    ADD CONSTRAINT student_discount_to_term_id_organization_id_fkey FOREIGN KEY (to_term_id, organization_id) REFERENCES public.term(id, organization_id) ON DELETE RESTRICT;
 
 --
 -- Name: student_enrollment student_enrollment_class_level_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -2708,4 +3243,9 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20261013090000'),
     ('20261013090100'),
     ('20261013090200'),
-    ('20261015090000');
+    ('20261015090000'),
+    ('20261016085900'),
+    ('20261016090000'),
+    ('20261016090100'),
+    ('20261016090200'),
+    ('20261016090300');
