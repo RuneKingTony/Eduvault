@@ -267,6 +267,17 @@ export interface LedgerAccount {
   type: string;
 }
 
+export interface LevelSubject {
+  class_level_id: string;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  kind: string;
+  organization_id: string;
+  sequence: number;
+  subject_id: string;
+  updated_at: Generated<Timestamp>;
+}
+
 export interface Member {
   createdAt: Timestamp;
   id: Generated<string>;
@@ -412,6 +423,38 @@ export interface StudentFeeOption {
   organization_id: string;
 }
 
+export interface StudentSubject {
+  created_at: Generated<Timestamp>;
+  enrollment_id: string;
+  id: Generated<string>;
+  organization_id: string;
+  subject_id: string;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface Subject {
+  code: string;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  name: string;
+  organization_id: string;
+  retired_at: Timestamp | null;
+  retired_by: string | null;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface SubjectTeacher {
+  assigned_by: string | null;
+  class_arm_id: string;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  organization_id: string;
+  subject_id: string;
+  term_id: string;
+  updated_at: Generated<Timestamp>;
+  user_id: string;
+}
+
 export interface Team {
   createdAt: Timestamp;
   id: Generated<string>;
@@ -489,6 +532,7 @@ export interface DB {
   journal_entry: JournalEntry;
   journal_line: JournalLine;
   ledger_account: LedgerAccount;
+  level_subject: LevelSubject;
   member: Member;
   money_account: MoneyAccount;
   organization: Organization;
@@ -500,6 +544,9 @@ export interface DB {
   student: Student;
   student_enrollment: StudentEnrollment;
   student_fee_option: StudentFeeOption;
+  student_subject: StudentSubject;
+  subject: Subject;
+  subject_teacher: SubjectTeacher;
   team: Team;
   teamMember: TeamMember;
   term: Term;
