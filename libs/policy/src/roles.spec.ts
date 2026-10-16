@@ -143,6 +143,21 @@ describe('roles', () => {
     }
   });
 
+  it('gives the bursar invoice bill and read, the administrator and principal invoice read, and the portal roles invoice readOwn', () => {
+    expect(starter('bursar').invoice).toEqual(['bill', 'read']);
+    expect(starter('administrator').invoice).toEqual(['read']);
+    expect(starter('principal').invoice).toEqual(['read']);
+    expect(starter('teacher').invoice).toBeUndefined();
+    for (const slug of ['student', 'guardian']) {
+      expect(starter(slug).invoice).toEqual(['readOwn']);
+    }
+  });
+
+  it('counts invoice:read but not invoice:bill in READ_PERMS', () => {
+    expect(READ_PERMS).toContain('invoice:read');
+    expect(READ_PERMS).not.toContain('invoice:bill');
+  });
+
   it('gives the administrator and principal every announcement permission and nobody else any', () => {
     for (const slug of ['administrator', 'principal']) {
       expect(starter(slug).announcement).toEqual(['create', 'read', 'update']);
@@ -287,6 +302,7 @@ describe('roles', () => {
       team: ['read'],
       campus: ['readAll'],
       announcement: ['create', 'read', 'update'],
+      invoice: ['read'],
       moneyAccount: ['read'],
     });
   });

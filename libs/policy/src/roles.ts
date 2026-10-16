@@ -61,6 +61,7 @@ export const STARTER_ROLES: readonly StarterRole[] = [
       'announcement:read',
       'announcement:update',
       'feeLine:read',
+      'invoice:read',
     ],
   },
   {
@@ -87,6 +88,8 @@ export const STARTER_ROLES: readonly StarterRole[] = [
       'feeLine:read',
       'feeLine:update',
       'feeLine:retire',
+      'invoice:bill',
+      'invoice:read',
       'moneyAccount:read',
       'ledger:read',
     ],
@@ -105,6 +108,7 @@ export const STARTER_ROLES: readonly StarterRole[] = [
       'announcement:create',
       'announcement:read',
       'announcement:update',
+      'invoice:read',
       'moneyAccount:read',
     ],
   },
@@ -112,13 +116,13 @@ export const STARTER_ROLES: readonly StarterRole[] = [
     slug: 'student',
     label: 'Student',
     description: 'Portal only. Sees their own records.',
-    permissions: ['student:readOwn'],
+    permissions: ['student:readOwn', 'invoice:readOwn'],
   },
   {
     slug: 'guardian',
     label: 'Guardian',
     description: 'Portal only. Sees their linked children.',
-    permissions: ['student:readOwn'],
+    permissions: ['student:readOwn', 'invoice:readOwn'],
   },
 ];
 

@@ -398,6 +398,11 @@ describe('Advanced grid vocabulary', () => {
     expect(RESOURCE_PILLARS.ac).toBe('People and access');
     expect(RESOURCE_PILLARS.member).toBe('People and access');
     expect(RESOURCE_PILLARS.feeLine).toBe('Finance');
+    expect(RESOURCE_PILLARS.invoice).toBe('Finance');
+  });
+
+  it('words the bill action', () => {
+    expect(ACTION_WORDS.bill).toBe('charge students');
   });
 });
 

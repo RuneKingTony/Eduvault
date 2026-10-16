@@ -54,6 +54,21 @@ describe('statements', () => {
     expect(permLabel('feeLine:retire')).toBe('School and other fees: retire');
   });
 
+  it('has the invoice resource with help, none sensitive', () => {
+    expect(ALL_PERMISSIONS).toEqual(
+      expect.arrayContaining([
+        'invoice:bill',
+        'invoice:read',
+        'invoice:readOwn',
+      ])
+    );
+    expect(SENSITIVE.some((p) => p.startsWith('invoice'))).toBe(false);
+    expect(permLabel('invoice:bill')).toBe('Charges: bill');
+    expect(PERM_HELP['invoice:bill']).toBeDefined();
+    expect(PERM_HELP['invoice:read']).toBeDefined();
+    expect(PERM_HELP['invoice:readOwn']).toBeDefined();
+  });
+
   it('has announcement create, read and update, with no delete and none sensitive', () => {
     expect(ALL_PERMISSIONS).toEqual(
       expect.arrayContaining([
