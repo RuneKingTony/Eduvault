@@ -9,6 +9,7 @@ export const statements = {
   session: ['create', 'read', 'update', 'setCurrent'],
   class: ['create', 'read', 'readAll', 'update', 'assignTeacher'],
   feeLine: ['create', 'read', 'readOwn', 'update', 'retire'],
+  invoice: ['bill', 'read', 'readOwn'],
   announcement: ['create', 'read', 'update'],
   ledger: ['read', 'manageAccounts'],
   moneyAccount: ['create', 'read', 'update'],
@@ -94,6 +95,11 @@ export const PERM_HELP: Partial<Record<Permission, string>> = {
   'feeLine:retire': 'Retires a fee. A fee for every campus needs every campus.',
   'subject:create': 'Adds subjects to the school. A code never changes.',
   'subject:update': 'Renames, retires and restores subjects.',
+  'invoice:bill':
+    'Prepares, sends and cancels rounds of student charges, on the campuses they see.',
+  'invoice:read': 'Sees rounds and charges, and what each one posted.',
+  'invoice:readOwn':
+    'Students see their own charges. Guardians see their children’s.',
 };
 
 const RESOURCE_LABELS: Record<Resource, string> = {
@@ -107,6 +113,7 @@ const RESOURCE_LABELS: Record<Resource, string> = {
   session: 'School years and terms',
   class: 'Classes',
   feeLine: 'School and other fees',
+  invoice: 'Charges',
   announcement: 'Announcements',
   ledger: 'Money categories',
   moneyAccount: 'Bank and POS accounts',

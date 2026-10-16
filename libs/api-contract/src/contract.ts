@@ -25,6 +25,14 @@ import {
   updateAnnouncementSchema,
 } from './announcements';
 import {
+  billingRunListQuerySchema,
+  billingRunListSchema,
+  billingRunSchema,
+  billingTermSchema,
+  prepareBodySchema,
+  prepareResultSchema,
+} from './billing';
+import {
   assignClassTeacherSchema,
   classDetailSchema,
   classGraduatedSchema,
@@ -45,6 +53,7 @@ import {
 import {
   activityPageSchema,
   activityQuerySchema,
+  dashboardChargedSchema,
   dashboardMoneySchema,
   dashboardRollSchema,
   dashboardTaskSchema,
@@ -97,6 +106,11 @@ import {
   resetLoginSchema,
   updateGuardianLinkSchema,
 } from './guardians';
+import {
+  invoiceListQuerySchema,
+  invoiceListSchema,
+  invoiceSchema,
+} from './invoices';
 import {
   portalAnnouncementListQuerySchema,
   portalAnnouncementListSchema,
@@ -677,6 +691,11 @@ export const contract = defineContract({
       path: '/dashboard/money',
       response: dashboardMoneySchema,
     }),
+    charged: defineRoute({
+      method: 'GET',
+      path: '/dashboard/charged',
+      response: dashboardChargedSchema.nullable(),
+    }),
   },
   moneyAccounts: {
     list: defineRoute({
@@ -811,6 +830,58 @@ export const contract = defineContract({
       params: feeOptionParamsSchema,
       body: setFeeOptionSchema,
       response: feeOptionResultSchema,
+    }),
+  },
+  billingRuns: {
+    list: defineRoute({
+      method: 'GET',
+      path: '/billing-runs',
+      query: billingRunListQuerySchema,
+      response: billingRunListSchema,
+    }),
+    terms: defineRoute({
+      method: 'GET',
+      path: '/billing-runs/terms',
+      response: z.array(billingTermSchema),
+    }),
+    get: defineRoute({
+      method: 'GET',
+      path: '/billing-runs/:id',
+      params: idParamsSchema,
+      query: billingRunListQuerySchema,
+      response: billingRunSchema,
+    }),
+    prepare: defineRoute({
+      method: 'POST',
+      path: '/billing-runs',
+      body: prepareBodySchema,
+      response: prepareResultSchema,
+    }),
+    issue: defineRoute({
+      method: 'POST',
+      path: '/billing-runs/:id/issue',
+      params: idParamsSchema,
+      response: billingRunSchema,
+    }),
+    cancel: defineRoute({
+      method: 'POST',
+      path: '/billing-runs/:id/cancel',
+      params: idParamsSchema,
+      response: billingRunSchema,
+    }),
+  },
+  invoices: {
+    list: defineRoute({
+      method: 'GET',
+      path: '/invoices',
+      query: invoiceListQuerySchema,
+      response: invoiceListSchema,
+    }),
+    get: defineRoute({
+      method: 'GET',
+      path: '/invoices/:id',
+      params: idParamsSchema,
+      response: invoiceSchema,
     }),
   },
   portal: {

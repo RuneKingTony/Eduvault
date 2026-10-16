@@ -1,6 +1,7 @@
 import {
   admitBody,
   admittedToast,
+  admittedToastAction,
   chosenTerm,
   addedGuardian,
   canAdmit,
@@ -230,5 +231,19 @@ describe('admittedToast', () => {
         },
       })
     ).toBe('Peace Udoh admitted as GF-0234.');
+  });
+});
+
+describe('admittedToastAction', () => {
+  it('offers Charge this student to someone who can bill', () => {
+    const onCharge = vi.fn();
+    const options = admittedToastAction(true, onCharge);
+    expect(options?.action.label).toBe('Charge this student');
+    options?.action.onClick();
+    expect(onCharge).toHaveBeenCalledTimes(1);
+  });
+
+  it('offers nothing to someone who cannot bill', () => {
+    expect(admittedToastAction(false, vi.fn())).toBeUndefined();
   });
 });

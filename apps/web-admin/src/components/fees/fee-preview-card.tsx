@@ -65,9 +65,8 @@ function Badges({ preview }: { preview: FeePreview }) {
       <Badge variant="secondary">
         {student.isNew ? 'New student' : 'Returning student'}
       </Badge>
-      {charged === null ? (
-        <Badge variant="warning">Not billed yet</Badge>
-      ) : (
+      {charged === null && <Badge variant="warning">Not billed yet</Badge>}
+      {charged && (
         <Tooltip>
           <TooltipTrigger asChild>
             <Badge variant="success">
@@ -101,7 +100,7 @@ function Lines({ preview }: { preview: FeePreview }) {
       </TableHeader>
       <TableBody>
         {preview.lines.map((line) => (
-          <TableRow key={line.feeLineId}>
+          <TableRow key={line.feeLineId ?? line.description}>
             <TableCell>
               <span className="flex flex-wrap items-center gap-1.5">
                 {line.description}

@@ -2,7 +2,7 @@
 
 - Status: implemented (M3.2, EDU-34)
 - Source: brand prototype `https://claude.ai/artifact/1hsDyr1KdUaYD2hnuA9sfY`, version `1791539787-0c53`
-- Milestone and slice: `M3.2` (see [roadmap](README.md)); the preview's "Already charged" badge, discount lines and pending-discount callout read charges and `student_discount`, both shipped in `M3.3`, and stay empty until then (see [Dependencies](#dependencies))
+- Milestone and slice: `M3.2` (see [roadmap](README.md)); the preview's "Already charged" badge, discount lines and pending-discount callout read charges and `student_discount`, both shipped in `M3.3` (see [Dependencies](#dependencies))
 - Related: [data-model-finance.md, Fees and charging](../brainstorming/data-model-finance.md#fees-and-charging), [data-model-overview.md, Rules every table follows](../brainstorming/data-model-overview.md#rules-every-table-follows), [permissions-and-custom-roles.md](../brainstorming/permissions-and-custom-roles.md), [technical reference](../technical-reference.md) decisions [D-001](../technical-reference.md#decision-log), [D-005](../technical-reference.md#decision-log), [D-017](../technical-reference.md#decision-log), [D-024](../technical-reference.md#decision-log), [D-040](../technical-reference.md#decision-log); sibling PRDs [51-charge-students.md](51-charge-students.md), [52-charges.md](52-charges.md)
 
 ## Summary

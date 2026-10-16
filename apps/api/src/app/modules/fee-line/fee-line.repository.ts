@@ -7,6 +7,7 @@ import type {
   FeeType,
 } from '@eduvault/api-contract';
 import type { CampusScope } from '../../common/campus-scope';
+import type { DiscountFacts, TermPosition } from '../../common/fees';
 
 export interface FeeScope {
   organizationId: string;
@@ -116,6 +117,7 @@ export interface StudentFeeContext {
     campusId: string;
     campusName: string;
   } | null;
+  latestPlacement: { campusId: string; campusName: string } | null;
 }
 
 export interface OptionChange {
@@ -124,6 +126,13 @@ export interface OptionChange {
   enrollmentId: string;
   feeTypeId: string;
   optedIn: boolean;
+}
+
+export interface ChargeFacts {
+  charged: { status: 'draft' | 'sent'; number: string | null } | null;
+  discounts: DiscountFacts[];
+  term: TermPosition;
+  discountsAccountId: string;
 }
 
 export abstract class FeeStudentRepository {
@@ -136,6 +145,11 @@ export abstract class FeeStudentRepository {
       termId?: string;
     }
   ): Promise<StudentFeeContext | undefined>;
+
+  abstract chargeFacts(
+    organizationId: string,
+    query: { studentId: string; termId: string }
+  ): Promise<ChargeFacts>;
 
   abstract candidates(
     scope: FeeScope,

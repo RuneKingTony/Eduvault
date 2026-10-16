@@ -129,6 +129,8 @@ async function renderAt(
       child('/members', page('Members page')),
       child('/finance/school-fees', page('Fees page')),
       child('/finance/other-fees', page('Other fees page')),
+      child('/finance/billing', page('Charge students page')),
+      child('/finance/invoices', page('Charges page')),
       child('/calendar', page('Calendar page')),
       child('/campuses', page('Campuses page')),
       child('/roles', page('Roles page')),
@@ -630,6 +632,35 @@ describe('AppShell access', () => {
     );
     expect(
       screen.queryByRole('option', { name: /Add a fee we charge/ })
+    ).not.toBeInTheDocument();
+  });
+
+  it('offers Charge students with invoice:bill and hides it from a reader', async () => {
+    await renderAt('/', { access: starterAccess('bursar') });
+    fireEvent.keyDown(globalThis as unknown as Window, {
+      key: 'k',
+      ctrlKey: true,
+    });
+    fireEvent.change(
+      await screen.findByPlaceholderText('Search pages and actions…'),
+      { target: { value: 'charge students' } }
+    );
+    expect(
+      screen.getByRole('option', { name: /Charge students/ })
+    ).toBeInTheDocument();
+    cleanup();
+
+    await renderAt('/', { access: starterAccess('administrator') });
+    fireEvent.keyDown(globalThis as unknown as Window, {
+      key: 'k',
+      ctrlKey: true,
+    });
+    fireEvent.change(
+      await screen.findByPlaceholderText('Search pages and actions…'),
+      { target: { value: 'charge students' } }
+    );
+    expect(
+      screen.queryByRole('option', { name: /Charge students/ })
     ).not.toBeInTheDocument();
   });
 

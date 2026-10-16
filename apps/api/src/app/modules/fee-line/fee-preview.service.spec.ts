@@ -12,7 +12,7 @@ import { FeePreviewService } from './fee-preview.service';
 const ctx = {
   organizationId: 'school-a',
   campusScope: 'all',
-  permissions: { student: ['read'], feeLine: ['read'] },
+  permissions: { student: ['read'], feeLine: ['read'], invoice: ['read'] },
 } as OrgContext;
 const query = { termId: 'term-1', studentId: 'ada' };
 
@@ -48,6 +48,7 @@ const student = (over: Partial<StudentFeeContext> = {}): StudentFeeContext => ({
     isNew: false,
   },
   placement: { armName: 'JSS 2A', campusId: 'ikeja', campusName: 'Ikeja' },
+  latestPlacement: null,
   ...over,
 });
 
@@ -106,6 +107,70 @@ describe('FeePreviewService.preview', () => {
     expect(preview.lines[0]?.campusName).toBe('Ikeja');
   });
 
+  it('shows the charge status of the term and the approved discount line', async () => {
+    const { service, students } = setup([line({ id: 'base' })], student());
+    students.facts = {
+      ...students.facts,
+      charged: { status: 'sent', number: 'CHG-2026-00001' },
+      discounts: [
+        {
+          id: 'sibling',
+          status: 'approved',
+          kind: 'percent',
+          value: 5,
+          feeTypeId: 'tuition',
+          feeTypeName: 'Tuition',
+          reason: 'Sibling discount (3 children)',
+          approvedAt: '2026-09-01T00:00:00.000Z',
+          from: { sessionStartsOn: '2026-09-07', sequence: 1 },
+          to: null,
+        },
+      ],
+    };
+    const preview = await service.preview(ctx, query);
+    expect(preview.charged).toEqual({
+      status: 'sent',
+      number: 'CHG-2026-00001',
+    });
+    expect(preview.lines.at(-1)).toEqual({
+      feeLineId: null,
+      description: 'Sibling discount (3 children) (5% of tuition)',
+      feeTypeName: 'Discounts given',
+      amountMinor: -900_000,
+      optedIn: false,
+      campusName: null,
+    });
+    expect(preview.totalMinor).toBe(17_100_000);
+    expect(preview.pendingDiscounts).toEqual([]);
+  });
+
+  it('lists a waiting discount as pending and leaves it out of the lines', async () => {
+    const { service, students } = setup([line({ id: 'base' })], student());
+    students.facts = {
+      ...students.facts,
+      discounts: [
+        {
+          id: 'scholarship',
+          status: 'submitted',
+          kind: 'percent',
+          value: 50,
+          feeTypeId: null,
+          feeTypeName: null,
+          reason: 'Academic scholarship, top of JSS 1',
+          approvedAt: null,
+          from: { sessionStartsOn: '2026-09-07', sequence: 1 },
+          to: null,
+        },
+      ],
+    };
+    const preview = await service.preview(ctx, query);
+    expect(preview.pendingDiscounts).toEqual([
+      'Academic scholarship, top of JSS 1',
+    ]);
+    expect(preview.totalMinor).toBe(18_000_000);
+    expect(preview.charged).toBeNull();
+  });
+
   it('lets the every-campus line through when the override is for new students and this one is returning', async () => {
     const { service } = setup(
       [
@@ -138,7 +203,82 @@ describe('FeePreviewService.preview', () => {
     expect(preview.lines[0]).toMatchObject({ feeLineId: 'bus', optedIn: true });
   });
 
-  it('leaves the charged state and pending discounts empty until charging exists', async () => {
+  it('prices a student with no placement in the term from the latest placement of the year', async () => {
+    const { service } = setup(
+      [
+        line({ id: 'base' }),
+        line({
+          id: 'override',
+          campusId: 'ikeja',
+          campusName: 'Ikeja',
+          amountMinor: 16_500_000,
+        }),
+      ],
+      student({
+        placement: null,
+        latestPlacement: { campusId: 'ikeja', campusName: 'Ikeja' },
+      })
+    );
+    const preview = await service.preview(ctx, query);
+    expect(preview.student.campusName).toBe('Ikeja');
+    expect(preview.lines.map((row) => row.feeLineId)).toEqual(['override']);
+  });
+
+  it('prices from every campus’s fee lines, as prepare does, for a student the caller can see', async () => {
+    const { service } = setup(
+      [line({ id: 'override', campusId: 'ikeja', campusName: 'Ikeja' })],
+      student()
+    );
+    const preview = await service.preview(
+      { ...ctx, campusScope: ['lekki'] },
+      query
+    );
+    expect(preview.lines.map((row) => row.feeLineId)).toEqual(['override']);
+  });
+
+  it('leaves the charge and the discounts out without invoice:read', async () => {
+    const { service, students } = setup([line({ id: 'base' })], student());
+    students.facts = {
+      ...students.facts,
+      charged: { status: 'sent', number: 'CHG-2026-00001' },
+      discounts: [
+        {
+          id: 'scholarship',
+          status: 'submitted',
+          kind: 'percent',
+          value: 50,
+          feeTypeId: null,
+          feeTypeName: null,
+          reason: 'Academic scholarship, top of JSS 1',
+          approvedAt: null,
+          from: { sessionStartsOn: '2026-09-07', sequence: 1 },
+          to: null,
+        },
+        {
+          id: 'sibling',
+          status: 'approved',
+          kind: 'percent',
+          value: 5,
+          feeTypeId: null,
+          feeTypeName: null,
+          reason: 'Sibling discount (3 children)',
+          approvedAt: '2026-09-01T00:00:00.000Z',
+          from: { sessionStartsOn: '2026-09-07', sequence: 1 },
+          to: null,
+        },
+      ],
+    };
+    const preview = await service.preview(
+      { ...ctx, permissions: { student: ['read'], feeLine: ['read'] } },
+      query
+    );
+    expect(preview).not.toHaveProperty('charged');
+    expect(preview.pendingDiscounts).toEqual([]);
+    expect(preview.lines.map((row) => row.feeLineId)).toEqual(['base']);
+    expect(preview.totalMinor).toBe(18_000_000);
+  });
+
+  it('reports no charge and no pending discounts when there are none', async () => {
     const { service } = setup([line({ id: 'base' })], student());
     const preview = await service.preview(ctx, query);
     expect(preview.charged).toBeNull();

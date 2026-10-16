@@ -2,6 +2,7 @@ import {
   ALL_PERMISSIONS,
   STARTER_ROLES,
   toPermissionMap,
+  type PermissionMap,
 } from '@eduvault/policy';
 import {
   NAV_GROUPS,
@@ -23,6 +24,8 @@ const built = new Set([
   '/members',
   '/finance/school-fees',
   '/finance/other-fees',
+  '/finance/billing',
+  '/finance/invoices',
   '/finance/money-accounts',
   '/finance/ledger',
   '/classes',
@@ -242,6 +245,11 @@ describe('settings sections', () => {
   });
 });
 
+const fees = (permissions: PermissionMap) =>
+  visibleNav(NAV_GROUPS, built, permissions)
+    .flatMap((group) => group.items)
+    .find((item) => item.id === 'fees')?.route;
+
 describe('nav gates', () => {
   it('shows a member with no permissions only Dashboard and Approvals', () => {
     expect(routesFor({})).toEqual(['/', '/approvals']);
@@ -269,16 +277,21 @@ describe('nav gates', () => {
     ]);
   });
 
-  it('shows Fees to a bursar and an administrator, not to a teacher or principal', () => {
+  it('shows Fees to a bursar and an administrator, not to a teacher', () => {
     for (const slug of ['bursar', 'administrator']) {
       expect(routesFor(starter(slug))).toContain('/finance/school-fees');
     }
-    for (const slug of ['teacher', 'principal']) {
-      expect(routesFor(starter(slug))).not.toContain('/finance/school-fees');
-    }
+    expect(routesFor(starter('teacher'))).not.toContain('/finance/school-fees');
     expect(routesFor(toPermissionMap(['feeLine:create']))).not.toContain(
       '/finance/school-fees'
     );
+  });
+
+  it('opens Fees on the first tab the member can see', () => {
+    expect(fees(starter('principal'))).toBe('/finance/billing');
+    expect(fees(toPermissionMap(['invoice:read']))).toBe('/finance/billing');
+    expect(fees(starter('bursar'))).toBe('/finance/school-fees');
+    expect(fees(starter('teacher'))).toBeUndefined();
   });
 
   it('hides Staff and members from a bursar and shows it with member:read', () => {
@@ -325,6 +338,11 @@ describe('nav gates', () => {
     expect(routeGate('/members')).toEqual(['member:read']);
     expect(routeGate('/finance/school-fees')).toEqual(['feeLine:read']);
     expect(routeGate('/finance/other-fees')).toEqual(['feeLine:read']);
+    expect(routeGate('/finance/billing')).toEqual([
+      'invoice:bill',
+      'invoice:read',
+    ]);
+    expect(routeGate('/finance/invoices')).toEqual(['invoice:read']);
     expect(routeGate('/campuses')).toEqual(['team:read']);
     expect(routeGate('/')).toBeUndefined();
     expect(routeGate('/approvals')).toBeUndefined();
@@ -364,9 +382,13 @@ describe('findCurrent', () => {
     );
   });
 
-  it('keeps Fees active on Other fees', () => {
+  it('keeps Fees active on Other fees, Charge students and Charges', () => {
     expect(current('/finance/school-fees')).toBe('fees');
     expect(current('/finance/other-fees')).toBe('fees');
+    expect(current('/finance/billing')).toBe('fees');
+    expect(current('/finance/billing/abc')).toBe('fees');
+    expect(current('/finance/invoices')).toBe('fees');
+    expect(current('/finance/invoices/abc')).toBe('fees');
   });
 });
 

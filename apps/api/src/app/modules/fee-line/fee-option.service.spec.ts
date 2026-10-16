@@ -26,6 +26,7 @@ const student: StudentFeeContext = {
     isNew: false,
   },
   placement: null,
+  latestPlacement: null,
 };
 
 function setup() {

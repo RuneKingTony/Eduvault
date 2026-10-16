@@ -16,6 +16,7 @@ import { CampusService } from '../../src/app/modules/campus/campus.service';
 import { PlatformService } from '../../src/app/modules/platform/platform.service';
 import { seedAnnouncements } from './announcements';
 import { seedCalendar } from './calendar';
+import { seedCharges } from './charges';
 import { seedClasses } from './classes';
 import { seedFinance } from './finance';
 import { seedStudents } from './student-seed';
@@ -260,6 +261,7 @@ export async function runSeed(
     school: GREENFIELD_SLUG,
     offsetDays,
   });
+  await seedCharges(app, { owner: greenfieldOwner, today });
   await addSupportActivity(app, superAdmin, created.organizationIds);
 
   const failures = await runSeedCheck(app, offsetDays);

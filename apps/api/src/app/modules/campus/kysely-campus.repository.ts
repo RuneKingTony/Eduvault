@@ -221,8 +221,32 @@ export class KyselyCampusRepository extends CampusRepository {
       fee !== undefined ||
       announcement !== undefined ||
       account !== undefined ||
-      line !== undefined
+      line !== undefined ||
+      (await this.hasCharges(organizationId, id))
     );
+  }
+
+  private async hasCharges(
+    organizationId: string,
+    id: string
+  ): Promise<boolean> {
+    const [invoice, round] = await Promise.all([
+      this.db
+        .selectFrom('invoice')
+        .select('id')
+        .where('campus_id', '=', id)
+        .where('organization_id', '=', organizationId)
+        .limit(1)
+        .executeTakeFirst(),
+      this.db
+        .selectFrom('billing_run')
+        .select('id')
+        .where('scope_campus_id', '=', id)
+        .where('organization_id', '=', organizationId)
+        .limit(1)
+        .executeTakeFirst(),
+    ]);
+    return invoice !== undefined || round !== undefined;
   }
 
   async create(organizationId: string, input: NewCampus): Promise<void> {

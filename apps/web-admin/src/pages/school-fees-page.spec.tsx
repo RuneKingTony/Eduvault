@@ -455,6 +455,32 @@ describe('the preview card', () => {
     ).toBeInTheDocument();
   });
 
+  it('shows an approved discount line in the preview, muted and negative', async () => {
+    setup({
+      preview: preview({
+        lines: [
+          preview().lines[0]!,
+          {
+            feeLineId: null,
+            description: 'Sibling discount (3 children) (5% of tuition)',
+            feeTypeName: 'Discounts given',
+            amountMinor: -900_000,
+            optedIn: false,
+            campusName: null,
+          },
+        ],
+        totalMinor: 17_100_000,
+      }),
+    });
+    const row = (
+      await screen.findByText('Sibling discount (3 children) (5% of tuition)')
+    ).closest('tr');
+    expect(row).toHaveTextContent('−₦9,000');
+    expect(row?.querySelector('td:last-child')).toHaveClass(
+      'text-muted-foreground'
+    );
+  });
+
   it('shows an already-charged badge and a pending-discount callout', async () => {
     setup({
       preview: preview({

@@ -7,6 +7,8 @@ import type {
   AnnouncementStatus,
   ClassStatus,
   FeeGroup,
+  InvoiceKind,
+  InvoiceStatus,
   RouteQuery,
   contract,
 } from '@eduvault/api-contract';
@@ -627,4 +629,73 @@ export const feeOptionsQueryOptions = (api: Api, studentId: string) =>
 
 export async function invalidateFees(queryClient: QueryClient): Promise<void> {
   await queryClient.invalidateQueries({ queryKey: FEES_KEY });
+}
+
+const BILLING_KEY = ['billing'] as const;
+const INVOICES_KEY = ['invoices'] as const;
+
+interface InvoiceFilters {
+  q?: string;
+  kind?: InvoiceKind;
+  status?: InvoiceStatus;
+  page?: number;
+}
+
+export const billingRunsQueryOptions = (api: Api, page: number) =>
+  queryOptions({
+    queryKey: [...BILLING_KEY, 'runs', page],
+    queryFn: () => api.billingRuns.list({ query: { page } }),
+    placeholderData: keepPreviousData,
+  });
+
+export const billingTermsQueryOptions = (api: Api) =>
+  queryOptions({
+    queryKey: [...BILLING_KEY, 'terms'],
+    queryFn: () => api.billingRuns.terms({}),
+  });
+
+export const billingRunQueryOptions = (api: Api, id: string, page: number) =>
+  queryOptions({
+    queryKey: [...BILLING_KEY, 'run', id, page],
+    queryFn: () => api.billingRuns.get({ params: { id }, query: { page } }),
+    placeholderData: keepPreviousData,
+  });
+
+export const invoicesQueryOptions = (
+  api: Api,
+  { q, kind, status, page = 1 }: InvoiceFilters = {}
+) =>
+  queryOptions({
+    queryKey: [...INVOICES_KEY, 'list', { q: q ?? '', kind, status, page }],
+    queryFn: () =>
+      api.invoices.list({
+        query: { q: q === '' ? undefined : q, kind, status, page },
+      }),
+    placeholderData: keepPreviousData,
+  });
+
+export const invoiceQueryOptions = (api: Api, id: string) =>
+  queryOptions({
+    queryKey: [...INVOICES_KEY, 'one', id],
+    queryFn: () => api.invoices.get({ params: { id } }),
+  });
+
+export const dashboardChargedQueryOptions = (api: Api) =>
+  queryOptions({
+    queryKey: [...DASHBOARD_KEY, 'charged'],
+    queryFn: () => api.dashboard.charged({}),
+  });
+
+export async function invalidateBilling(
+  queryClient: QueryClient
+): Promise<void> {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: BILLING_KEY }),
+    queryClient.invalidateQueries({ queryKey: INVOICES_KEY }),
+    queryClient.invalidateQueries({ queryKey: [...FEES_KEY, 'preview'] }),
+    queryClient.invalidateQueries({ queryKey: [...DASHBOARD_KEY, 'tasks'] }),
+    queryClient.invalidateQueries({ queryKey: [...DASHBOARD_KEY, 'charged'] }),
+    queryClient.invalidateQueries({ queryKey: LEDGER_KEY }),
+    queryClient.invalidateQueries({ queryKey: MONEY_ACCOUNTS_KEY }),
+  ]);
 }

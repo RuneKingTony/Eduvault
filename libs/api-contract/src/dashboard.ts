@@ -38,6 +38,20 @@ export const dashboardTaskSchema = z.discriminatedUnion('kind', [
     titles: samples(z.string()),
   }),
   z.object({
+    kind: z.literal('unsentRound'),
+    runId: idSchema,
+    number: z.string(),
+    termName: z.string(),
+    count: countSchema,
+  }),
+  z.object({
+    kind: z.literal('notCharged'),
+    count: countSchema,
+    termId: idSchema,
+    termName: z.string(),
+    students: samples(nameSchema),
+  }),
+  z.object({
     kind: z.literal('noRole'),
     memberId: idSchema,
     name: z.string(),
@@ -110,3 +124,12 @@ export const dashboardMoneySchema = z.object({
   hiddenSchoolWide: z.number().int().nonnegative(),
 });
 export type DashboardMoney = z.infer<typeof dashboardMoneySchema>;
+
+export const dashboardChargedSchema = z.object({
+  currency: currencySchema,
+  termId: idSchema,
+  termName: z.string(),
+  chargedMinor: z.number().int(),
+  chargeCount: z.number().int().nonnegative(),
+});
+export type DashboardCharged = z.infer<typeof dashboardChargedSchema>;

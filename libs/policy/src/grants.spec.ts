@@ -43,7 +43,10 @@ describe('canGrantRole', () => {
       expect(
         canGrantRole({
           slug,
-          rolePermissions: toPermissionMap(['student:readOwn']),
+          rolePermissions: toPermissionMap([
+            'student:readOwn',
+            'invoice:readOwn',
+          ]),
           assignerPermissions: teacher,
           assignerIsOwner: false,
         })

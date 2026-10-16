@@ -4,7 +4,7 @@ import { fakeAccess, starterAccess } from '../../test-utils';
 import { FEE_TABS, FeesTabs } from './fees-tabs';
 
 describe('FeesTabs', () => {
-  it('lists School fees then Other fees for a member who reads fees', async () => {
+  it('lists the fee tabs then Charge students and Charges for a member who reads them all', async () => {
     renderFees(
       <FeesTabs term={undefined} />,
       feesApi(),
@@ -15,7 +15,21 @@ describe('FeesTabs', () => {
       within(tabs)
         .getAllByRole('link')
         .map((link) => link.textContent)
-    ).toEqual(['School fees', 'Other fees']);
+    ).toEqual(['School fees', 'Other fees', 'Charge students', 'Charges']);
+  });
+
+  it('shows a holder of invoice:bill alone only Charge students', async () => {
+    renderFees(
+      <FeesTabs term={undefined} />,
+      feesApi(),
+      fakeAccess({ permissions: { invoice: ['bill'] }, campusScope: 'all' })
+    );
+    const tabs = await screen.findByRole('navigation', { name: 'Fees' });
+    expect(
+      within(tabs)
+        .getAllByRole('link')
+        .map((link) => link.textContent)
+    ).toEqual(['Charge students']);
   });
 
   it('carries the chosen term to both tabs', async () => {
@@ -43,6 +57,8 @@ describe('FeesTabs', () => {
     expect(FEE_TABS.map((tab) => tab.gate)).toEqual([
       ['feeLine:read'],
       ['feeLine:read'],
+      ['invoice:bill', 'invoice:read'],
+      ['invoice:read'],
     ]);
     expect(fakeAccess().permissions).toEqual({});
   });

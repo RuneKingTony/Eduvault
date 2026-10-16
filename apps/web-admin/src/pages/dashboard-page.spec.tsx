@@ -338,3 +338,82 @@ describe('DashboardPage tasks', () => {
     });
   });
 });
+
+describe('DashboardPage Charged this term', () => {
+  const charged = {
+    currency: 'NGN',
+    termId: 't1',
+    termName: 'First term, 2026/2027',
+    chargedMinor: 45_200_000,
+    chargeCount: 2,
+  };
+
+  it('shows the figure and the term to a holder of invoice:read', async () => {
+    render(ownerAccess(), dashboardApi({ charged }));
+    expect(await screen.findByText('Charged this term')).toBeInTheDocument();
+    expect(screen.getByText('₦452,000')).toBeInTheDocument();
+    expect(screen.getByText('First term, 2026/2027')).toBeInTheDocument();
+    expect(screen.getByText('Charged this term').closest('a')).toHaveAttribute(
+      'href',
+      '/finance/invoices'
+    );
+  });
+
+  it('asks for nothing and shows nothing without invoice:read', async () => {
+    const api = dashboardApi({ charged });
+    render(
+      fakeAccess({
+        permissions: toPermissionMap(['student:read']),
+        campusScope: 'all',
+      }),
+      api
+    );
+    expect(await screen.findByText('Students by status')).toBeInTheDocument();
+    expect(api.dashboard.charged).not.toHaveBeenCalled();
+    expect(screen.queryByText('Charged this term')).not.toBeInTheDocument();
+  });
+
+  it('leaves the tile out when there is no current term to charge', async () => {
+    render(ownerAccess(), dashboardApi({ charged: null }));
+    expect(await screen.findByText('Students by status')).toBeInTheDocument();
+    expect(screen.queryByText('Charged this term')).not.toBeInTheDocument();
+  });
+
+  it('lists the charge tasks with their buttons', async () => {
+    render(
+      ownerAccess(),
+      dashboardApi({
+        tasks: [
+          {
+            kind: 'unsentRound',
+            runId: 'r1',
+            number: 'BR-2026-0002',
+            termName: 'Second term, 2026/2027',
+            count: 3,
+          },
+          {
+            kind: 'notCharged',
+            count: 2,
+            termId: 't2',
+            termName: 'Second term',
+            students: [person(1), person(2)],
+          },
+        ],
+      })
+    );
+    expect(
+      await screen.findByText(
+        'Charges prepared for Second term, 2026/2027, not sent yet'
+      )
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: /Check and send/ })
+    ).toHaveAttribute('href', expect.stringContaining('/finance/billing/r1'));
+    expect(
+      screen.getByText('2 students not charged for Second term yet')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: /Charge students/ })
+    ).toHaveAttribute('href', '/finance/billing?prepare=1');
+  });
+});

@@ -1,15 +1,19 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { sql } from 'kysely';
 import {
+  DISCOUNTS_GIVEN_SYSTEM_KEY,
   FEE_CANDIDATE_LIMIT,
   type FeeCandidates,
 } from '@eduvault/api-contract';
 import { Clock, schoolToday } from '../../common/clock';
 import { escapeLike } from '../../common/db/escape-like';
 import { KYSELY_TOKEN, type Database } from '../../common/db/tokens';
+import { discountFacts, termPosition } from '../../common/fees';
+import { systemAccountId } from '../../common/ledger';
 import { visibleStudentsCte } from '../../common/students';
 import {
   FeeStudentRepository,
+  type ChargeFacts,
   type FeeScope,
   type StudentFeeContext,
 } from './fee-line.repository';
@@ -73,6 +77,11 @@ export class KyselyFeeStudentRepository extends FeeStudentRepository {
               enrollment.id,
               query.termId
             )) ?? null),
+      latestPlacement:
+        enrollment === undefined
+          ? null
+          : ((await this.latestPlacement(organizationId, enrollment.id)) ??
+            null),
     };
   }
 
@@ -108,6 +117,24 @@ export class KyselyFeeStudentRepository extends FeeStudentRepository {
     );
   }
 
+  private async latestPlacement(organizationId: string, enrollmentId: string) {
+    const row = await this.db
+      .selectFrom('enrollment_placement as p')
+      .innerJoin('term', (join) =>
+        join
+          .onRef('term.id', '=', 'p.term_id')
+          .onRef('term.organization_id', '=', 'p.organization_id')
+      )
+      .innerJoin('team as campus', 'campus.id', 'p.campus_id')
+      .select(['p.campus_id', 'campus.name as campus_name'])
+      .where('p.organization_id', '=', organizationId)
+      .where('p.enrollment_id', '=', enrollmentId)
+      .orderBy('term.sequence', 'desc')
+      .limit(1)
+      .executeTakeFirst();
+    return row && { campusId: row.campus_id, campusName: row.campus_name };
+  }
+
   private async placement(
     organizationId: string,
     enrollmentId: string,
@@ -137,6 +164,41 @@ export class KyselyFeeStudentRepository extends FeeStudentRepository {
         campusName: row.campus_name,
       }
     );
+  }
+
+  async chargeFacts(
+    organizationId: string,
+    query: { studentId: string; termId: string }
+  ): Promise<ChargeFacts> {
+    const [invoice, discounts, term, account] = await Promise.all([
+      this.db
+        .selectFrom('invoice')
+        .select(['number', 'status'])
+        .where('organization_id', '=', organizationId)
+        .where('student_id', '=', query.studentId)
+        .where('term_id', '=', query.termId)
+        .where('kind', '=', 'term')
+        .where('status', '<>', 'cancelled')
+        .executeTakeFirst(),
+      discountFacts(this.db, organizationId, [query.studentId]),
+      termPosition(this.db, organizationId, query.termId),
+      systemAccountId(this.db, organizationId, DISCOUNTS_GIVEN_SYSTEM_KEY),
+    ]);
+    if (term === undefined) {
+      throw new Error('The term vanished while a preview was built');
+    }
+    return {
+      charged:
+        invoice === undefined
+          ? null
+          : {
+              status: invoice.status === 'issued' ? 'sent' : 'draft',
+              number: invoice.number,
+            },
+      discounts: discounts.get(query.studentId) ?? [],
+      term,
+      discountsAccountId: account,
+    };
   }
 
   async candidates(

@@ -11,6 +11,7 @@ import {
   type JournalQuery,
 } from '@eduvault/api-contract';
 import { inCampusScope } from '../../common/db/in-campus-scope';
+import { day } from '../../common/db/rows';
 import { KYSELY_TOKEN, type Database } from '../../common/db/tokens';
 import {
   LedgerPoster,
@@ -36,6 +37,7 @@ interface EntryRow {
   kind: string;
   memo: string | null;
   effective_on: string;
+  invoice_id: string | null;
 }
 
 interface LineRow {
@@ -68,7 +70,8 @@ const toEntry = (
   kind: journalKindSchema.parse(row.kind),
   memo: row.memo,
   totalMinor,
-  link: null,
+  link:
+    row.invoice_id === null ? null : { type: 'invoice', id: row.invoice_id },
   lines,
 });
 
@@ -234,9 +237,13 @@ export class KyselyLedgerRepository extends LedgerRepository {
           'journal_entry.reference',
           'journal_entry.kind',
           'journal_entry.memo',
-          sql<string>`to_char(journal_entry.effective_on, 'YYYY-MM-DD')`.as(
-            'effective_on'
-          ),
+          day('journal_entry.effective_on').as('effective_on'),
+          sql<string | null>`(
+            select invoice.id
+            from invoice
+            where invoice.journal_entry_id = journal_entry.id
+              and invoice.organization_id = journal_entry.organization_id
+          )`.as('invoice_id'),
         ])
         .orderBy('journal_entry.effective_on', 'desc')
         .orderBy('journal_entry.sequence', 'desc')

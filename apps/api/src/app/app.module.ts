@@ -12,12 +12,14 @@ import { DatabaseModule } from './common/db/database.module';
 import { FilesModule } from './common/files';
 import { AnnouncementModule } from './modules/announcement/announcement.module';
 import { PortalModule } from './modules/portal/portal.module';
+import { BillingModule } from './modules/billing/billing.module';
 import { CalendarModule } from './modules/calendar/calendar.module';
 import { CampusModule } from './modules/campus/campus.module';
 import { ClassModule } from './modules/class/class.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { GuardianModule } from './modules/guardian/guardian.module';
 import { FeeLineModule } from './modules/fee-line/fee-line.module';
+import { InvoiceModule } from './modules/invoice/invoice.module';
 import { HealthModule } from './modules/health/health.module';
 import { MoneyAccountModule } from './modules/money-account/money-account.module';
 import { LedgerModule } from './modules/ledger/ledger.module';
@@ -57,6 +59,8 @@ import { SubjectModule } from './modules/subject/subject.module';
     PortalModule,
     MoneyAccountModule,
     LedgerModule,
+    InvoiceModule,
+    BillingModule,
   ],
 })
 export class AppModule implements NestModule {

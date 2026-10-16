@@ -1,0 +1,32 @@
+import {
+  INVOICE_KINDS,
+  INVOICE_STATUSES,
+  type InvoiceKind,
+  type InvoiceStatus,
+} from '@eduvault/api-contract';
+import { oneOf, pageOf, textOf } from '@eduvault/shared';
+
+export interface InvoicesSearch {
+  q?: string;
+  kind?: InvoiceKind;
+  status?: InvoiceStatus;
+  page?: number;
+}
+
+export const NO_INVOICE_FILTERS = {
+  q: undefined,
+  kind: undefined,
+  status: undefined,
+  page: undefined,
+} as const satisfies InvoicesSearch;
+
+export function parseInvoicesSearch(
+  search: Record<string, unknown>
+): InvoicesSearch {
+  return {
+    q: textOf(search['q']),
+    kind: oneOf(INVOICE_KINDS, search['kind']),
+    status: oneOf(INVOICE_STATUSES, search['status']),
+    page: pageOf(search['page']),
+  };
+}

@@ -758,6 +758,8 @@ test.describe('roles', () => {
           'feeLine:read',
           'feeLine:update',
           'feeLine:retire',
+          'invoice:bill',
+          'invoice:read',
           'moneyAccount:read',
           'ledger:read',
         ],
@@ -788,6 +790,8 @@ test.describe('roles', () => {
         'feeLine:read',
         'feeLine:update',
         'feeLine:retire',
+        'invoice:bill',
+        'invoice:read',
         'moneyAccount:read',
         'ledger:read',
       ]);

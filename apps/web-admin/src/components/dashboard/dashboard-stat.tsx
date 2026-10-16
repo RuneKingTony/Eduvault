@@ -1,7 +1,15 @@
 import type { ReactNode } from 'react';
 import { Link } from '@tanstack/react-router';
 import { Card, CardContent } from '@eduvault/ui';
+import { NO_INVOICE_FILTERS } from '../../invoices-search';
 import { CardSkeleton } from './card-states';
+
+const searchFor = (to: string) =>
+  to === '/finance/invoices'
+    ? {
+        search: NO_INVOICE_FILTERS,
+      }
+    : {};
 
 export function StatCard({
   label,
@@ -13,7 +21,7 @@ export function StatCard({
   label: string;
   value: string | number;
   sub: string;
-  to?: '/students' | '/classes';
+  to?: '/students' | '/classes' | '/finance/invoices';
   children?: ReactNode;
 }) {
   const body = (
@@ -32,6 +40,7 @@ export function StatCard({
         <Link
           to={to}
           className="rounded-xl focus-visible:ring-2 focus-visible:ring-ring"
+          {...searchFor(to)}
         >
           {body}
         </Link>

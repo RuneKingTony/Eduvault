@@ -128,6 +128,35 @@ const announcementDrafts = (task: Counted<'announcementDrafts'>): TaskRow => ({
   extra: null,
 });
 
+const unsentRound = (task: Counted<'unsentRound'>): TaskRow => ({
+  key: `${task.kind}-${task.runId}`,
+  kind: task.kind,
+  tone: 'default',
+  title: `Charges prepared for ${task.termName}, not sent yet`,
+  subline: `${task.number} · ${countOf(task.count, 'charge', 'charges')}`,
+  action: {
+    label: 'Check and send',
+    target: { to: '/finance/billing/$runId', params: { runId: task.runId } },
+  },
+  extra: null,
+});
+
+const notCharged = (task: Counted<'notCharged'>): TaskRow => ({
+  key: task.kind,
+  kind: task.kind,
+  tone: 'default',
+  title: `${students(task.count)} not charged for ${task.termName} yet`,
+  subline: listed(
+    task.students.map((student) => student.name),
+    task.count
+  ),
+  action: {
+    label: 'Charge students',
+    target: { to: '/finance/billing', search: { prepare: 1 } },
+  },
+  extra: null,
+});
+
 const noRole = (task: Counted<'noRole'>): TaskRow => ({
   key: `${task.kind}-${task.memberId}`,
   kind: task.kind,
@@ -158,6 +187,12 @@ export function taskRow(task: DashboardTask): TaskRow {
     }
     case 'announcementDrafts': {
       return announcementDrafts(task);
+    }
+    case 'unsentRound': {
+      return unsentRound(task);
+    }
+    case 'notCharged': {
+      return notCharged(task);
     }
     case 'noRole': {
       return noRole(task);

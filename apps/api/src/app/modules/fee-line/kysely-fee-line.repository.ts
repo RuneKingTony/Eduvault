@@ -282,7 +282,7 @@ export class KyselyFeeLineRepository extends FeeLineRepository {
   ): Promise<FeeLine | undefined> {
     const changed = await this.db
       .updateTable('fee_line')
-      .set({ amount_minor: String(amountMinor) })
+      .set({ amount_minor: String(amountMinor), updated_at: sql<Date>`now()` })
       .where('organization_id', '=', organizationId)
       .where('id', '=', id)
       .where('retired_at', 'is', null)

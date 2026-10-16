@@ -327,6 +327,7 @@ test.describe('/me/permissions', () => {
         team: ['read'],
         campus: ['readAll'],
         announcement: ['create', 'read', 'update'],
+        invoice: ['read'],
         moneyAccount: ['read'],
       },
       campusScope: 'all',
@@ -361,6 +362,7 @@ test.describe('/me/permissions', () => {
       guardian: ['read'],
       enrollment: ['read'],
       feeLine: ['create', 'read', 'update', 'retire'],
+      invoice: ['bill', 'read'],
       moneyAccount: ['read'],
       ledger: ['read'],
     });
@@ -559,6 +561,7 @@ test.describe('starter roles', () => {
       const row = rows.find((candidate) => candidate.role === slug);
       expect(parsePermissionMap(row?.permission ?? '')).toEqual({
         student: ['readOwn'],
+        invoice: ['readOwn'],
       });
     }
   });

@@ -251,6 +251,7 @@ describe('capSummary', () => {
       'Parents and guardians: add guardians and link them to students',
       'Announcements: write, publish, pin and withdraw announcements',
       'Fees: set and change what each class pays',
+      'Charges: charge students and send the charges',
       'Bank and POS accounts: add and change bank and POS accounts',
       'Money categories: change the accountant’s categories',
       'Own records: can see',
@@ -274,6 +275,7 @@ describe('capSummary', () => {
       'Parents and guardians: add guardians and link them to students',
       'Announcements: write, publish, pin and withdraw announcements',
       'Fees: can see',
+      'Charges: can see',
     ]);
   });
 
@@ -288,6 +290,7 @@ describe('capSummary', () => {
       'Students: can see',
       'Parents and guardians: can see',
       'Fees: set and change what each class pays',
+      'Charges: charge students and send the charges',
       'Bank and POS accounts: can see',
       'Money categories: can see',
     ]);
@@ -302,6 +305,7 @@ describe('capSummary', () => {
       'Subjects: can see',
       'Students: can see',
       'Announcements: write, publish, pin and withdraw announcements',
+      'Charges: can see',
       'Bank and POS accounts: can see',
     ]);
   });
@@ -399,13 +403,49 @@ describe('the Fees area', () => {
   });
 });
 
+describe('the Charges area', () => {
+  const charges = area('charges');
+
+  it('sits in Money after Fees and splits seeing from charging', () => {
+    const ids = CAP_AREAS.map((candidate) => candidate.id);
+    expect(ids.indexOf('charges')).toBe(ids.indexOf('fees') + 1);
+    expect(charges.group).toBe('Money');
+    expect(charges.label).toBe('Charges');
+    expect(charges.see).toEqual(['invoice:read']);
+    expect(charges.change).toEqual(['invoice:bill']);
+    expect(charges.changeDesc).toBe('Charge students and send the charges');
+    expect(charges.important).toBe(false);
+  });
+
+  it('is see for invoice:read, change with invoice:bill and custom for a lone bill', () => {
+    expect(capLevel(toPermissionMap(['invoice:read']), charges)).toBe('see');
+    expect(
+      capLevel(toPermissionMap(['invoice:read', 'invoice:bill']), charges)
+    ).toBe('change');
+    expect(capLevel(toPermissionMap(['invoice:bill']), charges)).toBe('custom');
+  });
+
+  it('keeps invoice:readOwn out of the area until the portal shows charges', () => {
+    expect(LEGACY_PERMISSIONS).toContain('invoice:readOwn');
+  });
+
+  it('summarises the bursar as able to charge and the administrator as able to see', () => {
+    expect(summaryFor('bursar')).toContain(
+      'Charges: charge students and send the charges'
+    );
+    expect(summaryFor('administrator')).toContain('Charges: can see');
+    expect(summaryFor('principal')).toContain('Charges: can see');
+    expect(summaryFor('teacher')).not.toContain('Charges: can see');
+  });
+});
+
 describe('the Money areas', () => {
   const accounts = area('money-accounts');
   const categories = area('money-categories');
 
-  it('sit in Money after Fees and before Own records', () => {
+  it('sit in Money after Charges and before Own records', () => {
     const ids = CAP_AREAS.map((candidate) => candidate.id);
-    expect(ids.indexOf('money-accounts')).toBe(ids.indexOf('fees') + 1);
+    expect(ids.indexOf('money-accounts')).toBe(ids.indexOf('charges') + 1);
     expect(ids.indexOf('money-categories')).toBe(
       ids.indexOf('money-accounts') + 1
     );

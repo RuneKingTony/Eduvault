@@ -217,6 +217,7 @@ export const RESOURCE_PILLARS: Record<Resource, Pillar> = {
   class: 'Foundation',
   announcement: 'Foundation',
   feeLine: 'Finance',
+  invoice: 'Finance',
   ledger: 'Finance',
   moneyAccount: 'Finance',
   subject: 'Foundation',
@@ -237,6 +238,7 @@ export const ACTION_WORDS: Record<Action, string> = {
   markAway: 'mark away',
   manageAccounts: 'manage accounts',
   retire: 'retire',
+  bill: 'charge students',
 };
 
 export function capabilityLabel(permission: Permission): string {
