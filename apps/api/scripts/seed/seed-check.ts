@@ -4,6 +4,9 @@ import { AnnouncementService } from '../../src/app/modules/announcement/announce
 import { CalendarService } from '../../src/app/modules/calendar/calendar.service';
 import { CampusService } from '../../src/app/modules/campus/campus.service';
 import { ClassService } from '../../src/app/modules/class/class.service';
+import { BillingService } from '../../src/app/modules/billing/billing.service';
+import { FeePreviewService } from '../../src/app/modules/fee-line/fee-preview.service';
+import { InvoiceService } from '../../src/app/modules/invoice/invoice.service';
 import { LedgerService } from '../../src/app/modules/ledger/ledger.service';
 import { MoneyAccountService } from '../../src/app/modules/money-account/money-account.service';
 import { StudentService } from '../../src/app/modules/student/student.service';
@@ -471,18 +474,120 @@ async function checkFinance(app: INestApplicationContext, check: Check) {
   const chart = await ledger.listAccounts(funmi);
   const balanceOf = (code: number) =>
     chart.items.find((item) => item.code === code)?.balanceMinor;
+  const charges = await checkCharges(app, funmi, check);
   check(
     'fees owed to the school',
     balanceOf(1100) ?? 'missing',
-    OPENING_DEBT_MINOR - OPENING_CREDIT_MINOR
+    OPENING_DEBT_MINOR - OPENING_CREDIT_MINOR + charges.chargedMinor
   );
   check(
     'opening balance',
     balanceOf(3000) ?? 'missing',
     OPENING_DEBT_MINOR - OPENING_CREDIT_MINOR
   );
+  check('fee income', balanceOf(4000) ?? 'missing', charges.feesMinor);
+  check('discounts given', balanceOf(5000) ?? 'missing', charges.discountMinor);
   const journal = await ledger.journal(funmi, { page: 1, pageSize: 50 });
-  check('opening entries', journal.total, SEED_OPENING_BALANCES.length);
+  check(
+    'journal entries',
+    journal.total,
+    SEED_OPENING_BALANCES.length + charges.sentCount
+  );
+}
+
+type OwnerContext = Awaited<ReturnType<typeof orgContextFor>>;
+
+async function checkRound(
+  app: INestApplicationContext,
+  funmi: OwnerContext,
+  check: Check
+) {
+  const runs = await app
+    .get(BillingService, { strict: false })
+    .list(funmi, { page: 1, pageSize: 10 });
+  check('charge rounds', runs.total, 1);
+  const run = runs.items[0];
+  check('round is sent', run?.status ?? 'missing', 'issued');
+  check('round prepared by', run?.createdBy ?? 'missing', 'Chika Eze');
+  check(
+    'round number',
+    /^BR-\d{4}-0001$/.test(run?.number ?? '') ? 'BR-…-0001' : 'wrong',
+    'BR-…-0001'
+  );
+}
+
+async function checkPreview(
+  app: INestApplicationContext,
+  funmi: OwnerContext,
+  check: Check
+) {
+  const terms = await app.get(BillingService, { strict: false }).terms(funmi);
+  const pending = await app
+    .get(FeePreviewService, { strict: false })
+    .preview(funmi, {
+      termId: terms[1]?.termId ?? '',
+      studentId: await studentIdOf(app, funmi, 'GF-0158'),
+    });
+  check(
+    'Halima pending scholarship',
+    pending.pendingDiscounts.join(', '),
+    'Academic scholarship, top of JSS 1'
+  );
+}
+
+async function checkCharges(
+  app: INestApplicationContext,
+  funmi: OwnerContext,
+  check: Check
+) {
+  await checkRound(app, funmi, check);
+  await checkPreview(app, funmi, check);
+  const invoices = app.get(InvoiceService, { strict: false });
+  const list = await invoices.list(funmi, {
+    kind: 'term',
+    page: 1,
+    pageSize: 50,
+  });
+  check('sent charges', list.summary.sentCount, list.total);
+  check('prepared charges', list.summary.draftCount, 0);
+  const ada = list.items.find((item) => item.admissionNumber === 'GF-0123');
+  const adaCharge = await invoices.get(funmi, ada?.id ?? '');
+  check(
+    'Ada sibling discount',
+    adaCharge.lines.find((line) => line.amountMinor < 0)?.amountMinor ?? 0,
+    -(adaCharge.lines[0]?.amountMinor ?? 0) / 20
+  );
+  const details = await Promise.all(
+    list.items.map((item) => invoices.get(funmi, item.id))
+  );
+  const amounts = details.flatMap((invoice) =>
+    invoice.lines.map((line) => line.amountMinor)
+  );
+  return {
+    sentCount: list.total,
+    chargedMinor: list.summary.sentTotalMinor,
+    feesMinor: amounts
+      .filter((amount) => amount > 0)
+      .reduce((sum, amount) => sum + amount, 0),
+    discountMinor: -amounts
+      .filter((amount) => amount < 0)
+      .reduce((sum, amount) => sum + amount, 0),
+  };
+}
+
+async function studentIdOf(
+  app: INestApplicationContext,
+  funmi: OwnerContext,
+  admissionNumber: string
+): Promise<string> {
+  const db = app.get<Database>(KYSELY_TOKEN, { strict: false });
+  const row = await db
+    .selectFrom('student')
+    .select('id')
+    .where('organization_id', '=', funmi.organizationId)
+    .where('admission_number', '=', admissionNumber)
+    .executeTakeFirstOrThrow();
+  return row.id;
 }
 
 export async function runSeedCheck(

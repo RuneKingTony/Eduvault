@@ -10,6 +10,7 @@ import {
   FeeOptionRepository,
   FeeStudentRepository,
   FeeTypeRepository,
+  type ChargeFacts,
   type FeeLineOutcome,
   type FeeScope,
   type FeeTypeOutcome,
@@ -164,9 +165,19 @@ export class FakeFeeTypeRepository extends FeeTypeRepository {
 export class FakeFeeStudentRepository extends FeeStudentRepository {
   student: StudentFeeContext | undefined;
   candidateList: FeeCandidates = { items: [], total: 0 };
+  facts: ChargeFacts = {
+    charged: null,
+    discounts: [],
+    term: { sessionStartsOn: '2026-09-07', sequence: 1 },
+    discountsAccountId: 'discounts-given',
+  };
 
   findStudent(): Promise<StudentFeeContext | undefined> {
     return Promise.resolve(this.student);
+  }
+
+  chargeFacts(): Promise<ChargeFacts> {
+    return Promise.resolve(this.facts);
   }
 
   candidates(): Promise<FeeCandidates> {
