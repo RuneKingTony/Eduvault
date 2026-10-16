@@ -38,6 +38,7 @@ import {
   createClassSchema,
   graduateClassSchema,
   teacherCandidateSchema,
+  teacherCandidatesQuerySchema,
   updateClassLevelSchema,
   updateClassSchema,
 } from './classes';
@@ -107,6 +108,21 @@ import {
   portalStudentSchema,
 } from './portal';
 import { defineContract, defineRoute } from './route';
+import {
+  assignSubjectTeacherSchema,
+  assignedSubjectTeacherSchema,
+  classSubjectParamsSchema,
+  createSubjectSchema,
+  levelSubjectListQuerySchema,
+  levelSubjectSchema,
+  subjectListQuerySchema,
+  subjectListSchema,
+  subjectSchema,
+  subjectTeacherRemovedSchema,
+  subjectTeachersCopiedSchema,
+  subjectTeachersSchema,
+  updateSubjectSchema,
+} from './subjects';
 import {
   admissionDuplicatesQuerySchema,
   admissionDuplicatesSchema,
@@ -946,6 +962,7 @@ export const contract = defineContract({
       method: 'GET',
       path: '/classes/:id/teacher-candidates',
       params: idParamsSchema,
+      query: teacherCandidatesQuerySchema,
       response: z.array(teacherCandidateSchema),
     }),
     assignTeacher: defineRoute({
@@ -960,6 +977,60 @@ export const contract = defineContract({
       path: '/classes/:id/teachers/:userId',
       params: classTeacherParamsSchema,
       response: classTeacherRemovedSchema,
+    }),
+  },
+  subjects: {
+    list: defineRoute({
+      method: 'GET',
+      path: '/subjects',
+      query: subjectListQuerySchema,
+      response: subjectListSchema,
+    }),
+    create: defineRoute({
+      method: 'POST',
+      path: '/subjects',
+      body: createSubjectSchema,
+      response: subjectSchema,
+    }),
+    update: defineRoute({
+      method: 'PATCH',
+      path: '/subjects/:id',
+      params: idParamsSchema,
+      body: updateSubjectSchema,
+      response: subjectSchema,
+    }),
+  },
+  levelSubjects: {
+    list: defineRoute({
+      method: 'GET',
+      path: '/level-subjects',
+      query: levelSubjectListQuerySchema,
+      response: z.array(levelSubjectSchema),
+    }),
+  },
+  subjectTeachers: {
+    list: defineRoute({
+      method: 'GET',
+      path: '/subject-teachers',
+      response: subjectTeachersSchema,
+    }),
+    assign: defineRoute({
+      method: 'PUT',
+      path: '/classes/:id/subject-teachers/:subjectId',
+      params: classSubjectParamsSchema,
+      body: assignSubjectTeacherSchema,
+      response: assignedSubjectTeacherSchema,
+    }),
+    remove: defineRoute({
+      method: 'DELETE',
+      path: '/classes/:id/subject-teachers/:subjectId',
+      params: classSubjectParamsSchema,
+      response: subjectTeacherRemovedSchema,
+    }),
+    copyFromPreviousTerm: defineRoute({
+      method: 'POST',
+      path: '/subject-teachers/copy-from-previous-term',
+      response: subjectTeachersCopiedSchema,
     }),
   },
   schoolAccount: {

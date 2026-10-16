@@ -8,5 +8,6 @@ export * from './finance';
 export * from './guardians';
 export * from './portal';
 export * from './students';
+export * from './subjects';
 export * from './contract';
 export * from './client';

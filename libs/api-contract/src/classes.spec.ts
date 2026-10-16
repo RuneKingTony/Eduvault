@@ -5,6 +5,7 @@ import {
   createClassLevelSchema,
   createClassSchema,
   graduateClassSchema,
+  teacherCandidatesQuerySchema,
   updateClassLevelSchema,
   updateClassSchema,
 } from './classes';
@@ -119,6 +120,18 @@ describe('class routes', () => {
     expect(
       Object.keys(contract.classLevels).toSorted((a, b) => a.localeCompare(b))
     ).toEqual(['create', 'list', 'update']);
+  });
+});
+
+describe('teacherCandidatesQuerySchema', () => {
+  it('lists class candidates unless asked for subject ones', () => {
+    expect(teacherCandidatesQuerySchema.parse({})).toEqual({ for: 'class' });
+    expect(teacherCandidatesQuerySchema.parse({ for: 'subject' })).toEqual({
+      for: 'subject',
+    });
+    expect(teacherCandidatesQuerySchema.safeParse({ for: 'x' }).success).toBe(
+      false
+    );
   });
 });
 
