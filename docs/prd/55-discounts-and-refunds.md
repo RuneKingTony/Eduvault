@@ -1,6 +1,6 @@
 # PRD: Discounts and refunds
 
-- Status: draft (pre-spec)
+- Status: partly implemented (M3.3, EDU-35: the `student_discount` table and its application to charges); request, approval and the screens follow in M3.5
 - Source: brand prototype `https://claude.ai/artifact/1hsDyr1KdUaYD2hnuA9sfY`, version `1791539787-0c53`
 - Milestone and slice: `M3.3` (the `student_discount` table and applying approved discounts to charges); `M3.5` (discount and correction screens, approvals, refunds, payment cancellations list) (see [roadmap](README.md))
 - Related: [data-model-finance.md](../brainstorming/data-model-finance.md) (Decisions: discounts and scholarships, second person; `adjustment`, `student_discount`, `payment_void`; Posting rules; Settings), [data-model-overview.md](../brainstorming/data-model-overview.md) (Rules every table follows: approval columns), [53-payments.md](53-payments.md), [54-who-owes-and-statements.md](54-who-owes-and-statements.md), [57-approvals.md](57-approvals.md), [technical reference](../technical-reference.md) decisions [D-001](../technical-reference.md#decision-log), [D-007](../technical-reference.md#decision-log), [D-013](../technical-reference.md#decision-log), [D-025](../technical-reference.md#decision-log), [D-027](../technical-reference.md#decision-log), [D-032](../technical-reference.md#decision-log), [D-043](../technical-reference.md#decision-log)
