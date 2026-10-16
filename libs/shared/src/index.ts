@@ -12,3 +12,4 @@ export * from './guardian-username';
 export * from './student-lifecycle';
 export * from './placeholder-email';
 export * from './logo-src';
+export * from './search-params';
