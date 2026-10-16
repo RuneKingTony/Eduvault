@@ -101,6 +101,14 @@ export function admittedToast(
     : base;
 }
 
+export const admittedToastAction = (
+  canCharge: boolean,
+  onCharge: () => void
+): { action: { label: string; onClick: () => void } } | undefined =>
+  canCharge
+    ? { action: { label: 'Charge this student', onClick: onCharge } }
+    : undefined;
+
 export const canRemoveGuardian = (
   index: number,
   requireGuardian: boolean

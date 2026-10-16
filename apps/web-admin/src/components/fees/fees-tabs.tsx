@@ -1,17 +1,25 @@
 import { Link } from '@tanstack/react-router';
 import { useCanAny } from '@eduvault/auth-client';
 import type { Gate } from '@eduvault/policy';
+import { NO_INVOICE_FILTERS } from '../../invoices-search';
 
 const TAB =
   'rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground';
 const ACTIVE = { className: 'bg-muted text-foreground' };
 
-interface FeeTab {
-  id: string;
-  label: string;
-  to: '/finance/school-fees' | '/finance/other-fees';
-  gate: Gate;
-}
+type FeeTab =
+  | {
+      id: string;
+      label: string;
+      to: '/finance/school-fees' | '/finance/other-fees';
+      gate: Gate;
+    }
+  | {
+      id: string;
+      label: string;
+      to: '/finance/billing' | '/finance/invoices';
+      gate: Gate;
+    };
 
 export const FEE_TABS: readonly FeeTab[] = [
   {
@@ -26,11 +34,50 @@ export const FEE_TABS: readonly FeeTab[] = [
     to: '/finance/other-fees',
     gate: ['feeLine:read'],
   },
+  {
+    id: 'billing',
+    label: 'Charge students',
+    to: '/finance/billing',
+    gate: ['invoice:bill', 'invoice:read'],
+  },
+  {
+    id: 'invoices',
+    label: 'Charges',
+    to: '/finance/invoices',
+    gate: ['invoice:read'],
+  },
 ];
 
 function Tab({ tab, term }: { tab: FeeTab; term: string | undefined }) {
   const allowed = useCanAny(tab.gate);
-  return allowed ? (
+  if (!allowed) {
+    return null;
+  }
+  if (tab.to === '/finance/billing') {
+    return (
+      <Link
+        to={tab.to}
+        search={{ page: undefined, prepare: undefined }}
+        className={TAB}
+        activeProps={ACTIVE}
+      >
+        {tab.label}
+      </Link>
+    );
+  }
+  if (tab.to === '/finance/invoices') {
+    return (
+      <Link
+        to={tab.to}
+        search={NO_INVOICE_FILTERS}
+        className={TAB}
+        activeProps={ACTIVE}
+      >
+        {tab.label}
+      </Link>
+    );
+  }
+  return (
     <Link
       to={tab.to}
       search={{ term, type: undefined, add: undefined }}
@@ -39,7 +86,7 @@ function Tab({ tab, term }: { tab: FeeTab; term: string | undefined }) {
     >
       {tab.label}
     </Link>
-  ) : null;
+  );
 }
 
 export function FeesTabs({ term }: { term: string | undefined }) {

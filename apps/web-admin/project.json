@@ -4,5 +4,14 @@
   "sourceRoot": "apps/web-admin/src",
   "projectType": "application",
   "tags": ["scope:web-admin"],
-  "targets": { "typecheck": {} }
+  "targets": {
+    "typecheck": {},
+    "lint": {
+      "options": {
+        "env": {
+          "NODE_OPTIONS": "--max-old-space-size=4096"
+        }
+      }
+    }
+  }
 }

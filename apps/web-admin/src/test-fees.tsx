@@ -32,7 +32,7 @@ const uuid = (n: number) =>
 export const TERM_1 = uuid(0x1_01);
 export const TERM_2 = uuid(0x1_02);
 export const JSS1 = uuid(0x2_01);
-const JSS2 = uuid(0x2_02);
+export const JSS2 = uuid(0x2_02);
 
 export const TUITION: FeeType = {
   id: uuid(0x3_01),

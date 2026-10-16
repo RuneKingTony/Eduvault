@@ -12,6 +12,14 @@ import {
   forgetMember,
   invalidateCalendar,
   invalidateAfterRemoval,
+  invalidateBilling,
+  billingRunQueryOptions,
+  billingRunsQueryOptions,
+  invoiceQueryOptions,
+  invoicesQueryOptions,
+  dashboardChargedQueryOptions,
+  dashboardTasksQueryOptions,
+  feePreviewQueryOptions,
   invalidateClassTeachers,
   invalidateClasses,
   invalidateLevels,
@@ -268,6 +276,80 @@ describe('students queries', () => {
 
     expect(list).toHaveBeenCalledTimes(2);
     expect(get).toHaveBeenCalledTimes(2);
+    for (const stop of unsubscribe) {
+      stop();
+    }
+  });
+});
+
+describe('billing queries', () => {
+  it('asks for the page of rounds, one round, and the charges with their filters', async () => {
+    const api = {
+      billingRuns: {
+        list: vi.fn().mockResolvedValue({ items: [], total: 0 }),
+        get: vi.fn().mockResolvedValue({}),
+      },
+      invoices: {
+        list: vi.fn().mockResolvedValue({ items: [] }),
+        get: vi.fn().mockResolvedValue({}),
+      },
+    } as unknown as Api;
+    const queryClient = new QueryClient();
+    await queryClient.query(billingRunsQueryOptions(api, 2));
+    await queryClient.query(billingRunQueryOptions(api, 'r1', 3));
+    await queryClient.query(
+      invoicesQueryOptions(api, { q: '', kind: 'term', status: 'draft' })
+    );
+    await queryClient.query(invoiceQueryOptions(api, 'i1'));
+    expect(api.billingRuns.list).toHaveBeenCalledWith({ query: { page: 2 } });
+    expect(api.billingRuns.get).toHaveBeenCalledWith({
+      params: { id: 'r1' },
+      query: { page: 3 },
+    });
+    expect(api.invoices.list).toHaveBeenCalledWith({
+      query: { q: undefined, kind: 'term', status: 'draft', page: 1 },
+    });
+    expect(api.invoices.get).toHaveBeenCalledWith({ params: { id: 'i1' } });
+  });
+
+  it('refreshes the rounds, charges, preview, home tasks and charged figure after a change', async () => {
+    const api = {
+      billingRuns: { list: vi.fn().mockResolvedValue({ items: [], total: 0 }) },
+      invoices: { list: vi.fn().mockResolvedValue({ items: [] }) },
+      feeLines: { preview: vi.fn().mockResolvedValue({}) },
+      dashboard: {
+        tasks: vi.fn().mockResolvedValue([]),
+        charged: vi.fn().mockResolvedValue(null),
+      },
+    } as unknown as Api;
+    const queryClient = new QueryClient();
+    const unsubscribe = [
+      new QueryObserver(queryClient, billingRunsQueryOptions(api, 1)),
+      new QueryObserver(queryClient, invoicesQueryOptions(api)),
+      new QueryObserver(queryClient, feePreviewQueryOptions(api, 't', 's')),
+      new QueryObserver(queryClient, dashboardTasksQueryOptions(api)),
+      new QueryObserver(queryClient, dashboardChargedQueryOptions(api)),
+    ].map((observer) => observer.subscribe(() => undefined));
+    await vi.waitFor(() => {
+      expect(api.billingRuns.list).toHaveBeenCalledTimes(1);
+      expect(api.invoices.list).toHaveBeenCalledTimes(1);
+      expect(api.feeLines.preview).toHaveBeenCalledTimes(1);
+      expect(api.dashboard.tasks).toHaveBeenCalledTimes(1);
+      expect(api.dashboard.charged).toHaveBeenCalledTimes(1);
+    });
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
+
+    await invalidateBilling(queryClient);
+
+    await vi.waitFor(() => {
+      expect(api.billingRuns.list).toHaveBeenCalledTimes(2);
+      expect(api.invoices.list).toHaveBeenCalledTimes(2);
+      expect(api.feeLines.preview).toHaveBeenCalledTimes(2);
+      expect(api.dashboard.tasks).toHaveBeenCalledTimes(2);
+      expect(api.dashboard.charged).toHaveBeenCalledTimes(2);
+    });
     for (const stop of unsubscribe) {
       stop();
     }

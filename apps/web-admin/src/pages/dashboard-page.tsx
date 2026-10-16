@@ -19,6 +19,7 @@ import { CardSkeleton } from '../components/dashboard/card-states';
 import { DashboardHeader } from '../components/dashboard/dashboard-header';
 import { selectDashboardView } from '../components/dashboard/dashboard-view';
 import { MyClassesCard } from '../components/dashboard/my-classes-card';
+import { ChargedStat } from '../components/dashboard/charged-stat';
 import { RollCard, StudentsStat } from '../components/dashboard/roll-card';
 import { SchoolAccountCard } from '../components/dashboard/school-account-card';
 import {
@@ -84,6 +85,20 @@ function TermSlot({ today }: { today: string }) {
   return <TermCard current={current.data} today={today} />;
 }
 
+function StaffStats() {
+  const canReadStudents = useCan('student', 'read');
+  const canReadCharges = useCan('invoice', 'read');
+  if (!canReadStudents && !canReadCharges) {
+    return null;
+  }
+  return (
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {canReadStudents ? <StudentsStat /> : null}
+      {canReadCharges ? <ChargedStat /> : null}
+    </div>
+  );
+}
+
 function StaffDashboard() {
   const today = useToday();
   const term = useTermState();
@@ -93,11 +108,7 @@ function StaffDashboard() {
     <section className="flex flex-col gap-4">
       <DashboardHeader />
       {term === 'missing' ? <NoCurrentTermCallout /> : null}
-      {term === 'ready' && canReadStudents ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StudentsStat />
-        </div>
-      ) : null}
+      {term === 'ready' ? <StaffStats /> : null}
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="flex flex-col gap-4 lg:col-span-2">
           <TasksCard />

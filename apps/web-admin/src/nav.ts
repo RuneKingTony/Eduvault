@@ -29,6 +29,13 @@ export interface SettingsSection {
 }
 
 const SETTINGS_ITEM_ID = 'settings';
+const FEES_ITEM_ID = 'fees';
+
+const FEES_ENTRIES: readonly (readonly [route: string, gate: Gate])[] = [
+  ['/finance/school-fees', ['feeLine:read']],
+  ['/finance/billing', ['invoice:bill', 'invoice:read']],
+  ['/finance/invoices', ['invoice:read']],
+];
 
 export const NAV_GROUPS: readonly NavGroup[] = [
   {
@@ -113,8 +120,12 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         pageTitle: 'Fees',
         route: '/finance/school-fees',
         icon: 'wallet',
-        alsoActiveFor: ['/finance/other-fees'],
-        gate: ['feeLine:read'],
+        alsoActiveFor: [
+          '/finance/school-fees',
+          '/finance/other-fees',
+          '/finance/billing',
+          '/finance/invoices',
+        ],
       },
       {
         id: 'payments',
@@ -253,6 +264,7 @@ const ROUTE_GATES = new Map<string, Gate>([
   ['/roles/new', ['ac:create']],
   ['/finance/ledger', ['ledger:read']],
   ['/finance/other-fees', ['feeLine:read']],
+  ...FEES_ENTRIES,
 ]);
 
 export const routeGate = (route: string): Gate | undefined =>
@@ -281,6 +293,35 @@ function settingsItem(
   return first === undefined ? undefined : { ...item, route: first.route };
 }
 
+function feesItem(
+  item: NavItem,
+  builtRoutes: ReadonlySet<string>,
+  permissions: PermissionMap
+): NavItem | undefined {
+  const entry = FEES_ENTRIES.find(
+    ([route, gate]) => builtRoutes.has(route) && passes(permissions, gate)
+  );
+  return entry === undefined ? undefined : { ...item, route: entry[0] };
+}
+
+function entryItem(
+  item: NavItem,
+  builtRoutes: ReadonlySet<string>,
+  permissions: PermissionMap
+): NavItem | undefined {
+  switch (item.id) {
+    case SETTINGS_ITEM_ID: {
+      return settingsItem(item, builtRoutes, permissions);
+    }
+    case FEES_ITEM_ID: {
+      return feesItem(item, builtRoutes, permissions);
+    }
+    default: {
+      return item;
+    }
+  }
+}
+
 export function visibleNav(
   groups: readonly NavGroup[],
   builtRoutes: ReadonlySet<string>,
@@ -290,11 +331,7 @@ export function visibleNav(
     .map((group) => ({
       ...group,
       items: group.items
-        .map((item) =>
-          item.id === SETTINGS_ITEM_ID
-            ? settingsItem(item, builtRoutes, permissions)
-            : item
-        )
+        .map((item) => entryItem(item, builtRoutes, permissions))
         .filter(
           (item): item is NavItem =>
             item !== undefined &&

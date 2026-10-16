@@ -107,6 +107,15 @@ const ADD_FEE_ACTION: CommandEntry = {
   keywords: ['new', 'fee', 'levy', 'tuition', 'amount', 'charge'],
 };
 
+const CHARGE_STUDENTS_ACTION: CommandEntry = {
+  id: 'charge-students',
+  label: 'Charge students',
+  hint: 'Fees',
+  route: '/finance/billing?prepare=1',
+  icon: 'wallet',
+  keywords: ['bill', 'invoice', 'charge', 'term', 'fees', 'send'],
+};
+
 function commandActions(
   builtRoutes: ReadonlySet<string>,
   access: MePermissions,
@@ -121,6 +130,9 @@ function commandActions(
     ...(allowed('/members', ['member:create']) ? [ADD_MEMBER_ACTION] : []),
     ...(allowed('/finance/school-fees', ['feeLine:create'])
       ? [ADD_FEE_ACTION]
+      : []),
+    ...(allowed('/finance/billing', ['invoice:bill'])
+      ? [CHARGE_STUDENTS_ACTION]
       : []),
     ...(allowed('/roles/new', ['ac:create']) ? [CREATE_ROLE_ACTION] : []),
   ];

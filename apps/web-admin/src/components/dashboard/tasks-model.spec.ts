@@ -109,3 +109,57 @@ describe('taskRow announcement drafts', () => {
     ).toBe('A, B, C, D, E and 3 more');
   });
 });
+
+describe('taskRow charges', () => {
+  it('names the unsent round and opens it', () => {
+    expect(
+      taskRow({
+        kind: 'unsentRound',
+        runId: 'r1',
+        number: 'BR-2026-0002',
+        termName: 'Second term, 2026/2027',
+        count: 1,
+      })
+    ).toEqual({
+      key: 'unsentRound-r1',
+      kind: 'unsentRound',
+      tone: 'default',
+      title: 'Charges prepared for Second term, 2026/2027, not sent yet',
+      subline: 'BR-2026-0002 · 1 charge',
+      action: {
+        label: 'Check and send',
+        target: { to: '/finance/billing/$runId', params: { runId: 'r1' } },
+      },
+      extra: null,
+    });
+  });
+
+  it('counts the students not charged and opens the prepare sheet', () => {
+    const row = taskRow({
+      kind: 'notCharged',
+      count: 8,
+      termId: 't2',
+      termName: 'Second term',
+      students: [person(1), person(2), person(3), person(4), person(5)],
+    });
+    expect(row).toMatchObject({
+      key: 'notCharged',
+      title: '8 students not charged for Second term yet',
+      subline:
+        'Student 1, Student 2, Student 3, Student 4, Student 5 and 3 more',
+      action: {
+        label: 'Charge students',
+        target: { to: '/finance/billing', search: { prepare: 1 } },
+      },
+    });
+    expect(
+      taskRow({
+        kind: 'notCharged',
+        count: 1,
+        termId: 't2',
+        termName: 'Second term',
+        students: [person(1)],
+      }).title
+    ).toBe('1 student not charged for Second term yet');
+  });
+});
