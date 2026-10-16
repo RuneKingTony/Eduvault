@@ -12,6 +12,7 @@ export const statements = {
   announcement: ['create', 'read', 'update'],
   ledger: ['read', 'manageAccounts'],
   moneyAccount: ['create', 'read', 'update'],
+  subject: ['create', 'read', 'update'],
   member: ['create', 'read', 'update', 'delete'],
   ac: ['create', 'read', 'update', 'delete'],
 } as const;
@@ -91,6 +92,8 @@ export const PERM_HELP: Partial<Record<Permission, string>> = {
   'feeLine:update':
     'Changes a fee amount and sets which students take optional fees.',
   'feeLine:retire': 'Retires a fee. A fee for every campus needs every campus.',
+  'subject:create': 'Adds subjects to the school. A code never changes.',
+  'subject:update': 'Renames, retires and restores subjects.',
 };
 
 const RESOURCE_LABELS: Record<Resource, string> = {
@@ -107,6 +110,7 @@ const RESOURCE_LABELS: Record<Resource, string> = {
   announcement: 'Announcements',
   ledger: 'Money categories',
   moneyAccount: 'Bank and POS accounts',
+  subject: 'Subjects',
   member: 'Staff',
   ac: 'Roles',
 };
