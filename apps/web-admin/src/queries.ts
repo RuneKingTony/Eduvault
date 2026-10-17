@@ -3,16 +3,18 @@ import {
   queryOptions,
   type QueryClient,
 } from '@tanstack/react-query';
-import type {
-  AnnouncementStatus,
-  BalanceFilter,
-  ClassStatus,
-  FeeGroup,
-  InvoiceKind,
-  InvoiceStatus,
-  PaymentStatus,
-  RouteQuery,
-  contract,
+import {
+  FINANCE_PAGE_SIZE_MAX,
+  type AnnouncementStatus,
+  type BalanceFilter,
+  type ClassStatus,
+  type FeeGroup,
+  type InvoiceKind,
+  type InvoiceStatus,
+  type ItemKind,
+  type PaymentStatus,
+  type RouteQuery,
+  type contract,
 } from '@eduvault/api-contract';
 import type { ActingState } from './acting-store';
 import type { Api } from './api';
@@ -795,6 +797,105 @@ export async function invalidatePayments(
     queryClient.invalidateQueries({ queryKey: [...DASHBOARD_KEY, 'money'] }),
     queryClient.invalidateQueries({ queryKey: [...DASHBOARD_KEY, 'finance'] }),
     queryClient.invalidateQueries({ queryKey: [...DASHBOARD_KEY, 'roll'] }),
+    queryClient.invalidateQueries({ queryKey: LEDGER_KEY }),
+    queryClient.invalidateQueries({ queryKey: MONEY_ACCOUNTS_KEY }),
+  ]);
+}
+
+const STORE_KEY = ['store'] as const;
+
+interface StoreItemFilters {
+  campusId?: string;
+  kind?: ItemKind;
+  q?: string;
+  lowOnly?: boolean;
+  includeRetired?: boolean;
+  page?: number;
+  pageSize?: number;
+}
+
+interface StoreDeliveryFilters {
+  campusId?: string;
+  page?: number;
+}
+
+export const storeSummaryQueryOptions = (api: Api, campusId?: string) =>
+  queryOptions({
+    queryKey: [...STORE_KEY, 'summary', { campusId }],
+    queryFn: () => api.store.summary({ query: { campusId } }),
+    placeholderData: keepPreviousData,
+  });
+
+export const storeItemsQueryOptions = (
+  api: Api,
+  {
+    campusId,
+    kind,
+    q,
+    lowOnly = false,
+    includeRetired = false,
+    page = 1,
+    pageSize,
+  }: StoreItemFilters = {}
+) =>
+  queryOptions({
+    queryKey: [
+      ...STORE_KEY,
+      'items',
+      { campusId, kind, q: q ?? '', lowOnly, includeRetired, page, pageSize },
+    ],
+    queryFn: () =>
+      api.store.items({
+        query: {
+          campusId,
+          kind,
+          q: q === '' ? undefined : q,
+          lowOnly,
+          includeRetired,
+          page,
+          pageSize,
+        },
+      }),
+    placeholderData: keepPreviousData,
+  });
+
+export const storeAllItemsQueryOptions = (api: Api) =>
+  queryOptions({
+    queryKey: [...STORE_KEY, 'items', 'all'],
+    queryFn: async () => {
+      const query = { pageSize: FINANCE_PAGE_SIZE_MAX };
+      const first = await api.store.items({ query: { ...query, page: 1 } });
+      const pages = Math.ceil(first.total / FINANCE_PAGE_SIZE_MAX);
+      const rest = await Promise.all(
+        Array.from({ length: Math.max(pages - 1, 0) }, (_, index) =>
+          api.store.items({ query: { ...query, page: index + 2 } })
+        )
+      );
+      return { items: [first, ...rest].flatMap((page) => page.items) };
+    },
+  });
+
+export const storeDeliveriesQueryOptions = (
+  api: Api,
+  { campusId, page = 1 }: StoreDeliveryFilters = {}
+) =>
+  queryOptions({
+    queryKey: [...STORE_KEY, 'deliveries', { campusId, page }],
+    queryFn: () => api.store.deliveries({ query: { campusId, page } }),
+    placeholderData: keepPreviousData,
+  });
+
+export const dashboardStoreQueryOptions = (api: Api) =>
+  queryOptions({
+    queryKey: [...DASHBOARD_KEY, 'store'],
+    queryFn: () => api.dashboard.store({}),
+  });
+
+/** A delivery posts a journal entry from a money account, so the ledger and accounts move too. */
+export async function invalidateStore(queryClient: QueryClient): Promise<void> {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: STORE_KEY }),
+    queryClient.invalidateQueries({ queryKey: DASHBOARD_KEY }),
     queryClient.invalidateQueries({ queryKey: LEDGER_KEY }),
     queryClient.invalidateQueries({ queryKey: MONEY_ACCOUNTS_KEY }),
   ]);

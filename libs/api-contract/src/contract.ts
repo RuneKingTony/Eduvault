@@ -57,6 +57,7 @@ import {
   dashboardFinanceSchema,
   dashboardMoneySchema,
   dashboardRollSchema,
+  dashboardStoreSchema,
   dashboardTaskSchema,
   myClassSchema,
 } from './dashboard';
@@ -140,6 +141,20 @@ import {
   statementQuerySchema,
   studentStatementSchema,
 } from './student-accounts';
+import {
+  createItemSchema,
+  deliveryDetailSchema,
+  deliveryListQuerySchema,
+  deliveryListSchema,
+  itemListQuerySchema,
+  itemListSchema,
+  itemSchema,
+  recordDeliverySchema,
+  recordedDeliverySchema,
+  storeSummaryQuerySchema,
+  storeSummarySchema,
+  updateItemSchema,
+} from './store';
 import {
   assignSubjectTeacherSchema,
   assignedSubjectTeacherSchema,
@@ -721,6 +736,11 @@ export const contract = defineContract({
       path: '/dashboard/finance',
       response: dashboardFinanceSchema.nullable(),
     }),
+    store: defineRoute({
+      method: 'GET',
+      path: '/dashboard/store',
+      response: dashboardStoreSchema,
+    }),
   },
   moneyAccounts: {
     list: defineRoute({
@@ -932,6 +952,51 @@ export const contract = defineContract({
       path: '/finance/payments',
       body: recordPaymentSchema,
       response: recordedPaymentSchema,
+    }),
+  },
+  store: {
+    summary: defineRoute({
+      method: 'GET',
+      path: '/store/summary',
+      query: storeSummaryQuerySchema,
+      response: storeSummarySchema,
+    }),
+    items: defineRoute({
+      method: 'GET',
+      path: '/store/items',
+      query: itemListQuerySchema,
+      response: itemListSchema,
+    }),
+    createItem: defineRoute({
+      method: 'POST',
+      path: '/store/items',
+      body: createItemSchema,
+      response: itemSchema,
+    }),
+    updateItem: defineRoute({
+      method: 'PATCH',
+      path: '/store/items/:id',
+      params: idParamsSchema,
+      body: updateItemSchema,
+      response: itemSchema,
+    }),
+    deliveries: defineRoute({
+      method: 'GET',
+      path: '/store/deliveries',
+      query: deliveryListQuerySchema,
+      response: deliveryListSchema,
+    }),
+    delivery: defineRoute({
+      method: 'GET',
+      path: '/store/deliveries/:id',
+      params: idParamsSchema,
+      response: deliveryDetailSchema,
+    }),
+    recordDelivery: defineRoute({
+      method: 'POST',
+      path: '/store/deliveries',
+      body: recordDeliverySchema,
+      response: recordedDeliverySchema,
     }),
   },
   studentAccounts: {

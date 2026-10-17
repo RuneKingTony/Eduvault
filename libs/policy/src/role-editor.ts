@@ -221,6 +221,7 @@ export const RESOURCE_PILLARS: Record<Resource, Pillar> = {
   payment: 'Finance',
   ledger: 'Finance',
   moneyAccount: 'Finance',
+  store: 'Finance',
   subject: 'Foundation',
 };
 
@@ -241,6 +242,7 @@ export const ACTION_WORDS: Record<Action, string> = {
   retire: 'retire',
   bill: 'charge students',
   record: 'record',
+  receive: 'receive stock',
   void: 'cancel',
 };
 

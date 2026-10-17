@@ -19,6 +19,7 @@ import { seedCalendar } from './calendar';
 import { seedCharges } from './charges';
 import { seedClasses } from './classes';
 import { seedFinance } from './finance';
+import { seedStore } from './store';
 import { seedStudents } from './student-seed';
 import { seedSubjects } from './subjects';
 import { orgContextFor } from './actors';
@@ -259,6 +260,13 @@ export async function runSeed(
     owner: greenfieldOwner,
     campusIds: created.campusIds,
     school: GREENFIELD_SLUG,
+    offsetDays,
+  });
+  await seedStore(app, {
+    owner: greenfieldOwner,
+    campusIds: created.campusIds,
+    school: GREENFIELD_SLUG,
+    today,
     offsetDays,
   });
   await seedCharges(app, { owner: greenfieldOwner, today });

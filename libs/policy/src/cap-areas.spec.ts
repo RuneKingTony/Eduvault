@@ -254,6 +254,7 @@ describe('capSummary', () => {
       'Charges: charge students and send the charges',
       'Payments: record payments and issue receipts',
       'Bank and POS accounts: add and change bank and POS accounts',
+      'Store: add items and record deliveries',
       'Money categories: change the accountant’s categories',
       'Own records: can see',
     ]);
@@ -278,6 +279,7 @@ describe('capSummary', () => {
       'Fees: can see',
       'Charges: can see',
       'Payments: can see',
+      'Store: can see',
     ]);
   });
 
@@ -295,6 +297,7 @@ describe('capSummary', () => {
       'Charges: charge students and send the charges',
       'Payments: record payments and issue receipts',
       'Bank and POS accounts: can see',
+      'Store: add items and record deliveries',
       'Money categories: can see',
     ]);
   });
@@ -311,6 +314,7 @@ describe('capSummary', () => {
       'Charges: can see',
       'Payments: can see',
       'Bank and POS accounts: can see',
+      'Store: can see',
     ]);
   });
 
@@ -474,9 +478,8 @@ describe('the Money areas', () => {
     const ids = CAP_AREAS.map((candidate) => candidate.id);
     expect(ids.indexOf('payments')).toBe(ids.indexOf('charges') + 1);
     expect(ids.indexOf('money-accounts')).toBe(ids.indexOf('payments') + 1);
-    expect(ids.indexOf('money-categories')).toBe(
-      ids.indexOf('money-accounts') + 1
-    );
+    expect(ids.indexOf('store')).toBe(ids.indexOf('money-accounts') + 1);
+    expect(ids.indexOf('money-categories')).toBe(ids.indexOf('store') + 1);
     expect(ids.indexOf('portal')).toBe(ids.indexOf('money-categories') + 1);
     expect(accounts.group).toBe('Money');
     expect(categories.group).toBe('Money');
@@ -506,6 +509,28 @@ describe('the Money areas', () => {
       capLevel(toPermissionMap(['ledger:manageAccounts']), categories)
     ).toBe('custom');
     expect(capLevel(toPermissionMap(['ledger:read']), categories)).toBe('see');
+  });
+});
+
+describe('the Store area', () => {
+  const store = area('store');
+
+  it('sits in Money, splitting seeing from receiving stock', () => {
+    expect(store.group).toBe('Money');
+    expect(store.label).toBe('Store');
+    expect(store.see).toEqual(['store:read']);
+    expect(store.change).toEqual(['store:receive']);
+    expect(store.changeDesc).toBe('Add items and record deliveries');
+    expect(store.extras).toEqual([]);
+    expect(store.important).toBe(false);
+  });
+
+  it('is see for store:read, change with store:receive and custom for a lone receive', () => {
+    expect(capLevel(toPermissionMap(['store:read']), store)).toBe('see');
+    expect(
+      capLevel(toPermissionMap(['store:read', 'store:receive']), store)
+    ).toBe('change');
+    expect(capLevel(toPermissionMap(['store:receive']), store)).toBe('custom');
   });
 });
 

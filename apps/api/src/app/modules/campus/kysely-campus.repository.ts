@@ -222,8 +222,31 @@ export class KyselyCampusRepository extends CampusRepository {
       announcement !== undefined ||
       account !== undefined ||
       line !== undefined ||
-      (await this.hasCharges(organizationId, id))
+      (await this.hasCharges(organizationId, id)) ||
+      (await this.hasStock(organizationId, id))
     );
+  }
+
+  private async hasStock(organizationId: string, id: string): Promise<boolean> {
+    const [delivery, movement] = await Promise.all([
+      this.db
+        .selectFrom('stock_delivery')
+        .innerJoin('store', 'store.id', 'stock_delivery.store_id')
+        .select('stock_delivery.id')
+        .where('store.campus_id', '=', id)
+        .where('stock_delivery.organization_id', '=', organizationId)
+        .limit(1)
+        .executeTakeFirst(),
+      this.db
+        .selectFrom('stock_movement')
+        .innerJoin('store', 'store.id', 'stock_movement.store_id')
+        .select('stock_movement.id')
+        .where('store.campus_id', '=', id)
+        .where('stock_movement.organization_id', '=', organizationId)
+        .limit(1)
+        .executeTakeFirst(),
+    ]);
+    return delivery !== undefined || movement !== undefined;
   }
 
   private async hasCharges(
@@ -250,14 +273,24 @@ export class KyselyCampusRepository extends CampusRepository {
   }
 
   async create(organizationId: string, input: NewCampus): Promise<void> {
-    await this.db
-      .insertInto('campus')
-      .values({
-        team_id: input.id,
-        organization_id: organizationId,
-        address: input.address,
-      })
-      .execute();
+    await this.db.transaction().execute(async (trx) => {
+      await trx
+        .insertInto('campus')
+        .values({
+          team_id: input.id,
+          organization_id: organizationId,
+          address: input.address,
+        })
+        .execute();
+      await trx
+        .insertInto('store')
+        .values({
+          organization_id: organizationId,
+          campus_id: input.id,
+          name: `${input.name} campus store`,
+        })
+        .execute();
+    });
   }
 
   async updateAddress(

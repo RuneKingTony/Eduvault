@@ -212,6 +212,16 @@ export const CAP_AREAS: readonly CapArea[] = [
     extras: [],
   },
   {
+    id: 'store',
+    group: 'Money',
+    label: 'Store',
+    important: false,
+    see: ['store:read'],
+    change: ['store:receive'],
+    changeDesc: 'Add items and record deliveries',
+    extras: [],
+  },
+  {
     id: 'money-categories',
     group: 'Money',
     label: 'Money categories',

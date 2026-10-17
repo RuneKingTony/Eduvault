@@ -276,6 +276,35 @@ export interface InvoiceLine {
   student_discount_id: string | null;
 }
 
+export interface Item {
+  class_level_id: string | null;
+  cost_price_minor: Int8;
+  created_at: Generated<Timestamp>;
+  created_by: string | null;
+  id: Generated<string>;
+  kind: string;
+  low_stock_level: Generated<number>;
+  name: string;
+  organization_id: string;
+  retired_at: Timestamp | null;
+  retired_by: string | null;
+  sell_price_minor: Int8;
+  updated_at: Generated<Timestamp>;
+  variant: string | null;
+}
+
+export interface ItemPriceChange {
+  changed_by: string | null;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  item_id: string;
+  new_cost_minor: Int8;
+  new_price_minor: Int8;
+  old_cost_minor: Int8;
+  old_price_minor: Int8;
+  organization_id: string;
+}
+
 export interface JournalEntry {
   effective_on: Timestamp;
   id: Generated<string>;
@@ -450,6 +479,56 @@ export interface Session {
   updatedAt: Timestamp;
   userAgent: string | null;
   userId: string;
+}
+
+export interface StockDelivery {
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  is_opening: Generated<boolean>;
+  journal_entry_id: string;
+  money_account_id: string | null;
+  number: string;
+  organization_id: string;
+  received_by: string | null;
+  received_on: Timestamp;
+  reference: string;
+  request_hash: string;
+  store_id: string;
+  supplier_name: string;
+  total_minor: Int8;
+}
+
+export interface StockDeliveryLine {
+  id: Generated<string>;
+  item_id: string;
+  organization_id: string;
+  quantity: number;
+  stock_delivery_id: string;
+  unit_cost_minor: Int8;
+}
+
+export interface StockMovement {
+  id: Generated<string>;
+  item_id: string;
+  kind: string;
+  moved_at: Generated<Timestamp>;
+  moved_by: string | null;
+  organization_id: string;
+  quantity: number;
+  reference: string;
+  source_id: string | null;
+  store_id: string;
+  value_minor: Int8;
+}
+
+export interface Store {
+  campus_id: string;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  name: string;
+  organization_id: string;
+  retired_at: Timestamp | null;
+  updated_at: Generated<Timestamp>;
 }
 
 export interface Student {
@@ -632,6 +711,8 @@ export interface DB {
   invitation: Invitation;
   invoice: Invoice;
   invoice_line: InvoiceLine;
+  item: Item;
+  item_price_change: ItemPriceChange;
   journal_entry: JournalEntry;
   journal_line: JournalLine;
   ledger_account: LedgerAccount;
@@ -646,6 +727,10 @@ export interface DB {
   school_holiday: SchoolHoliday;
   school_setting: SchoolSetting;
   session: Session;
+  stock_delivery: StockDelivery;
+  stock_delivery_line: StockDeliveryLine;
+  stock_movement: StockMovement;
+  store: Store;
   student: Student;
   student_discount: StudentDiscount;
   student_enrollment: StudentEnrollment;

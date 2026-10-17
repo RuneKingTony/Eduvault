@@ -13,6 +13,7 @@ import type {
   DashboardFinance,
   DashboardMoney,
   DashboardRoll,
+  DashboardStore,
   DashboardTask,
   MePermissions,
   MyClass,
@@ -112,6 +113,9 @@ export const finance = (
 const financeOf = (overrides: { finance?: DashboardFinance | null }) =>
   overrides.finance === undefined ? finance() : overrides.finance;
 
+const storeOf = (overrides: { store?: DashboardStore }): DashboardStore =>
+  overrides.store ?? { stockValueMinor: 0 };
+
 export function dashboardApi(
   overrides: {
     calendar?: unknown;
@@ -124,6 +128,8 @@ export function dashboardApi(
     money?: DashboardMoney;
     charged?: DashboardCharged | null;
     finance?: DashboardFinance | null;
+
+    store?: DashboardStore;
   } = {}
 ) {
   return {
@@ -140,6 +146,8 @@ export function dashboardApi(
       money: vi.fn().mockResolvedValue(overrides.money ?? emptyMoney()),
       charged: vi.fn().mockResolvedValue(chargedOf(overrides)),
       finance: vi.fn().mockResolvedValue(financeOf(overrides)),
+
+      store: vi.fn().mockResolvedValue(storeOf(overrides)),
     },
     activity: {
       list: vi.fn().mockResolvedValue(overrides.activity ?? emptyActivity()),
@@ -171,6 +179,7 @@ export function renderInRouter(
     '/finance/accounts',
     '/finance/billing',
     '/finance/billing/$runId',
+    '/finance/store',
     '/members/$memberId',
   ];
   const router = createRouter({

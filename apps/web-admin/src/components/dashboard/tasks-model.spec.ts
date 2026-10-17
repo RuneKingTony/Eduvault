@@ -163,3 +163,30 @@ describe('taskRow charges', () => {
     ).toBe('1 student not charged for Second term yet');
   });
 });
+
+describe('taskRow low stock', () => {
+  it('counts the items, lists the first three and opens the Store', () => {
+    expect(
+      taskRow({
+        kind: 'lowStock',
+        count: 5,
+        names: ['School tie', 'Pinafore, Size 16', 'School shirt, Size 14'],
+      })
+    ).toEqual({
+      key: 'lowStock',
+      kind: 'lowStock',
+      tone: 'default',
+      title: '5 store items running low',
+      subline:
+        'School tie, Pinafore, Size 16, School shirt, Size 14 and 2 more',
+      action: { label: 'Store', target: { to: '/finance/store' } },
+      extra: null,
+    });
+  });
+
+  it('uses the singular for one item and no "more" when the sample is whole', () => {
+    const row = taskRow({ kind: 'lowStock', count: 1, names: ['School tie'] });
+    expect(row.title).toBe('1 store item running low');
+    expect(row.subline).toBe('School tie');
+  });
+});

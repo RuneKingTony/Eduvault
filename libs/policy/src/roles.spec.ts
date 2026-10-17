@@ -193,6 +193,17 @@ describe('roles', () => {
     }
   });
 
+  it('gives the bursar store read and receive, the administrator and principal store read, and nobody else any', () => {
+    expect(starter('bursar').store).toEqual(['read', 'receive']);
+    expect(starter('administrator').store).toEqual(['read']);
+    expect(starter('principal').store).toEqual(['read']);
+    for (const slug of ['teacher', 'student', 'guardian']) {
+      expect(starter(slug).store).toBeUndefined();
+    }
+    expect(READ_PERMS).toContain('store:read');
+    expect(READ_PERMS).not.toContain('store:receive');
+  });
+
   it('keeps ledger:manageAccounts and the money account writes out of every starter role', () => {
     for (const role of STARTER_ROLES) {
       for (const permission of [
@@ -314,6 +325,7 @@ describe('roles', () => {
       invoice: ['read'],
       payment: ['read'],
       moneyAccount: ['read'],
+      store: ['read'],
     });
   });
 

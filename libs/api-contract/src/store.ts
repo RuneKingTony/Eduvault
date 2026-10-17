@@ -1,0 +1,334 @@
+import { z } from 'zod';
+import { FINANCE_PAGE_SIZE, FINANCE_PAGE_SIZE_MAX } from './finance';
+import { idSchema } from './schemas';
+
+export const ITEM_KINDS = ['uniform', 'book'] as const;
+export const STOCK_STATES = ['in', 'low', 'out'] as const;
+export const ITEM_NAME_MAX = 120;
+export const ITEM_VARIANT_MAX = 40;
+export const ITEM_LOW_STOCK_DEFAULT = 5;
+export const STORE_SEARCH_MAX = 120;
+export const DELIVERY_REFERENCE_MAX = 80;
+export const DELIVERY_SUPPLIER_MAX = 120;
+export const DELIVERY_QUANTITY_MAX = 100_000;
+export const DELIVERY_LINES_MAX = 500;
+export const UNIT_PRICE_MAX_MINOR = 100_000_000;
+export const OPENING_STOCK_SUPPLIER = 'Opening stock count';
+
+export const ITEM_REQUIRED_MESSAGE =
+  'Enter a name, a cost price and a selling price.';
+export const ITEM_PRICE_BELOW_COST_MESSAGE =
+  'The selling price is below the cost price.';
+export const BOOK_LEVEL_REQUIRED_MESSAGE = 'Choose a class level for a book.';
+export const UNIFORM_NO_LEVEL_MESSAGE = 'A uniform has no class level.';
+export const BOOK_NO_SIZE_MESSAGE = 'A book has no size.';
+export const ITEM_RETIRED_EDIT_MESSAGE = 'A retired item can’t be edited.';
+export const ITEM_NOT_FOUND_MESSAGE = 'Item not found';
+export const ITEM_LEVEL_NOT_FOUND_MESSAGE = 'Class level not found';
+export const itemDuplicateMessage = (displayName: string): string =>
+  `${displayName} is already in the store.`;
+
+export const DELIVERY_REQUIRED_MESSAGE =
+  'Enter the supplier and at least one quantity.';
+export const DELIVERY_REFERENCE_REQUIRED_MESSAGE =
+  'Enter a reference. It makes a retried request apply at most once.';
+export const DELIVERY_UNIT_COST_MESSAGE =
+  'Enter a unit cost for every item you received.';
+export const DELIVERY_QUANTITY_MAX_MESSAGE = `Receive ${DELIVERY_QUANTITY_MAX.toLocaleString('en-NG')} or fewer of an item at a time.`;
+export const DELIVERY_LINES_MAX_MESSAGE = `List ${DELIVERY_LINES_MAX} items or fewer in one delivery.`;
+export const UNIT_PRICE_MAX_MESSAGE = 'That price is too large.';
+export const DELIVERY_FUTURE_DATE_MESSAGE =
+  'The received date can’t be in the future.';
+export const DELIVERY_ACCOUNT_MESSAGE =
+  'Pay from an open money account on this campus or school-wide.';
+export const DELIVERY_OPENING_ACCOUNT_MESSAGE =
+  'Opening stock isn’t paid from a money account.';
+export const DELIVERY_DUPLICATE_ITEM_MESSAGE = 'List each item once.';
+export const DELIVERY_NOT_FOUND_MESSAGE = 'Delivery not found';
+export const STORE_CAMPUS_NOT_FOUND_MESSAGE = 'Campus not found';
+export const DELIVERY_REFERENCE_TAKEN_MESSAGE =
+  'That reference is already used by another record.';
+export const deliveryRetiredItemMessage = (displayName: string): string =>
+  `${displayName} is retired.`;
+export const openingStockRecordedMessage = (campusName: string): string =>
+  `Opening stock is already recorded for ${campusName}.`;
+export const deliveryReferenceUsedMessage = (
+  reference: string,
+  number: string
+): string => `Reference ${reference} is already used by ${number}.`;
+
+export const itemKindSchema = z.enum(ITEM_KINDS);
+export type ItemKind = z.infer<typeof itemKindSchema>;
+
+export const stockStateSchema = z.enum(STOCK_STATES);
+export type StockState = z.infer<typeof stockStateSchema>;
+
+const minorSchema = z.number().int();
+const countSchema = z.number().int().nonnegative();
+
+export function itemDisplayName(item: {
+  name: string;
+  variant: string | null;
+}): string {
+  return item.variant === null ? item.name : `${item.name}, ${item.variant}`;
+}
+
+export function stockState(
+  rows: readonly { onHand: number }[],
+  lowLevel: number
+): StockState {
+  if (rows.every((row) => row.onHand <= 0)) {
+    return 'out';
+  }
+  return rows.some((row) => row.onHand <= lowLevel) ? 'low' : 'in';
+}
+
+const requiredText = (max: number, message: string) =>
+  z
+    .string({ error: message })
+    .trim()
+    .min(1, message)
+    .max(max, `Use ${max} characters or fewer.`);
+
+const priceSchema = z
+  .number({ error: ITEM_REQUIRED_MESSAGE })
+  .int(ITEM_REQUIRED_MESSAGE);
+
+const sellPriceSchema = priceSchema
+  .positive(ITEM_REQUIRED_MESSAGE)
+  .max(UNIT_PRICE_MAX_MINOR, UNIT_PRICE_MAX_MESSAGE);
+const costPriceSchema = priceSchema
+  .nonnegative(ITEM_REQUIRED_MESSAGE)
+  .max(UNIT_PRICE_MAX_MINOR, UNIT_PRICE_MAX_MESSAGE);
+
+const lowLevelSchema = z
+  .number({ error: ITEM_REQUIRED_MESSAGE })
+  .int(ITEM_REQUIRED_MESSAGE)
+  .nonnegative(ITEM_REQUIRED_MESSAGE);
+
+const variantSchema = z
+  .string()
+  .trim()
+  .max(ITEM_VARIANT_MAX, `Use ${ITEM_VARIANT_MAX} characters or fewer.`)
+  .transform((value) => (value === '' ? null : value));
+
+const createItemObjectSchema = z.object({
+  kind: itemKindSchema,
+  name: requiredText(ITEM_NAME_MAX, ITEM_REQUIRED_MESSAGE),
+  variant: variantSchema.nullish().transform((value) => value ?? null),
+  classLevelId: idSchema.nullish().transform((value) => value ?? null),
+  costPriceMinor: costPriceSchema,
+  sellPriceMinor: sellPriceSchema,
+  lowStockLevel: lowLevelSchema.default(ITEM_LOW_STOCK_DEFAULT),
+});
+
+export const createItemSchema = createItemObjectSchema.superRefine(
+  (body, context) => {
+    if (body.kind === 'book' && body.classLevelId === null) {
+      context.addIssue({
+        code: 'custom',
+        message: BOOK_LEVEL_REQUIRED_MESSAGE,
+        path: ['classLevelId'],
+      });
+    }
+    if (body.kind === 'uniform' && body.classLevelId !== null) {
+      context.addIssue({
+        code: 'custom',
+        message: UNIFORM_NO_LEVEL_MESSAGE,
+        path: ['classLevelId'],
+      });
+    }
+    if (body.kind === 'book' && body.variant !== null) {
+      context.addIssue({
+        code: 'custom',
+        message: BOOK_NO_SIZE_MESSAGE,
+        path: ['variant'],
+      });
+    }
+    if (body.sellPriceMinor < body.costPriceMinor) {
+      context.addIssue({
+        code: 'custom',
+        message: ITEM_PRICE_BELOW_COST_MESSAGE,
+        path: ['sellPriceMinor'],
+      });
+    }
+  }
+);
+export type CreateItemInput = z.input<typeof createItemSchema>;
+export type CreateItem = z.output<typeof createItemSchema>;
+
+export const updateItemSchema = z
+  .object({
+    name: requiredText(ITEM_NAME_MAX, ITEM_REQUIRED_MESSAGE).optional(),
+    variant: variantSchema.nullable().optional(),
+    costPriceMinor: costPriceSchema.optional(),
+    sellPriceMinor: sellPriceSchema.optional(),
+    lowStockLevel: lowLevelSchema.optional(),
+    retired: z.literal(true).optional(),
+  })
+  .superRefine((body, context) => {
+    if (
+      body.costPriceMinor !== undefined &&
+      body.sellPriceMinor !== undefined &&
+      body.sellPriceMinor < body.costPriceMinor
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: ITEM_PRICE_BELOW_COST_MESSAGE,
+        path: ['sellPriceMinor'],
+      });
+    }
+  });
+export type UpdateItemInput = z.input<typeof updateItemSchema>;
+export type UpdateItem = z.output<typeof updateItemSchema>;
+
+const flagSchema = z
+  .union([z.boolean(), z.enum(['true', 'false'])])
+  .default(false)
+  .transform((value) => value === true || value === 'true');
+
+export const itemListQuerySchema = z.object({
+  campusId: idSchema.optional(),
+  kind: itemKindSchema.optional(),
+  q: z.string().trim().max(STORE_SEARCH_MAX).optional(),
+  lowOnly: flagSchema,
+  includeRetired: flagSchema,
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(FINANCE_PAGE_SIZE_MAX)
+    .default(FINANCE_PAGE_SIZE),
+});
+export type ItemListQueryInput = z.input<typeof itemListQuerySchema>;
+export type ItemListQuery = z.output<typeof itemListQuerySchema>;
+
+export const stockRowSchema = z.object({
+  campusId: idSchema,
+  onHand: minorSchema,
+  valueMinor: minorSchema,
+  averageCostMinor: minorSchema.nonnegative(),
+});
+export type StockRow = z.infer<typeof stockRowSchema>;
+
+export const itemSchema = z.object({
+  id: idSchema,
+  kind: itemKindSchema,
+  name: z.string(),
+  variant: z.string().nullable(),
+  displayName: z.string(),
+  classLevel: z.object({ id: idSchema, name: z.string() }).nullable(),
+  costPriceMinor: minorSchema.nonnegative(),
+  sellPriceMinor: minorSchema.positive(),
+  lowStockLevel: countSchema,
+  retiredAt: z.iso.datetime({ offset: true }).nullable(),
+  stock: z.array(stockRowSchema),
+  state: stockStateSchema,
+});
+export type Item = z.infer<typeof itemSchema>;
+
+export const itemListSchema = z.object({
+  items: z.array(itemSchema),
+  total: countSchema,
+});
+export type ItemList = z.infer<typeof itemListSchema>;
+
+export const deliveryLineInputSchema = z.object({
+  itemId: idSchema,
+  quantity: z
+    .number({ error: DELIVERY_REQUIRED_MESSAGE })
+    .int(DELIVERY_REQUIRED_MESSAGE)
+    .positive(DELIVERY_REQUIRED_MESSAGE)
+    .max(DELIVERY_QUANTITY_MAX, DELIVERY_QUANTITY_MAX_MESSAGE),
+  unitCostMinor: z
+    .number({ error: DELIVERY_UNIT_COST_MESSAGE })
+    .int(DELIVERY_UNIT_COST_MESSAGE)
+    .positive(DELIVERY_UNIT_COST_MESSAGE)
+    .max(UNIT_PRICE_MAX_MINOR, UNIT_PRICE_MAX_MESSAGE),
+});
+export type DeliveryLineInput = z.infer<typeof deliveryLineInputSchema>;
+
+export const recordDeliverySchema = z.object({
+  reference: requiredText(
+    DELIVERY_REFERENCE_MAX,
+    DELIVERY_REFERENCE_REQUIRED_MESSAGE
+  ),
+  campusId: idSchema,
+  supplierName: requiredText(DELIVERY_SUPPLIER_MAX, DELIVERY_REQUIRED_MESSAGE),
+  moneyAccountId: idSchema.optional(),
+  isOpening: z.boolean().optional(),
+  receivedOn: z.iso.date().optional(),
+  lines: z
+    .array(deliveryLineInputSchema)
+    .min(1, DELIVERY_REQUIRED_MESSAGE)
+    .max(DELIVERY_LINES_MAX, DELIVERY_LINES_MAX_MESSAGE),
+});
+export type RecordDeliveryInput = z.input<typeof recordDeliverySchema>;
+export type RecordDelivery = z.output<typeof recordDeliverySchema>;
+
+export const deliveryListQuerySchema = z.object({
+  campusId: idSchema.optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(FINANCE_PAGE_SIZE_MAX)
+    .default(FINANCE_PAGE_SIZE),
+});
+export type DeliveryListQueryInput = z.input<typeof deliveryListQuerySchema>;
+export type DeliveryListQuery = z.output<typeof deliveryListQuerySchema>;
+
+export const deliverySchema = z.object({
+  id: idSchema,
+  number: z.string(),
+  reference: z.string(),
+  campusId: idSchema,
+  supplierName: z.string(),
+  moneyAccount: z.object({ id: idSchema, name: z.string() }).nullable(),
+  isOpening: z.boolean(),
+  receivedOn: z.iso.date(),
+  receivedBy: z.string().nullable(),
+  totalMinor: minorSchema.positive(),
+  itemCount: countSchema,
+});
+export type Delivery = z.infer<typeof deliverySchema>;
+
+export const deliveryLineSchema = z.object({
+  itemId: idSchema,
+  displayName: z.string(),
+  retired: z.boolean(),
+  quantity: z.number().int().positive(),
+  unitCostMinor: minorSchema.positive(),
+  totalMinor: minorSchema.positive(),
+});
+export type DeliveryLine = z.infer<typeof deliveryLineSchema>;
+
+export const deliveryDetailSchema = deliverySchema.extend({
+  lines: z.array(deliveryLineSchema),
+});
+export type DeliveryDetail = z.infer<typeof deliveryDetailSchema>;
+
+export const deliveryListSchema = z.object({
+  items: z.array(deliverySchema),
+  total: countSchema,
+  suppliers: z.array(z.string()),
+});
+export type DeliveryList = z.infer<typeof deliveryListSchema>;
+
+export const recordedDeliverySchema = deliveryDetailSchema.extend({
+  replayed: z.boolean(),
+});
+export type RecordedDelivery = z.infer<typeof recordedDeliverySchema>;
+
+export const storeSummaryQuerySchema = z.object({
+  campusId: idSchema.optional(),
+});
+export type StoreSummaryQuery = z.infer<typeof storeSummaryQuerySchema>;
+
+export const storeSummarySchema = z.object({
+  stockValueMinor: minorSchema,
+  lowCount: countSchema,
+});
+export type StoreSummary = z.infer<typeof storeSummarySchema>;

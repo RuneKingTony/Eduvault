@@ -331,6 +331,25 @@ describe('DashboardPage tasks', () => {
     );
   });
 
+  it('lists the low-stock task with a button to the Store', async () => {
+    render(
+      ownerAccess(),
+      dashboardApi({
+        tasks: [
+          { kind: 'lowStock', count: 2, names: ['School tie', 'Pinafore'] },
+        ],
+      })
+    );
+    expect(
+      await screen.findByText('2 store items running low')
+    ).toBeInTheDocument();
+    expect(screen.getByText('School tie, Pinafore')).toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: 'Store' })[0]).toHaveAttribute(
+      'href',
+      '/finance/store'
+    );
+  });
+
   it('shows All caught up when nothing needs the member', async () => {
     render(ownerAccess(), dashboardApi());
     expect(await screen.findByText('All caught up')).toBeInTheDocument();
@@ -466,5 +485,30 @@ describe('DashboardPage Received and Still owed', () => {
     expect(await screen.findByText('Students by status')).toBeInTheDocument();
     expect(screen.queryByText('Still owed')).not.toBeInTheDocument();
     expect(screen.queryByText('Received')).not.toBeInTheDocument();
+  });
+});
+
+describe('DashboardPage Store card', () => {
+  it('shows the Store card to a holder of store:read and nothing else asks for it', async () => {
+    const api = dashboardApi({ store: { stockValueMinor: 5_000_000 } });
+    render(ownerAccess(), api);
+    expect(await screen.findByText('Stock value')).toBeInTheDocument();
+    expect(api.dashboard.store).toHaveBeenCalledTimes(1);
+  });
+
+  it('asks for nothing and shows nothing without store:read', async () => {
+    const api = dashboardApi();
+    render(
+      fakeAccess({
+        roles: ['custom'],
+        permissions: toPermissionMap(['student:read', 'moneyAccount:read']),
+        campusScope: 'all',
+        classScope: 'all',
+      }),
+      api
+    );
+    await screen.findByText('School account');
+    expect(screen.queryByText('Stock value')).not.toBeInTheDocument();
+    expect(api.dashboard.store).not.toHaveBeenCalled();
   });
 });

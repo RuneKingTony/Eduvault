@@ -765,6 +765,8 @@ test.describe('roles', () => {
           'payment:void',
           'moneyAccount:read',
           'ledger:read',
+          'store:read',
+          'store:receive',
         ],
         { campuses: [lekki] }
       );
@@ -800,6 +802,8 @@ test.describe('roles', () => {
         'payment:void',
         'moneyAccount:read',
         'ledger:read',
+        'store:read',
+        'store:receive',
       ]);
       const res = await api(deleter).delete('/roles/bursar').expect(409);
       expect(res.body.message).toBe(

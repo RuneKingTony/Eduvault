@@ -3,6 +3,7 @@ import { moneyAccountKindSchema } from './finance';
 import { currencySchema, idSchema } from './schemas';
 
 export const DASHBOARD_SAMPLE_SIZE = 5;
+export const DASHBOARD_LOW_STOCK_NAMES = 3;
 export const ACTIVITY_PAGE_SIZE = 10;
 
 const countSchema = z.number().int().positive();
@@ -50,6 +51,11 @@ export const dashboardTaskSchema = z.discriminatedUnion('kind', [
     termId: idSchema,
     termName: z.string(),
     students: samples(nameSchema),
+  }),
+  z.object({
+    kind: z.literal('lowStock'),
+    count: countSchema,
+    names: z.array(z.string()).max(DASHBOARD_LOW_STOCK_NAMES),
   }),
   z.object({
     kind: z.literal('noRole'),
@@ -154,3 +160,8 @@ export const dashboardFinanceSchema = z.object({
   owingStudents: z.number().int().nonnegative(),
 });
 export type DashboardFinance = z.infer<typeof dashboardFinanceSchema>;
+
+export const dashboardStoreSchema = z.object({
+  stockValueMinor: z.number().int(),
+});
+export type DashboardStore = z.infer<typeof dashboardStoreSchema>;
