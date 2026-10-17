@@ -9,9 +9,24 @@ import {
 describe('graduate class helpers', () => {
   it('orders the roster by last name', () => {
     const roster = [
-      { studentId: '1', name: 'Zainab Bello', admissionNumber: 'GF-1' },
-      { studentId: '2', name: 'Ada Adams', admissionNumber: 'GF-2' },
-      { studentId: '3', name: 'Tobi Bello', admissionNumber: 'GF-3' },
+      {
+        studentId: '1',
+        name: 'Zainab Bello',
+        admissionNumber: 'GF-1',
+        electives: [],
+      },
+      {
+        studentId: '2',
+        name: 'Ada Adams',
+        admissionNumber: 'GF-2',
+        electives: [],
+      },
+      {
+        studentId: '3',
+        name: 'Tobi Bello',
+        admissionNumber: 'GF-3',
+        electives: [],
+      },
     ];
     expect(byLastName(roster).map((row) => row.name)).toEqual([
       'Ada Adams',

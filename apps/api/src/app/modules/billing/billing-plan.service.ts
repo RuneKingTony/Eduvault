@@ -21,8 +21,15 @@ import {
   defaultTermId,
   type RoundFilter,
 } from './billing-inclusion';
-import { BillingRepository, type TermInfo } from './billing.repository';
+import { scopeOf } from './billing-scope';
+import {
+  BillingRepository,
+  type ChargeSummary,
+  type TermInfo,
+} from './billing.repository';
 import { includedCandidates, planRound, type RoundPlan } from './round-plan';
+
+const NO_SAMPLE = 0;
 
 @Injectable()
 export class BillingPlanService {
@@ -39,15 +46,26 @@ export class BillingPlanService {
     };
   }
 
+  summary(
+    ctx: OrgContext,
+    term: TermInfo,
+    sampleSize: number
+  ): Promise<ChargeSummary> {
+    return this.billing.chargeSummary(scopeOf(ctx), term, {
+      today: schoolToday(ctx, this.clock),
+      sampleSize,
+    });
+  }
+
   async terms(ctx: OrgContext): Promise<BillingTerm[]> {
     const offered = await this.billing.termsToCharge(ctx.organizationId);
     const charged = await Promise.all(
       offered.map(async (term) => {
-        const plan = await this.plan(ctx, term, { scope: 'school' });
+        const summary = await this.summary(ctx, term, NO_SAMPLE);
         return {
           term,
-          state: chargedState(plan.counts),
-          levelIds: plan.levelIds,
+          state: chargedState(summary),
+          levelIds: summary.levelIds,
         };
       })
     );
@@ -112,7 +130,7 @@ export class BillingPlanService {
     filter: RoundFilter
   ): Promise<RoundPlan & { levelIds: string[] }> {
     const candidates = await this.billing.candidates(
-      { organizationId: ctx.organizationId, campusScope: ctx.campusScope },
+      scopeOf(ctx),
       term,
       schoolToday(ctx, this.clock)
     );

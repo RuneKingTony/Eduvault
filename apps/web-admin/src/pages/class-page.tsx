@@ -232,6 +232,33 @@ function TeachersCard({
   );
 }
 
+function RosterTable({ rows }: { rows: NonNullable<ClassDetail['roster']> }) {
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Student</TableHead>
+          <TableHead>Adm. no.</TableHead>
+          <TableHead>Electives</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {rows.map((row) => (
+          <TableRow key={row.studentId}>
+            <TableCell className="font-medium">{row.name}</TableCell>
+            <TableCell className="font-mono text-sm">
+              {row.admissionNumber}
+            </TableCell>
+            <TableCell>
+              {row.electives.length === 0 ? '—' : row.electives.join(', ')}
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  );
+}
+
 function RosterCard({
   roster,
 }: {
@@ -259,24 +286,7 @@ function RosterCard({
             </EmptyHeader>
           </Empty>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Student</TableHead>
-                <TableHead>Adm. no.</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {shown.map((row) => (
-                <TableRow key={row.studentId}>
-                  <TableCell className="font-medium">{row.name}</TableCell>
-                  <TableCell className="font-mono text-sm">
-                    {row.admissionNumber}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <RosterTable rows={shown} />
         )}
         {roster.length > ROSTER_PAGE_SIZE ? (
           <NumberedPager

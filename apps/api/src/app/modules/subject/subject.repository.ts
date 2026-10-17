@@ -1,4 +1,6 @@
 import type { LevelSubjectKind } from '@eduvault/api-contract';
+import type { CampusScope } from '../../common/campus-scope';
+import type { ClassScope } from '../../common/class-scope';
 
 export interface SubjectRecord {
   id: string;
@@ -32,6 +34,60 @@ export interface LevelSubjectRecord {
   subjectRetiredAt: string | null;
   kind: LevelSubjectKind;
   sequence: number;
+  takerCount: number;
+}
+
+export interface LevelListRow {
+  subjectId: string;
+  kind: LevelSubjectKind;
+}
+
+export interface TakerCount {
+  classLevelId: string;
+  subjectId: string;
+  count: number;
+}
+
+export interface SessionRecord {
+  id: string;
+  name: string;
+}
+
+export interface ElectiveLevelRecord {
+  subjectId: string;
+  subjectName: string;
+  classLevelId: string;
+}
+
+export interface ElectiveScope {
+  campusScope: CampusScope;
+  classScope: ClassScope;
+}
+
+export interface ElectiveStudentQuery {
+  sessionId: string;
+  studentIds?: readonly string[];
+}
+
+export interface ElectiveStudentRecord {
+  studentId: string;
+  name: string;
+  admissionNumber: string;
+  classId: string | null;
+  className: string | null;
+  enrollmentId: string | null;
+  classLevelId: string | null;
+}
+
+export interface ElectiveTakerRow {
+  enrollmentId: string;
+  subjectId: string;
+}
+
+export interface ElectiveWrite {
+  subjectId: string;
+  enrollmentIds: readonly string[];
+  visibleEnrollmentIds: readonly string[];
 }
 
 export interface TermRecord {
@@ -107,6 +163,54 @@ export abstract class SubjectRepository {
     organizationId: string,
     classLevelId?: string
   ): Promise<LevelSubjectRecord[]>;
+
+  abstract subjectsByIds(
+    organizationId: string,
+    ids: readonly string[]
+  ): Promise<SubjectRecord[]>;
+
+  abstract currentSessionId(
+    organizationId: string
+  ): Promise<string | undefined>;
+
+  /** Replaces the level's list in one transaction, first clearing this school year's takers of every elective that is removed or becomes core. */
+  abstract replaceLevelList(
+    organizationId: string,
+    classLevelId: string,
+    rows: readonly LevelListRow[]
+  ): Promise<void>;
+
+  abstract takerCounts(
+    organizationId: string,
+    classLevelId?: string
+  ): Promise<TakerCount[]>;
+
+  abstract findSession(
+    organizationId: string,
+    id: string
+  ): Promise<SessionRecord | undefined>;
+
+  /** Without `studentIds`: visible students with an active enrolment that session at a level that has an elective. With them: those ids that are visible, enrolment fields null when they have none. */
+  abstract visibleElectiveStudents(
+    organizationId: string,
+    scope: ElectiveScope,
+    query: ElectiveStudentQuery
+  ): Promise<ElectiveStudentRecord[]>;
+
+  abstract electiveTakers(
+    organizationId: string,
+    sessionId: string,
+    enrollmentIds: readonly string[]
+  ): Promise<ElectiveTakerRow[]>;
+
+  abstract electiveLevels(
+    organizationId: string
+  ): Promise<ElectiveLevelRecord[]>;
+
+  abstract setElectiveTakers(
+    organizationId: string,
+    write: ElectiveWrite
+  ): Promise<void>;
 
   abstract currentTerm(organizationId: string): Promise<TermRecord | undefined>;
 

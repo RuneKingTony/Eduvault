@@ -158,6 +158,7 @@ export class CampusService {
       }
       await this.campuses.create(ctx.organizationId, {
         id: teamId,
+        name: input.name,
         address: input.address ?? null,
       });
     } catch (error) {

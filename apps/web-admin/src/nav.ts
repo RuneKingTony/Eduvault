@@ -148,6 +148,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         pageTitle: 'Store',
         route: '/finance/store',
         icon: 'store',
+        gate: ['store:read'],
       },
       {
         id: 'accounts',

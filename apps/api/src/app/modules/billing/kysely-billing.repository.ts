@@ -10,6 +10,7 @@ import {
   type BillingRunListQuery,
   type BillingRunSummary,
 } from '@eduvault/api-contract';
+import { INACTIVE_AFTER_DAYS } from '@eduvault/shared';
 import { chunks, day, iso, nullableDay } from '../../common/db/rows';
 import { KYSELY_TOKEN, type Database } from '../../common/db/tokens';
 import {
@@ -34,6 +35,8 @@ import { scopeLabel } from './billing-inclusion';
 import {
   BillingRepository,
   type BillingScope,
+  type ChargeSummary,
+  type ChargeSummaryOptions,
   type CreatedRound,
   type IssueRound,
   type LevelRef,
@@ -142,6 +145,99 @@ const toCandidate = (row: CandidateRow, today: string): RoundCandidate => ({
   latestPlacementCampusId: row.latest_campus_id,
   homeCampusId: row.home_campus_id,
   classLevelId: row.class_level_id,
+});
+
+// These fragments read the caller's aliases: s (student) and en (enrollment).
+const termPlacementCampusSql = (termId: string) =>
+  sql<string | null>`(
+    select tp.campus_id
+    from enrollment_placement tp
+    where tp.enrollment_id = en.id
+      and tp.term_id = ${termId}
+  )`;
+
+const latestPlacementCampusSql = () =>
+  sql<string | null>`(
+    select ep.campus_id
+    from enrollment_placement ep
+    join term t on t.id = ep.term_id and t.organization_id = ep.organization_id
+    where ep.enrollment_id = en.id
+    order by t.sequence desc
+    limit 1
+  )`;
+
+const termCampusSql = (termId: string) =>
+  sql<string>`coalesce(${termPlacementCampusSql(termId)}, ${latestPlacementCampusSql()}, s.campus_id)`;
+
+const includedSql = (today: string) =>
+  sql<boolean>`(
+    en.status = 'active'
+    and s.exit_kind is null
+    and (
+      s.not_seen_since is null
+      or ${today}::date - s.not_seen_since < ${INACTIVE_AFTER_DAYS}
+    )
+  )`;
+
+const chargedInvoiceMatchSql = (termId: string) =>
+  sql`i.student_id = s.id
+      and i.organization_id = s.organization_id
+      and i.term_id = ${termId}
+      and i.kind = 'term'
+      and i.status <> 'cancelled'`;
+
+const chargedSql = (termId: string) =>
+  sql<boolean>`exists (
+    select 1
+    from invoice i
+    where ${chargedInvoiceMatchSql(termId)}
+  )`;
+
+const chargedInvoiceIdSql = (termId: string) =>
+  sql<string | null>`(
+    select i.id
+    from invoice i
+    where ${chargedInvoiceMatchSql(termId)}
+    limit 1
+  )`;
+
+const hasLineSql = (termId: string) =>
+  sql<boolean>`exists (
+    select 1
+    from fee_line f
+    join ledger_account fee_type
+      on fee_type.id = f.ledger_account_id
+      and fee_type.organization_id = f.organization_id
+    where f.organization_id = s.organization_id
+      and f.term_id = ${termId}
+      and f.retired_at is null
+      and f.class_level_id = en.class_level_id
+      and (f.campus_id is null or f.campus_id = ${termCampusSql(termId)})
+      and (f.applies_to = 'all' or (f.applies_to = 'new') = en.is_new_student)
+      and (
+        not f.is_optional
+        or exists (
+          select 1
+          from student_fee_option o
+          where o.enrollment_id = en.id
+            and o.ledger_account_id = f.ledger_account_id
+            and o.organization_id = f.organization_id
+        )
+      )
+  )`;
+
+interface ChargeSummaryRow {
+  created: number;
+  skipped: number;
+  level_ids: string[] | null;
+  sample: { id: string; name: string }[] | null;
+}
+
+const toChargeSummary = (row: ChargeSummaryRow | undefined): ChargeSummary => ({
+  created: row?.created ?? 0,
+  skipped: row?.skipped ?? 0,
+  levelIds: row?.level_ids ?? [],
+  sample: row?.sample ?? [],
 });
 
 interface LedgerChargeLine {
@@ -264,11 +360,6 @@ export class KyselyBillingRepository extends BillingRepository {
           .onRef('en.student_id', '=', 's.id')
           .onRef('en.organization_id', '=', 's.organization_id')
       )
-      .leftJoin('enrollment_placement as tp', (join) =>
-        join
-          .onRef('tp.enrollment_id', '=', 'en.id')
-          .on('tp.term_id', '=', term.id)
-      )
       .select([
         's.id',
         's.first_name',
@@ -281,32 +372,61 @@ export class KyselyBillingRepository extends BillingRepository {
         'en.status as enrollment_status',
         'en.class_level_id',
         'en.is_new_student',
-        'tp.campus_id as term_campus_id',
-        sql<string | null>`(
-          select ep.campus_id
-          from enrollment_placement ep
-          join term t on t.id = ep.term_id and t.organization_id = ep.organization_id
-          where ep.enrollment_id = en.id
-          order by t.sequence desc
-          limit 1
-        )`.as('latest_campus_id'),
+        termPlacementCampusSql(term.id).as('term_campus_id'),
+        latestPlacementCampusSql().as('latest_campus_id'),
         currentCampusSql('s').as('current_campus_id'),
-        sql<string | null>`(
-          select i.id
-          from invoice i
-          where i.student_id = s.id
-            and i.organization_id = s.organization_id
-            and i.term_id = ${term.id}
-            and i.kind = 'term'
-            and i.status <> 'cancelled'
-          limit 1
-        )`.as('charged_invoice_id'),
+        chargedInvoiceIdSql(term.id).as('charged_invoice_id'),
       ])
       .where('s.organization_id', '=', scope.organizationId)
       .where('en.session_id', '=', term.sessionId)
       .where(inScope(currentCampusSql('s'), scope.campusScope))
       .execute();
     return rows.map((row) => toCandidate(row, today));
+  }
+
+  async chargeSummary(
+    scope: BillingScope,
+    term: TermInfo,
+    options: ChargeSummaryOptions
+  ): Promise<ChargeSummary> {
+    const { rows } = await sql<ChargeSummaryRow>`
+      with cand as (
+        select
+          s.id,
+          s.first_name,
+          s.last_name,
+          en.class_level_id,
+          ${includedSql(options.today)} as included,
+          ${chargedSql(term.id)} as charged,
+          ${hasLineSql(term.id)} as has_line
+        from student s
+        join student_enrollment en
+          on en.student_id = s.id
+          and en.organization_id = s.organization_id
+        where s.organization_id = ${scope.organizationId}
+          and en.session_id = ${term.sessionId}
+          and ${inScope(currentCampusSql('s'), scope.campusScope)}
+      )
+      select
+        (count(*) filter (where included and not charged and has_line))::int as created,
+        (count(*) filter (where included and charged))::int as skipped,
+        array_agg(distinct class_level_id) as level_ids,
+        (
+          select json_agg(
+            json_build_object('id', picked.id, 'name', picked.first_name || ' ' || picked.last_name)
+            order by picked.first_name, picked.last_name, picked.id
+          )
+          from (
+            select id, first_name, last_name
+            from cand
+            where included and not charged and has_line
+            order by first_name, last_name, id
+            limit ${options.sampleSize}
+          ) picked
+        ) as sample
+      from cand
+    `.execute(this.db);
+    return toChargeSummary(rows[0]);
   }
 
   async feeLines(

@@ -330,6 +330,7 @@ test.describe('/me/permissions', () => {
         invoice: ['read'],
         payment: ['read'],
         moneyAccount: ['read'],
+        store: ['read'],
       },
       campusScope: 'all',
       classScope: 'all',
@@ -367,6 +368,7 @@ test.describe('/me/permissions', () => {
       payment: ['record', 'read', 'void'],
       moneyAccount: ['read'],
       ledger: ['read'],
+      store: ['read', 'receive'],
     });
   });
 

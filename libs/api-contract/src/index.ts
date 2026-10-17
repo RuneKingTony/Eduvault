@@ -10,6 +10,7 @@ export * from './guardians';
 export * from './invoices';
 export * from './payments';
 export * from './portal';
+export * from './store';
 export * from './student-accounts';
 export * from './students';
 export * from './subjects';

@@ -2,9 +2,7 @@ import type { ReactNode } from 'react';
 import type { UseQueryResult } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { Card, CardContent, ErrorMessage } from '@eduvault/ui';
-import { NO_ACCOUNT_FILTERS } from '../../accounts-search';
-import { NO_INVOICE_FILTERS } from '../../invoices-search';
-import { NO_PAYMENT_FILTERS } from '../../payments-search';
+import { hasSearchDefaults, searchFor } from '../../route-search-defaults';
 import { CardSkeleton } from './card-states';
 
 type StatTarget =
@@ -13,16 +11,6 @@ type StatTarget =
   | '/finance/invoices'
   | '/finance/payments'
   | '/finance/accounts';
-
-function searchFor(to: StatTarget) {
-  if (to === '/finance/invoices') {
-    return { search: NO_INVOICE_FILTERS };
-  }
-  if (to === '/finance/payments') {
-    return { search: NO_PAYMENT_FILTERS };
-  }
-  return to === '/finance/accounts' ? { search: NO_ACCOUNT_FILTERS } : {};
-}
 
 export function StatCard({
   label,
@@ -45,6 +33,8 @@ export function StatCard({
       {children}
     </CardContent>
   );
+  const linkSearch =
+    to !== undefined && hasSearchDefaults(to) ? { search: searchFor(to) } : {};
   return (
     <Card>
       {to === undefined ? (
@@ -53,7 +43,7 @@ export function StatCard({
         <Link
           to={to}
           className="rounded-xl focus-visible:ring-2 focus-visible:ring-ring"
-          {...searchFor(to)}
+          {...linkSearch}
         >
           {body}
         </Link>

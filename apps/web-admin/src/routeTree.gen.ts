@@ -31,6 +31,7 @@ import { Route as FinanceMoneyAccountsRouteImport } from './routes/finance/money
 import { Route as FinanceOtherFeesRouteImport } from './routes/finance/other-fees'
 import { Route as FinancePaymentsRouteImport } from './routes/finance/payments'
 import { Route as FinanceSchoolFeesRouteImport } from './routes/finance/school-fees'
+import { Route as FinanceStoreRouteImport } from './routes/finance/store'
 import { Route as MembersMemberIdRouteImport } from './routes/members_.$memberId'
 import { Route as PlatformIndexRouteImport } from './routes/platform.index'
 import { Route as PlatformAuditRouteImport } from './routes/platform.audit'
@@ -161,6 +162,11 @@ const FinanceSchoolFeesRoute = FinanceSchoolFeesRouteImport.update({
   path: '/finance/school-fees',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FinanceStoreRoute = FinanceStoreRouteImport.update({
+  id: '/finance/store',
+  path: '/finance/store',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const MembersMemberIdRoute = MembersMemberIdRouteImport.update({
   id: '/members_/$memberId',
   path: '/members/$memberId',
@@ -284,6 +290,7 @@ export interface FileRoutesByFullPath {
   '/finance/other-fees': typeof FinanceOtherFeesRoute
   '/finance/payments': typeof FinancePaymentsRoute
   '/finance/school-fees': typeof FinanceSchoolFeesRoute
+  '/finance/store': typeof FinanceStoreRoute
   '/members/$memberId': typeof MembersMemberIdRoute
   '/platform/audit': typeof PlatformAuditRoute
   '/roles/$roleSlug': typeof RolesRoleSlugRoute
@@ -325,6 +332,7 @@ export interface FileRoutesByTo {
   '/finance/other-fees': typeof FinanceOtherFeesRoute
   '/finance/payments': typeof FinancePaymentsRoute
   '/finance/school-fees': typeof FinanceSchoolFeesRoute
+  '/finance/store': typeof FinanceStoreRoute
   '/members/$memberId': typeof MembersMemberIdRoute
   '/platform/audit': typeof PlatformAuditRoute
   '/roles/$roleSlug': typeof RolesRoleSlugRoute
@@ -369,6 +377,7 @@ export interface FileRoutesById {
   '/finance/other-fees': typeof FinanceOtherFeesRoute
   '/finance/payments': typeof FinancePaymentsRoute
   '/finance/school-fees': typeof FinanceSchoolFeesRoute
+  '/finance/store': typeof FinanceStoreRoute
   '/members_/$memberId': typeof MembersMemberIdRoute
   '/platform/audit': typeof PlatformAuditRoute
   '/roles_/$roleSlug': typeof RolesRoleSlugRoute
@@ -414,6 +423,7 @@ export interface FileRouteTypes {
     | '/finance/other-fees'
     | '/finance/payments'
     | '/finance/school-fees'
+    | '/finance/store'
     | '/members/$memberId'
     | '/platform/audit'
     | '/roles/$roleSlug'
@@ -455,6 +465,7 @@ export interface FileRouteTypes {
     | '/finance/other-fees'
     | '/finance/payments'
     | '/finance/school-fees'
+    | '/finance/store'
     | '/members/$memberId'
     | '/platform/audit'
     | '/roles/$roleSlug'
@@ -498,6 +509,7 @@ export interface FileRouteTypes {
     | '/finance/other-fees'
     | '/finance/payments'
     | '/finance/school-fees'
+    | '/finance/store'
     | '/members_/$memberId'
     | '/platform/audit'
     | '/roles_/$roleSlug'
@@ -542,6 +554,7 @@ export interface RootRouteChildren {
   FinanceOtherFeesRoute: typeof FinanceOtherFeesRoute
   FinancePaymentsRoute: typeof FinancePaymentsRoute
   FinanceSchoolFeesRoute: typeof FinanceSchoolFeesRoute
+  FinanceStoreRoute: typeof FinanceStoreRoute
   MembersMemberIdRoute: typeof MembersMemberIdRoute
   RolesRoleSlugRoute: typeof RolesRoleSlugRoute
   RolesNewRoute: typeof RolesNewRoute
@@ -707,6 +720,13 @@ declare module '@tanstack/react-router' {
       path: '/finance/school-fees'
       fullPath: '/finance/school-fees'
       preLoaderRoute: typeof FinanceSchoolFeesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/finance/store': {
+      id: '/finance/store'
+      path: '/finance/store'
+      fullPath: '/finance/store'
+      preLoaderRoute: typeof FinanceStoreRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/members_/$memberId': {
@@ -908,6 +928,7 @@ const rootRouteChildren: RootRouteChildren = {
   FinanceOtherFeesRoute: FinanceOtherFeesRoute,
   FinancePaymentsRoute: FinancePaymentsRoute,
   FinanceSchoolFeesRoute: FinanceSchoolFeesRoute,
+  FinanceStoreRoute: FinanceStoreRoute,
   MembersMemberIdRoute: MembersMemberIdRoute,
   RolesRoleSlugRoute: RolesRoleSlugRoute,
   RolesNewRoute: RolesNewRoute,

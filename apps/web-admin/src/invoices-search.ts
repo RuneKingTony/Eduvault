@@ -13,13 +13,6 @@ export interface InvoicesSearch {
   page?: number;
 }
 
-export const NO_INVOICE_FILTERS = {
-  q: undefined,
-  kind: undefined,
-  status: undefined,
-  page: undefined,
-} as const satisfies InvoicesSearch;
-
 export function parseInvoicesSearch(
   search: Record<string, unknown>
 ): InvoicesSearch {

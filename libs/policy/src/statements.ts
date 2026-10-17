@@ -14,6 +14,7 @@ export const statements = {
   announcement: ['create', 'read', 'update'],
   ledger: ['read', 'manageAccounts'],
   moneyAccount: ['create', 'read', 'update'],
+  store: ['read', 'receive'],
   subject: ['create', 'read', 'update'],
   member: ['create', 'read', 'update', 'delete'],
   ac: ['create', 'read', 'update', 'delete'],
@@ -95,7 +96,8 @@ export const PERM_HELP: Partial<Record<Permission, string>> = {
     'Changes a fee amount and sets which students take optional fees.',
   'feeLine:retire': 'Retires a fee. A fee for every campus needs every campus.',
   'subject:create': 'Adds subjects to the school. A code never changes.',
-  'subject:update': 'Renames, retires and restores subjects.',
+  'subject:update':
+    'Renames, retires and restores subjects, sets each level’s subjects and chooses elective students.',
   'invoice:bill':
     'Prepares, sends and cancels rounds of student charges, on the campuses they see.',
   'invoice:read': 'Sees rounds and charges, and what each one posted.',
@@ -108,6 +110,10 @@ export const PERM_HELP: Partial<Record<Permission, string>> = {
     'Students see their own payments. Guardians see their children’s.',
   'payment:void':
     'Asks for a recorded payment to be cancelled. A second person approves it.',
+  'store:read':
+    'Sees the store: items, stock on hand and deliveries, on the campuses they see.',
+  'store:receive':
+    'Adds items, edits prices and records deliveries and opening stock, on the campuses they see.',
 };
 
 const RESOURCE_LABELS: Record<Resource, string> = {
@@ -126,6 +132,7 @@ const RESOURCE_LABELS: Record<Resource, string> = {
   announcement: 'Announcements',
   ledger: 'Money categories',
   moneyAccount: 'Bank and POS accounts',
+  store: 'Store',
   subject: 'Subjects',
   member: 'Staff',
   ac: 'Roles',

@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { currentSessionId } from '../../common/db/current-session';
 import { KYSELY_TOKEN, type Database } from '../../common/db/tokens';
 import { FeeOptionRepository, type OptionChange } from './fee-line.repository';
 
@@ -18,14 +19,8 @@ export class KyselyFeeOptionRepository extends FeeOptionRepository {
     return row !== undefined;
   }
 
-  async currentSessionId(organizationId: string): Promise<string | undefined> {
-    const row = await this.db
-      .selectFrom('term')
-      .select('session_id')
-      .where('organization_id', '=', organizationId)
-      .where('is_current', '=', true)
-      .executeTakeFirst();
-    return row?.session_id;
+  currentSessionId(organizationId: string): Promise<string | undefined> {
+    return currentSessionId(this.db, organizationId);
   }
 
   async optedInFeeTypeIds(

@@ -23,8 +23,18 @@ const GOLD = classDetail({
   studentCount: 8,
   classTeachers: [teacher('Ayo Bassey'), teacher('Claire Ade', 'assistant')],
   roster: [
-    { studentId: IDS.p1, name: 'Ada Obi', admissionNumber: 'GF-0123' },
-    { studentId: IDS.jss1, name: 'Bola Ade', admissionNumber: 'GF-0124' },
+    {
+      studentId: IDS.p1,
+      name: 'Ada Obi',
+      admissionNumber: 'GF-0123',
+      electives: ['French', 'Music'],
+    },
+    {
+      studentId: IDS.jss1,
+      name: 'Bola Ade',
+      admissionNumber: 'GF-0124',
+      electives: [],
+    },
   ],
 });
 
@@ -268,6 +278,16 @@ describe('ClassPage', () => {
       ).toBeInTheDocument();
     });
 
+    it('shows each student’s electives, or a dash for none', async () => {
+      setup();
+      const roster = await card('Roster');
+      expect(
+        roster.getByRole('columnheader', { name: 'Electives' })
+      ).toBeInTheDocument();
+      expect(roster.getByText('French, Music')).toBeInTheDocument();
+      expect(roster.getByText('—')).toBeInTheDocument();
+    });
+
     it('says Nothing here yet for an empty roster', async () => {
       setup({ row: classDetail({ displayName: 'JSS 2 Gold', roster: [] }) });
       expect(
@@ -391,9 +411,24 @@ describe('ClassPage', () => {
       isFinalYear: true,
       studentCount: 3,
       roster: [
-        { studentId: IDS.p1, name: 'Zainab Bello', admissionNumber: 'GF-0131' },
-        { studentId: IDS.jss1, name: 'Ada Adams', admissionNumber: 'GF-0123' },
-        { studentId: IDS.ss3, name: 'Tobi Bello', admissionNumber: 'GF-0124' },
+        {
+          studentId: IDS.p1,
+          name: 'Zainab Bello',
+          admissionNumber: 'GF-0131',
+          electives: [],
+        },
+        {
+          studentId: IDS.jss1,
+          name: 'Ada Adams',
+          admissionNumber: 'GF-0123',
+          electives: [],
+        },
+        {
+          studentId: IDS.ss3,
+          name: 'Tobi Bello',
+          admissionNumber: 'GF-0124',
+          electives: [],
+        },
       ],
     });
     it('is offered for a final-year class with students to a holder of student:archive', async () => {

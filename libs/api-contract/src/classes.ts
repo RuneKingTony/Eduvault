@@ -104,6 +104,7 @@ export const rosterRowSchema = z.object({
   studentId: idSchema,
   name: z.string(),
   admissionNumber: z.string(),
+  electives: z.array(z.string()),
 });
 export type RosterRow = z.infer<typeof rosterRowSchema>;
 

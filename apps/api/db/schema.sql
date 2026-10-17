@@ -139,6 +139,38 @@ END;
 $$;
 
 --
+-- Name: item_never_deleted(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.item_never_deleted() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  IF school_is_gone(OLD.organization_id) THEN
+    RETURN OLD;
+  END IF;
+  RAISE EXCEPTION 'an item is retired, never deleted'
+    USING ERRCODE = 'check_violation', CONSTRAINT = 'item_never_deleted';
+END;
+$$;
+
+--
+-- Name: item_price_change_append_only(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.item_price_change_append_only() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  IF TG_OP = 'DELETE' AND school_is_gone(OLD.organization_id) THEN
+    RETURN OLD;
+  END IF;
+  RAISE EXCEPTION '% is append-only', TG_TABLE_NAME
+    USING ERRCODE = 'check_violation', CONSTRAINT = 'store_record_append_only';
+END;
+$$;
+
+--
 -- Name: journal_append_only(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -286,6 +318,16 @@ END;
 $$;
 
 --
+-- Name: school_is_gone(text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.school_is_gone(org text) RETURNS boolean
+    LANGUAGE sql STABLE
+    AS $$
+  SELECT NOT EXISTS (SELECT 1 FROM "organization" WHERE id = org);
+$$;
+
+--
 -- Name: seed_ledger_accounts(text); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -323,6 +365,51 @@ CREATE FUNCTION public.seed_ledger_accounts(org text) RETURNS void
   JOIN ledger_account parent
     ON parent.organization_id = org AND parent.system_key = 'fee_income'
   ON CONFLICT DO NOTHING;
+$$;
+
+--
+-- Name: stock_delivery_not_empty(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.stock_delivery_not_empty() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM stock_delivery_line
+    WHERE stock_delivery_id = NEW.id AND organization_id = NEW.organization_id
+  ) THEN
+    RAISE EXCEPTION 'stock delivery % has no lines', NEW.id
+      USING ERRCODE = 'check_violation', CONSTRAINT = 'stock_delivery_not_empty';
+  END IF;
+  RETURN NULL;
+END;
+$$;
+
+--
+-- Name: stock_movement_append_only(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.stock_movement_append_only() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  RAISE EXCEPTION 'a stock movement is never changed or deleted'
+    USING ERRCODE = 'check_violation', CONSTRAINT = 'stock_movement_append_only';
+END;
+$$;
+
+--
+-- Name: store_record_append_only(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.store_record_append_only() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  RAISE EXCEPTION '% is append-only', TG_TABLE_NAME
+    USING ERRCODE = 'check_violation', CONSTRAINT = 'store_record_append_only';
+END;
 $$;
 
 SET default_tablespace = '';
@@ -702,6 +789,51 @@ CREATE TABLE public.invoice_line (
 );
 
 --
+-- Name: item; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.item (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id text NOT NULL,
+    kind text NOT NULL,
+    name text NOT NULL,
+    variant text,
+    class_level_id uuid,
+    cost_price_minor bigint NOT NULL,
+    sell_price_minor bigint NOT NULL,
+    low_stock_level integer DEFAULT 5 NOT NULL,
+    retired_at timestamp with time zone,
+    retired_by text,
+    created_by text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT item_cost_price_minor_check CHECK ((cost_price_minor >= 0)),
+    CONSTRAINT item_kind_check CHECK ((kind = ANY (ARRAY['uniform'::text, 'book'::text]))),
+    CONSTRAINT item_level_only_for_books CHECK (((kind = 'book'::text) = (class_level_id IS NOT NULL))),
+    CONSTRAINT item_low_stock_level_check CHECK ((low_stock_level >= 0)),
+    CONSTRAINT item_name_check CHECK (((char_length(btrim(name)) >= 1) AND (char_length(btrim(name)) <= 120))),
+    CONSTRAINT item_price_not_below_cost CHECK ((sell_price_minor >= cost_price_minor)),
+    CONSTRAINT item_variant_check CHECK (((char_length(btrim(variant)) >= 1) AND (char_length(btrim(variant)) <= 40))),
+    CONSTRAINT item_variant_not_for_books CHECK (((kind <> 'book'::text) OR (variant IS NULL)))
+);
+
+--
+-- Name: item_price_change; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.item_price_change (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id text NOT NULL,
+    item_id uuid NOT NULL,
+    old_cost_minor bigint NOT NULL,
+    new_cost_minor bigint NOT NULL,
+    old_price_minor bigint NOT NULL,
+    new_price_minor bigint NOT NULL,
+    changed_by text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+--
 -- Name: journal_entry; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -984,6 +1116,83 @@ CREATE TABLE public.session (
     "impersonatedBy" text,
     "activeOrganizationId" text,
     "activeTeamId" text
+);
+
+--
+-- Name: stock_delivery; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.stock_delivery (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id text NOT NULL,
+    number text NOT NULL,
+    reference text NOT NULL,
+    request_hash text NOT NULL,
+    store_id uuid NOT NULL,
+    supplier_name text NOT NULL,
+    money_account_id uuid,
+    is_opening boolean DEFAULT false NOT NULL,
+    received_on date NOT NULL,
+    received_by text,
+    total_minor bigint NOT NULL,
+    journal_entry_id uuid NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT stock_delivery_number_check CHECK ((char_length(btrim(number)) > 0)),
+    CONSTRAINT stock_delivery_opening_has_no_account CHECK ((is_opening = (money_account_id IS NULL))),
+    CONSTRAINT stock_delivery_reference_check CHECK (((char_length(btrim(reference)) >= 1) AND (char_length(btrim(reference)) <= 80))),
+    CONSTRAINT stock_delivery_supplier_name_check CHECK (((char_length(btrim(supplier_name)) >= 1) AND (char_length(btrim(supplier_name)) <= 120))),
+    CONSTRAINT stock_delivery_total_minor_check CHECK ((total_minor > 0))
+);
+
+--
+-- Name: stock_delivery_line; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.stock_delivery_line (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id text NOT NULL,
+    stock_delivery_id uuid NOT NULL,
+    item_id uuid NOT NULL,
+    quantity integer NOT NULL,
+    unit_cost_minor bigint NOT NULL,
+    CONSTRAINT stock_delivery_line_quantity_check CHECK ((quantity > 0)),
+    CONSTRAINT stock_delivery_line_unit_cost_minor_check CHECK ((unit_cost_minor > 0))
+);
+
+--
+-- Name: stock_movement; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.stock_movement (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id text NOT NULL,
+    store_id uuid NOT NULL,
+    item_id uuid NOT NULL,
+    quantity integer NOT NULL,
+    kind text NOT NULL,
+    value_minor bigint NOT NULL,
+    reference text NOT NULL,
+    source_id uuid,
+    moved_by text,
+    moved_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT stock_movement_kind_check CHECK ((kind = ANY (ARRAY['opening'::text, 'receive'::text, 'sell'::text, 'count'::text]))),
+    CONSTRAINT stock_movement_quantity_check CHECK ((quantity <> 0)),
+    CONSTRAINT stock_movement_reference_check CHECK ((char_length(btrim(reference)) > 0))
+);
+
+--
+-- Name: store; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.store (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id text NOT NULL,
+    campus_id text NOT NULL,
+    name text NOT NULL,
+    retired_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT store_name_check CHECK (((char_length(btrim(name)) >= 1) AND (char_length(btrim(name)) <= 160)))
 );
 
 --
@@ -1513,6 +1722,34 @@ ALTER TABLE ONLY public.invoice
     ADD CONSTRAINT invoice_pkey PRIMARY KEY (id);
 
 --
+-- Name: item item_id_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.item
+    ADD CONSTRAINT item_id_organization_id_key UNIQUE (id, organization_id);
+
+--
+-- Name: item item_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.item
+    ADD CONSTRAINT item_pkey PRIMARY KEY (id);
+
+--
+-- Name: item_price_change item_price_change_id_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.item_price_change
+    ADD CONSTRAINT item_price_change_id_organization_id_key UNIQUE (id, organization_id);
+
+--
+-- Name: item_price_change item_price_change_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.item_price_change
+    ADD CONSTRAINT item_price_change_pkey PRIMARY KEY (id);
+
+--
 -- Name: journal_entry journal_entry_id_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1735,6 +1972,104 @@ ALTER TABLE ONLY public.session
 
 ALTER TABLE ONLY public.session
     ADD CONSTRAINT session_token_key UNIQUE (token);
+
+--
+-- Name: stock_delivery stock_delivery_id_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stock_delivery
+    ADD CONSTRAINT stock_delivery_id_organization_id_key UNIQUE (id, organization_id);
+
+--
+-- Name: stock_delivery_line stock_delivery_line_id_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stock_delivery_line
+    ADD CONSTRAINT stock_delivery_line_id_organization_id_key UNIQUE (id, organization_id);
+
+--
+-- Name: stock_delivery_line stock_delivery_line_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stock_delivery_line
+    ADD CONSTRAINT stock_delivery_line_pkey PRIMARY KEY (id);
+
+--
+-- Name: stock_delivery_line stock_delivery_line_stock_delivery_id_item_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stock_delivery_line
+    ADD CONSTRAINT stock_delivery_line_stock_delivery_id_item_id_key UNIQUE (stock_delivery_id, item_id);
+
+--
+-- Name: stock_delivery stock_delivery_organization_id_number_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stock_delivery
+    ADD CONSTRAINT stock_delivery_organization_id_number_key UNIQUE (organization_id, number);
+
+--
+-- Name: stock_delivery stock_delivery_organization_id_reference_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stock_delivery
+    ADD CONSTRAINT stock_delivery_organization_id_reference_key UNIQUE (organization_id, reference);
+
+--
+-- Name: stock_delivery stock_delivery_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stock_delivery
+    ADD CONSTRAINT stock_delivery_pkey PRIMARY KEY (id);
+
+--
+-- Name: stock_movement stock_movement_id_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stock_movement
+    ADD CONSTRAINT stock_movement_id_organization_id_key UNIQUE (id, organization_id);
+
+--
+-- Name: stock_movement stock_movement_organization_id_reference_store_id_item_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stock_movement
+    ADD CONSTRAINT stock_movement_organization_id_reference_store_id_item_id_key UNIQUE (organization_id, reference, store_id, item_id);
+
+--
+-- Name: stock_movement stock_movement_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stock_movement
+    ADD CONSTRAINT stock_movement_pkey PRIMARY KEY (id);
+
+--
+-- Name: store store_campus_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.store
+    ADD CONSTRAINT store_campus_id_key UNIQUE (campus_id);
+
+--
+-- Name: store store_campus_id_name_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.store
+    ADD CONSTRAINT store_campus_id_name_key UNIQUE (campus_id, name);
+
+--
+-- Name: store store_id_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.store
+    ADD CONSTRAINT store_id_organization_id_key UNIQUE (id, organization_id);
+
+--
+-- Name: store store_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.store
+    ADD CONSTRAINT store_pkey PRIMARY KEY (id);
 
 --
 -- Name: student_discount student_discount_id_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
@@ -2144,6 +2479,24 @@ CREATE INDEX invoice_term_idx ON public.invoice USING btree (organization_id, te
 CREATE UNIQUE INDEX invoice_term_student_live_key ON public.invoice USING btree (student_id, term_id) WHERE ((kind = 'term'::text) AND (status <> 'cancelled'::text));
 
 --
+-- Name: item_active_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX item_active_key ON public.item USING btree (organization_id, kind, name, variant, class_level_id) NULLS NOT DISTINCT WHERE (retired_at IS NULL);
+
+--
+-- Name: item_listing_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX item_listing_idx ON public.item USING btree (organization_id, kind, name);
+
+--
+-- Name: item_price_change_item_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX item_price_change_item_idx ON public.item_price_change USING btree (organization_id, item_id, created_at DESC);
+
+--
 -- Name: journal_entry_effective_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2256,6 +2609,36 @@ CREATE UNIQUE INDEX payment_provider_reference_key ON public.payment USING btree
 --
 
 CREATE INDEX "session_userId_idx" ON public.session USING btree ("userId");
+
+--
+-- Name: stock_delivery_journal_entry_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX stock_delivery_journal_entry_key ON public.stock_delivery USING btree (journal_entry_id);
+
+--
+-- Name: stock_delivery_line_item_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX stock_delivery_line_item_idx ON public.stock_delivery_line USING btree (organization_id, item_id);
+
+--
+-- Name: stock_delivery_listing_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX stock_delivery_listing_idx ON public.stock_delivery USING btree (organization_id, received_on DESC, created_at DESC);
+
+--
+-- Name: stock_delivery_opening_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX stock_delivery_opening_key ON public.stock_delivery USING btree (store_id) WHERE is_opening;
+
+--
+-- Name: stock_movement_stock_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX stock_movement_stock_idx ON public.stock_movement USING btree (organization_id, store_id, item_id);
 
 --
 -- Name: student_discount_ledger_account_idx; Type: INDEX; Schema: public; Owner: -
@@ -2384,6 +2767,18 @@ CREATE TRIGGER invoice_immutable BEFORE DELETE OR UPDATE ON public.invoice FOR E
 CREATE TRIGGER invoice_line_draft_only BEFORE INSERT OR DELETE OR UPDATE ON public.invoice_line FOR EACH ROW EXECUTE FUNCTION public.invoice_line_draft_only();
 
 --
+-- Name: item item_never_deleted; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER item_never_deleted BEFORE DELETE ON public.item FOR EACH ROW EXECUTE FUNCTION public.item_never_deleted();
+
+--
+-- Name: item_price_change item_price_change_append_only; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER item_price_change_append_only BEFORE DELETE OR UPDATE ON public.item_price_change FOR EACH ROW EXECUTE FUNCTION public.item_price_change_append_only();
+
+--
 -- Name: journal_entry journal_entry_append_only; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -2430,6 +2825,30 @@ CREATE TRIGGER payment_allocation_immutable BEFORE DELETE OR UPDATE ON public.pa
 --
 
 CREATE TRIGGER payment_immutable BEFORE DELETE OR UPDATE ON public.payment FOR EACH ROW EXECUTE FUNCTION public.payment_immutable();
+
+--
+-- Name: stock_delivery stock_delivery_append_only; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER stock_delivery_append_only BEFORE DELETE OR UPDATE ON public.stock_delivery FOR EACH ROW EXECUTE FUNCTION public.store_record_append_only();
+
+--
+-- Name: stock_delivery_line stock_delivery_line_append_only; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER stock_delivery_line_append_only BEFORE DELETE OR UPDATE ON public.stock_delivery_line FOR EACH ROW EXECUTE FUNCTION public.store_record_append_only();
+
+--
+-- Name: stock_delivery stock_delivery_not_empty; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE CONSTRAINT TRIGGER stock_delivery_not_empty AFTER INSERT ON public.stock_delivery DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.stock_delivery_not_empty();
+
+--
+-- Name: stock_movement stock_movement_append_only; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER stock_movement_append_only BEFORE DELETE OR UPDATE ON public.stock_movement FOR EACH ROW EXECUTE FUNCTION public.stock_movement_append_only();
 
 --
 -- Name: academic_session academic_session_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -2908,6 +3327,34 @@ ALTER TABLE ONLY public.invoice
     ADD CONSTRAINT invoice_term_id_organization_id_fkey FOREIGN KEY (term_id, organization_id) REFERENCES public.term(id, organization_id) ON DELETE RESTRICT;
 
 --
+-- Name: item item_class_level_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.item
+    ADD CONSTRAINT item_class_level_id_organization_id_fkey FOREIGN KEY (class_level_id, organization_id) REFERENCES public.class_level(id, organization_id);
+
+--
+-- Name: item item_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.item
+    ADD CONSTRAINT item_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE CASCADE;
+
+--
+-- Name: item_price_change item_price_change_item_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.item_price_change
+    ADD CONSTRAINT item_price_change_item_id_organization_id_fkey FOREIGN KEY (item_id, organization_id) REFERENCES public.item(id, organization_id);
+
+--
+-- Name: item_price_change item_price_change_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.item_price_change
+    ADD CONSTRAINT item_price_change_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE CASCADE;
+
+--
 -- Name: journal_entry journal_entry_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3165,6 +3612,90 @@ ALTER TABLE ONLY public.school_setting
 
 ALTER TABLE ONLY public.session
     ADD CONSTRAINT "session_userId_fkey" FOREIGN KEY ("userId") REFERENCES public."user"(id) ON DELETE CASCADE;
+
+--
+-- Name: stock_delivery stock_delivery_journal_entry_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stock_delivery
+    ADD CONSTRAINT stock_delivery_journal_entry_id_organization_id_fkey FOREIGN KEY (journal_entry_id, organization_id) REFERENCES public.journal_entry(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: stock_delivery_line stock_delivery_line_item_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stock_delivery_line
+    ADD CONSTRAINT stock_delivery_line_item_id_organization_id_fkey FOREIGN KEY (item_id, organization_id) REFERENCES public.item(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: stock_delivery_line stock_delivery_line_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stock_delivery_line
+    ADD CONSTRAINT stock_delivery_line_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE RESTRICT;
+
+--
+-- Name: stock_delivery_line stock_delivery_line_stock_delivery_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stock_delivery_line
+    ADD CONSTRAINT stock_delivery_line_stock_delivery_id_organization_id_fkey FOREIGN KEY (stock_delivery_id, organization_id) REFERENCES public.stock_delivery(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: stock_delivery stock_delivery_money_account_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stock_delivery
+    ADD CONSTRAINT stock_delivery_money_account_id_organization_id_fkey FOREIGN KEY (money_account_id, organization_id) REFERENCES public.money_account(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: stock_delivery stock_delivery_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stock_delivery
+    ADD CONSTRAINT stock_delivery_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE RESTRICT;
+
+--
+-- Name: stock_delivery stock_delivery_store_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stock_delivery
+    ADD CONSTRAINT stock_delivery_store_id_organization_id_fkey FOREIGN KEY (store_id, organization_id) REFERENCES public.store(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: stock_movement stock_movement_item_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stock_movement
+    ADD CONSTRAINT stock_movement_item_id_organization_id_fkey FOREIGN KEY (item_id, organization_id) REFERENCES public.item(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: stock_movement stock_movement_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stock_movement
+    ADD CONSTRAINT stock_movement_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE RESTRICT;
+
+--
+-- Name: stock_movement stock_movement_store_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stock_movement
+    ADD CONSTRAINT stock_movement_store_id_organization_id_fkey FOREIGN KEY (store_id, organization_id) REFERENCES public.store(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: store store_campus_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.store
+    ADD CONSTRAINT store_campus_id_organization_id_fkey FOREIGN KEY (campus_id, organization_id) REFERENCES public.campus(team_id, organization_id) ON DELETE CASCADE;
+
+--
+-- Name: store store_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.store
+    ADD CONSTRAINT store_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE CASCADE;
 
 --
 -- Name: student student_archived_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -3494,4 +4025,5 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20261016090200'),
     ('20261016090300'),
     ('20261017090000'),
-    ('20261017090100');
+    ('20261017090100'),
+    ('20261017090200');

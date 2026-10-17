@@ -63,6 +63,7 @@ export const STARTER_ROLES: readonly StarterRole[] = [
       'feeLine:read',
       'invoice:read',
       'payment:read',
+      'store:read',
     ],
   },
   {
@@ -96,6 +97,8 @@ export const STARTER_ROLES: readonly StarterRole[] = [
       'payment:void',
       'moneyAccount:read',
       'ledger:read',
+      'store:read',
+      'store:receive',
     ],
   },
   {
@@ -115,6 +118,7 @@ export const STARTER_ROLES: readonly StarterRole[] = [
       'invoice:read',
       'payment:read',
       'moneyAccount:read',
+      'store:read',
     ],
   },
   {

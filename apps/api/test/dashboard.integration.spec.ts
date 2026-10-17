@@ -14,6 +14,7 @@ import { assignClassTeacher, createClass } from './support/factories/classes';
 import { createAnnouncement } from './support/factories/announcements';
 import { bankAccount, owes, recordCash } from './support/factories/payments';
 import { createStudent } from './support/factories/students';
+import { createItem, openStock } from './support/factories/store';
 import { makeCurrent } from './support/factories/terms';
 import { schoolsTest } from './support/two-schools';
 
@@ -511,6 +512,7 @@ test.describe('isolation', () => {
   }) => {
     await api(noPermission).get('/dashboard/roll').expect(403);
     await api(noPermission).get('/dashboard/my-classes').expect(403);
+    await api(noPermission).get('/dashboard/store').expect(403);
     expect(await tasksOf(api, noPermission)).toEqual([]);
   });
 
@@ -521,6 +523,7 @@ test.describe('isolation', () => {
       '/dashboard/tasks',
       '/dashboard/roll',
       '/dashboard/my-classes',
+      '/dashboard/store',
       '/activity',
     ]) {
       await api().get(path).expect(401);
@@ -848,6 +851,82 @@ test.describe('tasks', () => {
     expect(notInClass?.students.map((row) => row.id)).toContain(
       studentLekki.id
     );
+  });
+});
+
+test.describe('store tasks', () => {
+  test('T8 shows a bursar the items at or below their level on their campus', async ({
+    api,
+    schools: { owner, lekkiOnly, lekki },
+  }) => {
+    const tie = await createItem(api, owner, {
+      name: 'School tie',
+      variant: null,
+      lowStockLevel: 5,
+    });
+    const shirt = await createItem(api, owner);
+    expect(taskOf(await tasksOf(api, lekkiOnly), 'lowStock')).toMatchObject({
+      count: 2,
+    });
+
+    await openStock(api, owner, {
+      campusId: lekki.id,
+      lines: [
+        { itemId: tie.id, quantity: 5, unitCostMinor: 120_000 },
+        { itemId: shirt.id, quantity: 6, unitCostMinor: 350_000 },
+      ],
+    });
+
+    const low = taskOf(await tasksOf(api, lekkiOnly), 'lowStock');
+    expect(low).toEqual({
+      kind: 'lowStock',
+      count: 1,
+      names: ['School tie'],
+    });
+  });
+
+  test('T8 is gone once every item is above its level', async ({
+    api,
+    schools: { owner, lekkiOnly, lekki },
+  }) => {
+    const shirt = await createItem(api, owner);
+    await openStock(api, owner, {
+      campusId: lekki.id,
+      lines: [{ itemId: shirt.id, quantity: 6, unitCostMinor: 350_000 }],
+    });
+
+    expect(taskOf(await tasksOf(api, lekkiOnly), 'lowStock')).toBeUndefined();
+  });
+
+  test('T8 names the first three of several low items', async ({
+    api,
+    schools: { owner, lekkiOnly },
+  }) => {
+    for (const variant of ['Size 10', 'Size 12', 'Size 14', 'Size 16']) {
+      await createItem(api, owner, { variant });
+    }
+
+    const low = taskOf(await tasksOf(api, lekkiOnly), 'lowStock');
+    expect(low?.count).toBe(4);
+    expect(low?.names).toHaveLength(3);
+  });
+
+  test('T8 is not shown to someone without store:receive, and /dashboard/store needs store:read', async ({
+    api,
+    withPermissions,
+    schools: { owner, orgA, lekki },
+  }) => {
+    await createItem(api, owner);
+    const reader = await withPermissions(orgA, ['store:read'], {
+      campuses: [lekki],
+    });
+    const nothing = await withPermissions(orgA, ['student:read'], {
+      campuses: [lekki],
+    });
+
+    expect(taskOf(await tasksOf(api, reader), 'lowStock')).toBeUndefined();
+    await api(reader).get('/dashboard/store').expect(200);
+    await api(nothing).get('/dashboard/store').expect(403);
   });
 });
 
