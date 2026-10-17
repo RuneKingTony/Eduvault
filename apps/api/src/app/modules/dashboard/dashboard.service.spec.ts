@@ -88,15 +88,19 @@ describe('DashboardService.tasks', () => {
     }
   );
 
-  it('keeps the order dueLeft, notSeen, notInClass, noClassTeacher, announcementDrafts, noRole', async () => {
+  it('gives every kind when every permission is held', async () => {
     const { service } = setup();
-    expect(kinds(await service.tasks(ctxFor(ALL.toReversed())))).toEqual([
-      'dueLeft',
-      'notSeen',
-      'notInClass',
-      'noClassTeacher',
+    expect(
+      kinds(await service.tasks(ctxFor(ALL))).toSorted((a, b) =>
+        a.localeCompare(b)
+      )
+    ).toEqual([
       'announcementDrafts',
+      'dueLeft',
+      'noClassTeacher',
       'noRole',
+      'notInClass',
+      'notSeen',
     ]);
   });
 

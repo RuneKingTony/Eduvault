@@ -1,23 +1,21 @@
 import { Injectable } from '@nestjs/common';
 import {
   DASHBOARD_SAMPLE_SIZE,
-  type DashboardCharged,
   type DashboardTask,
 } from '@eduvault/api-contract';
 import { can } from '@eduvault/policy';
 import type { OrgContext } from '../../common/auth';
 import { BillingPlanService } from '../billing/billing-plan.service';
 import { BillingService } from '../billing/billing.service';
-import { InvoiceService } from '../invoice/invoice.service';
+import type { DashboardTaskSource } from './dashboard-task-source';
 
 const MAX_UNSENT_ROUNDS = 20;
 
 @Injectable()
-export class DashboardChargesService {
+export class DashboardChargesService implements DashboardTaskSource {
   constructor(
     private readonly plans: BillingPlanService,
-    private readonly billing: BillingService,
-    private readonly invoices: InvoiceService
+    private readonly billing: BillingService
   ) {}
 
   async tasks(ctx: OrgContext): Promise<DashboardTask[]> {
@@ -59,20 +57,5 @@ export class DashboardChargesService {
             students,
           },
         ];
-  }
-
-  async charged(ctx: OrgContext): Promise<DashboardCharged | null> {
-    const term = await this.plans.currentTerm(ctx);
-    if (term === undefined) {
-      return null;
-    }
-    const totals = await this.invoices.chargedIn(ctx, term.id);
-    return {
-      currency: totals.currency,
-      termId: term.id,
-      termName: `${term.name}, ${term.schoolYearName}`,
-      chargedMinor: totals.totalMinor,
-      chargeCount: totals.count,
-    };
   }
 }
