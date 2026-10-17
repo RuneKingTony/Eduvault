@@ -26,13 +26,13 @@ export class DashboardChargesService implements DashboardTaskSource {
     if (term === undefined) {
       return [];
     }
-    const [drafts, plan] = await Promise.all([
+    const [drafts, summary] = await Promise.all([
       this.billing.list(ctx, {
         status: 'draft',
         page: 1,
         pageSize: MAX_UNSENT_ROUNDS,
       }),
-      this.plans.plan(ctx, term, { scope: 'school' }),
+      this.plans.summary(ctx, term, DASHBOARD_SAMPLE_SIZE),
     ]);
     const unsent = drafts.items.map((run): DashboardTask => ({
       kind: 'unsentRound',
@@ -41,20 +41,16 @@ export class DashboardChargesService implements DashboardTaskSource {
       termName: run.termName,
       count: run.chargeCount,
     }));
-    const students = plan.charges
-      .map((charge) => ({ id: charge.studentId, name: charge.name }))
-      .toSorted((a, b) => a.name.localeCompare(b.name))
-      .slice(0, DASHBOARD_SAMPLE_SIZE);
-    return plan.counts.created === 0
+    return summary.created === 0
       ? unsent
       : [
           ...unsent,
           {
             kind: 'notCharged',
-            count: plan.counts.created,
+            count: summary.created,
             termId: term.id,
             termName: term.name,
-            students,
+            students: summary.sample,
           },
         ];
   }

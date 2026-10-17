@@ -21,16 +21,8 @@ import type { OrgContext } from '../../common/auth';
 import { InvoiceService } from '../invoice/invoice.service';
 import { settleCounts } from './billing-inclusion';
 import { BillingPlanService } from './billing-plan.service';
-import {
-  BillingRepository,
-  type BillingScope,
-  type RunOutcome,
-} from './billing.repository';
-
-const scopeOf = (ctx: OrgContext): BillingScope => ({
-  organizationId: ctx.organizationId,
-  campusScope: ctx.campusScope,
-});
+import { scopeOf } from './billing-scope';
+import { BillingRepository, type RunOutcome } from './billing.repository';
 
 const FIRST_PAGE: BillingRunListQuery = { page: 1, pageSize: 10 };
 

@@ -31,6 +31,18 @@ export interface LevelRef {
   name: string;
 }
 
+export interface ChargeSummary {
+  created: number;
+  skipped: number;
+  levelIds: string[];
+  sample: { id: string; name: string }[];
+}
+
+export interface ChargeSummaryOptions {
+  today: string;
+  sampleSize: number;
+}
+
 export type RunHeader = Omit<BillingRun, 'charges' | 'currency'>;
 
 export interface RunPage {
@@ -90,6 +102,12 @@ export abstract class BillingRepository {
     term: TermInfo,
     today: string
   ): Promise<RoundCandidate[]>;
+
+  abstract chargeSummary(
+    scope: BillingScope,
+    term: TermInfo,
+    options: ChargeSummaryOptions
+  ): Promise<ChargeSummary>;
 
   abstract feeLines(
     organizationId: string,
