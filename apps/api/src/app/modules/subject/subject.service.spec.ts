@@ -1,4 +1,8 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { createSubjectSchema } from '@eduvault/api-contract';
 import { toPermissionMap } from '@eduvault/policy';
 import type { OrgContext } from '../../common/auth';
@@ -27,7 +31,7 @@ const newSubject = (code: string, name: string) =>
   createSubjectSchema.parse({ code, name });
 
 const list = (service: SubjectService, page = 1) =>
-  service.list(ctx, { page, includeRetired: true });
+  service.list(ctx, { page, includeRetired: true, pageSize: 10 });
 
 describe('SubjectService code normalisation', () => {
   it('stores the code upper-case and the name trimmed', async () => {
@@ -91,7 +95,11 @@ describe('SubjectService ordering', () => {
     const one = await service.create(ctx, newSubject('ONE', 'One'));
     await service.create(ctx, newSubject('TWO', 'Two'));
     await service.update(ctx, one.id, { retired: true });
-    const page = await service.list(ctx, { page: 1, includeRetired: false });
+    const page = await service.list(ctx, {
+      page: 1,
+      includeRetired: false,
+      pageSize: 10,
+    });
     expect(page.items.map((item) => item.code)).toEqual(['TWO']);
     expect(page.total).toBe(1);
   });
@@ -181,6 +189,157 @@ describe('SubjectService level subjects', () => {
     ).toEqual([
       ['Mathematics', 'core', 1],
       ['French', 'elective', 2],
+    ]);
+  });
+});
+
+async function seeded() {
+  const { repository, service } = setup();
+  const maths = await service.create(ctx, newSubject('MTH', 'Mathematics'));
+  const english = await service.create(ctx, newSubject('ENG', 'English'));
+  const french = await service.create(ctx, newSubject('FRE', 'French'));
+  repository.levelSubjects = [
+    { classLevelId: 'jss1', subjectId: maths.id, kind: 'core', sequence: 1 },
+    {
+      classLevelId: 'jss1',
+      subjectId: french.id,
+      kind: 'elective',
+      sequence: 2,
+    },
+    {
+      classLevelId: 'jss2',
+      subjectId: french.id,
+      kind: 'elective',
+      sequence: 1,
+    },
+  ];
+  repository.sessions = [
+    { id: 'year-1', name: '2025/2026' },
+    { id: 'year-0', name: '2024/2025' },
+  ];
+  repository.currentSession = 'year-1';
+  repository.enrollments = [
+    { id: 'e-jss1', studentId: 's1', sessionId: 'year-1', levelId: 'jss1' },
+    { id: 'e-jss2', studentId: 's2', sessionId: 'year-1', levelId: 'jss2' },
+    { id: 'e-old', studentId: 's1', sessionId: 'year-0', levelId: 'jss1' },
+  ];
+  repository.takers = [
+    { enrollmentId: 'e-jss1', subjectId: french.id },
+    { enrollmentId: 'e-jss2', subjectId: french.id },
+    { enrollmentId: 'e-old', subjectId: french.id },
+  ];
+  return { repository, service, maths, english, french };
+}
+
+const takersOf = (repository: FakeSubjectRepository) =>
+  repository.takers
+    .map((taker) => taker.enrollmentId)
+    .toSorted((a, b) => a.localeCompare(b));
+
+describe('SubjectService replaceLevelSubjects', () => {
+  it('numbers the rows 1..n in the order given', async () => {
+    const { service, maths, english, french } = await seeded();
+    const rows = await service.replaceLevelSubjects(ctx, 'jss1', {
+      subjects: [
+        { subjectId: english.id, kind: 'core' },
+        { subjectId: french.id, kind: 'elective' },
+        { subjectId: maths.id, kind: 'core' },
+      ],
+    });
+    expect(
+      rows.map((row) => [row.subjectName, row.kind, row.sequence])
+    ).toEqual([
+      ['English', 'core', 1],
+      ['French', 'elective', 2],
+      ['Mathematics', 'core', 3],
+    ]);
+  });
+
+  it('answers 400 for a retired subject', async () => {
+    const { service, english } = await seeded();
+    await service.update(ctx, english.id, { retired: true });
+    await expect(
+      service.replaceLevelSubjects(ctx, 'jss1', {
+        subjects: [{ subjectId: english.id, kind: 'core' }],
+      })
+    ).rejects.toThrow(
+      new BadRequestException(
+        'English is retired. Restore it before assigning it.'
+      )
+    );
+  });
+
+  it('answers 404 for an unknown subject and an unknown level', async () => {
+    const { service, maths } = await seeded();
+    await expect(
+      service.replaceLevelSubjects(ctx, 'jss1', {
+        subjects: [{ subjectId: 'elsewhere', kind: 'core' }],
+      })
+    ).rejects.toThrow(NotFoundException);
+    await expect(
+      service.replaceLevelSubjects(ctx, 'other-school-level', {
+        subjects: [{ subjectId: maths.id, kind: 'core' }],
+      })
+    ).rejects.toThrow(NotFoundException);
+  });
+
+  it("clears this school year's takers when an elective is removed, and only at that level", async () => {
+    const { repository, service, maths } = await seeded();
+    await service.replaceLevelSubjects(ctx, 'jss1', {
+      subjects: [{ subjectId: maths.id, kind: 'core' }],
+    });
+    expect(takersOf(repository)).toEqual(['e-jss2', 'e-old']);
+  });
+
+  it('clears the takers when an elective becomes core', async () => {
+    const { repository, service, maths, french } = await seeded();
+    const rows = await service.replaceLevelSubjects(ctx, 'jss1', {
+      subjects: [
+        { subjectId: maths.id, kind: 'core' },
+        { subjectId: french.id, kind: 'core' },
+      ],
+    });
+    expect(takersOf(repository)).toEqual(['e-jss2', 'e-old']);
+    expect(rows.map((row) => row.takerCount)).toEqual([0, 0]);
+  });
+
+  it('keeps the takers of an elective that stays one', async () => {
+    const { repository, service, maths, french } = await seeded();
+    const rows = await service.replaceLevelSubjects(ctx, 'jss1', {
+      subjects: [
+        { subjectId: french.id, kind: 'elective' },
+        { subjectId: maths.id, kind: 'core' },
+      ],
+    });
+    expect(takersOf(repository)).toEqual(['e-jss1', 'e-jss2', 'e-old']);
+    expect(rows.map((row) => [row.subjectName, row.takerCount])).toEqual([
+      ['French', 1],
+      ['Mathematics', 0],
+    ]);
+  });
+
+  it('clears nothing when a core subject is removed', async () => {
+    const { repository, service, french } = await seeded();
+    await service.replaceLevelSubjects(ctx, 'jss1', {
+      subjects: [{ subjectId: french.id, kind: 'elective' }],
+    });
+    expect(takersOf(repository)).toEqual(['e-jss1', 'e-jss2', 'e-old']);
+  });
+
+  it('accepts an empty list', async () => {
+    const { repository, service } = await seeded();
+    expect(
+      await service.replaceLevelSubjects(ctx, 'jss1', { subjects: [] })
+    ).toEqual([]);
+    expect(takersOf(repository)).toEqual(['e-jss2', 'e-old']);
+  });
+
+  it('reports the takers of the current school year on the level list', async () => {
+    const { service } = await seeded();
+    const rows = await service.levelSubjects(ctx, { classLevelId: 'jss1' });
+    expect(rows.map((row) => [row.subjectName, row.takerCount])).toEqual([
+      ['Mathematics', 0],
+      ['French', 1],
     ]);
   });
 });

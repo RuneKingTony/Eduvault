@@ -33,7 +33,9 @@ function useTabCounts(page: number): Record<SubjectTab, number | undefined> {
     'by-level':
       levels.data === undefined || rows.data === undefined
         ? undefined
-        : groupByLevel(levels.data, rows.data).length,
+        : groupByLevel(levels.data, rows.data).filter(
+            (group) => group.rows.length > 0
+          ).length,
     teachers: teachers.data?.arms.length,
   };
 }

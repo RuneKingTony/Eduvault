@@ -3,8 +3,10 @@ import { sql } from 'kysely';
 import { classTeacherRoleSchema, type RosterRow } from '@eduvault/api-contract';
 import { splitRoles, type PermissionMap } from '@eduvault/policy';
 import { customRolePermissions } from '../../common/auth';
+import { currentSessionId } from '../../common/db/current-session';
 import { inCampusScope } from '../../common/db/in-campus-scope';
 import { isoOrNull } from '../../common/db/rows';
+import { studentSubjectsOf } from '../../common/db/student-subjects';
 import { KYSELY_TOKEN, type Database } from '../../common/db/tokens';
 import { placedNow } from '../../common/students';
 import {
@@ -339,26 +341,60 @@ export class KyselyClassRepository extends ClassRepository {
         'student.first_name',
         'student.last_name',
         'student.admission_number',
+        'en.id as enrollment_id',
       ])
       .orderBy('student.last_name')
       .orderBy('student.first_name')
       .orderBy('student.id')
       .execute();
+    const electives = await this.electiveNames(
+      organizationId,
+      rows.map((row) => row.enrollment_id)
+    );
     return rows.map((row) => ({
       studentId: row.id,
       name: `${row.first_name} ${row.last_name}`,
       admissionNumber: row.admission_number,
+      electives: electives.get(row.enrollment_id) ?? [],
     }));
   }
 
+  private async electiveNames(
+    organizationId: string,
+    enrollmentIds: readonly string[]
+  ): Promise<Map<string, string[]>> {
+    const names = new Map<string, string[]>();
+    if (enrollmentIds.length === 0) {
+      return names;
+    }
+    const rows = await studentSubjectsOf(this.db, organizationId, enrollmentIds)
+      .innerJoin('level_subject', (join) =>
+        join
+          .onRef(
+            'level_subject.class_level_id',
+            '=',
+            'student_enrollment.class_level_id'
+          )
+          .onRef('level_subject.subject_id', '=', 'student_subject.subject_id')
+      )
+      .innerJoin('subject', 'subject.id', 'student_subject.subject_id')
+      .select(['student_subject.enrollment_id', 'subject.name'])
+      .orderBy('level_subject.sequence')
+      .orderBy('subject.id')
+      .execute();
+    for (const row of rows) {
+      const own = names.get(row.enrollment_id);
+      if (own === undefined) {
+        names.set(row.enrollment_id, [row.name]);
+      } else {
+        own.push(row.name);
+      }
+    }
+    return names;
+  }
+
   async currentSessionId(organizationId: string): Promise<string | null> {
-    const row = await this.db
-      .selectFrom('term')
-      .where('organization_id', '=', organizationId)
-      .where('is_current', '=', true)
-      .select('session_id')
-      .executeTakeFirst();
-    return row?.session_id ?? null;
+    return (await currentSessionId(this.db, organizationId)) ?? null;
   }
 
   async teachersOf(

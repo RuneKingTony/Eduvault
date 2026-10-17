@@ -17,10 +17,10 @@ import {
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
-  Input,
   NativeSelect,
   NativeSelectOption,
   NumberedPager,
+  SearchInput,
   Tooltip,
   TooltipContent,
   TooltipTrigger,
@@ -95,22 +95,19 @@ function Toolbar({
 }) {
   return (
     <div className="flex flex-wrap items-center gap-2 px-4 pb-3">
-      <div className="relative min-w-48 flex-1">
-        <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          className="pl-8"
-          aria-label="Search students"
-          placeholder="Search name or GF number"
-          value={search.q ?? ''}
-          onChange={(event) => {
-            onSearchChange({
-              ...search,
-              q: event.target.value === '' ? undefined : event.target.value,
-              page: undefined,
-            });
-          }}
-        />
-      </div>
+      <SearchInput
+        className="min-w-48 flex-1"
+        aria-label="Search students"
+        placeholder="Search name or GF number"
+        value={search.q ?? ''}
+        onChange={(event) => {
+          onSearchChange({
+            ...search,
+            q: event.target.value === '' ? undefined : event.target.value,
+            page: undefined,
+          });
+        }}
+      />
       <NativeSelect
         aria-label="Show"
         value={search.filter ?? 'owing'}
