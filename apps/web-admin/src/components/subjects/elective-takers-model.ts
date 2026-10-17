@@ -1,8 +1,8 @@
 import type { ElectiveStudent } from '@eduvault/api-contract';
 
-export const NO_CLASS_LABEL = 'No class';
+const NO_CLASS_LABEL = 'No class';
 
-export interface StudentGroup {
+interface StudentGroup {
   label: string;
   students: ElectiveStudent[];
 }

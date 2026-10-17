@@ -85,7 +85,7 @@ export const levelRow = (
   ...overrides,
 });
 
-export const electiveStudent = (
+const electiveStudent = (
   overrides: Partial<ElectiveStudent> = {}
 ): ElectiveStudent => ({
   id: SUBJECT_IDS.ada,
