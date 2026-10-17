@@ -2,14 +2,17 @@ import { randomUUID } from 'node:crypto';
 import type { Pool } from 'pg';
 import type {
   ActivityPage,
+  BalanceList,
+  DashboardFinance,
   DashboardRoll,
   DashboardTask,
   MyClass,
 } from '@eduvault/api-contract';
-import { expect, type Fixtures } from './support/base-test';
+import { expect, type Fixtures, type TestUser } from './support/base-test';
 import { YEAR_2027, createSchoolYear } from './support/factories/calendar';
 import { assignClassTeacher, createClass } from './support/factories/classes';
 import { createAnnouncement } from './support/factories/announcements';
+import { bankAccount, owes, recordCash } from './support/factories/payments';
 import { createStudent } from './support/factories/students';
 import { makeCurrent } from './support/factories/terms';
 import { schoolsTest } from './support/two-schools';
@@ -116,6 +119,53 @@ const STAFF_PERMISSIONS = [
   'member:update',
   'session:read',
 ] as const;
+
+const financeOf = async (api: Api, actor: Actor) =>
+  (await api(actor).get('/dashboard/finance').expect(200))
+    .body as DashboardFinance | null;
+
+const LEKKI_DEBT = 3_000_000;
+const IKEJA_DEBT = 9_000_000;
+const LEKKI_PAID = 1_000_000;
+const IKEJA_PAID = 500_000;
+
+interface Scene {
+  api: Api;
+  app: Fixtures['app'];
+  clock: Fixtures['clock'];
+  owner: TestUser;
+  studentLekki: { id: string };
+  studentIkeja: { id: string };
+}
+
+const seedDebtsAndPayments = async ({
+  api,
+  app,
+  clock,
+  owner,
+  studentLekki,
+  studentIkeja,
+}: Scene) => {
+  await owes(app, owner, {
+    studentId: studentLekki.id,
+    amountMinor: LEKKI_DEBT,
+  });
+  await owes(app, owner, {
+    studentId: studentIkeja.id,
+    amountMinor: IKEJA_DEBT,
+  });
+  const account = await bankAccount(app, owner);
+  for (const [student, amountMinor] of [
+    [studentLekki, LEKKI_PAID],
+    [studentIkeja, IKEJA_PAID],
+  ] as const) {
+    await recordCash(api, owner, {
+      accountId: account.id,
+      paidOn: clock.today(),
+      allocations: [{ studentId: student.id, amountMinor }],
+    });
+  }
+};
 
 test.describe('isolation', () => {
   test('case 2: tasks, roll, classes and activity hold nothing of another school', async ({
@@ -522,6 +572,71 @@ test.describe('isolation', () => {
     expect(
       (await activityOf(api, teacher)).items.map((i) => i.text).join(' ')
     ).not.toContain(outside.firstName);
+  });
+
+  test('case 2: the finance tiles and the roll owed column hold nothing of another school', async ({
+    api,
+    app,
+    clock,
+    schools,
+  }) => {
+    await seedDebtsAndPayments({ api, app, clock, ...schools });
+
+    const other = await financeOf(api, schools.ownerB);
+    expect(other?.owedMinor ?? 0).toBe(0);
+    expect(other?.owingStudents ?? 0).toBe(0);
+    expect(other?.receivedMinor ?? 0).toBe(0);
+    expect(await rollOf(api, schools.ownerB)).toMatchObject({
+      owedMinor: { active: 0, left: 0 },
+      formerOwedMinor: 0,
+    });
+  });
+
+  test('case 4: a campus-scoped caller counts only their campus in the tiles and the roll', async ({
+    api,
+    app,
+    clock,
+    schools,
+  }) => {
+    await seedDebtsAndPayments({ api, app, clock, ...schools });
+    const { owner, studentIkeja, lekkiOnly } = schools;
+    await api(owner)
+      .post(`/students/${studentIkeja.id}/leave`)
+      .send({ reason: 'relocated', lastDay: studentIkeja.admittedOn })
+      .expect(201);
+
+    expect(await financeOf(api, lekkiOnly)).toEqual({
+      currency: 'NGN',
+      receivedMinor: LEKKI_PAID,
+      paymentCount: 1,
+      owedMinor: LEKKI_DEBT - LEKKI_PAID,
+      owingStudents: 1,
+    });
+    const campusRoll = await rollOf(api, lekkiOnly);
+    expect(campusRoll.owedMinor).toMatchObject({
+      active: LEKKI_DEBT - LEKKI_PAID,
+      left: 0,
+    });
+    expect(campusRoll.formerOwedMinor).toBe(0);
+  });
+
+  test('case 5: /dashboard/finance answers 403 without invoice:read or payment:read', async ({
+    api,
+    withPermissions,
+    schools: { orgA, lekki, noPermission },
+  }) => {
+    const neither = await withPermissions(orgA, ['student:read'], {
+      campuses: [lekki],
+    });
+    for (const user of [neither, noPermission]) {
+      await api(user).get('/dashboard/finance').expect(403);
+    }
+  });
+
+  test('case 6: /dashboard/finance answers 401 without a session', async ({
+    api,
+  }) => {
+    await api().get('/dashboard/finance').expect(401);
   });
 });
 
@@ -989,5 +1104,120 @@ test.describe('recent activity', () => {
     ]);
     expect(beyond).toMatchObject({ items: [], total: 12 });
     await api(noPermission).get('/activity?page=0').expect(400);
+  });
+});
+
+test.describe('finance tiles and the roll owed column', () => {
+  test('the tiles match Who owes for the whole school', async ({
+    api,
+    app,
+    clock,
+    schools,
+  }) => {
+    await seedDebtsAndPayments({ api, app, clock, ...schools });
+
+    const finance = await financeOf(api, schools.owner);
+    const balances = (
+      await api(schools.owner).get('/finance/balances').expect(200)
+    ).body as BalanceList;
+
+    expect(finance).toEqual({
+      currency: 'NGN',
+      receivedMinor: LEKKI_PAID + IKEJA_PAID,
+      paymentCount: 2,
+      owedMinor: LEKKI_DEBT + IKEJA_DEBT - LEKKI_PAID - IKEJA_PAID,
+      owingStudents: 2,
+    });
+    expect(finance).toMatchObject({
+      receivedMinor: balances.summary.receivedThisTermMinor,
+      paymentCount: balances.summary.paymentsThisTerm,
+      owedMinor: balances.summary.totalOwedMinor,
+      owingStudents: balances.summary.studentsOwing,
+    });
+  });
+
+  test('a payment dated after the current term ends is not received', async ({
+    api,
+    app,
+    clock,
+    schools,
+  }) => {
+    await seedDebtsAndPayments({ api, app, clock, ...schools });
+    const { owner, studentLekki } = schools;
+    const account = await bankAccount(app, owner);
+    clock.set('2035-01-01');
+    await recordCash(api, owner, {
+      accountId: account.id,
+      paidOn: clock.today(),
+      allocations: [{ studentId: studentLekki.id, amountMinor: 100_000 }],
+    });
+
+    expect(await financeOf(api, owner)).toMatchObject({
+      receivedMinor: LEKKI_PAID + IKEJA_PAID,
+      paymentCount: 2,
+    });
+  });
+
+  test('invoice:read alone drops the received fields and payment:read alone keeps them', async ({
+    api,
+    app,
+    clock,
+    withPermissions,
+    schools,
+  }) => {
+    await seedDebtsAndPayments({ api, app, clock, ...schools });
+    const { orgA, lekki, ikeja } = schools;
+    const campuses = { campuses: [lekki, ikeja] };
+    const viaInvoice = await withPermissions(orgA, ['invoice:read'], campuses);
+    const viaPayment = await withPermissions(orgA, ['payment:read'], campuses);
+
+    const invoiceView = await financeOf(api, viaInvoice);
+    expect(invoiceView).toMatchObject({ owingStudents: 2 });
+    expect(invoiceView).not.toHaveProperty('receivedMinor');
+    expect(invoiceView).not.toHaveProperty('paymentCount');
+    expect(await financeOf(api, viaPayment)).toMatchObject({
+      receivedMinor: LEKKI_PAID + IKEJA_PAID,
+      paymentCount: 2,
+      owingStudents: 2,
+    });
+  });
+
+  test('the roll adds owed per bucket for finance readers only, and the buckets sum to Who owes', async ({
+    api,
+    app,
+    clock,
+    withPermissions,
+    schools,
+  }) => {
+    await seedDebtsAndPayments({ api, app, clock, ...schools });
+    const { owner, orgA, studentIkeja } = schools;
+    await api(owner)
+      .post(`/students/${studentIkeja.id}/leave`)
+      .send({ reason: 'relocated', lastDay: studentIkeja.admittedOn })
+      .expect(201);
+    const lekkiOwes = LEKKI_DEBT - LEKKI_PAID;
+    const ikejaOwes = IKEJA_DEBT - IKEJA_PAID;
+
+    const roll = await rollOf(api, owner);
+    expect(roll.currency).toBe('NGN');
+    expect(roll.owedMinor).toMatchObject({
+      active: lekkiOwes,
+      inactive: 0,
+      left: ikejaOwes,
+      graduated: 0,
+    });
+    expect(roll.formerOwedMinor).toBe(ikejaOwes);
+    const balances = (await api(owner).get('/finance/balances').expect(200))
+      .body as BalanceList;
+    const { active, inactive, left, graduated } = roll.owedMinor ?? {};
+    expect(
+      (active ?? 0) + (inactive ?? 0) + (left ?? 0) + (graduated ?? 0)
+    ).toBe(balances.summary.totalOwedMinor);
+
+    const readsStudentsOnly = await withPermissions(orgA, ['student:read']);
+    const plain = await rollOf(api, readsStudentsOnly);
+    expect(plain).not.toHaveProperty('currency');
+    expect(plain).not.toHaveProperty('owedMinor');
+    expect(plain).not.toHaveProperty('formerOwedMinor');
   });
 });

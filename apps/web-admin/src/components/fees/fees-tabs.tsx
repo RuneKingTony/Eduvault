@@ -1,6 +1,6 @@
 import { Link } from '@tanstack/react-router';
 import { useCanAny } from '@eduvault/auth-client';
-import type { Gate } from '@eduvault/policy';
+import { FINANCE_READ_GATE, type Gate } from '@eduvault/policy';
 import { NO_ACCOUNT_FILTERS } from '../../accounts-search';
 import { NO_INVOICE_FILTERS } from '../../invoices-search';
 
@@ -33,7 +33,7 @@ export const FEE_TABS: readonly FeeTab[] = [
     id: 'accounts',
     label: 'Who owes',
     to: '/finance/accounts',
-    gate: ['invoice:read', 'payment:read'],
+    gate: FINANCE_READ_GATE,
   },
   {
     id: 'school-fees',

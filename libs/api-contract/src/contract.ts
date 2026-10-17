@@ -54,6 +54,7 @@ import {
   activityPageSchema,
   activityQuerySchema,
   dashboardChargedSchema,
+  dashboardFinanceSchema,
   dashboardMoneySchema,
   dashboardRollSchema,
   dashboardTaskSchema,
@@ -717,6 +718,11 @@ export const contract = defineContract({
       method: 'GET',
       path: '/dashboard/charged',
       response: dashboardChargedSchema.nullable(),
+    }),
+    finance: defineRoute({
+      method: 'GET',
+      path: '/dashboard/finance',
+      response: dashboardFinanceSchema.nullable(),
     }),
   },
   moneyAccounts: {

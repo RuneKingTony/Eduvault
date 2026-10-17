@@ -21,12 +21,6 @@ export class DashboardController {
     return this.tasksService.tasks(org);
   }
 
-  @Get('roll')
-  @OrganizationAuth('student', 'read')
-  roll(@Org() org: OrgContext): Promise<RouteOutput<Routes['roll']>> {
-    return this.dashboard.roll(org);
-  }
-
   @Get('my-classes')
   @OrganizationAuth('class', 'read')
   myClasses(@Org() org: OrgContext): Promise<RouteOutput<Routes['myClasses']>> {

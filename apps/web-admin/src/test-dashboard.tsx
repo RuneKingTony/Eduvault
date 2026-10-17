@@ -10,6 +10,7 @@ import type {
   ActivityPage,
   AnnouncementSummary,
   DashboardCharged,
+  DashboardFinance,
   DashboardMoney,
   DashboardRoll,
   DashboardTask,
@@ -97,6 +98,20 @@ const emptyMoney = (): DashboardMoney => ({
 const chargedOf = (overrides: { charged?: DashboardCharged | null }) =>
   overrides.charged ?? null;
 
+export const finance = (
+  overrides: Partial<DashboardFinance> = {}
+): DashboardFinance => ({
+  currency: 'NGN',
+  receivedMinor: 90_000_000,
+  paymentCount: 12,
+  owedMinor: 25_000_000,
+  owingStudents: 9,
+  ...overrides,
+});
+
+const financeOf = (overrides: { finance?: DashboardFinance | null }) =>
+  overrides.finance === undefined ? finance() : overrides.finance;
+
 export function dashboardApi(
   overrides: {
     calendar?: unknown;
@@ -108,6 +123,7 @@ export function dashboardApi(
     announcements?: AnnouncementSummary[];
     money?: DashboardMoney;
     charged?: DashboardCharged | null;
+    finance?: DashboardFinance | null;
   } = {}
 ) {
   return {
@@ -123,6 +139,7 @@ export function dashboardApi(
       myClasses: vi.fn().mockResolvedValue(overrides.myClasses ?? []),
       money: vi.fn().mockResolvedValue(overrides.money ?? emptyMoney()),
       charged: vi.fn().mockResolvedValue(chargedOf(overrides)),
+      finance: vi.fn().mockResolvedValue(financeOf(overrides)),
     },
     activity: {
       list: vi.fn().mockResolvedValue(overrides.activity ?? emptyActivity()),
@@ -150,6 +167,8 @@ export function renderInRouter(
     '/classes/$classId',
     '/finance/money-accounts',
     '/finance/invoices',
+    '/finance/payments',
+    '/finance/accounts',
     '/finance/billing',
     '/finance/billing/$runId',
     '/members/$memberId',

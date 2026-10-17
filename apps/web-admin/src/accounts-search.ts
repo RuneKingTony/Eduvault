@@ -13,6 +13,11 @@ export const NO_ACCOUNT_FILTERS = {
   page: undefined,
 } as const satisfies AccountsSearch;
 
+export const NO_STATEMENT_FILTERS = {
+  view: undefined,
+  page: undefined,
+} as const;
+
 export function parseAccountsSearch(
   search: Record<string, unknown>
 ): AccountsSearch {

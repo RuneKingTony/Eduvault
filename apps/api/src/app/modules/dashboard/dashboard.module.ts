@@ -3,11 +3,14 @@ import { EduvaultAuthModule } from '../../common/auth';
 import { BillingModule } from '../billing/billing.module';
 import { InvoiceModule } from '../invoice/invoice.module';
 import { MoneyAccountModule } from '../money-account/money-account.module';
+import { StudentAccountModule } from '../student-account/student-account.module';
 import { StudentModule } from '../student/student.module';
 import { ActivityController } from './activity.controller';
 import { ActivityRepository } from './activity.repository';
 import { ActivityService } from './activity.service';
 import { DashboardChargesService } from './dashboard-charges.service';
+import { DashboardFinanceController } from './dashboard-finance.controller';
+import { DashboardRollService } from './dashboard-roll.service';
 import { DashboardMoneyService } from './dashboard-money.service';
 import {
   DASHBOARD_TASK_SOURCES,
@@ -27,12 +30,18 @@ import { KyselyDashboardRepository } from './kysely-dashboard.repository';
     MoneyAccountModule,
     BillingModule,
     InvoiceModule,
+    StudentAccountModule,
   ],
-  controllers: [DashboardController, ActivityController],
+  controllers: [
+    DashboardController,
+    DashboardFinanceController,
+    ActivityController,
+  ],
   providers: [
     DashboardService,
     DashboardMoneyService,
     DashboardChargesService,
+    DashboardRollService,
     DashboardTasksService,
     {
       provide: DASHBOARD_TASK_SOURCES,
