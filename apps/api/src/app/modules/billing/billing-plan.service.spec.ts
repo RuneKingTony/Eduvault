@@ -2,7 +2,7 @@ import type { OrgContext } from '../../common/auth';
 import { Clock } from '../../common/clock';
 import type { ChargeableFeeLine } from '../../common/fees';
 import type { CampusService } from '../campus/campus.service';
-import type { RoundFilter } from './billing-inclusion';
+import type { RoundFilter } from './billing-round';
 import { BillingPlanService } from './billing-plan.service';
 import type {
   BillingRepository,

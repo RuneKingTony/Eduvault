@@ -9,7 +9,7 @@ import type {
   DiscountFacts,
   TermPosition,
 } from '../../common/fees';
-import type { RoundFilter } from './billing-inclusion';
+import type { RoundFilter } from './billing-round';
 import type { PlannedCharge, RoundCandidate } from './round-plan';
 
 export interface BillingScope {

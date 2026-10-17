@@ -19,7 +19,7 @@ import {
 } from '@eduvault/api-contract';
 import type { OrgContext } from '../../common/auth';
 import { InvoiceService } from '../invoice/invoice.service';
-import { settleCounts } from './billing-inclusion';
+import { settleCounts } from './billing-round';
 import { BillingPlanService } from './billing-plan.service';
 import { scopeOf } from './billing-scope';
 import { BillingRepository, type RunOutcome } from './billing.repository';

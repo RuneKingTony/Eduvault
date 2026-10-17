@@ -7,11 +7,11 @@ import {
 } from '../../common/fees';
 import {
   campusForTerm,
-  type InclusionFacts,
+  type CampusPlacement,
   type OutcomeCounts,
-} from './billing-inclusion';
+} from './billing-round';
 
-export interface RoundCandidate extends InclusionFacts {
+export interface RoundCandidate extends CampusPlacement {
   studentId: string;
   enrollmentId: string;
   firstName: string;
@@ -28,15 +28,12 @@ export interface PlannedCharge {
   lines: ChargeLine[];
 }
 
-interface PlannedRound {
-  charges: PlannedCharge[];
-  none: number;
-}
-
 export interface RoundPlan {
   charges: PlannedCharge[];
   counts: OutcomeCounts;
 }
+
+type PlannedRound = Pick<RoundPlan, 'charges'> & Pick<OutcomeCounts, 'none'>;
 
 export interface RoundPlanInput {
   termId: string;
@@ -77,10 +74,10 @@ function planStudent(
 }
 
 export function planRound(
-  included: readonly RoundCandidate[],
+  candidates: readonly RoundCandidate[],
   input: RoundPlanInput
 ): PlannedRound {
-  const planned = included.map((candidate) => planStudent(candidate, input));
+  const planned = candidates.map((candidate) => planStudent(candidate, input));
   const charges = planned.filter((charge) => charge.lines.length > 0);
   return { charges, none: planned.length - charges.length };
 }

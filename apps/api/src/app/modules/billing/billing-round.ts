@@ -5,7 +5,7 @@ export type RoundFilter =
   | { scope: 'campus'; campusId: string }
   | { scope: 'level'; classLevelId: string };
 
-export interface InclusionFacts {
+export interface CampusPlacement {
   termPlacementCampusId: string | null;
   latestPlacementCampusId: string | null;
   homeCampusId: string;
@@ -19,7 +19,7 @@ export interface OutcomeCounts {
 
 type ChargedState = 'all' | 'partly' | 'none';
 
-export const campusForTerm = (facts: InclusionFacts): string =>
+export const campusForTerm = (facts: CampusPlacement): string =>
   facts.termPlacementCampusId ??
   facts.latestPlacementCampusId ??
   facts.homeCampusId;

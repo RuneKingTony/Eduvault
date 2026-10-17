@@ -4,10 +4,10 @@ import {
   defaultTermId,
   scopeLabel,
   settleCounts,
-  type InclusionFacts,
-} from './billing-inclusion';
+  type CampusPlacement,
+} from './billing-round';
 
-const facts = (over: Partial<InclusionFacts> = {}): InclusionFacts => ({
+const facts = (over: Partial<CampusPlacement> = {}): CampusPlacement => ({
   termPlacementCampusId: 'lekki',
   latestPlacementCampusId: 'lekki',
   homeCampusId: 'lekki',

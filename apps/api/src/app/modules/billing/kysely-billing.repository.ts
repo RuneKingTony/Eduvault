@@ -31,7 +31,7 @@ import {
 } from '../../common/ledger';
 import { currentCampusSql, inScope } from '../../common/students';
 import type { DB } from '../../../db/db-types';
-import { scopeLabel, type RoundFilter } from './billing-inclusion';
+import { scopeLabel, type RoundFilter } from './billing-round';
 import {
   BillingRepository,
   type BillingScope,

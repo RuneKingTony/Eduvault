@@ -16,11 +16,7 @@ import type { OrgContext } from '../../common/auth';
 import { Clock, schoolToday } from '../../common/clock';
 import { documentYear } from '../../common/documents';
 import { CampusService } from '../campus/campus.service';
-import {
-  chargedState,
-  defaultTermId,
-  type RoundFilter,
-} from './billing-inclusion';
+import { chargedState, defaultTermId, type RoundFilter } from './billing-round';
 import { scopeOf } from './billing-scope';
 import {
   BillingRepository,

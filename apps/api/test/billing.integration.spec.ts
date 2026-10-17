@@ -341,7 +341,7 @@ test.describe('charge students', () => {
     api,
     app,
     pool,
-    schools: { owner, orgA, lekki },
+    schools: { owner, orgA, lekki, ikeja },
   }) => {
     const fixture = await chargeFixture(app, api, owner);
     const upper = await createClass(app, owner, {
@@ -380,6 +380,14 @@ test.describe('charge students', () => {
       scopeId: rows[0]?.id ?? '',
     });
     expect(level).toMatchObject({ created: 1, skipped: 1, none: 0 });
+
+    expect(
+      await prepare(api, owner, {
+        termId: fixture.secondTermId,
+        scope: 'campus',
+        scopeId: ikeja.id,
+      })
+    ).toMatchObject({ created: 0, skipped: 1, none: 0, runId: null });
   });
 });
 
