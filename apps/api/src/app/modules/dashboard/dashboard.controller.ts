@@ -42,6 +42,6 @@ export class DashboardController {
   @Get('charged')
   @OrganizationAuth('invoice', 'read')
   charged(@Org() org: OrgContext): Promise<RouteOutput<Routes['charged']>> {
-    return this.tasksService.charged(org);
+    return this.moneySummary.charged(org);
   }
 }

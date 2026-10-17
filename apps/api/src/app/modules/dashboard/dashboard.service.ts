@@ -9,6 +9,7 @@ import type { OrgContext } from '../../common/auth';
 import { Clock } from '../../common/clock';
 import { NewSchoolYearService } from '../student/new-school-year.service';
 import { dashboardScope } from './dashboard-scope';
+import type { DashboardTaskSource } from './dashboard-task-source';
 import {
   DashboardRepository,
   type DashboardScope,
@@ -28,7 +29,7 @@ const nonEmpty = (task: DashboardTask): DashboardTask[] =>
   'count' in task && task.count === 0 ? [] : [task];
 
 @Injectable()
-export class DashboardService {
+export class DashboardService implements DashboardTaskSource {
   constructor(
     private readonly repository: DashboardRepository,
     private readonly newSchoolYear: NewSchoolYearService,
