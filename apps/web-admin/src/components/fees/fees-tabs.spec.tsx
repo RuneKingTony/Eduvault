@@ -15,7 +15,13 @@ describe('FeesTabs', () => {
       within(tabs)
         .getAllByRole('link')
         .map((link) => link.textContent)
-    ).toEqual(['School fees', 'Other fees', 'Charge students', 'Charges']);
+    ).toEqual([
+      'Who owes',
+      'School fees',
+      'Other fees',
+      'Charge students',
+      'Charges',
+    ]);
   });
 
   it('shows a holder of invoice:bill alone only Charge students', async () => {
@@ -55,6 +61,7 @@ describe('FeesTabs', () => {
     const tabs = await screen.findByRole('navigation', { name: 'Fees' });
     expect(within(tabs).queryAllByRole('link')).toEqual([]);
     expect(FEE_TABS.map((tab) => tab.gate)).toEqual([
+      ['invoice:read', 'payment:read'],
       ['feeLine:read'],
       ['feeLine:read'],
       ['invoice:bill', 'invoice:read'],

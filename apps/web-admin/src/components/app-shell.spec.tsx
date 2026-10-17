@@ -127,6 +127,8 @@ async function renderAt(
       child('/announcements', page('Announcements page')),
       child('/students', page('Students page')),
       child('/members', page('Members page')),
+      child('/finance/accounts', page('Who owes page')),
+      child('/finance/payments', page('Payments page')),
       child('/finance/school-fees', page('Fees page')),
       child('/finance/other-fees', page('Other fees page')),
       child('/finance/billing', page('Charge students page')),
@@ -484,6 +486,7 @@ describe('AppShell access', () => {
         'Approvals',
         'Students',
         'Fees',
+        'Payments',
       ]);
     });
     expect(permissions).toHaveBeenCalledTimes(2);
@@ -498,6 +501,7 @@ describe('AppShell access', () => {
       'Students',
       'Staff and members',
       'Fees',
+      'Payments',
       'Settings',
     ]);
     expect(
@@ -532,7 +536,13 @@ describe('AppShell access', () => {
 
   it('shows a bursar Students and Fees but no Staff and members or Settings', async () => {
     await renderAt('/', { access: starterAccess('bursar') });
-    expect(linkNames()).toEqual(['Dashboard', 'Approvals', 'Students', 'Fees']);
+    expect(linkNames()).toEqual([
+      'Dashboard',
+      'Approvals',
+      'Students',
+      'Fees',
+      'Payments',
+    ]);
   });
 
   it('shows a member with no roles only Dashboard and Approvals', async () => {
@@ -633,6 +643,81 @@ describe('AppShell access', () => {
     expect(
       screen.queryByRole('option', { name: /Add a fee we charge/ })
     ).not.toBeInTheDocument();
+  });
+
+  it('offers Record a payment with payment:record and hides it from a reader', async () => {
+    await renderAt('/', { access: starterAccess('bursar') });
+    fireEvent.keyDown(globalThis as unknown as Window, {
+      key: 'k',
+      ctrlKey: true,
+    });
+    fireEvent.change(
+      await screen.findByPlaceholderText('Search pages and actions…'),
+      { target: { value: 'record a payment' } }
+    );
+    expect(
+      screen.getByRole('option', { name: /Record a payment/ })
+    ).toBeInTheDocument();
+    cleanup();
+
+    await renderAt('/', { access: starterAccess('administrator') });
+    fireEvent.keyDown(globalThis as unknown as Window, {
+      key: 'k',
+      ctrlKey: true,
+    });
+    fireEvent.change(
+      await screen.findByPlaceholderText('Search pages and actions…'),
+      { target: { value: 'record a payment' } }
+    );
+    expect(
+      screen.queryByRole('option', { name: /Record a payment/ })
+    ).not.toBeInTheDocument();
+  });
+
+  it('offers See who owes fees with invoice:read and hides it from a teacher', async () => {
+    await renderAt('/', { access: starterAccess('administrator') });
+    fireEvent.keyDown(globalThis as unknown as Window, {
+      key: 'k',
+      ctrlKey: true,
+    });
+    fireEvent.change(
+      await screen.findByPlaceholderText('Search pages and actions…'),
+      { target: { value: 'see who owes' } }
+    );
+    expect(
+      screen.getByRole('option', { name: /See who owes fees/ })
+    ).toBeInTheDocument();
+    cleanup();
+
+    await renderAt('/', { access: starterAccess('teacher') });
+    fireEvent.keyDown(globalThis as unknown as Window, {
+      key: 'k',
+      ctrlKey: true,
+    });
+    fireEvent.change(
+      await screen.findByPlaceholderText('Search pages and actions…'),
+      { target: { value: 'see who owes' } }
+    );
+    expect(
+      screen.queryByRole('option', { name: /See who owes fees/ })
+    ).not.toBeInTheDocument();
+  });
+
+  it('offers See who owes fees to a member who holds only payment:read', async () => {
+    await renderAt('/', {
+      access: fakeAccess({ permissions: { payment: ['read'] } }),
+    });
+    fireEvent.keyDown(globalThis as unknown as Window, {
+      key: 'k',
+      ctrlKey: true,
+    });
+    fireEvent.change(
+      await screen.findByPlaceholderText('Search pages and actions…'),
+      { target: { value: 'see who owes' } }
+    );
+    expect(
+      screen.getByRole('option', { name: /See who owes fees/ })
+    ).toBeInTheDocument();
   });
 
   it('offers Charge students with invoice:bill and hides it from a reader', async () => {

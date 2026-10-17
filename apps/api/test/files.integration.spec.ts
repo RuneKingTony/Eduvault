@@ -93,7 +93,7 @@ test.describe('uploading', () => {
   }) => {
     await post(api, owner).field('kind', 'school_logo').expect(400);
     await post(api, owner)
-      .field('kind', 'payment_proof')
+      .field('kind', 'store_receipt')
       .attach('file', png(), { filename: 'a.png' })
       .expect(400);
     const denied = await post(api, noPermission)
@@ -137,6 +137,9 @@ test.describe('the logo', () => {
       expect(res.headers['content-type']).toBe('image/png');
       expect(res.headers['content-disposition']).toBe('inline');
       expect(res.headers['x-content-type-options']).toBe('nosniff');
+      expect(res.headers['content-security-policy']).toBe(
+        "default-src 'none'; frame-ancestors 'none'"
+      );
       expect(res.headers['cache-control']).toBe('private');
       expect(Buffer.compare(res.body as Buffer, png())).toBe(0);
     }

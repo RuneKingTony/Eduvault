@@ -11,6 +11,7 @@ import { ConfigModule } from './common/config/config.module';
 import { DatabaseModule } from './common/db/database.module';
 import { FilesModule } from './common/files';
 import { AnnouncementModule } from './modules/announcement/announcement.module';
+import { PaymentModule } from './modules/payment/payment.module';
 import { PortalModule } from './modules/portal/portal.module';
 import { BillingModule } from './modules/billing/billing.module';
 import { CalendarModule } from './modules/calendar/calendar.module';
@@ -29,6 +30,7 @@ import { RolesModule } from './modules/roles/roles.module';
 import { PlatformModule } from './modules/platform/platform.module';
 import { SchoolAccountModule } from './modules/school-account/school-account.module';
 import { SchoolModule } from './modules/school/school.module';
+import { StudentAccountModule } from './modules/student-account/student-account.module';
 import { StudentModule } from './modules/student/student.module';
 import { SubjectModule } from './modules/subject/subject.module';
 
@@ -61,6 +63,8 @@ import { SubjectModule } from './modules/subject/subject.module';
     LedgerModule,
     InvoiceModule,
     BillingModule,
+    PaymentModule,
+    StudentAccountModule,
   ],
 })
 export class AppModule implements NestModule {

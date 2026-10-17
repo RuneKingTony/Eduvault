@@ -22,6 +22,8 @@ const built = new Set([
   '/announcements',
   '/students',
   '/members',
+  '/finance/accounts',
+  '/finance/payments',
   '/finance/school-fees',
   '/finance/other-fees',
   '/finance/billing',
@@ -36,6 +38,7 @@ const built = new Set([
   '/roles/new',
   '/settings/profile',
   '/settings/admissions',
+  '/settings/payment-rules',
   '/settings/danger',
   '/settings/levels',
 ]);
@@ -85,7 +88,8 @@ describe('nav model', () => {
       '/members',
       '/classes',
       '/subjects',
-      '/finance/school-fees',
+      '/finance/accounts',
+      '/finance/payments',
       '/finance/money-accounts',
       '/settings/profile',
     ]);
@@ -111,6 +115,7 @@ describe('nav model', () => {
     ).toEqual([
       'School profile',
       'Admissions rules',
+      'Payment rules',
       'School years and terms',
       'Campuses',
       'Levels',
@@ -139,6 +144,7 @@ describe('settings sections', () => {
     ).toEqual([
       ['School profile', 'General'],
       ['Admissions rules', 'General'],
+      ['Payment rules', 'Finance'],
       ['School years and terms', 'School structure'],
       ['Campuses', 'School structure'],
       ['Levels', 'School structure'],
@@ -151,6 +157,7 @@ describe('settings sections', () => {
     expect(idsFor(everything)).toEqual([
       'profile',
       'admissions',
+      'payment-rules',
       'calendar',
       'campuses',
       'levels',
@@ -164,6 +171,7 @@ describe('settings sections', () => {
     expect(idsFor(starter('administrator'))).toEqual([
       'profile',
       'admissions',
+      'payment-rules',
       'calendar',
       'campuses',
       'levels',
@@ -279,19 +287,42 @@ describe('nav gates', () => {
 
   it('shows Fees to a bursar and an administrator, not to a teacher', () => {
     for (const slug of ['bursar', 'administrator']) {
-      expect(routesFor(starter(slug))).toContain('/finance/school-fees');
+      expect(routesFor(starter(slug))).toContain('/finance/accounts');
     }
-    expect(routesFor(starter('teacher'))).not.toContain('/finance/school-fees');
+    expect(routesFor(starter('teacher'))).not.toContain('/finance/accounts');
     expect(routesFor(toPermissionMap(['feeLine:create']))).not.toContain(
       '/finance/school-fees'
     );
   });
 
-  it('opens Fees on the first tab the member can see', () => {
-    expect(fees(starter('principal'))).toBe('/finance/billing');
-    expect(fees(toPermissionMap(['invoice:read']))).toBe('/finance/billing');
-    expect(fees(starter('bursar'))).toBe('/finance/school-fees');
+  it('opens Fees on Who owes first, then the first other tab the member can see', () => {
+    expect(fees(starter('principal'))).toBe('/finance/accounts');
+    expect(fees(toPermissionMap(['invoice:read']))).toBe('/finance/accounts');
+    expect(fees(toPermissionMap(['payment:read']))).toBe('/finance/accounts');
+    expect(fees(starter('bursar'))).toBe('/finance/accounts');
+    expect(fees(toPermissionMap(['feeLine:read']))).toBe(
+      '/finance/school-fees'
+    );
+    expect(fees(toPermissionMap(['invoice:bill']))).toBe('/finance/billing');
     expect(fees(starter('teacher'))).toBeUndefined();
+  });
+
+  it('shows Payments only with payment:read', () => {
+    for (const slug of ['bursar', 'administrator', 'principal']) {
+      expect(routesFor(starter(slug))).toContain('/finance/payments');
+    }
+    expect(routesFor(starter('teacher'))).not.toContain('/finance/payments');
+    expect(routesFor(toPermissionMap(['payment:record']))).not.toContain(
+      '/finance/payments'
+    );
+    expect(routeGate('/finance/payments')).toEqual(['payment:read']);
+    expect(routeGate('/finance/accounts')).toEqual([
+      'invoice:read',
+      'payment:read',
+    ]);
+    expect(routeGate('/settings/payment-rules')).toEqual([
+      'schoolAccount:read',
+    ]);
   });
 
   it('hides Staff and members from a bursar and shows it with member:read', () => {

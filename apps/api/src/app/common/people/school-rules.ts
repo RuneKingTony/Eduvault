@@ -2,7 +2,7 @@ import type { Kysely } from 'kysely';
 import type { DB } from '../../../db/db-types';
 import type { SchoolRules } from './guardian-tx';
 
-export async function findSchoolRules(
+async function findSchoolRules(
   db: Kysely<DB>,
   organizationId: string
 ): Promise<SchoolRules | undefined> {

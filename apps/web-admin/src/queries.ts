@@ -5,10 +5,12 @@ import {
 } from '@tanstack/react-query';
 import type {
   AnnouncementStatus,
+  BalanceFilter,
   ClassStatus,
   FeeGroup,
   InvoiceKind,
   InvoiceStatus,
+  PaymentStatus,
   RouteQuery,
   contract,
 } from '@eduvault/api-contract';
@@ -695,6 +697,94 @@ export async function invalidateBilling(
     queryClient.invalidateQueries({ queryKey: [...FEES_KEY, 'preview'] }),
     queryClient.invalidateQueries({ queryKey: [...DASHBOARD_KEY, 'tasks'] }),
     queryClient.invalidateQueries({ queryKey: [...DASHBOARD_KEY, 'charged'] }),
+    queryClient.invalidateQueries({ queryKey: LEDGER_KEY }),
+    queryClient.invalidateQueries({ queryKey: MONEY_ACCOUNTS_KEY }),
+  ]);
+}
+
+const PAYMENTS_KEY = ['payments'] as const;
+const BALANCES_KEY = ['balances'] as const;
+const STATEMENTS_KEY = ['statements'] as const;
+
+interface PaymentFilters {
+  q?: string;
+  status?: PaymentStatus;
+  page?: number;
+}
+
+interface BalanceFilters {
+  filter?: BalanceFilter;
+  q?: string;
+  page?: number;
+}
+
+export const paymentsQueryOptions = (
+  api: Api,
+  { q, status, page = 1 }: PaymentFilters = {}
+) =>
+  queryOptions({
+    queryKey: [...PAYMENTS_KEY, 'list', { q: q ?? '', status, page }],
+    queryFn: () =>
+      api.payments.list({
+        query: { q: q === '' ? undefined : q, status, page },
+      }),
+    placeholderData: keepPreviousData,
+  });
+
+export const paymentQueryOptions = (api: Api, id: string) =>
+  queryOptions({
+    queryKey: [...PAYMENTS_KEY, 'one', id],
+    queryFn: () => api.payments.get({ params: { id } }),
+  });
+
+export const recordingOptionsQueryOptions = (api: Api) =>
+  queryOptions({
+    queryKey: [...PAYMENTS_KEY, 'recording-options'],
+    queryFn: () => api.payments.recordingOptions({}),
+    gcTime: 0,
+  });
+
+export const balancesQueryOptions = (
+  api: Api,
+  { filter = 'owing', q, page = 1 }: BalanceFilters = {}
+) =>
+  queryOptions({
+    queryKey: [...BALANCES_KEY, 'list', { filter, q: q ?? '', page }],
+    queryFn: () =>
+      api.studentAccounts.balances({
+        query: { filter, q: q === '' ? undefined : q, page },
+      }),
+    placeholderData: keepPreviousData,
+  });
+
+export const statementQueryOptions = (
+  api: Api,
+  studentId: string,
+  page?: number
+) =>
+  queryOptions({
+    queryKey: [...STATEMENTS_KEY, 'student', studentId, page ?? 'last'],
+    queryFn: () =>
+      api.studentAccounts.statement({ params: { studentId }, query: { page } }),
+    placeholderData: keepPreviousData,
+  });
+
+export const familyStatementQueryOptions = (api: Api, guardianId: string) =>
+  queryOptions({
+    queryKey: [...STATEMENTS_KEY, 'family', guardianId],
+    queryFn: () =>
+      api.studentAccounts.guardianStatement({ params: { guardianId } }),
+  });
+
+export async function invalidatePayments(
+  queryClient: QueryClient
+): Promise<void> {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: PAYMENTS_KEY }),
+    queryClient.invalidateQueries({ queryKey: BALANCES_KEY }),
+    queryClient.invalidateQueries({ queryKey: STATEMENTS_KEY }),
+    queryClient.invalidateQueries({ queryKey: INVOICES_KEY }),
+    queryClient.invalidateQueries({ queryKey: [...DASHBOARD_KEY, 'money'] }),
     queryClient.invalidateQueries({ queryKey: LEDGER_KEY }),
     queryClient.invalidateQueries({ queryKey: MONEY_ACCOUNTS_KEY }),
   ]);

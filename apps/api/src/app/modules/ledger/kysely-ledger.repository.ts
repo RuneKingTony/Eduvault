@@ -38,6 +38,7 @@ interface EntryRow {
   memo: string | null;
   effective_on: string;
   invoice_id: string | null;
+  payment_id: string | null;
 }
 
 interface LineRow {
@@ -59,6 +60,15 @@ const toLine = (row: LineRow): JournalLine => ({
   creditMinor: Number(row.credit_minor),
 });
 
+const linkOf = (row: EntryRow): JournalEntry['link'] => {
+  if (row.invoice_id !== null) {
+    return { type: 'invoice', id: row.invoice_id };
+  }
+  return row.payment_id === null
+    ? null
+    : { type: 'payment', id: row.payment_id };
+};
+
 const toEntry = (
   row: EntryRow,
   totalMinor: number,
@@ -70,8 +80,7 @@ const toEntry = (
   kind: journalKindSchema.parse(row.kind),
   memo: row.memo,
   totalMinor,
-  link:
-    row.invoice_id === null ? null : { type: 'invoice', id: row.invoice_id },
+  link: linkOf(row),
   lines,
 });
 
@@ -244,6 +253,12 @@ export class KyselyLedgerRepository extends LedgerRepository {
             where invoice.journal_entry_id = journal_entry.id
               and invoice.organization_id = journal_entry.organization_id
           )`.as('invoice_id'),
+          sql<string | null>`(
+            select payment.id
+            from payment
+            where payment.journal_entry_id = journal_entry.id
+              and payment.organization_id = journal_entry.organization_id
+          )`.as('payment_id'),
         ])
         .orderBy('journal_entry.effective_on', 'desc')
         .orderBy('journal_entry.sequence', 'desc')

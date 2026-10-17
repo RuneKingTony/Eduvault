@@ -116,6 +116,24 @@ const CHARGE_STUDENTS_ACTION: CommandEntry = {
   keywords: ['bill', 'invoice', 'charge', 'term', 'fees', 'send'],
 };
 
+const RECORD_PAYMENT_ACTION: CommandEntry = {
+  id: 'record-payment',
+  label: 'Record a payment',
+  hint: 'Finance',
+  route: '/finance/payments?record=1',
+  icon: 'banknote',
+  keywords: ['receipt', 'cash', 'transfer', 'pos', 'paid', 'fees'],
+};
+
+const WHO_OWES_ACTION: CommandEntry = {
+  id: 'who-owes',
+  label: 'See who owes fees',
+  hint: 'Fees',
+  route: '/finance/accounts',
+  icon: 'wallet',
+  keywords: ['balance', 'debt', 'owing', 'statement', 'arrears'],
+};
+
 function commandActions(
   builtRoutes: ReadonlySet<string>,
   access: MePermissions,
@@ -133,6 +151,12 @@ function commandActions(
       : []),
     ...(allowed('/finance/billing', ['invoice:bill'])
       ? [CHARGE_STUDENTS_ACTION]
+      : []),
+    ...(allowed('/finance/payments', ['payment:record'])
+      ? [RECORD_PAYMENT_ACTION]
+      : []),
+    ...(allowed('/finance/accounts', ['invoice:read', 'payment:read'])
+      ? [WHO_OWES_ACTION]
       : []),
     ...(allowed('/roles/new', ['ac:create']) ? [CREATE_ROLE_ACTION] : []),
   ];

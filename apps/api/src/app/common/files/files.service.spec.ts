@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
@@ -19,6 +20,7 @@ const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2]);
 class FakeFiles extends FilesRepository {
   rows = new Map<string, NewFile>();
   attached = new Set<string>();
+  hidden = new Set<string>();
 
   insert(input: NewFile) {
     this.rows.set(input.id, input);
@@ -34,6 +36,10 @@ class FakeFiles extends FilesRepository {
 
   isAttached(file: FileRecord) {
     return Promise.resolve(this.attached.has(file.id));
+  }
+
+  isVisible(file: FileRecord) {
+    return Promise.resolve(!this.hidden.has(file.id));
   }
 
   delete(_organizationId: string, id: string) {
@@ -299,5 +305,107 @@ describe('FilesService guardian photos', () => {
     await service.remove(updater, id);
 
     expect(files.rows.size).toBe(0);
+  });
+});
+
+const PDF = Buffer.from('%PDF-1.7\n%\u00E2\u00E3', 'latin1');
+const HEIC = Buffer.from([
+  0, 0, 0, 0x18, 0x66, 0x74, 0x79, 0x70, 0x68, 0x65, 0x69, 0x63, 0, 0, 0, 0,
+]);
+
+const uploadProof = (ctx: OrgContext, buffer: Buffer, name = 'proof.pdf') => {
+  const made = setup();
+  return {
+    ...made,
+    result: made.service.upload(ctx, {
+      kind: 'payment_proof',
+      file: { originalname: name, buffer },
+    }),
+  };
+};
+
+describe('FilesService payment proofs', () => {
+  const recorder = context('payment:record');
+  const paymentReader = context('payment:read');
+
+  it('takes a PDF, a HEIC photo and a PNG from payment:record', async () => {
+    for (const [buffer, contentType] of [
+      [PDF, 'application/pdf'],
+      [HEIC, 'image/heic'],
+      [PNG, 'image/png'],
+    ] as const) {
+      const { result } = uploadProof(recorder, buffer);
+      await expect(result).resolves.toMatchObject({ contentType });
+    }
+  });
+
+  it('answers 403 to a member who may only read payments', async () => {
+    const { result } = uploadProof(paymentReader, PDF);
+    await expect(result).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('refuses an executable named proof.pdf and a Word document with the PRD copy', async () => {
+    for (const buffer of [
+      Buffer.from('MZ\u0090\u0000'),
+      Buffer.from('PK\u0003\u0004word/document.xml'),
+    ]) {
+      const { result } = uploadProof(recorder, buffer);
+      await expect(result).rejects.toThrow(
+        'The proof must be a photo, a screenshot or a PDF.'
+      );
+    }
+  });
+
+  it('allows 10 MB and refuses one byte more', async () => {
+    const limit = 10 * 1_048_576;
+    const exact = Buffer.concat([PDF, Buffer.alloc(limit - PDF.length)]);
+    await expect(uploadProof(recorder, exact).result).resolves.toMatchObject({
+      byteSize: limit,
+    });
+    const over = Buffer.concat([PDF, Buffer.alloc(limit - PDF.length + 1)]);
+    await expect(uploadProof(recorder, over).result).rejects.toThrow(
+      'That proof is over 10 MB. Please choose a smaller one.'
+    );
+  });
+
+  it('serves an attached proof to payment:read and hides it from other members', async () => {
+    const { files, service, result } = uploadProof(recorder, PDF);
+    const { id } = await result;
+    files.attached.add(id);
+
+    await expect(service.read(paymentReader, id)).resolves.toMatchObject({
+      contentType: 'application/pdf',
+      originalName: 'proof.pdf',
+    });
+    await expect(service.read(reader, id)).rejects.toBeInstanceOf(
+      NotFoundException
+    );
+  });
+
+  it('answers 404 when the payment is outside the caller’s campuses', async () => {
+    const { files, service, result } = uploadProof(recorder, PDF);
+    const { id } = await result;
+    files.attached.add(id);
+    files.hidden.add(id);
+
+    await expect(service.read(paymentReader, id)).rejects.toBeInstanceOf(
+      NotFoundException
+    );
+  });
+
+  it('removes an unattached proof but refuses to remove an attached one', async () => {
+    const { files, service, result } = uploadProof(recorder, PDF);
+    const { id } = await result;
+
+    await service.remove(recorder, id);
+    expect(files.rows.size).toBe(0);
+
+    const attached = uploadProof(recorder, PDF);
+    const { id: keptId } = await attached.result;
+    attached.files.attached.add(keptId);
+    await expect(
+      attached.service.remove(recorder, keptId)
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(attached.files.rows.size).toBe(1);
   });
 });

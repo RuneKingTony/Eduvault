@@ -1,13 +1,16 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type {
-  Expression,
-  ExpressionBuilder,
-  Selectable,
-  SqlBool,
+import {
+  sql,
+  type Expression,
+  type ExpressionBuilder,
+  type Selectable,
+  type SqlBool,
 } from 'kysely';
 import type { FileKind } from '@eduvault/api-contract';
 import type { DB } from '../../../db/db-types';
+import type { CampusScope } from '../campus-scope';
 import { KYSELY_TOKEN, type Database } from '../db/tokens';
+import { anyAllocationInScopeSql } from '../students/payment-allocations';
 import {
   FilesRepository,
   type FileRecord,
@@ -42,6 +45,13 @@ const OWNED_BY: Record<FileKind, (eb: FileEntry) => Expression<SqlBool>> = {
         .selectFrom('guardian')
         .select('guardian.id')
         .whereRef('guardian.photo_file_id', '=', 'file_object.id')
+    ),
+  payment_proof: (eb) =>
+    eb.exists(
+      eb
+        .selectFrom('payment')
+        .select('payment.id')
+        .whereRef('payment.proof_file_id', '=', 'file_object.id')
     ),
 };
 
@@ -90,6 +100,19 @@ export class KyselyFilesRepository extends FilesRepository {
       .where(OWNED_BY[file.kind])
       .executeTakeFirst();
     return row !== undefined;
+  }
+
+  async isVisible(file: FileRecord, scope: CampusScope): Promise<boolean> {
+    if (scope === 'all') {
+      return true;
+    }
+    const { rows } = await sql<{ id: string }>`
+      SELECT p.id FROM payment p
+      WHERE p.proof_file_id = ${file.id}
+        AND p.organization_id = ${file.organizationId}
+        AND ${anyAllocationInScopeSql('p', scope)}
+      LIMIT 1`.execute(this.db);
+    return rows.length > 0;
   }
 
   async delete(organizationId: string, id: string): Promise<void> {

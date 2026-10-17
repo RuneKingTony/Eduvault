@@ -1,4 +1,5 @@
 import type { FileKind } from '@eduvault/api-contract';
+import type { CampusScope } from '../campus-scope';
 
 export interface FileRecord {
   id: string;
@@ -27,6 +28,8 @@ export abstract class FilesRepository {
   ): Promise<FileRecord | undefined>;
 
   abstract isAttached(file: FileRecord): Promise<boolean>;
+
+  abstract isVisible(file: FileRecord, scope: CampusScope): Promise<boolean>;
 
   abstract delete(organizationId: string, id: string): Promise<void>;
 

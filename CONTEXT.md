@@ -90,7 +90,7 @@ Terms the code and the people using it share. Adapted from the earlier school-ma
 
 **Ledger account** — one line of the school's chart of accounts. "Money category" on screen. Fee types are ledger accounts under fee income.
 
-**Balance** — what a student owes (or holds as credit): the sum of their journal lines. Never stored. "Owing", "Paid up" or "In credit" on screen.
+**Balance** — what a student owes (or holds as credit): the sum of their journal lines. Never stored. "Owing", "Paid up" or "Extra paid" on screen.
 
 **Money account** — where money physically sits: a cash box, a bank account, a POS terminal, later a gateway. A closed account is retired, never deleted.
 
@@ -105,6 +105,12 @@ Terms the code and the people using it share. Adapted from the earlier school-ma
 **Invoice** — the bill a parent sees: a term's fee lines and discounts, a store purchase, or a one-off charge. "Charge" on screen (`CHG-2026-00042`); "Prepared" before it is sent, "Sent" after. Never edited once sent.
 
 **Payment** — money received, recorded at once with a receipt (`RCT-2026-00088`). One payment can be split across siblings. A bank transfer needs proof attached. "Payment rules" sets which ways to pay the school accepts.
+
+**Receipt** — the numbered record of one payment (`RCT-2026-00088`), with how the amount was split across students. Printed on A5 with the school’s footer from Payment rules.
+
+**Payer** — who handed over the money: a guardian of the students it pays for, or "Someone else" named by hand.
+
+**Payment method** — how a payment was made: cash, bank transfer or POS. "Payment rules" switches each on or off, but never all three.
 
 **Void** — undoing a payment. "Cancel a payment" on screen. The row is kept and marked, and the reversal is a new movement once approved. Money records are never deleted. A store sale's payment can't be cancelled on its own.
 

@@ -25,4 +25,14 @@ export class SchoolSettingsController {
   ): Promise<RouteOutput<typeof routes.update>> {
     return this.settings.update(org, body);
   }
+
+  @Patch('payment-rules')
+  @OrganizationAuth('schoolAccount', 'update')
+  updatePaymentRules(
+    @Org() org: OrgContext,
+    @Body(zod(routes.updatePaymentRules.body))
+    body: Parameters<SchoolSettingsService['updatePaymentRules']>[1]
+  ): Promise<RouteOutput<typeof routes.updatePaymentRules>> {
+    return this.settings.updatePaymentRules(org, body);
+  }
 }

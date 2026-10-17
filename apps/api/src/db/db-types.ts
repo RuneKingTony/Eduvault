@@ -370,6 +370,33 @@ export interface OrganizationRole {
   updatedAt: Timestamp | null;
 }
 
+export interface Payment {
+  amount_minor: Int8;
+  created_at: Generated<Timestamp>;
+  created_by: string | null;
+  id: Generated<string>;
+  journal_entry_id: string;
+  method: string;
+  money_account_id: string;
+  organization_id: string;
+  paid_on: Timestamp;
+  payer_guardian_id: string | null;
+  payer_name: string;
+  proof_file_id: string | null;
+  provider_reference: string | null;
+  receipt_number: string;
+  reference: string;
+  request_hash: string;
+  status: Generated<string>;
+}
+
+export interface PaymentAllocation {
+  amount_minor: Int8;
+  organization_id: string;
+  payment_id: string;
+  student_id: string;
+}
+
 export interface SchoolAccount {
   address: string | null;
   admission_prefix: string;
@@ -402,6 +429,10 @@ export interface SchoolSetting {
   created_at: Generated<Timestamp>;
   max_guardians: Generated<number>;
   organization_id: string;
+  pay_cash: Generated<boolean>;
+  pay_pos: Generated<boolean>;
+  pay_transfer: Generated<boolean>;
+  receipt_footer: Generated<string>;
   require_guardian: Generated<boolean>;
   updated_at: Generated<Timestamp>;
   updated_by: string | null;
@@ -609,6 +640,8 @@ export interface DB {
   money_account: MoneyAccount;
   organization: Organization;
   organizationRole: OrganizationRole;
+  payment: Payment;
+  payment_allocation: PaymentAllocation;
   school_account: SchoolAccount;
   school_holiday: SchoolHoliday;
   school_setting: SchoolSetting;

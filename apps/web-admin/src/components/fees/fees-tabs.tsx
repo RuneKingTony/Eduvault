@@ -1,6 +1,7 @@
 import { Link } from '@tanstack/react-router';
 import { useCanAny } from '@eduvault/auth-client';
 import type { Gate } from '@eduvault/policy';
+import { NO_ACCOUNT_FILTERS } from '../../accounts-search';
 import { NO_INVOICE_FILTERS } from '../../invoices-search';
 
 const TAB =
@@ -8,6 +9,12 @@ const TAB =
 const ACTIVE = { className: 'bg-muted text-foreground' };
 
 type FeeTab =
+  | {
+      id: string;
+      label: string;
+      to: '/finance/accounts';
+      gate: Gate;
+    }
   | {
       id: string;
       label: string;
@@ -22,6 +29,12 @@ type FeeTab =
     };
 
 export const FEE_TABS: readonly FeeTab[] = [
+  {
+    id: 'accounts',
+    label: 'Who owes',
+    to: '/finance/accounts',
+    gate: ['invoice:read', 'payment:read'],
+  },
   {
     id: 'school-fees',
     label: 'School fees',
@@ -52,6 +65,18 @@ function Tab({ tab, term }: { tab: FeeTab; term: string | undefined }) {
   const allowed = useCanAny(tab.gate);
   if (!allowed) {
     return null;
+  }
+  if (tab.to === '/finance/accounts') {
+    return (
+      <Link
+        to={tab.to}
+        search={NO_ACCOUNT_FILTERS}
+        className={TAB}
+        activeProps={ACTIVE}
+      >
+        {tab.label}
+      </Link>
+    );
   }
   if (tab.to === '/finance/billing') {
     return (
