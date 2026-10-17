@@ -162,6 +162,14 @@ describe('roles', () => {
     }
   });
 
+  it('gives the bursar adjustment read and create, the principal read and approve, and nobody else any', () => {
+    expect(starter('bursar').adjustment).toEqual(['read', 'create']);
+    expect(starter('principal').adjustment).toEqual(['read', 'approve']);
+    for (const slug of ['administrator', 'teacher', 'student', 'guardian']) {
+      expect(starter(slug).adjustment).toBeUndefined();
+    }
+  });
+
   it('counts invoice:read but not invoice:bill in READ_PERMS', () => {
     expect(READ_PERMS).toContain('invoice:read');
     expect(READ_PERMS).not.toContain('invoice:bill');
@@ -324,6 +332,7 @@ describe('roles', () => {
       announcement: ['create', 'read', 'update'],
       invoice: ['read'],
       payment: ['read'],
+      adjustment: ['read', 'approve'],
       moneyAccount: ['read'],
       store: ['read'],
     });

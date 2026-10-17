@@ -9,11 +9,13 @@ import {
   SidebarGroupContent,
   SidebarGroupLabel,
   SidebarMenu,
+  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarSeparator,
 } from '@eduvault/ui';
 import { findCurrent, type NavGroup, type NavItem } from '../nav';
+import { useApprovalsSummary } from './approvals/use-approvals-summary';
 import { useCollapsedGroups } from './shell-state';
 
 interface SidebarNavProps {
@@ -21,6 +23,14 @@ interface SidebarNavProps {
   pathname: string;
   rail: boolean;
   onNavigate: () => void;
+}
+
+function useNavCounts(): Readonly<Record<string, number>> {
+  const summary = useApprovalsSummary();
+  return {
+    approvals: summary?.byNav.approvals ?? 0,
+    payments: summary?.byNav.payments ?? 0,
+  };
 }
 
 function NavItems({
@@ -35,12 +45,14 @@ function NavItems({
   onNavigate: () => void;
 }) {
   const current = findCurrent(groups, pathname)?.item;
+  const counts = useNavCounts();
   return (
     <SidebarMenu>
       {group.items.map((item) => (
         <NavMenuItem
           key={item.id}
           item={item}
+          count={counts[item.id] ?? 0}
           active={current?.id === item.id}
           onNavigate={onNavigate}
         />
@@ -51,10 +63,12 @@ function NavItems({
 
 function NavMenuItem({
   item,
+  count,
   active,
   onNavigate,
 }: {
   item: NavItem;
+  count: number;
   active: boolean;
   onNavigate: () => void;
 }) {
@@ -70,6 +84,11 @@ function NavMenuItem({
           <span>{item.label}</span>
         </Link>
       </SidebarMenuButton>
+      {count > 0 ? (
+        <SidebarMenuBadge aria-label={`${count} waiting for you`}>
+          {count}
+        </SidebarMenuBadge>
+      ) : null}
     </SidebarMenuItem>
   );
 }

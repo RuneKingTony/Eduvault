@@ -1,8 +1,14 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { Selectable } from 'kysely';
-import type { PaymentMethods, SchoolSettings } from '@eduvault/api-contract';
+import type {
+  ApprovalRules,
+  PaymentMethods,
+  SchoolSettings,
+} from '@eduvault/api-contract';
 import type { SchoolSetting } from '../../../db/db-types';
+import { RULE_COLUMNS, approvalRulesOf } from '../../common/approvals';
 import { KYSELY_TOKEN, type Database } from '../../common/db/tokens';
+import { approverLabels } from '../../common/school-setting/approvers';
 import { paymentMethodsOf } from '../../common/school-setting/payment-methods';
 import {
   SchoolSettingsRepository,
@@ -17,16 +23,41 @@ const COLUMNS = [
   'pay_transfer',
   'pay_pos',
   'receipt_footer',
+  ...RULE_COLUMNS,
 ] as const;
 
 type SettingsRow = Pick<Selectable<SchoolSetting>, (typeof COLUMNS)[number]>;
 
-const toSettings = (row: SettingsRow): SchoolSettings => ({
+const toSettings = (row: SettingsRow, approvers: string[]): SchoolSettings => ({
   maxGuardians: row.max_guardians,
   requireGuardian: row.require_guardian,
   paymentMethods: paymentMethodsOf(row),
   receiptFooter: row.receipt_footer,
+  approvalRules: approvalRulesOf(row),
+  approvers,
 });
+
+async function mergeRules(
+  trx: Database,
+  who: { organizationId: string; updatedBy: string },
+  change: { current: SettingsRow; patch: Partial<ApprovalRules> }
+): Promise<ApprovalRules> {
+  const merged = { ...approvalRulesOf(change.current), ...change.patch };
+  await trx
+    .updateTable('school_setting')
+    .set({
+      approve_refund: merged.refund,
+      approve_write_off: merged.writeOff,
+      approve_credit_note: merged.creditNote,
+      approve_discount: merged.discount,
+      approve_payment_void: merged.paymentVoid,
+      updated_by: who.updatedBy,
+      updated_at: new Date(),
+    })
+    .where('organization_id', '=', who.organizationId)
+    .execute();
+  return merged;
+}
 
 async function mergeMethods(
   trx: Database,
@@ -60,13 +91,22 @@ export class KyselySchoolSettingsRepository extends SchoolSettingsRepository {
     super();
   }
 
+  private async approvers(organizationId: string): Promise<string[]> {
+    const rows = await this.db
+      .selectFrom('organizationRole')
+      .select(['role', 'label', 'permission'])
+      .where('organizationId', '=', organizationId)
+      .execute();
+    return approverLabels(rows);
+  }
+
   async find(organizationId: string): Promise<SchoolSettings | undefined> {
     const row = await this.db
       .selectFrom('school_setting')
       .select(COLUMNS)
       .where('organization_id', '=', organizationId)
       .executeTakeFirst();
-    return row && toSettings(row);
+    return row && toSettings(row, await this.approvers(organizationId));
   }
 
   async update(
@@ -92,7 +132,25 @@ export class KyselySchoolSettingsRepository extends SchoolSettingsRepository {
       .where('organization_id', '=', organizationId)
       .returning(COLUMNS)
       .executeTakeFirst();
-    return row && toSettings(row);
+    return row && toSettings(row, await this.approvers(organizationId));
+  }
+
+  updateApprovalRules(
+    organizationId: string,
+    patch: Partial<ApprovalRules>,
+    updatedBy: string
+  ): Promise<ApprovalRules | undefined> {
+    return this.db.transaction().execute(async (trx) => {
+      const current = await trx
+        .selectFrom('school_setting')
+        .select(COLUMNS)
+        .where('organization_id', '=', organizationId)
+        .forUpdate()
+        .executeTakeFirst();
+      return current === undefined
+        ? current
+        : mergeRules(trx, { organizationId, updatedBy }, { current, patch });
+    });
   }
 
   updatePaymentMethods(

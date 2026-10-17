@@ -219,6 +219,7 @@ export const RESOURCE_PILLARS: Record<Resource, Pillar> = {
   feeLine: 'Finance',
   invoice: 'Finance',
   payment: 'Finance',
+  adjustment: 'Finance',
   ledger: 'Finance',
   moneyAccount: 'Finance',
   store: 'Finance',
@@ -244,6 +245,7 @@ export const ACTION_WORDS: Record<Action, string> = {
   record: 'record',
   receive: 'receive stock',
   void: 'cancel',
+  approve: 'approve',
 };
 
 export function capabilityLabel(permission: Permission): string {

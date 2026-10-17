@@ -47,7 +47,11 @@ test.describe('dev seed', () => {
                 (SELECT count(*) FROM billing_run WHERE status = 'issued') AS issued_round,
                 (SELECT count(*) FROM invoice WHERE status = 'issued') AS issued_invoice,
                 (SELECT count(*) FROM student_discount WHERE status = 'approved') AS approved_discount,
-                (SELECT count(*) FROM student_discount WHERE status = 'submitted') AS waiting_discount`
+                (SELECT count(*) FROM student_discount WHERE status = 'submitted') AS waiting_discount,
+                (SELECT count(*) FROM payment) AS payment,
+                (SELECT count(*) FROM payment_void WHERE status = 'submitted') AS waiting_void,
+                (SELECT count(*) FROM adjustment WHERE status = 'submitted') AS waiting_adjustment,
+                (SELECT count(*) FROM adjustment WHERE status = 'rejected') AS declined_adjustment`
       );
       return rows[0];
     };
@@ -87,13 +91,17 @@ test.describe('dev seed', () => {
       everyone_announcement: '4',
       ledger_account: '59',
       money_account: '2',
-      journal_entry: '26',
-      journal_line: '162',
+      journal_entry: '27',
+      journal_line: '164',
       fee_line: '84',
       issued_round: '1',
       issued_invoice: '18',
       approved_discount: '3',
       waiting_discount: '1',
+      payment: '1',
+      waiting_void: '1',
+      waiting_adjustment: '1',
+      declined_adjustment: '2',
     });
 
     const scopeOf = async (key: string) => {

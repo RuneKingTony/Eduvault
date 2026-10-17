@@ -22,6 +22,7 @@ import type {
 import { PermissionsProvider } from '@eduvault/auth-client';
 import { TooltipProvider } from '@eduvault/ui';
 import { parseAccountsSearch, parseStatementSearch } from './accounts-search';
+import { parseAdjustmentsSearch } from './adjustments-search';
 import { ApiProvider, type Api } from './api';
 import { parseBillingSearch } from './billing-search';
 import { parseFeesSearch } from './fees-search';
@@ -289,6 +290,9 @@ export function renderPayments(
     ),
   });
   const routes = [
+    ['/approvals', undefined],
+    ['/settings/approvals', undefined],
+    ['/finance/adjustments', parseAdjustmentsSearch],
     ['/finance/payments', parsePaymentsSearch],
     ['/finance/payments/$paymentId', parseReceiptSearch],
     ['/finance/payments/$paymentId/print', undefined],

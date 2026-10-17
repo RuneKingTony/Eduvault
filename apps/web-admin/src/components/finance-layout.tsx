@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react';
 import { Link } from '@tanstack/react-router';
 import { useCan } from '@eduvault/auth-client';
+import { NO_ADJUSTMENT_SEARCH } from '../adjustments-search';
+import { NO_PAYMENT_FILTERS } from '../payments-search';
 
 const TAB =
   'rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground';
@@ -32,6 +34,36 @@ export function FinanceLayout({ children }: { children: ReactNode }) {
               Money categories
             </Link>
           ) : null}
+        </nav>
+      ) : null}
+      {children}
+    </div>
+  );
+}
+
+export function PaymentsLayout({ children }: { children: ReactNode }) {
+  const canSeePayments = useCan('payment', 'read');
+  const canSeeAdjustments = useCan('adjustment', 'read');
+  return (
+    <div className="flex flex-col gap-4">
+      {canSeePayments && canSeeAdjustments ? (
+        <nav aria-label="Payments" className="flex gap-1">
+          <Link
+            to="/finance/payments"
+            search={NO_PAYMENT_FILTERS}
+            className={TAB}
+            activeProps={ACTIVE}
+          >
+            Payments
+          </Link>
+          <Link
+            to="/finance/adjustments"
+            search={NO_ADJUSTMENT_SEARCH}
+            className={TAB}
+            activeProps={ACTIVE}
+          >
+            Discounts and refunds
+          </Link>
         </nav>
       ) : null}
       {children}

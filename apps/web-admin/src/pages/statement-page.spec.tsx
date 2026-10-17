@@ -138,7 +138,7 @@ describe('StatementPage (one child)', () => {
     expect(screen.getByText('CHG-2026-00001 · ₦180,000')).toBeVisible();
   });
 
-  it('shows the credit callout without a button when the student is in credit', async () => {
+  it('shows the credit callout and offers Pay the extra back to someone who can ask for a refund', async () => {
     const base = statement();
     setup({
       statement: statement({
@@ -152,8 +152,32 @@ describe('StatementPage (one child)', () => {
       )
     ).toBeVisible();
     expect(screen.getAllByText('Extra paid').length).toBeGreaterThan(0);
+    const link = screen.getByRole('link', { name: 'Pay the extra back' });
+    const target = new URL(
+      link.getAttribute('href') ?? '',
+      'http://school.test'
+    );
+    expect(target.pathname).toBe('/finance/adjustments');
+    expect(Object.fromEntries(target.searchParams)).toEqual({
+      new: '1',
+      kind: 'refund',
+      student: ADA,
+      amount: '500000',
+    });
+  });
+
+  it('keeps the credit callout but offers no refund to a member who cannot ask for one', async () => {
+    const base = statement();
+    setup({
+      access: starterAccess('principal'),
+      statement: statement({
+        totals: { ...base.totals, balanceMinor: -500_000 },
+        unpaid: [],
+      }),
+    });
+    expect(await screen.findByText(/was paid in extra/)).toBeVisible();
     expect(
-      screen.queryByRole('button', { name: 'Pay the extra back' })
+      screen.queryByRole('link', { name: 'Pay the extra back' })
     ).not.toBeInTheDocument();
   });
 

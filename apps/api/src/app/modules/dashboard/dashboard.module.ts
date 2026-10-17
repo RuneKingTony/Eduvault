@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { EduvaultAuthModule } from '../../common/auth';
+import { ApprovalsModule } from '../approvals/approvals.module';
 import { BillingModule } from '../billing/billing.module';
 import { InvoiceModule } from '../invoice/invoice.module';
 import { MoneyAccountModule } from '../money-account/money-account.module';
@@ -9,6 +10,7 @@ import { StudentModule } from '../student/student.module';
 import { ActivityController } from './activity.controller';
 import { ActivityRepository } from './activity.repository';
 import { ActivityService } from './activity.service';
+import { DashboardApprovalsService } from './dashboard-approvals.service';
 import { DashboardChargesService } from './dashboard-charges.service';
 import { DashboardFinanceController } from './dashboard-finance.controller';
 import { DashboardRollService } from './dashboard-roll.service';
@@ -35,6 +37,7 @@ import { KyselyDashboardRepository } from './kysely-dashboard.repository';
     InvoiceModule,
     StudentAccountModule,
     StoreModule,
+    ApprovalsModule,
   ],
   controllers: [
     DashboardController,
@@ -47,6 +50,7 @@ import { KyselyDashboardRepository } from './kysely-dashboard.repository';
     DashboardMoneyService,
     DashboardChargesService,
     DashboardRollService,
+    DashboardApprovalsService,
     DashboardTasksService,
     DashboardStoreTasksService,
     {
@@ -56,6 +60,7 @@ import { KyselyDashboardRepository } from './kysely-dashboard.repository';
         DashboardService,
         DashboardChargesService,
         DashboardStoreTasksService,
+        DashboardApprovalsService,
       ],
     },
     ActivityService,

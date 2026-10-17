@@ -25,6 +25,7 @@ const built = new Set([
   '/finance/accounts',
   '/finance/payments',
   '/finance/store',
+  '/finance/adjustments',
   '/finance/school-fees',
   '/finance/other-fees',
   '/finance/billing',
@@ -39,6 +40,7 @@ const built = new Set([
   '/roles/new',
   '/settings/profile',
   '/settings/admissions',
+  '/settings/approvals',
   '/settings/payment-rules',
   '/settings/danger',
   '/settings/levels',
@@ -117,6 +119,7 @@ describe('nav model', () => {
     ).toEqual([
       'School profile',
       'Admissions rules',
+      'Approval rules',
       'Payment rules',
       'School years and terms',
       'Campuses',
@@ -146,6 +149,7 @@ describe('settings sections', () => {
     ).toEqual([
       ['School profile', 'General'],
       ['Admissions rules', 'General'],
+      ['Approval rules', 'General'],
       ['Payment rules', 'Finance'],
       ['School years and terms', 'School structure'],
       ['Campuses', 'School structure'],
@@ -159,6 +163,7 @@ describe('settings sections', () => {
     expect(idsFor(everything)).toEqual([
       'profile',
       'admissions',
+      'approvals',
       'payment-rules',
       'calendar',
       'campuses',
@@ -173,6 +178,7 @@ describe('settings sections', () => {
     expect(idsFor(starter('administrator'))).toEqual([
       'profile',
       'admissions',
+      'approvals',
       'payment-rules',
       'calendar',
       'campuses',
@@ -337,6 +343,15 @@ describe('nav gates', () => {
     expect(routeGate('/settings/payment-rules')).toEqual([
       'schoolAccount:read',
     ]);
+    expect(routeGate('/settings/approvals')).toEqual(['schoolAccount:read']);
+    expect(routeGate('/finance/adjustments')).toEqual(['adjustment:read']);
+  });
+
+  it('keeps Payments current on Discounts and refunds', () => {
+    const groups = visibleNav(NAV_GROUPS, built, everything);
+    expect(findCurrent(groups, '/finance/adjustments')?.item.id).toBe(
+      'payments'
+    );
   });
 
   it('hides Staff and members from a bursar and shows it with member:read', () => {

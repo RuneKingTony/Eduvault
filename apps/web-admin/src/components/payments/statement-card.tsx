@@ -6,11 +6,14 @@ import {
   type StatementRow,
   type StudentStatement,
 } from '@eduvault/api-contract';
+import { useCan } from '@eduvault/auth-client';
 import { fmtDate, money } from '@eduvault/shared';
 import {
   Alert,
+  AlertAction,
   AlertDescription,
   Badge,
+  Button,
   Card,
   CardContent,
   CardHeader,
@@ -28,6 +31,7 @@ import {
   TableRow,
   cn,
 } from '@eduvault/ui';
+import { NO_ADJUSTMENT_SEARCH } from '../../adjustments-search';
 import { PersonAvatar } from '../person-avatar';
 import {
   ROW_STATUS_LABELS,
@@ -186,6 +190,37 @@ function CardTitleRow({ statement }: { statement: StudentStatement }) {
   );
 }
 
+function CreditCallout({ statement }: { statement: StudentStatement }) {
+  const canRefund = useCan('adjustment', 'create');
+  const creditMinor = -statement.totals.balanceMinor;
+  return (
+    <Alert className={canRefund ? 'pr-44' : undefined}>
+      <InfoIcon />
+      <AlertDescription>
+        {creditCallout(creditMinor, statement.currency)}
+      </AlertDescription>
+      {canRefund ? (
+        <AlertAction>
+          <Button asChild size="sm" variant="outline">
+            <Link
+              to="/finance/adjustments"
+              search={{
+                ...NO_ADJUSTMENT_SEARCH,
+                new: 1,
+                kind: 'refund',
+                student: statement.student.id,
+                amount: creditMinor,
+              }}
+            >
+              Pay the extra back
+            </Link>
+          </Button>
+        </AlertAction>
+      ) : null}
+    </Alert>
+  );
+}
+
 export function StatementCard({
   statement,
   onPage,
@@ -203,12 +238,7 @@ export function StatementCard({
         <div className="flex flex-col gap-4 px-6">
           <MoneyTiles statement={statement} />
           {totals.balanceMinor < 0 ? (
-            <Alert>
-              <InfoIcon />
-              <AlertDescription>
-                {creditCallout(-totals.balanceMinor, statement.currency)}
-              </AlertDescription>
-            </Alert>
+            <CreditCallout statement={statement} />
           ) : null}
         </div>
         {statement.rows.length === 0 ? (

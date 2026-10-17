@@ -85,7 +85,6 @@ function discountRows(
     .where('d.organization_id', '=', organizationId)
     .where('d.student_id', 'in', [...studentIds])
     .where('d.status', 'in', ['submitted', 'approved'])
-    .where('d.ended_at', 'is', null)
     .execute();
 }
 

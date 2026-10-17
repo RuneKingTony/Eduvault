@@ -29,6 +29,17 @@ describe('dashboardTaskSchema', () => {
     { kind: 'announcementDrafts', count: 2, titles: ['PTA', 'Sports day'] },
     { kind: 'lowStock', count: 4, names: ['Tie', 'School shirt, Size 12'] },
     { kind: 'noRole', memberId: id(1), name: 'Ada Obi' },
+    {
+      kind: 'approvalsWaiting',
+      count: 2,
+      items: [
+        {
+          label: 'Cancel a payment',
+          details: 'RCT-2026-00098 from Mrs Danjuma',
+        },
+        { label: 'Cancel a balance', details: 'Bola: Left the school' },
+      ],
+    },
   ])('parses a $kind task', (task) => {
     expect(dashboardTaskSchema.parse(task)).toEqual(task);
   });
@@ -36,6 +47,17 @@ describe('dashboardTaskSchema', () => {
   it('rejects an unknown kind', () => {
     expect(
       dashboardTaskSchema.safeParse({ kind: 'owed', count: 1 }).success
+    ).toBe(false);
+  });
+
+  it('rejects more than two approval items in the task', () => {
+    const item = { label: 'Refund', details: 'Ada: Overpaid' };
+    expect(
+      dashboardTaskSchema.safeParse({
+        kind: 'approvalsWaiting',
+        count: 3,
+        items: [item, item, item],
+      }).success
     ).toBe(false);
   });
 
