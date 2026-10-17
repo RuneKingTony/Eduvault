@@ -2,6 +2,7 @@ import type { ComponentPropsWithoutRef } from 'react';
 import { Link } from '@tanstack/react-router';
 import type { BillingSearch } from '../../billing-search';
 import { searchFor } from '../../route-search-defaults';
+import type { StoreSearch } from '../../store-search';
 import type { StudentsSearch } from '../../students-search';
 
 export type TaskTarget =
@@ -12,7 +13,8 @@ export type TaskTarget =
   | { to: '/classes/$classId'; params: { classId: string } }
   | { to: '/members/$memberId'; params: { memberId: string } }
   | { to: '/finance/billing'; search?: BillingSearch }
-  | { to: '/finance/billing/$runId'; params: { runId: string } };
+  | { to: '/finance/billing/$runId'; params: { runId: string } }
+  | { to: '/finance/store'; search?: StoreSearch };
 
 type AnchorProps = Omit<ComponentPropsWithoutRef<'a'>, 'href'>;
 
@@ -47,6 +49,9 @@ export function TargetLink({
           {...props}
         />
       );
+    }
+    case '/finance/store': {
+      return <Link to="/finance/store" search={dest.search} {...props} />;
     }
     case '/finance/billing/$runId': {
       return (

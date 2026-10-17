@@ -14,6 +14,7 @@ export const statements = {
   announcement: ['create', 'read', 'update'],
   ledger: ['read', 'manageAccounts'],
   moneyAccount: ['create', 'read', 'update'],
+  store: ['read', 'receive'],
   subject: ['create', 'read', 'update'],
   member: ['create', 'read', 'update', 'delete'],
   ac: ['create', 'read', 'update', 'delete'],
@@ -106,6 +107,10 @@ export const PERM_HELP: Partial<Record<Permission, string>> = {
   'payment:read': 'Sees payments and receipts, and who owes what.',
   'payment:void':
     'Asks for a recorded payment to be cancelled. A second person approves it.',
+  'store:read':
+    'Sees the store: items, stock on hand and deliveries, on the campuses they see.',
+  'store:receive':
+    'Adds items, edits prices and records deliveries and opening stock, on the campuses they see.',
 };
 
 const RESOURCE_LABELS: Record<Resource, string> = {
@@ -124,6 +129,7 @@ const RESOURCE_LABELS: Record<Resource, string> = {
   announcement: 'Announcements',
   ledger: 'Money categories',
   moneyAccount: 'Bank and POS accounts',
+  store: 'Store',
   subject: 'Subjects',
   member: 'Staff',
   ac: 'Roles',

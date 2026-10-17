@@ -14,8 +14,9 @@ const TASK_ORDER: Record<DashboardTask['kind'], number> = {
   notSeen: 4,
   notInClass: 5,
   noClassTeacher: 6,
-  noRole: 7,
-  announcementDrafts: 8,
+  lowStock: 7,
+  noRole: 8,
+  announcementDrafts: 9,
 };
 
 export function orderTasks(tasks: DashboardTask[]): DashboardTask[] {

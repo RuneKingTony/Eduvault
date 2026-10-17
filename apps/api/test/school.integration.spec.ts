@@ -7,6 +7,7 @@ import {
 } from './support/base-test';
 import { createSchoolYear } from './support/factories/calendar';
 import { assignClassTeacher, createClass } from './support/factories/classes';
+import { createItem } from './support/factories/store';
 import { schoolsTest } from './support/two-schools';
 
 const test = schoolsTest;
@@ -390,6 +391,11 @@ test.describe('deleting the school', () => {
       classId: arm.id,
       userId: teacher.id,
     });
+    const item = await createItem(api, doomedOwner);
+    await api(doomedOwner)
+      .patch(`/store/items/${item.id}`)
+      .send({ costPriceMinor: 360_000 })
+      .expect(200);
 
     const res = await api(doomedOwner)
       .delete('/school')
@@ -409,6 +415,9 @@ test.describe('deleting the school', () => {
       ['class_arm', 'organization_id'],
       ['class_arm_teacher', 'organization_id'],
       ['academic_session', 'organization_id'],
+      ['store', 'organization_id'],
+      ['item', 'organization_id'],
+      ['item_price_change', 'organization_id'],
     ]) {
       const { rows } = await pool.query(
         `SELECT 1 FROM ${table} WHERE ${column} = $1`,

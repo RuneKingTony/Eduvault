@@ -113,6 +113,16 @@ describe('statements', () => {
     expect(PERM_HELP['ledger:manageAccounts']).toBeDefined();
   });
 
+  it('has the store resource with no sensitive action', () => {
+    expect(ALL_PERMISSIONS).toEqual(
+      expect.arrayContaining(['store:read', 'store:receive'])
+    );
+    expect(SENSITIVE.filter((item) => item.startsWith('store:'))).toEqual([]);
+    expect(permLabel('store:receive')).toBe('Store: receive');
+    expect(PERM_HELP['store:read']).toBeDefined();
+    expect(PERM_HELP['store:receive']).toBeDefined();
+  });
+
   it('has the subject resource with no sensitive action', () => {
     expect(ALL_PERMISSIONS).toEqual(
       expect.arrayContaining([

@@ -24,6 +24,7 @@ import { OwedStat } from '../components/dashboard/owed-stat';
 import { ReceivedStat } from '../components/dashboard/received-stat';
 import { RollCard, StudentsStat } from '../components/dashboard/roll-card';
 import { SchoolAccountCard } from '../components/dashboard/school-account-card';
+import { StoreCard } from '../components/dashboard/store-card';
 import {
   MyClassesStat,
   MyStudentsStat,
@@ -110,6 +111,7 @@ function StaffDashboard() {
   const term = useTermState();
   const canReadStudents = useCan('student', 'read');
   const canReadMoney = useCan('moneyAccount', 'read');
+  const canReadStore = useCan('store', 'read');
   return (
     <section className="flex flex-col gap-4">
       <DashboardHeader />
@@ -122,6 +124,7 @@ function StaffDashboard() {
         </div>
         <div className="flex flex-col gap-4">
           {canReadMoney ? <SchoolAccountCard /> : null}
+          {canReadStore ? <StoreCard /> : null}
           {term === 'missing' ? null : <TermSlot today={today} />}
         </div>
       </div>

@@ -145,14 +145,14 @@ Definitions behind each count are in [Business rules](#business-rules) R10–R19
 #### Card: Store
 
 - Shown with `store:read`. Title "Store", icon store, action "Store" → Store. Content and the Show costs masking of profit and stock value are owned by [61-store](61-store.md) ("Dashboard surfaces", STO-12). These figures are the only place store sales count on the dashboard ([D-026](../technical-reference.md#decision-log)).
-- Four tiles:
+- Four tiles. M4.3 ships Stock value and its Show costs masking; the three sales tiles follow in M4.4:
 
-  | Tile             | Value                                             | Sub-line              |
-  | ---------------- | ------------------------------------------------- | --------------------- |
-  | Sold this term   | sum of store sales this term on campuses in scope | "{n} students served" |
-  | Profit this term | sales minus cost                                  | "Sales minus cost"    |
-  | Items sold       | sum of quantities sold this term                  | "This term"           |
-  | Stock value      | stock on hand × cost price on campuses in scope   | "At cost price"       |
+  | Tile             | Value                                                                                                     | Sub-line              |
+  | ---------------- | --------------------------------------------------------------------------------------------------------- | --------------------- |
+  | Sold this term   | sum of store sales this term on campuses in scope                                                         | "{n} students served" |
+  | Profit this term | sales minus cost                                                                                          | "Sales minus cost"    |
+  | Items sold       | sum of quantities sold this term                                                                          | "This term"           |
+  | Stock value      | sum of stock value at average cost on campuses in scope ([D-239](../technical-reference.md#decision-log)) | "At cost"             |
 
 #### Card: School account
 
@@ -210,7 +210,7 @@ Tasks
 14. **R14 (T5)** Active students with a "not seen since" date (not yet inactive).
 15. **R15 (T6)** Active students with no placement in the current term. When any of them has no enrolment in the current school year and the "Start new school year" action in [40-students](40-students.md#start-new-school-year-dialog) is offered, the button reads "Start {year}" and opens Students with that dialog open (gate `enrollment:place`, [D-029](../technical-reference.md#decision-log)). Otherwise the button is "Open".
 16. **R16 (T7)** Arms not archived, on a campus in scope, with at least one student placed this term and no class teacher for the current session.
-17. **R17 (T8)** Store items whose stock state is low or out on the campuses in scope ([inventory](../brainstorming/data-model-inventory.md#items-and-stores)).
+17. **R17 (T8)** Store items whose stock state is low or out on the campuses in scope ([inventory](../brainstorming/data-model-inventory.md#items-and-stores)). Retired items don't count. Shown to `store:receive` holders; the count is of items and the names are the first three display names.
 18. **R18 (T9)** One task per member whose only role is `member`, limited to members on a campus in scope (see gaps).
 19. **R19 (T10)** Announcement drafts whose audience is in campus scope (everyone, or a campus in scope).
 20. **R20** Student-based counts for a member without a finance permission use the visible student set: campus scope, then class scope when it binds. Tasks T4–T6 use the same set.
@@ -248,7 +248,7 @@ All under the `dashboard` module unless noted. "Member of the active school" rou
 | GET    | `/dashboard/roll`       | `student:read`                                                                                   | —       | `{ active, newIntakes, inactive, dueLeft, left, leftThisTerm, graduated, campusNames, currency?, owedMinor?: { active, newIntakes, inactive, left, graduated }, formerOwedMinor? }` (flat, [D-229](../technical-reference.md#decision-log)); the three finance keys only with `invoice:read` or `payment:read`                   | 403    |
 | GET    | `/dashboard/finance`    | `invoice:read` or `payment:read` (any-of guard, [D-012](../technical-reference.md#decision-log)) | —       | `{ currency, receivedMinor?, paymentCount?, owedMinor, owingStudents }` or `null` with no current term: `received*` only with `payment:read`; the charged figure stays on `GET /dashboard/charged` (`invoice:read`); reuses the Who owes queries ([D-228](../technical-reference.md#decision-log)); store sales excluded (D-026) | 403    |
 | GET    | `/dashboard/my-classes` | `class:read`                                                                                     | —       | `[{ armId, name, campusName, studentCount, isClassTeacher, subjects: [name], sampleStudents: [{id, name}] }]`                                                                                                                                                                                                                    | 403    |
-| GET    | `/dashboard/store`      | `store:read`                                                                                     | —       | `{ soldMinor, salesCount, profitMinor, itemsSold, stockValueMinor }`                                                                                                                                                                                                                                                             | 403    |
+| GET    | `/dashboard/store`      | `store:read`                                                                                     | —       | `{ stockValueMinor }` in M4.3 (sum of `value_minor` in scope); M4.4 adds `soldMinor`, `salesCount`, `profitMinor`, `itemsSold`                                                                                                                                                                                                   | 403    |
 | GET    | `/dashboard/money`      | `moneyAccount:read`                                                                              | —       | `{ totalMinor, accounts: [{id, name, kind, campusName?, last4?, balanceMinor}], hiddenSchoolWide }`                                                                                                                                                                                                                              | 403    |
 | GET    | `/activity`             | member of active school                                                                          | `?page` | `{ items: [{occurredAt, pillar, text}], total }`, filtered per R26                                                                                                                                                                                                                                                               | —      |
 

@@ -3,6 +3,7 @@ import type { CampusScope } from '../../common/campus-scope';
 
 export interface NewCampus {
   id: string;
+  name: string;
   address: string | null;
 }
 

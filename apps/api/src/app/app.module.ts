@@ -30,6 +30,7 @@ import { RolesModule } from './modules/roles/roles.module';
 import { PlatformModule } from './modules/platform/platform.module';
 import { SchoolAccountModule } from './modules/school-account/school-account.module';
 import { SchoolModule } from './modules/school/school.module';
+import { StoreModule } from './modules/store/store.module';
 import { StudentAccountModule } from './modules/student-account/student-account.module';
 import { StudentModule } from './modules/student/student.module';
 import { SubjectModule } from './modules/subject/subject.module';
@@ -64,6 +65,7 @@ import { SubjectModule } from './modules/subject/subject.module';
     InvoiceModule,
     BillingModule,
     PaymentModule,
+    StoreModule,
     StudentAccountModule,
   ],
 })

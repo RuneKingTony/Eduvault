@@ -1,10 +1,23 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { expect } from './support/base-test';
 import { createAnnouncement } from './support/factories/announcements';
 import { createClass } from './support/factories/classes';
 import { createFeeLine, feeFixture } from './support/factories/fees';
+import { bankAccount } from './support/factories/payments';
+import { createItem, openStock, receive } from './support/factories/store';
 import { schoolsTest } from './support/two-schools';
 
 const test = schoolsTest;
+
+const storesOf = async (
+  pool: {
+    query: (sql: string, values: string[]) => Promise<{ rows: unknown[] }>;
+  },
+  campusId: string
+) =>
+  (await pool.query('SELECT name FROM store WHERE campus_id = $1', [campusId]))
+    .rows;
 
 const names = (rows: { name: string }[]) => rows.map((row) => row.name);
 
@@ -185,6 +198,62 @@ test.describe('creating a campus', () => {
   });
 });
 
+test.describe('a campus store', () => {
+  test('is created with every new campus, named after it', async ({
+    api,
+    pool,
+    schools: { owner },
+  }) => {
+    const res = await api(owner)
+      .post('/campuses')
+      .send({ name: 'Ajah' })
+      .expect(201);
+
+    expect(await storesOf(pool, res.body.id)).toEqual([
+      { name: 'Ajah campus store' },
+    ]);
+  });
+
+  test('is given to a campus that had none by the migration backfill', async ({
+    pool,
+    schools: { lekki, ikeja },
+  }) => {
+    await pool.query('DELETE FROM store');
+    const migration = readFileSync(
+      join(
+        import.meta.dirname,
+        '../db/migrations/20261017090200_create_store_items_and_deliveries.sql'
+      ),
+      'utf8'
+    );
+    const backfill = /INSERT INTO store[^;]*;/.exec(migration)?.[0];
+
+    await pool.query(backfill ?? 'SELECT 1/0');
+
+    expect(await storesOf(pool, lekki.id)).toEqual([
+      { name: 'Lekki campus store' },
+    ]);
+    expect(await storesOf(pool, ikeja.id)).toEqual([
+      { name: 'Ikeja campus store' },
+    ]);
+  });
+
+  test('keeps the name it was given when the campus is renamed', async ({
+    api,
+    pool,
+    schools: { owner, lekki },
+  }) => {
+    await api(owner)
+      .patch(`/campuses/${lekki.id}`)
+      .send({ name: 'Lekki Phase 1' })
+      .expect(200);
+
+    expect(await storesOf(pool, lekki.id)).toEqual([
+      { name: 'Lekki campus store' },
+    ]);
+  });
+});
+
 test.describe('deleting a campus', () => {
   test('answers 409 while a student references it and keeps the team', async ({
     api,
@@ -266,5 +335,59 @@ test.describe('deleting a campus', () => {
 
     await api(owner).delete(`/campuses/${annex.id}`).expect(200);
     await api(owner).get(`/campuses/${annex.id}`).expect(404);
+  });
+
+  test('removes a campus with only an empty store, and the store goes with it', async ({
+    api,
+    createCampus,
+    pool,
+    schools: { owner, orgA },
+  }) => {
+    const annex = await createCampus(orgA, 'Annex');
+    const before = await pool.query(
+      'SELECT 1 FROM store WHERE campus_id = $1',
+      [annex.id]
+    );
+    expect(before.rows).toHaveLength(1);
+
+    await api(owner).delete(`/campuses/${annex.id}`).expect(200);
+
+    const after = await pool.query('SELECT 1 FROM store WHERE campus_id = $1', [
+      annex.id,
+    ]);
+    expect(after.rows).toHaveLength(0);
+  });
+
+  test('answers 409 while its store has a delivery and keeps the team and the store', async ({
+    api,
+    app,
+    createCampus,
+    pool,
+    schools: { owner, orgA },
+  }) => {
+    const annex = await createCampus(orgA, 'Annex');
+    const shirt = await createItem(api, owner);
+    await openStock(api, owner, {
+      campusId: annex.id,
+      lines: [{ itemId: shirt.id, quantity: 4, unitCostMinor: 350_000 }],
+    });
+    const bank = await bankAccount(app, owner);
+    await receive(api, owner, {
+      campusId: annex.id,
+      accountId: bank.id,
+      lines: [{ itemId: shirt.id, quantity: 2, unitCostMinor: 350_000 }],
+    });
+
+    const res = await api(owner).delete(`/campuses/${annex.id}`).expect(409);
+
+    expect(res.body.message).toBe(
+      'This campus still has classes, students or money records, so it can’t be deleted.'
+    );
+    await api(owner).get(`/campuses/${annex.id}`).expect(200);
+    const stores = await pool.query(
+      'SELECT 1 FROM store WHERE campus_id = $1',
+      [annex.id]
+    );
+    expect(stores.rows).toHaveLength(1);
   });
 });

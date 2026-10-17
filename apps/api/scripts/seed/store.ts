@@ -1,0 +1,319 @@
+import type { INestApplicationContext } from '@nestjs/common';
+import {
+  OPENING_STOCK_SUPPLIER,
+  itemDisplayName,
+  type RecordDelivery,
+} from '@eduvault/api-contract';
+import type { OrgContext } from '../../src/app/common/auth';
+import { Clock } from '../../src/app/common/clock';
+import { KYSELY_TOKEN, type Database } from '../../src/app/common/db/tokens';
+import { DeliveryService } from '../../src/app/modules/store/delivery.service';
+import { ItemService } from '../../src/app/modules/store/item.service';
+import { shiftDate } from './date-shift';
+
+type SeedCampus = 'Lekki' | 'Ikeja';
+
+interface SeedUniform {
+  name: string;
+  sizes: readonly string[];
+  costMinor: number;
+  priceMinor: number;
+  lowLevel: number;
+}
+
+interface SeedBook {
+  name: string;
+  level: string;
+  costMinor: number;
+  priceMinor: number;
+}
+
+const UNIFORM_SIZES = ['Size 10', 'Size 12', 'Size 14', 'Size 16'];
+
+const SEED_UNIFORMS: readonly SeedUniform[] = [
+  {
+    name: 'School shirt',
+    sizes: UNIFORM_SIZES,
+    costMinor: 350_000,
+    priceMinor: 450_000,
+    lowLevel: 5,
+  },
+  {
+    name: 'School trousers',
+    sizes: UNIFORM_SIZES,
+    costMinor: 500_000,
+    priceMinor: 650_000,
+    lowLevel: 5,
+  },
+  {
+    name: 'Pinafore',
+    sizes: UNIFORM_SIZES,
+    costMinor: 550_000,
+    priceMinor: 700_000,
+    lowLevel: 5,
+  },
+  {
+    name: 'Sportswear set',
+    sizes: ['Small', 'Medium', 'Large'],
+    costMinor: 600_000,
+    priceMinor: 800_000,
+    lowLevel: 5,
+  },
+  {
+    name: 'School tie',
+    sizes: [],
+    costMinor: 120_000,
+    priceMinor: 180_000,
+    lowLevel: 10,
+  },
+];
+
+const SEED_BOOKS: readonly SeedBook[] = [
+  {
+    name: 'Mathematics',
+    level: 'JSS1',
+    costMinor: 250_000,
+    priceMinor: 320_000,
+  },
+  {
+    name: 'English Language',
+    level: 'JSS1',
+    costMinor: 230_000,
+    priceMinor: 300_000,
+  },
+  {
+    name: 'Basic Science',
+    level: 'JSS1',
+    costMinor: 260_000,
+    priceMinor: 340_000,
+  },
+  {
+    name: 'Mathematics',
+    level: 'JSS2',
+    costMinor: 270_000,
+    priceMinor: 350_000,
+  },
+  {
+    name: 'English Language',
+    level: 'JSS2',
+    costMinor: 240_000,
+    priceMinor: 310_000,
+  },
+  {
+    name: 'Basic Technology',
+    level: 'JSS2',
+    costMinor: 280_000,
+    priceMinor: 360_000,
+  },
+  {
+    name: 'Mathematics',
+    level: 'JSS3',
+    costMinor: 290_000,
+    priceMinor: 370_000,
+  },
+  {
+    name: 'English Language',
+    level: 'JSS3',
+    costMinor: 250_000,
+    priceMinor: 320_000,
+  },
+  {
+    name: 'Business Studies',
+    level: 'JSS3',
+    costMinor: 300_000,
+    priceMinor: 390_000,
+  },
+  {
+    name: 'Mathematics',
+    level: 'SS1',
+    costMinor: 320_000,
+    priceMinor: 420_000,
+  },
+  {
+    name: 'English Language',
+    level: 'SS1',
+    costMinor: 280_000,
+    priceMinor: 360_000,
+  },
+];
+
+const OPENING_ON = '2026-09-01';
+const DELIVERED_ON = '2026-09-21';
+const SUPPLIER = 'Adebayo Uniforms Ltd';
+const PAID_FROM = 'GTBank current';
+
+const IKEJA_LOW = 'School shirt, Size 14';
+const IKEJA_OUT = 'Pinafore, Size 16';
+const IKEJA_LOW_QUANTITY = 3;
+
+const SEED_DELIVERY_LINES: readonly {
+  displayName: string;
+  quantity: number;
+}[] = [
+  { displayName: 'School shirt, Size 12', quantity: 20 },
+  { displayName: 'School shirt, Size 14', quantity: 20 },
+  { displayName: 'School trousers, Size 12', quantity: 10 },
+];
+
+export const SEED_STORE_ENTRIES = 3;
+
+interface StoreSeed {
+  owner: OrgContext;
+  campusIds: Map<string, string>;
+  school: string;
+  today: string;
+  offsetDays: number;
+}
+
+interface Stocked {
+  id: string;
+  displayName: string;
+  costMinor: number;
+}
+
+function openingQuantity(index: number, campus: SeedCampus): number {
+  return campus === 'Lekki' ? 20 + (index % 5) * 4 : 12 + (index % 4) * 3;
+}
+
+async function levelIds(
+  db: Database,
+  organizationId: string
+): Promise<Map<string, string>> {
+  const rows = await db
+    .selectFrom('class_level')
+    .select(['id', 'code'])
+    .where('organization_id', '=', organizationId)
+    .execute();
+  return new Map(rows.map((row) => [row.code, row.id]));
+}
+
+async function createItems(
+  app: INestApplicationContext,
+  owner: OrgContext
+): Promise<Stocked[]> {
+  const items = app.get(ItemService, { strict: false });
+  const db = app.get<Database>(KYSELY_TOKEN, { strict: false });
+  const levels = await levelIds(db, owner.organizationId);
+  const stocked: Stocked[] = [];
+  for (const uniform of SEED_UNIFORMS) {
+    for (const size of uniform.sizes.length === 0 ? [null] : uniform.sizes) {
+      const created = await items.create(owner, {
+        kind: 'uniform',
+        name: uniform.name,
+        variant: size,
+        classLevelId: null,
+        costPriceMinor: uniform.costMinor,
+        sellPriceMinor: uniform.priceMinor,
+        lowStockLevel: uniform.lowLevel,
+      });
+      stocked.push({
+        id: created.id,
+        displayName: created.displayName,
+        costMinor: uniform.costMinor,
+      });
+    }
+  }
+  for (const book of SEED_BOOKS) {
+    const classLevelId = levels.get(book.level);
+    if (classLevelId === undefined) {
+      throw new Error(`Seed has no class level ${book.level}`);
+    }
+    const created = await items.create(owner, {
+      kind: 'book',
+      name: book.name,
+      variant: null,
+      classLevelId,
+      costPriceMinor: book.costMinor,
+      sellPriceMinor: book.priceMinor,
+      lowStockLevel: 5,
+    });
+    stocked.push({
+      id: created.id,
+      displayName: `${itemDisplayName(created)} (${book.level})`,
+      costMinor: book.costMinor,
+    });
+  }
+  return stocked;
+}
+
+function openingLines(
+  stocked: readonly Stocked[],
+  campus: SeedCampus
+): RecordDelivery['lines'] {
+  return stocked.flatMap((item, index) => {
+    if (campus === 'Ikeja' && item.displayName === IKEJA_OUT) {
+      return [];
+    }
+    const quantity =
+      campus === 'Ikeja' && item.displayName === IKEJA_LOW
+        ? IKEJA_LOW_QUANTITY
+        : openingQuantity(index, campus);
+    return [{ itemId: item.id, quantity, unitCostMinor: item.costMinor }];
+  });
+}
+
+async function moneyAccountId(
+  db: Database,
+  organizationId: string,
+  name: string
+): Promise<string> {
+  const row = await db
+    .selectFrom('money_account')
+    .select('id')
+    .where('organization_id', '=', organizationId)
+    .where('name', '=', name)
+    .executeTakeFirstOrThrow();
+  return row.id;
+}
+
+export async function seedStore(
+  app: INestApplicationContext,
+  { owner, campusIds, school, today, offsetDays }: StoreSeed
+) {
+  const clock = app.get(Clock, { strict: false });
+  clock.set(today);
+  try {
+    const stocked = await createItems(app, owner);
+    const deliveries = app.get(DeliveryService, { strict: false });
+    const campusId = (campus: SeedCampus): string => {
+      const found = campusIds.get(`${school}/${campus}`);
+      if (found === undefined) {
+        throw new Error(`Seed has no campus ${campus}`);
+      }
+      return found;
+    };
+    for (const campus of ['Lekki', 'Ikeja'] as const) {
+      await deliveries.record(owner, {
+        reference: `SEED-OPENING-${campus.toUpperCase()}`,
+        campusId: campusId(campus),
+        supplierName: OPENING_STOCK_SUPPLIER,
+        isOpening: true,
+        receivedOn: shiftDate(OPENING_ON, offsetDays),
+        lines: openingLines(stocked, campus),
+      });
+    }
+    const db = app.get<Database>(KYSELY_TOKEN, { strict: false });
+    await deliveries.record(owner, {
+      reference: 'SEED-DELIVERY-0001',
+      campusId: campusId('Lekki'),
+      supplierName: SUPPLIER,
+      moneyAccountId: await moneyAccountId(db, owner.organizationId, PAID_FROM),
+      receivedOn: shiftDate(DELIVERED_ON, offsetDays),
+      lines: SEED_DELIVERY_LINES.map((line) => {
+        const item = stocked.find(
+          (candidate) => candidate.displayName === line.displayName
+        );
+        if (item === undefined) {
+          throw new Error(`Seed has no item ${line.displayName}`);
+        }
+        return {
+          itemId: item.id,
+          quantity: line.quantity,
+          unitCostMinor: item.costMinor,
+        };
+      }),
+    });
+  } finally {
+    clock.set(null);
+  }
+}

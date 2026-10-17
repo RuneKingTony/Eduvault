@@ -24,6 +24,7 @@ const built = new Set([
   '/members',
   '/finance/accounts',
   '/finance/payments',
+  '/finance/store',
   '/finance/school-fees',
   '/finance/other-fees',
   '/finance/billing',
@@ -90,6 +91,7 @@ describe('nav model', () => {
       '/subjects',
       '/finance/accounts',
       '/finance/payments',
+      '/finance/store',
       '/finance/money-accounts',
       '/settings/profile',
     ]);
@@ -305,6 +307,18 @@ describe('nav gates', () => {
     );
     expect(fees(toPermissionMap(['invoice:bill']))).toBe('/finance/billing');
     expect(fees(starter('teacher'))).toBeUndefined();
+  });
+
+  it('shows Store only with store:read', () => {
+    for (const slug of ['bursar', 'administrator', 'principal']) {
+      expect(routesFor(starter(slug))).toContain('/finance/store');
+    }
+    expect(routesFor(starter('teacher'))).not.toContain('/finance/store');
+    expect(routesFor(toPermissionMap([]))).not.toContain('/finance/store');
+    expect(routesFor(toPermissionMap(['store:receive']))).not.toContain(
+      '/finance/store'
+    );
+    expect(routeGate('/finance/store')).toEqual(['store:read']);
   });
 
   it('shows Payments only with payment:read', () => {

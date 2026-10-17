@@ -1,4 +1,5 @@
 import type { INestApplicationContext } from '@nestjs/common';
+import { sql } from 'kysely';
 import { KYSELY_TOKEN, type Database } from '../../src/app/common/db/tokens';
 import { AnnouncementService } from '../../src/app/modules/announcement/announcement.service';
 import { CalendarService } from '../../src/app/modules/calendar/calendar.service';
@@ -23,6 +24,7 @@ import {
   SEED_OPENING_BALANCES,
 } from './finance';
 import { shiftDate } from './date-shift';
+import { SEED_STORE_ENTRIES } from './store';
 import {
   CURRENT_SUBJECT_TEACHERS,
   RETIRED_SUBJECT,
@@ -475,6 +477,8 @@ async function checkFinance(app: INestApplicationContext, check: Check) {
   const balanceOf = (code: number) =>
     chart.items.find((item) => item.code === code)?.balanceMinor;
   const charges = await checkCharges(app, funmi, check);
+  const db = app.get<Database>(KYSELY_TOKEN, { strict: false });
+  const openingStock = await openingStockMinor(db, funmi.organizationId);
   check(
     'fees owed to the school',
     balanceOf(1100) ?? 'missing',
@@ -483,7 +487,7 @@ async function checkFinance(app: INestApplicationContext, check: Check) {
   check(
     'opening balance',
     balanceOf(3000) ?? 'missing',
-    OPENING_DEBT_MINOR - OPENING_CREDIT_MINOR
+    OPENING_DEBT_MINOR - OPENING_CREDIT_MINOR + openingStock
   );
   check('fee income', balanceOf(4000) ?? 'missing', charges.feesMinor);
   check('discounts given', balanceOf(5000) ?? 'missing', charges.discountMinor);
@@ -491,8 +495,79 @@ async function checkFinance(app: INestApplicationContext, check: Check) {
   check(
     'journal entries',
     journal.total,
-    SEED_OPENING_BALANCES.length + charges.sentCount
+    SEED_OPENING_BALANCES.length + charges.sentCount + SEED_STORE_ENTRIES
   );
+}
+
+async function openingStockMinor(
+  db: Database,
+  organizationId: string
+): Promise<number> {
+  const row = await db
+    .selectFrom('stock_movement')
+    .select(sql<string>`coalesce(sum(value_minor), 0)`.as('total'))
+    .where('organization_id', '=', organizationId)
+    .where('kind', '=', 'opening')
+    .executeTakeFirstOrThrow();
+  return Number(row.total);
+}
+
+async function checkStore(db: Database, check: Check) {
+  const campuses = await db
+    .selectFrom('campus')
+    .select(['team_id', 'organization_id'])
+    .execute();
+  const stores = await db
+    .selectFrom('store')
+    .select(['campus_id', sql<string>`count(*)`.as('total')])
+    .groupBy('campus_id')
+    .execute();
+  const perCampus = new Map(stores.map((row) => [row.campus_id, row.total]));
+  for (const campus of campuses) {
+    check(
+      `store of campus ${campus.team_id}`,
+      perCampus.get(campus.team_id) ?? '0',
+      '1'
+    );
+  }
+  const stock = await db
+    .selectFrom('stock_movement')
+    .innerJoin('store', 'store.id', 'stock_movement.store_id')
+    .select([
+      'store.campus_id',
+      sql<string>`sum(stock_movement.value_minor)`.as('total'),
+    ])
+    .groupBy('store.campus_id')
+    .execute();
+  const ledger = await db
+    .selectFrom('journal_line')
+    .innerJoin('ledger_account', (join) =>
+      join
+        .onRef('ledger_account.id', '=', 'journal_line.ledger_account_id')
+        .onRef(
+          'ledger_account.organization_id',
+          '=',
+          'journal_line.organization_id'
+        )
+    )
+    .select([
+      'journal_line.campus_id',
+      sql<string>`sum(journal_line.debit_minor - journal_line.credit_minor)`.as(
+        'total'
+      ),
+    ])
+    .where('ledger_account.code', '=', 1300)
+    .groupBy('journal_line.campus_id')
+    .execute();
+  const ledgerOf = new Map(ledger.map((row) => [row.campus_id, row.total]));
+  check('campuses with stock', stock.length, 2);
+  for (const row of stock) {
+    check(
+      `Store stock (1300) of campus ${row.campus_id}`,
+      ledgerOf.get(row.campus_id) ?? '0',
+      row.total
+    );
+  }
 }
 
 type OwnerContext = Awaited<ReturnType<typeof orgContextFor>>;
@@ -634,6 +709,7 @@ export async function runSeedCheck(
   await checkStudents(app, db, check);
   await checkAnnouncements(app, check);
   await checkFinance(app, check);
+  await checkStore(db, check);
 
   for (const [key, expected] of Object.entries(visibleStudents)) {
     const ctx = await orgContextFor(app, emailOf(key));

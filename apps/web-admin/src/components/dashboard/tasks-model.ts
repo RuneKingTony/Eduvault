@@ -157,6 +157,16 @@ const notCharged = (task: Counted<'notCharged'>): TaskRow => ({
   extra: null,
 });
 
+const lowStock = (task: Counted<'lowStock'>): TaskRow => ({
+  key: task.kind,
+  kind: task.kind,
+  tone: 'default',
+  title: `${countOf(task.count, 'store item', 'store items')} running low`,
+  subline: listed(task.names, task.count),
+  action: { label: 'Store', target: { to: '/finance/store' } },
+  extra: null,
+});
+
 const noRole = (task: Counted<'noRole'>): TaskRow => ({
   key: `${task.kind}-${task.memberId}`,
   kind: task.kind,
@@ -193,6 +203,9 @@ export function taskRow(task: DashboardTask): TaskRow {
     }
     case 'notCharged': {
       return notCharged(task);
+    }
+    case 'lowStock': {
+      return lowStock(task);
     }
     case 'noRole': {
       return noRole(task);
