@@ -11,6 +11,9 @@ import type {
   PortalFamilyStatement,
   PortalMe,
   PortalStatement,
+  PortalPriceList,
+  PortalPurchase,
+  PortalPurchases,
   PortalStudent,
 } from '@eduvault/api-contract';
 import { PermissionsProvider } from '@eduvault/auth-client';
@@ -67,6 +70,71 @@ export const portalAnnouncements = (
 export const portalAnnouncementList = (
   overrides: Partial<PortalAnnouncementList> = {}
 ): PortalAnnouncementList => ({ items: [], total: 0, ...overrides });
+
+export const portalPurchase = (
+  overrides: Partial<PortalPurchase> = {}
+): PortalPurchase => ({
+  id: '6c0f1e1e-6e53-4c52-9f1c-0a1d7a7f9c21',
+  date: '2026-09-08',
+  campusName: 'Lekki',
+  receiptNumber: 'RCT-2026-00012',
+  method: 'pos',
+  totalMinor: 1_300_000,
+  lines: [
+    {
+      itemName: 'School shirt, Size 12',
+      quantity: 2,
+      unitPriceMinor: 450_000,
+      amountMinor: 900_000,
+    },
+    {
+      itemName: 'Mathematics',
+      quantity: 1,
+      unitPriceMinor: 400_000,
+      amountMinor: 400_000,
+    },
+  ],
+  ...overrides,
+});
+
+export const portalPurchases = (
+  overrides: Partial<PortalPurchases> = {}
+): PortalPurchases => ({
+  termName: 'First term',
+  spentThisTermMinor: 1_300_000,
+  termPurchaseCount: 1,
+  itemsBought: 3,
+  sales: [portalPurchase()],
+  ...overrides,
+});
+
+export const portalPriceList = (
+  overrides: Partial<PortalPriceList> = {}
+): PortalPriceList => ({
+  levelName: 'JSS 1',
+  books: [
+    { name: 'Mathematics', priceMinor: 400_000, inStock: true },
+    { name: 'Basic Science', priceMinor: 340_000, inStock: false },
+  ],
+  uniforms: [
+    {
+      name: 'School shirt',
+      sizes: ['Size 8', 'Size 10', 'Size 12'],
+      minPriceMinor: 400_000,
+      maxPriceMinor: 450_000,
+      inStock: true,
+    },
+    {
+      name: 'School tie',
+      sizes: [],
+      minPriceMinor: 180_000,
+      maxPriceMinor: 180_000,
+      inStock: false,
+    },
+  ],
+  paymentMethods: ['cash', 'pos', 'transfer'],
+  ...overrides,
+});
 
 export const calendarCurrent = (
   overrides: Partial<CalendarCurrent> = {}

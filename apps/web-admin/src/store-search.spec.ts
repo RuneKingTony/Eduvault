@@ -13,6 +13,8 @@ describe('parseStoreSearch', () => {
         page: '3',
         deliver: 1,
         add: '1',
+        sell: 1,
+        sale: ' sale-1 ',
       })
     ).toEqual({
       tab: 'deliveries',
@@ -24,7 +26,13 @@ describe('parseStoreSearch', () => {
       page: 3,
       deliver: 1,
       add: 1,
+      sell: 1,
+      sale: 'sale-1',
     });
+  });
+
+  it('keeps the Items sold tab', () => {
+    expect(parseStoreSearch({ tab: 'sold' }).tab).toBe('sold');
   });
 
   it('drops the Items tab, blanks, unknown kinds, other flag values and page one', () => {
@@ -39,6 +47,8 @@ describe('parseStoreSearch', () => {
         page: 1,
         deliver: '0',
         add: false,
+        sell: 'yes',
+        sale: ' ',
       })
     ).toEqual({
       tab: undefined,
@@ -50,6 +60,8 @@ describe('parseStoreSearch', () => {
       page: undefined,
       deliver: undefined,
       add: undefined,
+      sell: undefined,
+      sale: undefined,
     });
   });
 });

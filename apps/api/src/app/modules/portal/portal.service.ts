@@ -119,7 +119,7 @@ export class PortalService {
     });
   }
 
-  private async require(
+  async require(
     ctx: OrgContext,
     studentId: string
   ): Promise<PortalStudentRecord> {

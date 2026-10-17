@@ -126,5 +126,8 @@ export const invoiceSchema = z.object({
     .object({ name: z.string(), relationship: z.string() })
     .nullable(),
   journal: invoiceJournalSchema.nullable(),
+  source: z
+    .object({ kind: z.literal('store_sale'), id: idSchema, number: z.string() })
+    .nullable(),
 });
 export type Invoice = z.infer<typeof invoiceSchema>;

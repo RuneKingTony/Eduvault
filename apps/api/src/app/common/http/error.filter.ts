@@ -9,6 +9,7 @@ import {
 import {
   ALREADY_DECIDED_MESSAGE,
   SELF_APPROVAL_MESSAGE,
+  STORE_PAYMENT_VOID_MESSAGE,
   YEAR_OVERLAP_MESSAGE,
   apiErrorCodeSchema,
   type ApiErrorBody,
@@ -49,6 +50,9 @@ const conflict = (message: string, code: ApiErrorCode = 'Conflict') => ({
 
 function describeCheckViolation(exception: unknown) {
   const constraint = pgConstraint(exception);
+  if (constraint === 'payment_store_sale_stays_posted') {
+    return conflict(STORE_PAYMENT_VOID_MESSAGE);
+  }
   // Convention: a self-approval CHECK is named `<table>_<action>_not_self`.
   if (constraint.includes('not_self')) {
     return conflict(SELF_APPROVAL_MESSAGE, 'SelfApproval');

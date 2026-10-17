@@ -212,6 +212,8 @@ interface DetailRow {
   proof_name: string | null;
   entry_reference: string;
   journal_entry_id: string;
+  sale_id: string | null;
+  sale_number: string | null;
 }
 
 interface AllocationRow {
@@ -377,7 +379,10 @@ function toPayment(
         : { fileId: row.proof_file_id, fileName: row.proof_name },
     allocations,
     void: null,
-    storeSale: null,
+    storeSale:
+      row.sale_id === null || row.sale_number === null
+        ? null
+        : { id: row.sale_id, number: row.sale_number },
     entry,
     voidEntry: null,
   };
@@ -396,7 +401,8 @@ export async function findPayment(
       p.amount_minor::text AS amount_minor,
       u.name AS recorded_by, p.created_at,
       p.proof_file_id, fo.original_name AS proof_name,
-      je.reference AS entry_reference, p.journal_entry_id
+      je.reference AS entry_reference, p.journal_entry_id,
+      ss.id AS sale_id, ss.number AS sale_number
     FROM payment p
     JOIN money_account ma
       ON ma.id = p.money_account_id AND ma.organization_id = p.organization_id
@@ -405,6 +411,8 @@ export async function findPayment(
     LEFT JOIN "user" u ON u.id = p.created_by
     LEFT JOIN file_object fo
       ON fo.id = p.proof_file_id AND fo.organization_id = p.organization_id
+    LEFT JOIN store_sale ss
+      ON ss.payment_id = p.id AND ss.organization_id = p.organization_id
     WHERE p.id = ${id}
       AND p.organization_id = ${scope.organizationId}
       AND ${anyAllocationInScopeSql('p', scope.campusScope)}`.execute(db);

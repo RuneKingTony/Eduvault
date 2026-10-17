@@ -1,4 +1,5 @@
 import { contract } from './contract';
+import type { MoneyAccountKind } from './finance';
 import {
   BOOK_LEVEL_REQUIRED_MESSAGE,
   BOOK_NO_SIZE_MESSAGE,
@@ -9,7 +10,11 @@ import {
   DELIVERY_REQUIRED_MESSAGE,
   DELIVERY_UNIT_COST_MESSAGE,
   ITEM_PRICE_BELOW_COST_MESSAGE,
+  DELIVERY_DUPLICATE_ITEM_MESSAGE,
   ITEM_REQUIRED_MESSAGE,
+  STORE_SALE_LINES_MAX_MESSAGE,
+  STORE_SALE_QUANTITY_MAX_MESSAGE,
+  STORE_SALE_REQUIRED_MESSAGE,
   UNIFORM_NO_LEVEL_MESSAGE,
   UNIT_PRICE_MAX_MESSAGE,
   UNIT_PRICE_MAX_MINOR,
@@ -20,7 +25,18 @@ import {
   itemListQuerySchema,
   openingStockRecordedMessage,
   recordDeliverySchema,
+  booksForLevel,
+  fittingSaleAccounts,
+  isSellable,
+  recordSaleSchema,
+  saleAccountKinds,
+  saleListQuerySchema,
   stockState,
+  storeSaleNoAccountMessage,
+  storeSaleReference,
+  storeSaleReplayedMessage,
+  storeSaleStockShortMessage,
+  storeSummarySchema,
   updateItemSchema,
 } from './store';
 
@@ -373,6 +389,241 @@ describe('contract.store', () => {
       '/store/deliveries',
       '/store/deliveries/:id',
       '/store/deliveries',
+      '/store/sales',
+      '/store/sales/options',
+      '/store/sales/:id',
+      '/store/sales',
     ]);
+  });
+});
+
+describe('storeSaleReference', () => {
+  it('is STORE, the compact date and the first 8 characters of the UUID', () => {
+    expect(
+      storeSaleReference('2026-10-07', '1b9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed')
+    ).toBe('STORE-20261007-1B9D6BCD');
+  });
+});
+
+describe('saleAccountKinds', () => {
+  it('maps POS to pos, transfer to bank and cash to cash then bank', () => {
+    expect(saleAccountKinds('pos')).toEqual(['pos']);
+    expect(saleAccountKinds('transfer')).toEqual(['bank']);
+    expect(saleAccountKinds('cash')).toEqual(['cash', 'bank']);
+  });
+});
+
+describe('store sale copy', () => {
+  it('words the stock shortage, the missing account and the replay', () => {
+    expect(
+      storeSaleStockShortMessage(3, 'School shirt, Size 12', 'Lekki')
+    ).toBe('Only 3 of School shirt, Size 12 left at Lekki.');
+    expect(storeSaleNoAccountMessage('pos', 'Ikeja')).toBe(
+      'No money account takes POS payments on Ikeja campus.'
+    );
+    expect(storeSaleNoAccountMessage('transfer', 'Ikeja')).toBe(
+      'No money account takes bank transfer payments on Ikeja campus.'
+    );
+    expect(storeSaleReplayedMessage('STORE-1', 'RCT-2026-0001')).toBe(
+      'Reference STORE-1 was already recorded as RCT-2026-0001. Nothing was posted twice.'
+    );
+  });
+});
+
+describe('recordSaleSchema', () => {
+  const sale = {
+    reference: 'STORE-20261007-1B9D6BCD',
+    studentId: id,
+    method: 'cash',
+    lines: [{ itemId: id, quantity: 2 }],
+  };
+
+  it('takes a student, a method and lines', () => {
+    expect(recordSaleSchema.safeParse(sale).success).toBe(true);
+  });
+
+  it('refuses a sale with no lines', () => {
+    expect(
+      messages(recordSaleSchema.safeParse({ ...sale, lines: [] }))
+    ).toEqual([STORE_SALE_REQUIRED_MESSAGE]);
+  });
+
+  it('refuses a zero quantity and one above the cap', () => {
+    expect(
+      messages(
+        recordSaleSchema.safeParse({
+          ...sale,
+          lines: [{ itemId: id, quantity: 0 }],
+        })
+      )
+    ).toEqual([STORE_SALE_REQUIRED_MESSAGE]);
+    expect(
+      messages(
+        recordSaleSchema.safeParse({
+          ...sale,
+          lines: [{ itemId: id, quantity: DELIVERY_QUANTITY_MAX + 1 }],
+        })
+      )
+    ).toEqual([STORE_SALE_QUANTITY_MAX_MESSAGE]);
+  });
+
+  it('refuses an item listed twice', () => {
+    expect(
+      messages(
+        recordSaleSchema.safeParse({
+          ...sale,
+          lines: [
+            { itemId: id, quantity: 1 },
+            { itemId: id, quantity: 2 },
+          ],
+        })
+      )
+    ).toEqual([DELIVERY_DUPLICATE_ITEM_MESSAGE]);
+  });
+
+  it('refuses more lines than a purchase may hold', () => {
+    const lines = Array.from({ length: DELIVERY_LINES_MAX + 1 }, () => ({
+      itemId: id,
+      quantity: 1,
+    }));
+    expect(messages(recordSaleSchema.safeParse({ ...sale, lines }))).toContain(
+      STORE_SALE_LINES_MAX_MESSAGE
+    );
+  });
+
+  it('refuses an unknown method and a blank reference', () => {
+    expect(
+      recordSaleSchema.safeParse({ ...sale, method: 'cheque' }).success
+    ).toBe(false);
+    expect(
+      recordSaleSchema.safeParse({ ...sale, reference: ' ' }).success
+    ).toBe(false);
+  });
+});
+
+describe('saleListQuerySchema', () => {
+  it('defaults to page 1 and coerces the string', () => {
+    expect(saleListQuerySchema.parse({})).toEqual({ page: 1 });
+    expect(saleListQuerySchema.parse({ page: '3', studentId: id })).toEqual({
+      page: 3,
+      studentId: id,
+    });
+  });
+});
+
+describe('storeSummarySchema', () => {
+  it('carries the term figures beside the stock figures', () => {
+    const summary = {
+      stockValueMinor: 100,
+      lowCount: 1,
+      termSalesMinor: 650_000,
+      termCostMinor: 500_000,
+      termSalesCount: 2,
+      termItemsSold: 4,
+      termStudentsServed: 2,
+    };
+    expect(storeSummarySchema.parse(summary)).toEqual(summary);
+    expect(
+      storeSummarySchema.safeParse({ stockValueMinor: 1, lowCount: 0 }).success
+    ).toBe(false);
+  });
+});
+
+interface TestAccount {
+  id: string;
+  name: string;
+  kind: MoneyAccountKind;
+  campusId: string | null;
+  ledgerAccountId: string;
+  retired: boolean;
+}
+
+const account = (overrides: Partial<TestAccount> = {}): TestAccount => ({
+  id: 'account',
+  name: 'Account',
+  kind: 'pos',
+  campusId: null,
+  ledgerAccountId: 'ledger',
+  retired: false,
+  ...overrides,
+});
+
+describe('fittingSaleAccounts', () => {
+  it('finds the one POS account', () => {
+    const pos = account({ id: 'pos', kind: 'pos' });
+    const bank = account({ id: 'bank', kind: 'bank' });
+    expect(fittingSaleAccounts('pos', 'lekki', [bank, pos])).toEqual([pos]);
+  });
+
+  it('takes a transfer into a bank account only', () => {
+    const bank = account({ id: 'bank', kind: 'bank' });
+    const cash = account({ id: 'cash', kind: 'cash' });
+    expect(fittingSaleAccounts('transfer', 'lekki', [cash, bank])).toEqual([
+      bank,
+    ]);
+  });
+
+  it('lists several fits in the order they were given', () => {
+    const first = account({ id: 'first', kind: 'pos' });
+    const second = account({ id: 'second', kind: 'pos', campusId: 'lekki' });
+    expect(fittingSaleAccounts('pos', 'lekki', [first, second])).toEqual([
+      first,
+      second,
+    ]);
+  });
+
+  it('accepts a school-wide account and one on the student’s campus', () => {
+    const wide = account({ id: 'wide', kind: 'pos', campusId: null });
+    const local = account({ id: 'local', kind: 'pos', campusId: 'lekki' });
+    expect(fittingSaleAccounts('pos', 'lekki', [wide, local])).toHaveLength(2);
+  });
+
+  it('refuses an account on another campus', () => {
+    const elsewhere = account({ kind: 'pos', campusId: 'ikeja' });
+    expect(fittingSaleAccounts('pos', 'lekki', [elsewhere])).toEqual([]);
+  });
+
+  it('refuses a retired account and a gateway', () => {
+    const retired = account({ id: 'retired', kind: 'pos', retired: true });
+    const gateway = account({ id: 'gateway', kind: 'gateway' });
+    expect(fittingSaleAccounts('pos', 'lekki', [retired, gateway])).toEqual([]);
+    expect(fittingSaleAccounts('cash', 'lekki', [gateway])).toEqual([]);
+  });
+
+  it('is empty when no account fits', () => {
+    expect(fittingSaleAccounts('cash', 'lekki', [])).toEqual([]);
+  });
+
+  it('lists cash before bank for a cash sale', () => {
+    const bank = account({ id: 'bank', kind: 'bank' });
+    const cash = account({ id: 'cash', kind: 'cash' });
+    expect(fittingSaleAccounts('cash', 'lekki', [bank, cash])).toEqual([
+      cash,
+      bank,
+    ]);
+  });
+});
+
+describe('isSellable and booksForLevel', () => {
+  const item = {
+    retiredAt: null,
+    sellPriceMinor: 100,
+    kind: 'book' as const,
+    classLevel: { id: 'jss1' },
+  };
+
+  it('sells an unretired item with a price', () => {
+    expect(isSellable(item)).toBe(true);
+    expect(isSellable({ ...item, sellPriceMinor: 0 })).toBe(false);
+    expect(isSellable({ ...item, retiredAt: '2026-09-01T00:00:00.000Z' })).toBe(
+      false
+    );
+  });
+
+  it('keeps only the books of the level, and none without a level', () => {
+    const elsewhere = { ...item, classLevel: { id: 'jss2' } };
+    const shirt = { ...item, kind: 'uniform' as const, classLevel: null };
+    expect(booksForLevel([item, elsewhere, shirt], 'jss1')).toEqual([item]);
+    expect(booksForLevel([item], null)).toEqual([]);
   });
 });

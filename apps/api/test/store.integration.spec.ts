@@ -39,6 +39,14 @@ import {
 } from './support/factories/store';
 import { schoolsTest as test } from './support/two-schools';
 
+const NO_SALES = {
+  termSalesMinor: 0,
+  termCostMinor: 0,
+  termSalesCount: 0,
+  termItemsSold: 0,
+  termStudentsServed: 0,
+};
+
 const COST = 350_000;
 const TEN_SHIRTS = 10 * COST;
 
@@ -721,21 +729,32 @@ test.describe('summary and dashboard', () => {
 
     const all = (await api(owner).get('/store/summary').expect(200))
       .body as StoreSummary;
-    expect(all).toEqual({ stockValueMinor: 12 * COST, lowCount: 1 });
+    expect(all).toEqual({
+      stockValueMinor: 12 * COST,
+      lowCount: 1,
+      ...NO_SALES,
+    });
     const one = (
       await api(owner).get(`/store/summary?campusId=${lekki.id}`).expect(200)
     ).body as StoreSummary;
-    expect(one).toEqual({ stockValueMinor: TEN_SHIRTS, lowCount: 0 });
+    expect(one).toEqual({
+      stockValueMinor: TEN_SHIRTS,
+      lowCount: 0,
+      ...NO_SALES,
+    });
     const mine = (await api(lekkiOnly).get('/store/summary').expect(200))
       .body as StoreSummary;
     expect(mine.stockValueMinor).toBe(TEN_SHIRTS);
 
     const dashboard = (await api(owner).get('/dashboard/store').expect(200))
       .body as DashboardStore;
-    expect(dashboard).toEqual({ stockValueMinor: 12 * COST });
+    expect(dashboard).toEqual({
+      stockValueMinor: 12 * COST,
+      ...NO_SALES,
+    });
     expect(
       (await api(lekkiOnly).get('/dashboard/store').expect(200)).body
-    ).toEqual({ stockValueMinor: TEN_SHIRTS });
+    ).toEqual({ stockValueMinor: TEN_SHIRTS, ...NO_SALES });
   });
 });
 
@@ -794,6 +813,7 @@ test.describe('isolation', () => {
     expect((await api(ownerB).get('/store/summary').expect(200)).body).toEqual({
       stockValueMinor: 0,
       lowCount: 1,
+      ...NO_SALES,
     });
     expect(await rows(pool, 'stock_delivery')).toBe(1);
   });

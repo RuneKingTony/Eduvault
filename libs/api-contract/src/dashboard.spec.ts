@@ -2,6 +2,7 @@ import {
   activityQuerySchema,
   dashboardFinanceSchema,
   dashboardRollSchema,
+  dashboardStoreSchema,
   dashboardTaskSchema,
   myClassSchema,
 } from './dashboard';
@@ -175,5 +176,33 @@ describe('dashboardRollSchema', () => {
       formerOwedMinor: 40_000,
     };
     expect(dashboardRollSchema.parse(roll)).toEqual(roll);
+  });
+});
+
+describe('dashboardStoreSchema', () => {
+  const store = {
+    stockValueMinor: 1_200_000,
+    termSalesMinor: 650_000,
+    termCostMinor: 500_000,
+    termSalesCount: 2,
+    termItemsSold: 4,
+    termStudentsServed: 2,
+  };
+
+  it('carries the stock value and this term’s sales figures', () => {
+    expect(dashboardStoreSchema.parse(store)).toEqual(store);
+  });
+
+  it('refuses a payload without the term figures', () => {
+    expect(dashboardStoreSchema.safeParse({ stockValueMinor: 1 }).success).toBe(
+      false
+    );
+  });
+
+  it('refuses a negative count', () => {
+    expect(
+      dashboardStoreSchema.safeParse({ ...store, termStudentsServed: -1 })
+        .success
+    ).toBe(false);
   });
 });

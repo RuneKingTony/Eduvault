@@ -2,6 +2,7 @@ import type {
   Delivery,
   Item,
   ItemKind,
+  Sale,
   StockState,
 } from '@eduvault/api-contract';
 import { countOf, naira } from '@eduvault/shared';
@@ -106,3 +107,13 @@ export function newDeliveryReference(
     .toUpperCase();
   return `DEL-REQ-${lagosDate.replaceAll('-', '')}-${suffix}`;
 }
+
+export const saleRecordedMessage = (
+  sale: Pick<Sale, 'number' | 'totalMinor' | 'receiptNumber'>
+): string =>
+  `${sale.number}: ${naira(sale.totalMinor)} paid, receipt ${sale.receiptNumber}.`;
+
+export const COSTS_HIDDEN_NOTE = 'Hidden · turn on Show costs';
+
+export const termSoldNote = (students: number): string =>
+  `${countOf(students, 'student', 'students')} served`;

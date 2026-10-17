@@ -23,6 +23,7 @@ import type {
 } from '@eduvault/api-contract';
 import { PermissionsProvider } from '@eduvault/auth-client';
 import { TooltipProvider } from '@eduvault/ui';
+import { parseStoreSearch } from './store-search';
 import { parseStatementSearch } from './accounts-search';
 import { ApiProvider, type Api } from './api';
 import { parseBillingSearch, parseRunSearch } from './billing-search';
@@ -194,6 +195,7 @@ export const invoice = (over: Partial<Invoice> = {}): Invoice => ({
   issuedBy: 'Chika Eze',
   chargedTo: { name: 'Ngozi Okeke', relationship: 'mother' },
   journal: sentJournal(),
+  source: null,
   ...over,
 });
 
@@ -305,6 +307,7 @@ export function renderBilling(
     ['/finance/invoices', parseInvoicesSearch],
     ['/finance/invoices/$invoiceId', undefined],
     ['/finance/school-fees', parseFeesSearch],
+    ['/finance/store', parseStoreSearch],
     ['/finance/other-fees', parseFeesSearch],
   ] as const;
   const router = createRouter({

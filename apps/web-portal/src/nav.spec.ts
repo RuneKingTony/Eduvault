@@ -15,11 +15,12 @@ const idsFor = (
   );
 
 describe('portal nav', () => {
-  it('lists My children, Home then Fees', () => {
+  it('lists My children, Home, Fees then Purchases', () => {
     expect(PORTAL_NAV.map((entry) => [entry.label, entry.route])).toEqual([
       ['My children', '/children'],
       ['Home', '/'],
       ['Fees', '/fees'],
+      ['Purchases', '/purchases'],
     ]);
   });
 
@@ -45,6 +46,19 @@ describe('portal nav', () => {
       icon: 'receipt',
       permission: 'invoice:readOwn',
     });
+  });
+
+  it('puts Purchases last on the store icon behind invoice:readOwn', () => {
+    expect(PORTAL_NAV.at(-1)).toMatchObject({
+      id: 'purchases',
+      route: '/purchases',
+      icon: 'store',
+      permission: 'invoice:readOwn',
+    });
+    expect(
+      idsFor('guardian', readOwnFees, new Set(['/', '/purchases']))
+    ).toEqual(['home', 'purchases']);
+    expect(idsFor('guardian', readOwn, new Set(['/purchases']))).toEqual([]);
   });
 
   it('shows nothing without student:readOwn', () => {

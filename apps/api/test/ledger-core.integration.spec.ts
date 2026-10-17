@@ -276,7 +276,7 @@ test.describe('the journal', () => {
     await refused('DELETE FROM journal_line WHERE entry_id = $1');
 
     await pool.query(
-      'TRUNCATE TABLE journal_line, journal_entry, invoice_line, invoice, payment_allocation, payment_void, payment, adjustment, stock_delivery_line, stock_delivery'
+      'TRUNCATE TABLE journal_line, journal_entry, invoice_line, invoice, store_sale_line, store_sale, payment_allocation, payment_void, payment, adjustment, stock_delivery_line, stock_delivery'
     );
     expect(await countOf(pool, 'SELECT count(*) FROM journal_entry', [])).toBe(
       0

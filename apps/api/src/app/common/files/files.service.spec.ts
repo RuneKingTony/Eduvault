@@ -339,6 +339,20 @@ describe('FilesService payment proofs', () => {
     }
   });
 
+  it('takes a proof from store:issue, the permission that records a student purchase', async () => {
+    const seller = context('store:issue');
+    await expect(uploadProof(seller, PDF).result).resolves.toMatchObject({
+      contentType: 'application/pdf',
+    });
+  });
+
+  it('answers 403 to a member who may only read the store', async () => {
+    const storeReader = context('store:read');
+    await expect(uploadProof(storeReader, PDF).result).rejects.toBeInstanceOf(
+      ForbiddenException
+    );
+  });
+
   it('answers 403 to a member who may only read payments', async () => {
     const { result } = uploadProof(paymentReader, PDF);
     await expect(result).rejects.toBeInstanceOf(ForbiddenException);

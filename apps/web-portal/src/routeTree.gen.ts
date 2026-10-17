@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AnnouncementsRouteImport } from './routes/announcements'
 import { Route as ChildrenRouteImport } from './routes/children'
 import { Route as FeesRouteImport } from './routes/fees'
+import { Route as PurchasesRouteImport } from './routes/purchases'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -34,18 +35,25 @@ const FeesRoute = FeesRouteImport.update({
   path: '/fees',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PurchasesRoute = PurchasesRouteImport.update({
+  id: '/purchases',
+  path: '/purchases',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/announcements': typeof AnnouncementsRoute
   '/children': typeof ChildrenRoute
   '/fees': typeof FeesRoute
+  '/purchases': typeof PurchasesRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/announcements': typeof AnnouncementsRoute
   '/children': typeof ChildrenRoute
   '/fees': typeof FeesRoute
+  '/purchases': typeof PurchasesRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -53,13 +61,14 @@ export interface FileRoutesById {
   '/announcements': typeof AnnouncementsRoute
   '/children': typeof ChildrenRoute
   '/fees': typeof FeesRoute
+  '/purchases': typeof PurchasesRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/announcements' | '/children' | '/fees'
+  fullPaths: '/' | '/announcements' | '/children' | '/fees' | '/purchases'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/announcements' | '/children' | '/fees'
-  id: '__root__' | '/' | '/announcements' | '/children' | '/fees'
+  to: '/' | '/announcements' | '/children' | '/fees' | '/purchases'
+  id: '__root__' | '/' | '/announcements' | '/children' | '/fees' | '/purchases'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -67,6 +76,7 @@ export interface RootRouteChildren {
   AnnouncementsRoute: typeof AnnouncementsRoute
   ChildrenRoute: typeof ChildrenRoute
   FeesRoute: typeof FeesRoute
+  PurchasesRoute: typeof PurchasesRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -99,6 +109,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FeesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/purchases': {
+      id: '/purchases'
+      path: '/purchases'
+      fullPath: '/purchases'
+      preLoaderRoute: typeof PurchasesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -107,6 +124,7 @@ const rootRouteChildren: RootRouteChildren = {
   AnnouncementsRoute: AnnouncementsRoute,
   ChildrenRoute: ChildrenRoute,
   FeesRoute: FeesRoute,
+  PurchasesRoute: PurchasesRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

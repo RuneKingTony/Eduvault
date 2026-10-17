@@ -244,6 +244,11 @@ export const PAYMENT_METHOD_LABELS = {
   pos: 'POS',
 } as const satisfies Record<PaymentMethod, string>;
 
+export const paymentMethodWord = (method: PaymentMethod): string =>
+  method === 'pos'
+    ? PAYMENT_METHOD_LABELS.pos
+    : PAYMENT_METHOD_LABELS[method].toLowerCase();
+
 export const RECEIPT_FOOTER_MAX = 120;
 export const RECEIPT_FOOTER_MESSAGE = `Use ${RECEIPT_FOOTER_MAX} characters or fewer.`;
 export const LAST_PAYMENT_METHOD_MESSAGE =

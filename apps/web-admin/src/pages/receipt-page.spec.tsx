@@ -3,6 +3,7 @@ import { ApiError } from '@eduvault/api-contract';
 import { toast } from '@eduvault/ui';
 import { PAYMENT_ID, payment, renderPayments } from '../test-payments';
 import { starterAccess } from '../test-utils';
+import { SALE_ID } from '../test-store';
 import { ReceiptPage } from './receipt-page';
 
 vi.mock('@eduvault/ui', async (importOriginal) => ({
@@ -131,6 +132,29 @@ describe('ReceiptPage', () => {
       'href',
       expect.stringMatching(/\/files\/00000000-0000-4000-8000-0000000a0a01$/)
     );
+  });
+
+  it('shows the store sale a receipt belongs to, linked to Items sold, and a POS slip', async () => {
+    setup({
+      payment: payment({
+        method: 'pos',
+        storeSale: { id: SALE_ID, number: 'ISS-2026-0001' },
+      }),
+    });
+
+    const link = await screen.findByRole('link', { name: 'ISS-2026-0001' });
+    expect(link).toHaveAttribute(
+      'href',
+      expect.stringContaining(`/finance/store?tab=sold&sale=${SALE_ID}`)
+    );
+    expect(screen.getByText('Store sale')).toBeVisible();
+    expect(screen.getByText('POS slip')).toBeVisible();
+  });
+
+  it('has no Store sale row for an ordinary receipt', async () => {
+    setup();
+    await screen.findByText('Receipt no.');
+    expect(screen.queryByText('Store sale')).not.toBeInTheDocument();
   });
 
   it('shows a dash for a missing provider reference and says when a transfer has no proof', async () => {

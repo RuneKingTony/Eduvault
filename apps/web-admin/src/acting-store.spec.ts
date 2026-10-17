@@ -1,4 +1,5 @@
 import { act, renderHook } from '@testing-library/react';
+import { READ_PERMS } from '@eduvault/policy';
 import {
   actingHeaders,
   allowWrites,
@@ -16,6 +17,12 @@ afterEach(() => {
 });
 
 describe('acting store', () => {
+  it('holds no store write permission while read-only, so Record student purchase stays hidden', () => {
+    expect(READ_PERMS).toContain('store:read');
+    expect(READ_PERMS).not.toContain('store:issue');
+    expect(READ_PERMS).not.toContain('store:receive');
+  });
+
   it('is not acting by default and sends no headers', () => {
     expect(getActing()).toBeNull();
     expect(actingHeaders()).toEqual({});

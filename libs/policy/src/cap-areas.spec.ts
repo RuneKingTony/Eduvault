@@ -257,7 +257,7 @@ describe('capSummary', () => {
       'Discounts and refunds: ask for refunds, fee reductions, cancelled balances and discounts',
       'Approves money requests',
       'Bank and POS accounts: add and change bank and POS accounts',
-      'Store: add items and record deliveries',
+      'Store: add items, record deliveries and sell to students',
       'Money categories: change the accountant’s categories',
       'Own records: can see',
       'Sees fees',
@@ -303,7 +303,7 @@ describe('capSummary', () => {
       'Asks to cancel payments',
       'Discounts and refunds: ask for refunds, fee reductions, cancelled balances and discounts',
       'Bank and POS accounts: can see',
-      'Store: add items and record deliveries',
+      'Store: add items, record deliveries and sell to students',
       'Money categories: can see',
     ]);
   });
@@ -567,18 +567,24 @@ describe('the Store area', () => {
     expect(store.group).toBe('Money');
     expect(store.label).toBe('Store');
     expect(store.see).toEqual(['store:read']);
-    expect(store.change).toEqual(['store:receive']);
-    expect(store.changeDesc).toBe('Add items and record deliveries');
+    expect(store.change).toEqual(['store:receive', 'store:issue']);
+    expect(store.changeDesc).toBe(
+      'Add items, record deliveries and sell to students'
+    );
     expect(store.extras).toEqual([]);
     expect(store.important).toBe(false);
   });
 
-  it('is see for store:read, change with store:receive and custom for a lone receive', () => {
+  it('is see for store:read, change with receive and issue, and custom for a lone receive or issue', () => {
     expect(capLevel(toPermissionMap(['store:read']), store)).toBe('see');
     expect(
-      capLevel(toPermissionMap(['store:read', 'store:receive']), store)
+      capLevel(
+        toPermissionMap(['store:read', 'store:receive', 'store:issue']),
+        store
+      )
     ).toBe('change');
     expect(capLevel(toPermissionMap(['store:receive']), store)).toBe('custom');
+    expect(capLevel(toPermissionMap(['store:issue']), store)).toBe('custom');
   });
 });
 

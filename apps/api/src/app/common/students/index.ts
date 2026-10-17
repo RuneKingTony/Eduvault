@@ -6,3 +6,4 @@ export * from './end-enrolments';
 export * from './current-campus';
 export * from './class-name';
 export * from './payment-allocations';
+export * from './paying-guardian';

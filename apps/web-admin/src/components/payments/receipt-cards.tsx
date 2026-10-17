@@ -5,6 +5,7 @@ import {
   type Payment,
   type PaymentAllocation,
 } from '@eduvault/api-contract';
+import { useCan } from '@eduvault/auth-client';
 import { fmtDate, money } from '@eduvault/shared';
 import {
   Card,
@@ -128,16 +129,40 @@ function Row({
   );
 }
 
+function SaleRow({ payment }: { payment: Payment }) {
+  const canOpen = useCan('store', 'read');
+  const { storeSale } = payment;
+  if (storeSale === null) {
+    return null;
+  }
+  return (
+    <Row label="Store sale">
+      {canOpen ? (
+        <Link
+          to="/finance/store"
+          search={{ tab: 'sold', sale: storeSale.id }}
+          className="font-mono underline-offset-4 hover:underline"
+        >
+          {storeSale.number}
+        </Link>
+      ) : (
+        <span className="font-mono">{storeSale.number}</span>
+      )}
+    </Row>
+  );
+}
+
 function ProofRow({ payment }: { payment: Payment }) {
+  const label = payment.method === 'pos' ? 'POS slip' : 'Proof of transfer';
   if (payment.proof === null) {
     return payment.method === 'transfer' ? (
-      <Row label="Proof of transfer">
+      <Row label={label}>
         Not uploaded (recorded before uploads were required)
       </Row>
     ) : null;
   }
   return (
-    <Row label="Proof of transfer">
+    <Row label={label}>
       <a
         href={`${API_URL}/files/${payment.proof.fileId}`}
         target="_blank"
@@ -172,6 +197,7 @@ export function ReceiptDetailsCard({ payment }: { payment: Payment }) {
           <Row label="Method">{PAYMENT_METHOD_LABELS[payment.method]}</Row>
           <Row label="Into">{payment.moneyAccount.label}</Row>
           <Row label="Recorded by">{payment.recordedBy ?? '—'}</Row>
+          <SaleRow payment={payment} />
           <ProofRow payment={payment} />
         </dl>
       </CardContent>

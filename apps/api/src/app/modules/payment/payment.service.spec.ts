@@ -22,7 +22,7 @@ import {
 import type { OrgContext } from '../../common/auth';
 import { Clock } from '../../common/clock';
 import type { MoneyAccountService } from '../money-account/money-account.service';
-import { paymentRequestHash } from './payment-request-hash';
+import { paymentRequestHash, type ProofState } from '../../common/payments';
 import {
   PaymentRepository,
   type ExistingPayment,
@@ -30,7 +30,6 @@ import {
   type NewPayment,
   type PaymentPage,
   type PaymentScope,
-  type ProofCheck,
   type RecordingAccount,
   type RecordingPeople,
 } from './payment.repository';
@@ -99,7 +98,7 @@ class FakePayments extends PaymentRepository {
   };
   guardian: string | undefined = 'Ngozi Okeke';
   inScope: string[] = [ADA, CHIDI];
-  proofState: ProofCheck = 'free';
+  proofState: ProofState = 'free';
   proofUploaders: string[] = [];
   providerPayment: ExistingPayment | undefined;
   outcome: InsertOutcome = { status: 'recorded', id: 'payment-1' };

@@ -2,23 +2,28 @@ import type {
   Payment,
   PaymentListQuery,
   PaymentListSummary,
-  PaymentMethod,
   PaymentMethods,
   PaymentSummary,
   RecordingChild,
   RecordingPayer,
 } from '@eduvault/api-contract';
 import type { CampusScope } from '../../common/campus-scope';
+import type {
+  ExistingPayment,
+  InsertOutcome,
+  NewPayment,
+  ProofState,
+} from '../../common/payments';
+
+export type {
+  ExistingPayment,
+  InsertOutcome,
+  NewPayment,
+} from '../../common/payments';
 
 export interface PaymentScope {
   organizationId: string;
   campusScope: CampusScope;
-}
-
-export interface ExistingPayment {
-  id: string;
-  receiptNumber: string;
-  requestHash: string;
 }
 
 export type RecordingAccount =
@@ -26,34 +31,6 @@ export type RecordingAccount =
   | { status: 'retired' }
   | { status: 'gateway' }
   | { status: 'ok'; ledgerAccountId: string; campusId: string | null };
-
-export type ProofCheck = 'missing' | 'taken' | 'free';
-
-export interface NewPayment {
-  organizationId: string;
-  userId: string;
-  year: number;
-  reference: string;
-  requestHash: string;
-  payerGuardianId: string | null;
-  payerName: string;
-  moneyAccountId: string;
-  ledgerAccountId: string;
-  accountCampusId: string | null;
-  method: PaymentMethod;
-  providerReference: string | null;
-  proofFileId: string | null;
-  amountMinor: number;
-  paidOn: string;
-  allocations: { studentId: string; amountMinor: number }[];
-}
-
-export type InsertOutcome =
-  | { status: 'recorded'; id: string }
-  | { status: 'replayed'; id: string }
-  | { status: 'reference_used' }
-  | { status: 'provider_reference_used' }
-  | { status: 'proof_taken' };
 
 export interface PaymentPage {
   items: PaymentSummary[];
@@ -105,7 +82,7 @@ export abstract class PaymentRepository {
     organizationId: string,
     userId: string,
     fileId: string
-  ): Promise<ProofCheck>;
+  ): Promise<ProofState>;
 
   abstract findByProviderReference(
     organizationId: string,

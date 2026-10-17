@@ -6,13 +6,22 @@ import type {
   PortalAnnouncements,
   PortalChild,
   PortalMe,
+  PortalPriceList,
+  PortalPurchases,
   PortalStudent,
 } from '@eduvault/api-contract';
 import { expect, type Fixtures } from './support/base-test';
 import { YEAR_2027, createSchoolYear } from './support/factories/calendar';
 import { createAnnouncement } from './support/factories/announcements';
 import { assignClassTeacher, createClass } from './support/factories/classes';
+import { createMoneyAccount } from './support/factories/finance';
 import { createStudent } from './support/factories/students';
+import {
+  classLevelId,
+  createItem,
+  receive,
+  sell,
+} from './support/factories/store';
 import { makeCurrent } from './support/factories/terms';
 import {
   NEW_PASSWORD,
@@ -87,12 +96,19 @@ const studentRoutes = (id: string) => [
   `/portal/students/${id}/statement`,
 ];
 
+const purchaseRoutes = (id: string) => [
+  `/portal/students/${id}/purchases`,
+  `/portal/students/${id}/price-list`,
+];
+
 const allRoutes = (id: string) => [
   '/portal/me',
   '/portal/children',
   '/portal/family-statement',
   ...studentRoutes(id),
 ];
+
+const everyRoute = (id: string) => [...allRoutes(id), ...purchaseRoutes(id)];
 
 test.describe('GET /portal/me and /portal/children', () => {
   test('lists every child linked to a guardian with class and campus', async ({
@@ -570,7 +586,7 @@ test.describe('permissions', () => {
     api,
     schools: { studentLekki },
   }) => {
-    for (const path of allRoutes(studentLekki.id)) {
+    for (const path of everyRoute(studentLekki.id)) {
       await api().get(path).expect(401);
     }
   });
@@ -581,7 +597,7 @@ test.describe('permissions', () => {
     schools,
   }) => {
     const staff = await withPermissions(schools.orgA, ['student:read']);
-    for (const path of allRoutes(schools.studentLekki.id)) {
+    for (const path of everyRoute(schools.studentLekki.id)) {
       await api(staff).get(path).expect(403);
     }
   });
@@ -746,6 +762,300 @@ function portalHandlers(app: INestApplication) {
     );
 }
 
+const guardianOnly = '{"student":["readOwn"]}';
+
+const purchasesOf = async (
+  api: Api,
+  user: Signed,
+  id: string
+): Promise<PortalPurchases> =>
+  (await api(user).get(`/portal/students/${id}/purchases`).expect(200))
+    .body as PortalPurchases;
+
+const priceListOf = async (
+  api: Api,
+  user: Signed,
+  id: string
+): Promise<PortalPriceList> =>
+  (await api(user).get(`/portal/students/${id}/price-list`).expect(200))
+    .body as PortalPriceList;
+
+async function shopFor(
+  app: INestApplication,
+  api: Api,
+  where: {
+    schools: Parameters<typeof family>[1] & { orgA: { id: string } };
+    pool: Parameters<typeof classLevelId>[0];
+  }
+) {
+  const { schools, pool } = where;
+  const { owner, lekki, ikeja, orgA } = schools;
+  const level = await classLevelId(pool, orgA.id, 'JSS1');
+  const cashLekki = await createMoneyAccount(app, owner, {
+    name: 'Lekki cash box',
+    kind: 'cash',
+    campusId: lekki.id,
+  });
+  const cashIkeja = await createMoneyAccount(app, owner, {
+    name: 'Ikeja cash box',
+    kind: 'cash',
+    campusId: ikeja.id,
+  });
+  const maths = await createItem(api, owner, {
+    kind: 'book',
+    name: 'Mathematics',
+    variant: null,
+    classLevelId: level,
+    costPriceMinor: 250_000,
+    sellPriceMinor: 320_000,
+  });
+  const small = await createItem(api, owner, {
+    variant: 'Size 10',
+    sellPriceMinor: 400_000,
+  });
+  const large = await createItem(api, owner, { variant: 'Size 12' });
+  const retired = await createItem(api, owner, {
+    name: 'Old badge',
+    variant: null,
+  });
+  await api(owner)
+    .patch(`/store/items/${retired.id}`)
+    .send({ retired: true })
+    .expect(200);
+  await receive(api, owner, {
+    campusId: lekki.id,
+    accountId: cashLekki.id,
+    lines: [
+      { itemId: maths.id, quantity: 4, unitCostMinor: 250_000 },
+      { itemId: small.id, quantity: 4, unitCostMinor: 350_000 },
+      { itemId: large.id, quantity: 4, unitCostMinor: 350_000 },
+    ],
+  });
+  await receive(api, owner, {
+    campusId: ikeja.id,
+    accountId: cashIkeja.id,
+    lines: [{ itemId: large.id, quantity: 4, unitCostMinor: 350_000 }],
+  });
+  return { maths, small, large, retired };
+}
+
+test.describe('Purchases and the store price list', () => {
+  test.beforeEach(({ clock }) => {
+    clock.set(TODAY);
+  });
+
+  test('show a child’s sales at the sale prices, to the student, a paying and a non-paying guardian', async ({
+    api,
+    app,
+    pool,
+    schools,
+  }) => {
+    const { owner } = schools;
+    const { ada, tobi, guardianLogin } = await family(app, schools);
+    const { maths, large } = await shopFor(app, api, { schools, pool });
+    const adaSale = await sell(api, owner, {
+      studentId: ada.id,
+      lines: [
+        { itemId: maths.id, quantity: 1 },
+        { itemId: large.id, quantity: 2 },
+      ],
+    });
+    const tobiSale = await sell(api, owner, {
+      studentId: tobi.id,
+      lines: [{ itemId: large.id, quantity: 1 }],
+    });
+    const student = await signInAs(api, studentOf(ada.logins));
+    const guardian = await signInAs(api, guardianLogin);
+
+    const own = await purchasesOf(api, student, ada.id);
+    expect(own).toMatchObject({
+      termName: 'First term',
+      spentThisTermMinor: adaSale.totalMinor,
+      termPurchaseCount: 1,
+      itemsBought: 3,
+    });
+    expect(own.sales).toEqual([
+      {
+        id: adaSale.id,
+        date: TODAY,
+        campusName: 'Lekki',
+        receiptNumber: adaSale.receiptNumber,
+        method: 'cash',
+        totalMinor: adaSale.totalMinor,
+        lines: [
+          {
+            itemName: 'School shirt, Size 12',
+            quantity: 2,
+            unitPriceMinor: 450_000,
+            amountMinor: 900_000,
+          },
+          {
+            itemName: 'Mathematics',
+            quantity: 1,
+            unitPriceMinor: 320_000,
+            amountMinor: 320_000,
+          },
+        ],
+      },
+    ]);
+    expect(
+      (await purchasesOf(api, guardian, ada.id)).sales.map((sale) => sale.id)
+    ).toEqual([adaSale.id]);
+    expect(
+      (await purchasesOf(api, guardian, tobi.id)).sales.map((sale) => sale.id)
+    ).toEqual([tobiSale.id]);
+  });
+
+  test('show an empty history for a child who bought nothing', async ({
+    api,
+    app,
+    schools,
+  }) => {
+    const { ada } = await family(app, schools);
+    const student = await signInAs(api, studentOf(ada.logins));
+
+    expect(await purchasesOf(api, student, ada.id)).toEqual({
+      termName: 'First term',
+      spentThisTermMinor: 0,
+      termPurchaseCount: 0,
+      itemsBought: 0,
+      sales: [],
+    });
+  });
+
+  test('keep the frozen prices after the item’s price changes', async ({
+    api,
+    app,
+    pool,
+    schools,
+  }) => {
+    const { owner } = schools;
+    const { ada } = await family(app, schools);
+    const { large } = await shopFor(app, api, { schools, pool });
+    await sell(api, owner, {
+      studentId: ada.id,
+      lines: [{ itemId: large.id, quantity: 1 }],
+    });
+    await api(owner)
+      .patch(`/store/items/${large.id}`)
+      .send({ sellPriceMinor: 900_000 })
+      .expect(200);
+    const student = await signInAs(api, studentOf(ada.logins));
+
+    const purchases = await purchasesOf(api, student, ada.id);
+    expect(purchases.sales[0]?.lines[0]?.unitPriceMinor).toBe(450_000);
+    const list = await priceListOf(api, student, ada.id);
+    expect(list.uniforms[0]?.minPriceMinor).toBe(400_000);
+    expect(list.uniforms[0]?.maxPriceMinor).toBe(900_000);
+  });
+
+  test('list the books for the child’s level and every uniform, out of stock from the child’s own campus store', async ({
+    api,
+    app,
+    pool,
+    schools,
+  }) => {
+    const { ada, tobi, guardianLogin } = await family(app, schools);
+    await shopFor(app, api, { schools, pool });
+    const student = await signInAs(api, studentOf(ada.logins));
+    const guardian = await signInAs(api, guardianLogin);
+
+    const atLekki = await priceListOf(api, student, ada.id);
+    expect(atLekki).toEqual({
+      levelName: 'JSS 1',
+      books: [{ name: 'Mathematics', priceMinor: 320_000, inStock: true }],
+      uniforms: [
+        {
+          name: 'School shirt',
+          sizes: ['Size 10', 'Size 12'],
+          minPriceMinor: 400_000,
+          maxPriceMinor: 450_000,
+          inStock: true,
+        },
+      ],
+      paymentMethods: ['cash', 'pos', 'transfer'],
+    });
+    const atIkeja = await priceListOf(api, guardian, tobi.id);
+    expect(atIkeja.books).toEqual([
+      { name: 'Mathematics', priceMinor: 320_000, inStock: false },
+    ]);
+    expect(atIkeja.uniforms[0]?.inStock).toBe(true);
+    const listed = [...atLekki.books, ...atLekki.uniforms].map(
+      (row) => row.name
+    );
+    expect(listed).not.toContain('Old badge');
+  });
+
+  test('name only the ways to pay the school switched on', async ({
+    api,
+    app,
+    schools,
+  }) => {
+    const { owner } = schools;
+    const { ada } = await family(app, schools);
+    await api(owner)
+      .patch('/school-settings/payment-rules')
+      .send({ pos: false })
+      .expect(200);
+    const student = await signInAs(api, studentOf(ada.logins));
+
+    expect((await priceListOf(api, student, ada.id)).paymentMethods).toEqual([
+      'cash',
+      'transfer',
+    ]);
+  });
+
+  test('answer 404 for another family’s child, an unlinked sibling and another school', async ({
+    api,
+    app,
+    schools,
+  }) => {
+    const { owner, lekki, studentB } = schools;
+    const { ada, guardianLogin } = await family(app, schools);
+    const sibling = await createStudent(app, owner, {
+      campusId: lekki.id,
+      firstName: 'Kemi',
+      lastName: 'Okeke',
+    });
+    const student = await signInAs(api, studentOf(ada.logins));
+    const guardian = await signInAs(api, guardianLogin);
+
+    for (const id of [schools.studentLekki.id, sibling.id, studentB.id]) {
+      for (const path of purchaseRoutes(id)) {
+        await api(guardian).get(path).expect(404);
+        await api(student).get(path).expect(404);
+      }
+    }
+    for (const path of purchaseRoutes(ada.id)) {
+      await api(student).get(path).expect(200);
+    }
+  });
+
+  test('answer 403 for a custom guardian role without invoice:readOwn and for staff holding invoice:read only', async ({
+    api,
+    app,
+    pool,
+    withPermissions,
+    schools,
+  }) => {
+    const { ada, guardianLogin } = await family(app, schools);
+    const guardian = await signInAs(api, guardianLogin);
+    await purchasesOf(api, guardian, ada.id);
+    await pool.query(
+      `UPDATE "organizationRole" SET permission = $2
+       WHERE "organizationId" = $1 AND role = 'guardian'`,
+      [schools.orgA.id, guardianOnly]
+    );
+    const staff = await withPermissions(schools.orgA, ['invoice:read']);
+
+    for (const path of purchaseRoutes(ada.id)) {
+      await api(guardian).get(path).expect(403);
+      await api(staff).get(path).expect(403);
+    }
+    await detailOf(api, guardian, ada.id);
+  });
+});
+
 test.describe('a read-only portal', () => {
   test('rejects every non-GET method on every portal route', async ({
     api,
@@ -756,7 +1066,7 @@ test.describe('a read-only portal', () => {
     const guardian = await signInAs(api, guardianLogin);
     const client = api(guardian);
 
-    for (const path of allRoutes(ada.id)) {
+    for (const path of everyRoute(ada.id)) {
       for (const send of [
         () => client.post(path),
         () => client.put(path),

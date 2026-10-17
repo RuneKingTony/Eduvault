@@ -1,5 +1,5 @@
-import type { LedgerLine } from '../../common/ledger';
-import type { ChargeLine } from '../../common/fees';
+import type { LedgerLine } from '../ledger';
+import type { ChargeLine } from './charge-lines';
 
 interface ChargePosting {
   lines: readonly Pick<ChargeLine, 'ledgerAccountId' | 'amountMinor'>[];

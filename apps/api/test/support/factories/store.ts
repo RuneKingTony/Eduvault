@@ -1,4 +1,8 @@
-import type { Item, RecordedDelivery } from '@eduvault/api-contract';
+import type {
+  Item,
+  RecordedDelivery,
+  RecordedSale,
+} from '@eduvault/api-contract';
 import type { Pool } from 'pg';
 import type { Fixtures, TestUser } from '../base-test';
 
@@ -9,6 +13,13 @@ let sequence = 0;
 export const nextDeliveryReference = (): string => {
   sequence += 1;
   return `DEL-REQ-20261007-${String(sequence).padStart(8, '0')}`;
+};
+
+let saleSequence = 0;
+
+const nextSaleReference = (): string => {
+  saleSequence += 1;
+  return `STORE-20261007-${String(saleSequence).padStart(8, '0')}`;
 };
 
 export const shirt = (overrides: Record<string, unknown> = {}) => ({
@@ -159,4 +170,63 @@ export async function stockValueByCampus(
   return Object.fromEntries(
     rows.map((row) => [row.campus_id, Number(row.total)])
   );
+}
+
+interface SaleInput {
+  studentId: string;
+  lines: { itemId: string; quantity: number }[];
+  method?: 'cash' | 'pos' | 'transfer';
+  accountId?: string;
+  proofFileId?: string;
+  reference?: string;
+}
+
+export const saleBody = (input: SaleInput) => ({
+  reference: input.reference ?? nextSaleReference(),
+  studentId: input.studentId,
+  method: input.method ?? 'cash',
+  ...(input.accountId === undefined ? {} : { moneyAccountId: input.accountId }),
+  ...(input.proofFileId === undefined
+    ? {}
+    : { proofFileId: input.proofFileId }),
+  lines: input.lines,
+});
+
+export async function sell(
+  api: Api,
+  actor: TestUser,
+  input: SaleInput
+): Promise<RecordedSale> {
+  const res = await api(actor)
+    .post('/store/sales')
+    .send(saleBody(input))
+    .expect(201);
+  return res.body as RecordedSale;
+}
+
+const SALE_TABLES = [
+  'store_sale',
+  'store_sale_line',
+  'stock_movement',
+  'payment',
+  'payment_allocation',
+  'invoice',
+  'journal_entry',
+] as const;
+
+export async function saleTables(
+  pool: Pool
+): Promise<Record<(typeof SALE_TABLES)[number], number>> {
+  const counts = await Promise.all(
+    SALE_TABLES.map(async (table) => {
+      const { rows } = await pool.query<{ n: string }>(
+        `SELECT count(*)::text AS n FROM ${table}`
+      );
+      return [table, Number(rows[0]?.n)] as const;
+    })
+  );
+  return Object.fromEntries(counts) as Record<
+    (typeof SALE_TABLES)[number],
+    number
+  >;
 }

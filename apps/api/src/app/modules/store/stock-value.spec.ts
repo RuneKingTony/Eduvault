@@ -1,4 +1,4 @@
-import { averageCost, receiveValue } from './stock-value';
+import { averageCost, receiveValue, takeValue } from './stock-value';
 
 describe('receiveValue', () => {
   it('multiplies the quantity by the unit cost', () => {
@@ -28,5 +28,32 @@ describe('averageCost', () => {
   it('blends a later delivery at a different cost', () => {
     const value = receiveValue(10, 350_000) + receiveValue(5, 400_000);
     expect(averageCost(value, 15)).toBe(366_667);
+  });
+});
+
+describe('takeValue', () => {
+  it('takes units at the blended average of two deliveries', () => {
+    const value = receiveValue(10, 300_000) + receiveValue(10, 350_000);
+    expect(takeValue(value, 20, 2)).toBe(650_000);
+  });
+
+  it('rounds a share half up and gives the last units whatever is left', () => {
+    expect(takeValue(1_000_000, 3, 1)).toBe(333_333);
+    expect(takeValue(1_000_000, 3, 3)).toBe(1_000_000);
+    expect(takeValue(1_000_000 - 333_333, 2, 2)).toBe(666_667);
+  });
+
+  it('rounds exactly half up', () => {
+    expect(takeValue(5, 2, 1)).toBe(3);
+    expect(takeValue(1, 2, 1)).toBe(1);
+  });
+
+  it('costs nothing for donated stock', () => {
+    expect(takeValue(0, 4, 3)).toBe(0);
+  });
+
+  it('stays exact where the product passes 2^53', () => {
+    const value = 100_000 * 100_000_000;
+    expect(takeValue(value, 100_000, 99_999)).toBe(99_999 * 100_000_000);
   });
 });

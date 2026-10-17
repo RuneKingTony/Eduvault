@@ -7,16 +7,25 @@ import type {
   MoneyAccount,
   MoneyAccountList,
   RecordedDelivery,
+  RecordedSale,
+  Sale,
+  SaleList,
+  SaleOptions,
   StockRow,
   StoreSummary,
+  StoreTermFigures,
 } from '@eduvault/api-contract';
 import { IKEJA, LEKKI } from './test-members';
 
 export const BANK_ACCOUNT_ID = '00000000-0000-4000-8000-0000000f0101';
 export const LEVEL_ID = '00000000-0000-4000-8000-0000000f0201';
 export const SHIRT_ID = '00000000-0000-4000-8000-0000000f0301';
-const TIE_ID = '00000000-0000-4000-8000-0000000f0302';
+export const TIE_ID = '00000000-0000-4000-8000-0000000f0302';
 const BOOK_ID = '00000000-0000-4000-8000-0000000f0303';
+export const SALE_ID = '00000000-0000-4000-8000-0000000f0601';
+export const ADA_ID = '00000000-0000-4000-8000-0000000f0701';
+export const TOBI_ID = '00000000-0000-4000-8000-0000000f0702';
+export const PROOF_ID = '00000000-0000-4000-8000-0000000f0603';
 const DELIVERY_ID = '00000000-0000-4000-8000-0000000f0401';
 const OPENING_ID = '00000000-0000-4000-8000-0000000f0402';
 
@@ -83,11 +92,31 @@ export const itemList = (items: Item[]): ItemList => ({
   total: items.length,
 });
 
+export const NO_SALES: StoreTermFigures = {
+  termSalesMinor: 0,
+  termCostMinor: 0,
+  termSalesCount: 0,
+  termItemsSold: 0,
+  termStudentsServed: 0,
+};
+
+export const termFigures = (
+  over: Partial<StoreTermFigures> = {}
+): StoreTermFigures => ({
+  termSalesMinor: 2_700_000,
+  termCostMinor: 2_000_000,
+  termSalesCount: 4,
+  termItemsSold: 9,
+  termStudentsServed: 3,
+  ...over,
+});
+
 export const storeSummary = (
   over: Partial<StoreSummary> = {}
 ): StoreSummary => ({
   stockValueMinor: 7_000_000,
   lowCount: 2,
+  ...termFigures(),
   ...over,
 });
 
@@ -162,4 +191,109 @@ export const moneyAccountList = (
   currency: 'NGN',
   items,
   hiddenSchoolWideCount: 0,
+});
+
+export const sale = (over: Partial<Sale> = {}): Sale => ({
+  id: SALE_ID,
+  number: 'ISS-2026-0001',
+  reference: 'STORE-20260922-AB12CD34',
+  soldOn: '2026-09-22',
+  student: {
+    id: ADA_ID,
+    name: 'Ada Okeke',
+    admissionNumber: 'GF-0123',
+    className: 'JSS 1 Gold',
+  },
+  campusId: LEKKI.id,
+  campusName: 'Lekki',
+  soldBy: 'Chika Eze',
+  lines: [
+    {
+      itemId: SHIRT_ID,
+      displayName: 'School shirt, Size 12',
+      quantity: 2,
+      unitPriceMinor: 550_000,
+      amountMinor: 1_100_000,
+      costMinor: 700_000,
+      unitCostMinor: 350_000,
+    },
+    {
+      itemId: TIE_ID,
+      displayName: 'School tie',
+      quantity: 1,
+      unitPriceMinor: 200_000,
+      amountMinor: 200_000,
+      costMinor: 120_000,
+      unitCostMinor: 120_000,
+    },
+  ],
+  totalMinor: 1_300_000,
+  costMinor: 820_000,
+  chargeId: '00000000-0000-4000-8000-0000000f0602',
+  chargeNumber: 'CHG-2026-00001',
+  paymentId: '00000000-0000-4000-8000-0000000f0604',
+  receiptNumber: 'RCT-2026-00012',
+  method: 'pos',
+  proof: { fileId: PROOF_ID, fileName: 'pos-slip.pdf' },
+  ...over,
+});
+
+export const saleList = (items: Sale[] = [sale()]): SaleList => ({
+  items,
+  total: items.length,
+});
+
+export const recordedSale = (
+  over: Partial<RecordedSale> = {}
+): RecordedSale => ({
+  ...sale(),
+  replayed: false,
+  ...over,
+});
+
+export const CASH_BOX_ID = '00000000-0000-4000-8000-0000000f0801';
+export const POS_ID = '00000000-0000-4000-8000-0000000f0802';
+
+export const saleOptions = (over: Partial<SaleOptions> = {}): SaleOptions => ({
+  students: [
+    {
+      id: ADA_ID,
+      name: 'Ada Okeke',
+      admissionNumber: 'GF-0123',
+      className: 'JSS 1 Gold',
+      levelId: LEVEL_ID,
+      levelName: 'JSS 1',
+      campusId: LEKKI.id,
+      campusName: 'Lekki',
+      balanceMinor: 1_250_000,
+    },
+    {
+      id: TOBI_ID,
+      name: 'Tobi Adewale',
+      admissionNumber: 'GF-0124',
+      className: 'JSS 1 Blue',
+      levelId: LEVEL_ID,
+      levelName: 'JSS 1',
+      campusId: IKEJA.id,
+      campusName: 'Ikeja',
+      balanceMinor: -300_000,
+    },
+  ],
+  methods: { cash: true, transfer: true, pos: true },
+  accounts: [
+    {
+      id: CASH_BOX_ID,
+      name: 'Lekki cash box',
+      kind: 'cash',
+      campusId: LEKKI.id,
+    },
+    { id: POS_ID, name: 'Moniepoint POS', kind: 'pos', campusId: LEKKI.id },
+    {
+      id: BANK_ACCOUNT_ID,
+      name: 'GTBank current',
+      kind: 'bank',
+      campusId: null,
+    },
+  ],
+  ...over,
 });
