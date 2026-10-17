@@ -4,7 +4,12 @@ import {
   ANNOUNCEMENT_PAGE_SIZE,
   announcementSummarySchema,
 } from './announcements';
-import { idSchema } from './schemas';
+import { FINANCE_PAGE_SIZE, FINANCE_PAGE_SIZE_MAX } from './finance';
+import { currencySchema, idSchema } from './schemas';
+import {
+  statementRowStatusSchema,
+  statementTotalsSchema,
+} from './student-accounts';
 
 export const PORTAL_STUDENT_NOT_FOUND_MESSAGE = 'Student not found';
 export const PORTAL_ANNOUNCEMENTS_MAX = 5;
@@ -28,6 +33,7 @@ export const portalChildSchema = z.object({
   className: z.string().nullable(),
   campusName: z.string(),
   archived: z.boolean(),
+  balanceMinor: z.number().int().optional(),
 });
 export type PortalChild = z.infer<typeof portalChildSchema>;
 
@@ -42,6 +48,7 @@ export const portalMeSchema = z.object({
   school: z.object({
     name: z.string(),
     admissionPrefix: z.string(),
+    currency: currencySchema,
     logoUrl: z.string().nullable(),
   }),
   children: z.array(portalChildSchema),
@@ -102,3 +109,64 @@ export const portalAnnouncementListSchema = z.object({
 export type PortalAnnouncementList = z.infer<
   typeof portalAnnouncementListSchema
 >;
+
+export const portalStatementQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).optional(),
+  pageSize: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(FINANCE_PAGE_SIZE_MAX)
+    .default(FINANCE_PAGE_SIZE),
+});
+export type PortalStatementQuery = z.output<typeof portalStatementQuerySchema>;
+
+export const portalStatementRowSchema = z.object({
+  effectiveOn: z.iso.date(),
+  description: z.string(),
+  status: statementRowStatusSchema,
+  amountMinor: z.number().int().positive(),
+});
+export type PortalStatementRow = z.infer<typeof portalStatementRowSchema>;
+
+export const portalStatementUnpaidSchema = z.object({
+  number: z.string(),
+  outstandingMinor: z.number().int().positive(),
+});
+export type PortalStatementUnpaid = z.infer<typeof portalStatementUnpaidSchema>;
+
+export const portalStatementSchema = z.object({
+  currency: currencySchema,
+  student: z.object({
+    id: idSchema,
+    name: z.string(),
+    admissionNumber: z.string(),
+    className: z.string().nullable(),
+    campusName: z.string(),
+    archived: z.boolean(),
+  }),
+  totals: statementTotalsSchema,
+  rows: z.array(portalStatementRowSchema),
+  total: z.number().int().nonnegative(),
+  page: z.number().int().min(1),
+  pageSize: z.number().int().min(1),
+  unpaid: z.array(portalStatementUnpaidSchema),
+});
+export type PortalStatement = z.infer<typeof portalStatementSchema>;
+
+export const portalFamilyStatementSchema = z.object({
+  currency: currencySchema,
+  totalOwedMinor: z.number().int().nonnegative(),
+  creditMinor: z.number().int().nonnegative(),
+  children: z.array(
+    z.object({
+      studentId: idSchema,
+      name: z.string(),
+      className: z.string().nullable(),
+      campusName: z.string(),
+      archived: z.boolean(),
+      balanceMinor: z.number().int(),
+    })
+  ),
+});
+export type PortalFamilyStatement = z.infer<typeof portalFamilyStatementSchema>;

@@ -1,4 +1,13 @@
-import { firstNameOf, portalKindOf, realEmail } from './portal-rules';
+import type { PortalChild } from '@eduvault/api-contract';
+import type { OwnStatement } from '../student-account/student-account.service';
+import {
+  firstNameOf,
+  portalKindOf,
+  realEmail,
+  toPortalFamilyStatement,
+  toPortalStatement,
+} from './portal-rules';
+import type { PortalStudentRecord } from './portal.repository';
 
 describe('portalKindOf', () => {
   it('is student when the caller has a student row, else guardian', () => {
@@ -26,5 +35,151 @@ describe('firstNameOf', () => {
   it('takes the first word of a guardian’s name', () => {
     expect(firstNameOf('  Ngozi Okeke ', null)).toBe('Ngozi');
     expect(firstNameOf('Ngozi', null)).toBe('Ngozi');
+  });
+});
+
+const record: PortalStudentRecord = {
+  id: 'ada',
+  firstName: 'Ada',
+  lastName: 'Okeke',
+  admissionNumber: 'GF-0001',
+  dateOfBirth: '2014-05-02',
+  className: 'JSS 1 Gold',
+  campusName: 'Lekki',
+  campusId: 'lekki',
+  armId: 'arm',
+  username: 'gf-0001',
+  archived: true,
+};
+
+const own: OwnStatement = {
+  currency: 'NGN',
+  totals: {
+    balanceMinor: 6_000_000,
+    totalMinor: 10_000_000,
+    paidMinor: 4_000_000,
+    reducedMinor: 0,
+  },
+  rows: [
+    {
+      entryId: 'entry-1',
+      effectiveOn: '2026-09-01',
+      reference: 'RCT-0001',
+      description: 'Payment RCT-0001 from Ngozi (Bank transfer)',
+      status: 'paid',
+      amountMinor: 4_000_000,
+      link: { type: 'payment', id: 'payment-1' },
+    },
+  ],
+  total: 1,
+  page: 1,
+  pageSize: 10,
+  unpaid: [
+    {
+      reference: 'INV-0001',
+      outstandingMinor: 6_000_000,
+      link: { type: 'invoice', id: 'invoice-1' },
+    },
+  ],
+};
+
+describe('toPortalStatement', () => {
+  it('names the student from the portal record, archived flag included', () => {
+    expect(toPortalStatement(record, own).student).toEqual({
+      id: 'ada',
+      name: 'Ada Okeke',
+      admissionNumber: 'GF-0001',
+      className: 'JSS 1 Gold',
+      campusName: 'Lekki',
+      archived: true,
+    });
+  });
+
+  it('drops the reference, link and entry id from every row', () => {
+    const { rows } = toPortalStatement(record, own);
+    expect(rows).toEqual([
+      {
+        effectiveOn: '2026-09-01',
+        description: 'Payment RCT-0001 from Ngozi (Bank transfer)',
+        status: 'paid',
+        amountMinor: 4_000_000,
+      },
+    ]);
+  });
+
+  it('keeps the charge number and amount of an unpaid charge and drops its link', () => {
+    expect(toPortalStatement(record, own).unpaid).toEqual([
+      { number: 'INV-0001', outstandingMinor: 6_000_000 },
+    ]);
+  });
+
+  it('carries the totals and paging across unchanged', () => {
+    expect(toPortalStatement(record, own)).toMatchObject({
+      currency: 'NGN',
+      totals: own.totals,
+      total: 1,
+      page: 1,
+      pageSize: 10,
+    });
+  });
+});
+
+const child = (
+  id: string,
+  overrides: Partial<PortalChild> = {}
+): PortalChild => ({
+  id,
+  firstName: id,
+  lastName: 'Okeke',
+  className: null,
+  campusName: 'Lekki',
+  archived: false,
+  ...overrides,
+});
+
+describe('toPortalFamilyStatement', () => {
+  it('keeps ₦100,000 owed and ₦20,000 credit apart rather than netting them', () => {
+    const family = toPortalFamilyStatement(
+      'NGN',
+      [child('ada'), child('chidi'), child('tobi')],
+      new Map([
+        ['ada', 6_000_000],
+        ['chidi', 4_000_000],
+        ['tobi', -2_000_000],
+      ])
+    );
+    expect(family.totalOwedMinor).toBe(10_000_000);
+    expect(family.creditMinor).toBe(2_000_000);
+    expect(family.children.map((row) => row.balanceMinor)).toEqual([
+      6_000_000, 4_000_000, -2_000_000,
+    ]);
+  });
+
+  it('lists a left child with debt as archived with their balance', () => {
+    const family = toPortalFamilyStatement(
+      'NGN',
+      [child('ada', { archived: true })],
+      new Map([['ada', 300_000]])
+    );
+    expect(family.children).toEqual([
+      {
+        studentId: 'ada',
+        name: 'ada Okeke',
+        className: null,
+        campusName: 'Lekki',
+        archived: true,
+        balanceMinor: 300_000,
+      },
+    ]);
+    expect(family.totalOwedMinor).toBe(300_000);
+  });
+
+  it('is empty with zero totals when no child is in scope', () => {
+    expect(toPortalFamilyStatement('NGN', [], new Map())).toEqual({
+      currency: 'NGN',
+      totalOwedMinor: 0,
+      creditMinor: 0,
+      children: [],
+    });
   });
 });

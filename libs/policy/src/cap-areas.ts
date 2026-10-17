@@ -266,14 +266,18 @@ export const CAP_AREAS: readonly CapArea[] = [
     see: ['student:readOwn'],
     change: [],
     changeDesc: '',
-    extras: [],
+    extras: [
+      {
+        label: 'Sees fees',
+        description: 'Charges, payments and the family statement.',
+        permissions: ['invoice:readOwn', 'payment:readOwn', 'feeLine:readOwn'],
+        important: false,
+      },
+    ],
   },
 ];
 
-export const LEGACY_PERMISSIONS: readonly Permission[] = [
-  'feeLine:readOwn',
-  'invoice:readOwn',
-];
+export const LEGACY_PERMISSIONS: readonly Permission[] = [];
 
 export function capLevel(permissions: PermissionMap, area: CapArea): CapLevel {
   const every = (list: readonly Permission[]) =>

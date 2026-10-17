@@ -30,6 +30,13 @@ export const PORTAL_NAV: readonly PortalNavEntry[] = [
     icon: 'house',
     permission: 'student:readOwn',
   },
+  {
+    id: 'fees',
+    label: 'Fees',
+    route: '/fees',
+    icon: 'receipt',
+    permission: 'invoice:readOwn',
+  },
 ];
 
 interface NavAudience {

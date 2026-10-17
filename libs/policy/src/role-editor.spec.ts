@@ -417,10 +417,9 @@ describe('capabilityLabel', () => {
     );
   });
 
-  it('falls back to the permission label for a legacy permission', () => {
-    expect(capabilityLabel('feeLine:readOwn')).toBe(
-      'School and other fees: read own'
-    );
+  it('labels an extra switch by its own label', () => {
+    expect(capabilityLabel('payment:void')).toBe('Asks to cancel payments');
+    expect(capabilityLabel('feeLine:readOwn')).toBe('Sees fees');
   });
 
   it('lists each label once', () => {

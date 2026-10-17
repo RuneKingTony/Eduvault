@@ -1,11 +1,13 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { ApiError, type AnnouncementSummary } from '@eduvault/api-contract';
+import type { Permission } from '@eduvault/policy';
 import { addDays, lagosDateOf } from '@eduvault/shared';
 import {
   calendarCurrent,
   dayOffEntry,
   portalAnnouncements,
   portalChild,
+  portalFamilyStatement,
   portalMe,
   portalStudent,
   renderWithApi,
@@ -66,6 +68,8 @@ const renderHome = (
     childId?: string;
     onMissing?: () => void;
     onSeeAll?: (childId: string) => void;
+    onSeeFees?: (childId: string) => void;
+    held?: Permission[];
   } = {}
 ) =>
   renderWithApi(
@@ -74,8 +78,10 @@ const renderHome = (
       childId={props.childId}
       onChildMissing={props.onMissing ?? vi.fn()}
       onSeeAllAnnouncements={props.onSeeAll ?? vi.fn()}
+      onSeeFees={props.onSeeFees ?? vi.fn()}
     />,
-    api
+    api,
+    props.held
   );
 
 describe('Home hero', () => {
@@ -406,5 +412,74 @@ describe('Home states and the selected child', () => {
   it('says so when no children are linked', () => {
     renderHome(apiWith(), { me: portalMe({ children: [] }) });
     expect(screen.getByText('No children linked')).toBeInTheDocument();
+  });
+});
+
+const WITH_FEES: Permission[] = ['student:readOwn', 'invoice:readOwn'];
+
+const feesApi = (balanceMinor: number) => {
+  const base = apiWith();
+  return {
+    ...base,
+    portal: {
+      ...base.portal,
+      children: vi
+        .fn()
+        .mockResolvedValue([
+          portalChild({ id: 'ada', firstName: 'Ada', balanceMinor }),
+          portalChild({ id: 'tobi', firstName: 'Tobi', balanceMinor: 0 }),
+        ]),
+      familyStatement: vi.fn().mockResolvedValue(portalFamilyStatement()),
+    },
+  };
+};
+
+describe('Home fees tile', () => {
+  it('shows what is owed for the selected child', async () => {
+    renderHome(feesApi(6_000_000), { held: WITH_FEES });
+    const tile = await screen.findByRole('button', { name: /Fees/ });
+    expect(within(tile).getByText('₦60,000')).toBeInTheDocument();
+    expect(within(tile).getByText('Owed')).toBeInTheDocument();
+  });
+
+  it('shows Paid up and what was paid ahead when in credit', async () => {
+    renderHome(feesApi(-500_000), { held: WITH_FEES });
+    const tile = await screen.findByRole('button', { name: /Fees/ });
+    expect(within(tile).getByText('Paid up')).toBeInTheDocument();
+    expect(within(tile).getByText('₦5,000 paid ahead')).toBeInTheDocument();
+  });
+
+  it('shows Paid up and Nothing owed at zero, with the other child’s balance ignored', async () => {
+    renderHome(feesApi(0), { held: WITH_FEES, childId: 'tobi' });
+    const tile = await screen.findByRole('button', { name: /Fees/ });
+    expect(within(tile).getByText('Paid up')).toBeInTheDocument();
+    expect(within(tile).getByText('Nothing owed')).toBeInTheDocument();
+  });
+
+  it('needs only the children list, so a failing family statement leaves it standing', async () => {
+    const api = feesApi(6_000_000);
+    api.portal.familyStatement.mockRejectedValue(new Error('boom'));
+    renderHome(api, { held: WITH_FEES });
+    const tile = await screen.findByRole('button', { name: /Fees/ });
+    expect(within(tile).getByText('₦60,000')).toBeInTheDocument();
+    expect(api.portal.familyStatement).not.toHaveBeenCalled();
+  });
+
+  it('opens Fees for the selected child', async () => {
+    const onSeeFees = vi.fn();
+    renderHome(feesApi(6_000_000), { held: WITH_FEES, onSeeFees });
+    fireEvent.click(await screen.findByRole('button', { name: /Fees/ }));
+    expect(onSeeFees).toHaveBeenCalledWith('ada');
+  });
+
+  it('is hidden, and asks for no balances, without invoice:readOwn', async () => {
+    const api = feesApi(6_000_000);
+    renderHome(api);
+    await screen.findByText('Class teacher');
+    expect(
+      screen.queryByRole('button', { name: /Fees/ })
+    ).not.toBeInTheDocument();
+    expect(api.portal.children).not.toHaveBeenCalled();
+    expect(api.portal.familyStatement).not.toHaveBeenCalled();
   });
 });

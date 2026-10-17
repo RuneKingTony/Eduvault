@@ -27,6 +27,9 @@ function ChildrenRoute() {
       onOpenChild={(child) => {
         void navigate({ to: '/', search: { child } });
       }}
+      onSeeFees={(child) => {
+        void navigate({ to: '/fees', search: { child } });
+      }}
     />
   );
 }

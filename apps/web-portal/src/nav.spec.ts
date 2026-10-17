@@ -1,8 +1,9 @@
 import { toPermissionMap } from '@eduvault/policy';
 import { PORTAL_NAV, isCurrent, visiblePortalNav } from './nav';
 
-const BUILT = new Set(['/', '/children']);
+const BUILT = new Set(['/', '/children', '/fees']);
 const readOwn = toPermissionMap(['student:readOwn']);
+const readOwnFees = toPermissionMap(['student:readOwn', 'invoice:readOwn']);
 
 const idsFor = (
   kind: 'student' | 'guardian',
@@ -14,19 +15,36 @@ const idsFor = (
   );
 
 describe('portal nav', () => {
-  it('lists My children then Home', () => {
+  it('lists My children, Home then Fees', () => {
     expect(PORTAL_NAV.map((entry) => [entry.label, entry.route])).toEqual([
       ['My children', '/children'],
       ['Home', '/'],
+      ['Fees', '/fees'],
     ]);
   });
 
-  it('gives a guardian My children and Home', () => {
-    expect(idsFor('guardian')).toEqual(['children', 'home']);
+  it('gives a guardian My children, Home and Fees with invoice:readOwn', () => {
+    expect(idsFor('guardian', readOwnFees)).toEqual([
+      'children',
+      'home',
+      'fees',
+    ]);
   });
 
-  it('gives a student Home only', () => {
+  it('gives a student Home and Fees with invoice:readOwn', () => {
+    expect(idsFor('student', readOwnFees)).toEqual(['home', 'fees']);
+  });
+
+  it('hides Fees without invoice:readOwn for both kinds', () => {
+    expect(idsFor('guardian')).toEqual(['children', 'home']);
     expect(idsFor('student')).toEqual(['home']);
+  });
+
+  it('puts Fees on the receipt icon behind invoice:readOwn', () => {
+    expect(PORTAL_NAV.find((entry) => entry.id === 'fees')).toMatchObject({
+      icon: 'receipt',
+      permission: 'invoice:readOwn',
+    });
   });
 
   it('shows nothing without student:readOwn', () => {
@@ -35,7 +53,7 @@ describe('portal nav', () => {
   });
 
   it('keeps only the entries whose route exists', () => {
-    expect(idsFor('guardian', readOwn, new Set(['/']))).toEqual(['home']);
+    expect(idsFor('guardian', readOwnFees, new Set(['/']))).toEqual(['home']);
   });
 
   it('gives My children a shorter label for the bottom bar', () => {

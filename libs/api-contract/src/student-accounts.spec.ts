@@ -1,7 +1,10 @@
 import { contract } from './contract';
 import {
+  ROW_STATUS_LABELS,
+  STATEMENT_ROW_STATUSES,
   balanceListQuerySchema,
   guardianStatementParamsSchema,
+  isOwingStatus,
   statementQuerySchema,
 } from './student-accounts';
 
@@ -57,5 +60,19 @@ describe('studentAccounts routes', () => {
     expect(
       guardianStatementParamsSchema.safeParse({ guardianId: 'nope' }).success
     ).toBe(false);
+  });
+});
+
+describe('the statement row statuses', () => {
+  it('label every status in plain words', () => {
+    expect(Object.keys(ROW_STATUS_LABELS)).toEqual([...STATEMENT_ROW_STATUSES]);
+    expect(ROW_STATUS_LABELS.cancelled).toBe('Payment cancelled');
+    expect(ROW_STATUS_LABELS.refunded).toBe('Refunded');
+  });
+
+  it('count charged, cancelled and refunded rows as owing and paid and reduced as not', () => {
+    expect(
+      STATEMENT_ROW_STATUSES.filter((status) => isOwingStatus(status))
+    ).toEqual(['charged', 'cancelled', 'refunded']);
   });
 });

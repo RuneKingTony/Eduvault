@@ -51,6 +51,9 @@ function HomeRoute() {
       onSeeAllAnnouncements={(id) => {
         void navigate({ to: '/announcements', search: { child: id } });
       }}
+      onSeeFees={(id) => {
+        void navigate({ to: '/fees', search: { child: id } });
+      }}
     />
   );
 }

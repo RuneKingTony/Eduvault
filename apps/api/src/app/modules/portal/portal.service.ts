@@ -6,13 +6,24 @@ import {
   type PortalAnnouncements,
   type PortalAnnouncementsQuery,
   type PortalChild,
+  type PortalFamilyStatement,
   type PortalMe,
+  type PortalStatement,
+  type PortalStatementQuery,
   type PortalStudent,
 } from '@eduvault/api-contract';
+import { holds } from '@eduvault/policy';
 import type { OrgContext } from '../../common/auth';
 import { AnnouncementService } from '../announcement/announcement.service';
 import { orderTeachers } from '../class/class-view';
-import { firstNameOf, portalKindOf, realEmail } from './portal-rules';
+import { StudentAccountService } from '../student-account/student-account.service';
+import {
+  firstNameOf,
+  portalKindOf,
+  realEmail,
+  toPortalFamilyStatement,
+  toPortalStatement,
+} from './portal-rules';
 import {
   PortalRepository,
   type PortalScope,
@@ -28,7 +39,8 @@ const scopeOf = (ctx: OrgContext): PortalScope => ({
 export class PortalService {
   constructor(
     private readonly portal: PortalRepository,
-    private readonly announcements: AnnouncementService
+    private readonly announcements: AnnouncementService,
+    private readonly accounts: StudentAccountService
   ) {}
 
   async me(ctx: OrgContext): Promise<PortalMe> {
@@ -53,7 +65,28 @@ export class PortalService {
   }
 
   children(ctx: OrgContext): Promise<PortalChild[]> {
-    return this.portal.children(scopeOf(ctx));
+    return holds(ctx.permissions, 'invoice:readOwn')
+      ? this.portal.childrenWithBalance(scopeOf(ctx))
+      : this.portal.children(scopeOf(ctx));
+  }
+
+  async statement(
+    ctx: OrgContext,
+    studentId: string,
+    query: PortalStatementQuery
+  ): Promise<PortalStatement> {
+    const record = await this.require(ctx, studentId);
+    const own = await this.accounts.ownStatement(ctx, studentId, query);
+    return toPortalStatement(record, own);
+  }
+
+  async familyStatement(ctx: OrgContext): Promise<PortalFamilyStatement> {
+    const children = await this.portal.children(scopeOf(ctx));
+    const { currency, balances } = await this.accounts.ownBalances(
+      ctx,
+      children.map((child) => child.id)
+    );
+    return toPortalFamilyStatement(currency, children, balances);
   }
 
   async student(ctx: OrgContext, studentId: string): Promise<PortalStudent> {

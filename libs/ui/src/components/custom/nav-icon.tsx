@@ -15,6 +15,7 @@ import {
   LayoutDashboardIcon,
   LockIcon,
   MegaphoneIcon,
+  ReceiptIcon,
   SchoolIcon,
   SettingsIcon,
   ShieldAlertIcon,
@@ -61,6 +62,7 @@ const NAV_ICONS = {
   'sliders-horizontal': SlidersHorizontalIcon,
   lock: LockIcon,
   'code-xml': CodeXmlIcon,
+  receipt: ReceiptIcon,
 } as const satisfies Record<string, LucideIcon>;
 
 export type NavIconName = keyof typeof NAV_ICONS;

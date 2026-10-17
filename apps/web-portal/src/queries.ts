@@ -61,6 +61,27 @@ export const portalAnnouncementListQueryOptions = (
     placeholderData: keepPreviousData,
   });
 
+export const portalStatementQueryOptions = (
+  api: Api,
+  studentId: string,
+  page: number | undefined
+) =>
+  queryOptions({
+    queryKey: [...PORTAL_KEY, 'statement', studentId, page],
+    queryFn: () =>
+      api.portal.statement({
+        params: { studentId },
+        query: page === undefined ? {} : { page },
+      }),
+    placeholderData: keepPreviousData,
+  });
+
+export const portalFamilyStatementQueryOptions = (api: Api) =>
+  queryOptions({
+    queryKey: [...PORTAL_KEY, 'family-statement'],
+    queryFn: () => api.portal.familyStatement({}),
+  });
+
 export const calendarCurrentQueryOptions = (api: Api) =>
   queryOptions({
     queryKey: [...CALENDAR_KEY, 'current'],

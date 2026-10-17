@@ -10,7 +10,7 @@ export const statements = {
   class: ['create', 'read', 'readAll', 'update', 'assignTeacher'],
   feeLine: ['create', 'read', 'readOwn', 'update', 'retire'],
   invoice: ['bill', 'read', 'readOwn'],
-  payment: ['record', 'read', 'void'],
+  payment: ['record', 'read', 'readOwn', 'void'],
   adjustment: ['create', 'read', 'approve'],
   announcement: ['create', 'read', 'update'],
   ledger: ['read', 'manageAccounts'],
@@ -107,6 +107,8 @@ export const PERM_HELP: Partial<Record<Permission, string>> = {
   'payment:record':
     'Records cash, transfer and POS payments and issues receipts, on the campuses they see.',
   'payment:read': 'Sees payments and receipts, and who owes what.',
+  'payment:readOwn':
+    'Students see their own payments. Guardians see their children’s.',
   'payment:void':
     'Asks for a recorded payment to be cancelled. A second person approves it.',
   'adjustment:create':

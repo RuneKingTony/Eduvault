@@ -60,3 +60,4 @@ export * from './components/custom/announcement-tag-badge';
 export * from './components/custom/error-message';
 export * from './components/custom/toast';
 export * from './components/custom/field-error';
+export * from './components/custom/statement-card';

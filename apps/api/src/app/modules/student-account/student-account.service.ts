@@ -16,15 +16,50 @@ import type { OrgContext } from '../../common/auth';
 import { Clock } from '../../common/clock';
 import { familyTotals, statementTotals } from '../../common/ledger';
 import {
+  describeForFamily,
+  describeMovement,
   pageOfRows,
   scopeNote,
   statementRowsOf,
   unpaidOf,
+  type Describer,
+  type MovementRecord,
 } from './statement-assembly';
 import {
   StudentAccountRepository,
   type AccountScope,
 } from './student-account.repository';
+
+export type OwnStatement = Omit<StudentStatement, 'student' | 'family'>;
+
+interface StudentHistory {
+  currency: string;
+  movements: readonly MovementRecord[];
+}
+
+function ownStatementOf(
+  { currency, movements }: StudentHistory,
+  query: StatementQuery,
+  describe: Describer
+): OwnStatement {
+  const rows = statementRowsOf(movements, describe);
+  const { items, page } = pageOfRows(rows, query.page, query.pageSize);
+  return {
+    currency,
+    totals: statementTotals(movements),
+    rows: items,
+    total: rows.length,
+    page,
+    pageSize: query.pageSize,
+    unpaid: unpaidOf(movements),
+  };
+}
+
+function requireOwnStudents(ctx: OrgContext, studentIds: readonly string[]) {
+  if (studentIds.some((id) => !ctx.studentScope.includes(id))) {
+    throw new NotFoundException(STUDENT_ACCOUNT_NOT_FOUND_MESSAGE);
+  }
+}
 
 interface Received {
   minor: number;
@@ -133,22 +168,13 @@ export class StudentAccountService {
     if (header === undefined) {
       throw new NotFoundException(STUDENT_ACCOUNT_NOT_FOUND_MESSAGE);
     }
-    const [currency, movements, family] = await Promise.all([
-      this.accounts.currency(ctx.organizationId),
-      this.accounts.movements(ctx.organizationId, studentId),
+    const [history, family] = await Promise.all([
+      this.history(ctx.organizationId, studentId),
       this.accounts.family(scope, studentId),
     ]);
-    const rows = statementRowsOf(movements);
-    const { items, page } = pageOfRows(rows, query.page, query.pageSize);
     return {
-      currency,
+      ...ownStatementOf(history, query, describeMovement),
       student: header,
-      totals: statementTotals(movements),
-      rows: items,
-      total: rows.length,
-      page,
-      pageSize: query.pageSize,
-      unpaid: unpaidOf(movements),
       family,
     };
   }
@@ -182,5 +208,53 @@ export class StudentAccountService {
       creditMinor,
       children,
     };
+  }
+
+  async ownStatement(
+    ctx: OrgContext,
+    studentId: string,
+    query: StatementQuery
+  ): Promise<OwnStatement> {
+    requireOwnStudents(ctx, [studentId]);
+    return ownStatementOf(
+      await this.history(ctx.organizationId, studentId),
+      query,
+      describeForFamily
+    );
+  }
+
+  async ownBalances(
+    ctx: OrgContext,
+    studentIds: readonly string[]
+  ): Promise<{ currency: string; balances: Map<string, number> }> {
+    requireOwnStudents(ctx, studentIds);
+    const [currency, histories] = await Promise.all([
+      this.accounts.currency(ctx.organizationId),
+      Promise.all(
+        studentIds.map((studentId) =>
+          this.accounts.movements(ctx.organizationId, studentId)
+        )
+      ),
+    ]);
+    return {
+      currency,
+      balances: new Map(
+        studentIds.map((studentId, index) => [
+          studentId,
+          statementTotals(histories[index] ?? []).balanceMinor,
+        ])
+      ),
+    };
+  }
+
+  private async history(
+    organizationId: string,
+    studentId: string
+  ): Promise<StudentHistory> {
+    const [currency, movements] = await Promise.all([
+      this.accounts.currency(organizationId),
+      this.accounts.movements(organizationId, studentId),
+    ]);
+    return { currency, movements };
   }
 }

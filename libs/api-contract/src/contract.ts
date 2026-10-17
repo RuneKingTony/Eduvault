@@ -153,7 +153,10 @@ import {
   portalAnnouncementsQuerySchema,
   portalAnnouncementsSchema,
   portalChildSchema,
+  portalFamilyStatementSchema,
   portalMeSchema,
+  portalStatementQuerySchema,
+  portalStatementSchema,
   portalStudentParamsSchema,
   portalStudentSchema,
 } from './portal';
@@ -1202,6 +1205,18 @@ export const contract = defineContract({
       params: portalStudentParamsSchema,
       query: portalAnnouncementListQuerySchema,
       response: portalAnnouncementListSchema,
+    }),
+    statement: defineRoute({
+      method: 'GET',
+      path: '/portal/students/:studentId/statement',
+      params: portalStudentParamsSchema,
+      query: portalStatementQuerySchema,
+      response: portalStatementSchema,
+    }),
+    familyStatement: defineRoute({
+      method: 'GET',
+      path: '/portal/family-statement',
+      response: portalFamilyStatementSchema,
     }),
   },
   announcements: {

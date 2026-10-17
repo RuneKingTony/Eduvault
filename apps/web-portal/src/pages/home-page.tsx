@@ -22,6 +22,7 @@ interface ChildHomeProps {
   selected: PortalChild;
   onChildMissing: (firstChildId: string) => void;
   onSeeAllAnnouncements: (childId: string) => void;
+  onSeeFees: (childId: string) => void;
 }
 
 function ChildHome({
@@ -29,6 +30,7 @@ function ChildHome({
   selected,
   onChildMissing,
   onSeeAllAnnouncements,
+  onSeeFees,
 }: ChildHomeProps) {
   const student = useQuery(portalStudentQueryOptions(useApi(), selected.id));
   const [today] = useState(() => lagosDateOf(new Date()));
@@ -54,7 +56,12 @@ function ChildHome({
   return (
     <>
       <HomeHero me={me} student={student.data} />
-      <HomeTiles student={student.data} today={today} />
+      <HomeTiles
+        student={student.data}
+        currency={me.school.currency}
+        today={today}
+        onSeeFees={onSeeFees}
+      />
       <div className="grid gap-4 lg:grid-cols-2">
         <AnnouncementsCard
           studentId={selected.id}
@@ -77,11 +84,13 @@ export function HomePage({
   childId,
   onChildMissing,
   onSeeAllAnnouncements,
+  onSeeFees,
 }: {
   me: PortalMe;
   childId: string | undefined;
   onChildMissing: (firstChildId: string) => void;
   onSeeAllAnnouncements: (childId: string) => void;
+  onSeeFees: (childId: string) => void;
 }) {
   const selected = selectChild(me.children, childId);
   if (selected === undefined) {
@@ -94,6 +103,7 @@ export function HomePage({
       selected={selected}
       onChildMissing={onChildMissing}
       onSeeAllAnnouncements={onSeeAllAnnouncements}
+      onSeeFees={onSeeFees}
     />
   );
 }

@@ -19,6 +19,10 @@ const ctxOf = (
   }) as OrgContext;
 
 const everyone = ctxOf('all');
+const familyOf = (studentScope: string[]): OrgContext => ({
+  ...ctxOf([]),
+  studentScope,
+});
 const lekkiOnly = ctxOf(['lekki']);
 const invoiceOnly = ctxOf('all', ['invoice:read']);
 
@@ -315,5 +319,172 @@ describe('StudentAccountService.guardianStatement', () => {
       'chidi',
       'tobi',
     ]);
+  });
+});
+
+const history = (count: number) =>
+  Array.from({ length: count }, (_, index) =>
+    movement({
+      kind: 'invoice',
+      entryId: `e${index}`,
+      reference: `CHG-${index}`,
+      debitMinor: 1000,
+      effectiveOn: `2026-09-${String(index + 1).padStart(2, '0')}`,
+    })
+  );
+
+describe('StudentAccountService.ownStatement', () => {
+  it('totals the entries with no campus scope and no header lookup', async () => {
+    const { accounts, service } = setup();
+    accounts.history.set('s1', [
+      movement({ kind: 'invoice', debitMinor: 22_000_000 }),
+      movement({ kind: 'payment', creditMinor: 16_900_000 }),
+    ]);
+
+    const statement = await service.ownStatement(familyOf(['s1']), 's1', {
+      pageSize: 10,
+    });
+
+    expect(statement.currency).toBe('NGN');
+    expect(statement.totals).toMatchObject({
+      balanceMinor: 5_100_000,
+      totalMinor: 22_000_000,
+      paidMinor: 16_900_000,
+    });
+  });
+
+  it('opens on the last page unless a page is asked for', async () => {
+    const { accounts, service } = setup();
+    accounts.history.set('s1', history(12));
+
+    const last = await service.ownStatement(familyOf(['s1']), 's1', {
+      pageSize: 5,
+    });
+    const first = await service.ownStatement(familyOf(['s1']), 's1', {
+      page: 1,
+      pageSize: 5,
+    });
+
+    expect(last).toMatchObject({ total: 12, page: 3, pageSize: 5 });
+    expect(last.rows.map((row) => row.reference)).toEqual(['CHG-10', 'CHG-11']);
+    expect(first.rows).toHaveLength(5);
+  });
+
+  it('lists unpaid charges oldest first, a payment covering the oldest', async () => {
+    const { accounts, service } = setup();
+    accounts.history.set('s1', [
+      movement({
+        kind: 'invoice',
+        sequence: 1,
+        reference: 'CHG-OLD',
+        debitMinor: 1000,
+        effectiveOn: '2026-09-01',
+      }),
+      movement({
+        kind: 'invoice',
+        sequence: 2,
+        reference: 'CHG-MID',
+        debitMinor: 1000,
+        effectiveOn: '2026-09-15',
+      }),
+      movement({
+        kind: 'invoice',
+        sequence: 3,
+        reference: 'CHG-NEW',
+        debitMinor: 1000,
+        effectiveOn: '2026-10-01',
+      }),
+      movement({
+        kind: 'payment',
+        sequence: 4,
+        creditMinor: 1500,
+        effectiveOn: '2026-10-02',
+      }),
+    ]);
+
+    const { unpaid } = await service.ownStatement(familyOf(['s1']), 's1', {
+      pageSize: 10,
+    });
+
+    expect(unpaid.map((item) => item.reference)).toEqual([
+      'CHG-MID',
+      'CHG-NEW',
+    ]);
+    expect(unpaid.map((item) => item.outstandingMinor)).toEqual([500, 1000]);
+  });
+});
+
+describe('StudentAccountService own reads outside student scope', () => {
+  it('answers 404 for a student the caller is not linked to', async () => {
+    const { accounts, service } = setup();
+    accounts.history.set('other', [
+      movement({ kind: 'invoice', debitMinor: 1000 }),
+    ]);
+
+    await expect(
+      service.ownStatement(familyOf(['mine']), 'other', { pageSize: 10 })
+    ).rejects.toBeInstanceOf(NotFoundException);
+    await expect(
+      service.ownBalances(familyOf(['mine']), ['mine', 'other'])
+    ).rejects.toBeInstanceOf(NotFoundException);
+    await expect(
+      service.ownBalances(familyOf([]), ['other'])
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('describes cancellations and adjustments without the staff memo', async () => {
+    const { accounts, service } = setup();
+    accounts.history.set('s1', [
+      movement({
+        kind: 'payment_void',
+        sequence: 1,
+        debitMinor: 1000,
+        memo: 'Void of RCT-2026-00088: Keyed the wrong amount',
+      }),
+      movement({
+        kind: 'adjustment',
+        sequence: 2,
+        debitMinor: 500,
+        memo: 'Refund: parent was rude',
+      }),
+    ]);
+
+    const { rows } = await service.ownStatement(familyOf(['s1']), 's1', {
+      pageSize: 10,
+    });
+
+    expect(rows.map((row) => row.description)).toEqual([
+      'Payment RCT-2026-00088 cancelled',
+      'Refund',
+    ]);
+  });
+});
+
+describe('StudentAccountService.ownBalances', () => {
+  it('gives each student their balance and keeps credit negative', async () => {
+    const { accounts, service } = setup();
+    accounts.history.set('ada', [
+      movement({ kind: 'invoice', debitMinor: 6_000_000 }),
+    ]);
+    accounts.history.set('tobi', [
+      movement({ kind: 'opening', creditMinor: 500_000 }),
+    ]);
+
+    const { currency, balances } = await service.ownBalances(
+      familyOf(['ada', 'tobi', 'new']),
+      ['ada', 'tobi', 'new']
+    );
+
+    expect(currency).toBe('NGN');
+    expect(Object.fromEntries(balances)).toEqual({
+      ada: 6_000_000,
+      tobi: -500_000,
+      new: 0,
+    });
+  });
+
+  it('is empty for no students', async () => {
+    const { service } = setup();
+    expect((await service.ownBalances(familyOf([]), [])).balances.size).toBe(0);
   });
 });

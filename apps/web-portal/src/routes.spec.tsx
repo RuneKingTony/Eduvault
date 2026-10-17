@@ -4,7 +4,13 @@ import {
   createMemoryHistory,
   createRouter,
 } from '@tanstack/react-router';
-import { render, screen, waitFor } from '@testing-library/react';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import {
   AuthClientProvider,
   type EduvaultAuthClient,
@@ -20,7 +26,9 @@ import {
   portalAnnouncementList,
   portalAnnouncements,
   portalChild,
+  portalFamilyStatement,
   portalMe,
+  portalStatement,
   portalStudent,
 } from './test-utils';
 
@@ -64,6 +72,8 @@ function fakeApi(
         .mockResolvedValue(portalStudent({ id: 'ada', firstName: 'Ada' })),
       announcements: vi.fn().mockResolvedValue(portalAnnouncements()),
       announcementList: vi.fn().mockResolvedValue(portalAnnouncementList()),
+      statement: vi.fn().mockResolvedValue(portalStatement()),
+      familyStatement: vi.fn().mockResolvedValue(portalFamilyStatement()),
     },
     calendar: {
       current: vi.fn().mockResolvedValue(calendarCurrent()),
@@ -205,5 +215,88 @@ describe('the portal routes', () => {
     expect(
       await screen.findByText(/This portal is for students and guardians/)
     ).toBeInTheDocument();
+  });
+
+  it('opens Fees for the chosen child with invoice:readOwn', async () => {
+    const api = fakeApi(
+      access(['guardian'], ['student:readOwn', 'invoice:readOwn'])
+    );
+    const router = renderAt('/fees?child=tobi', api);
+    expect(
+      await screen.findByRole('heading', { name: 'Fees' })
+    ).toBeInTheDocument();
+    expect(api.portal.statement).toHaveBeenCalledWith({
+      params: { studentId: 'tobi' },
+      query: {},
+    });
+    expect(router.state.location.pathname).toBe('/fees');
+  });
+
+  it('switches child in place on Fees with the real switcher', async () => {
+    const api = fakeApi(
+      access(['guardian'], ['student:readOwn', 'invoice:readOwn'])
+    );
+    const base = portalStatement();
+    api.portal.statement.mockImplementation(
+      ({ params }: { params: { studentId: string } }) =>
+        Promise.resolve({
+          ...base,
+          student: {
+            ...base.student,
+            id: params.studentId,
+            name: `${params.studentId} Okeke`,
+          },
+        })
+    );
+    const router = renderAt('/fees?child=ada', api);
+    await screen.findByText('ada Okeke');
+
+    const group = screen.getByRole('group', { name: 'Viewing child' });
+    fireEvent.click(within(group).getByRole('button', { name: 'Tobi' }));
+
+    expect(await screen.findByText('tobi Okeke')).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe('/fees');
+    expect(router.state.location.search).toEqual({ child: 'tobi' });
+    expect(api.portal.statement).toHaveBeenCalledWith({
+      params: { studentId: 'tobi' },
+      query: {},
+    });
+    expect(screen.getByRole('heading', { name: 'Fees' })).toBeInTheDocument();
+  });
+
+  it('falls back to the first child on Fees for an id that is not linked', async () => {
+    const api = fakeApi(
+      access(['guardian'], ['student:readOwn', 'invoice:readOwn'])
+    );
+    renderAt('/fees?child=another-family', api);
+    await screen.findByRole('heading', { name: 'Fees' });
+    expect(api.portal.statement).toHaveBeenCalledWith({
+      params: { studentId: 'ada' },
+      query: {},
+    });
+    expect(api.portal.statement).not.toHaveBeenCalledWith({
+      params: { studentId: 'another-family' },
+      query: {},
+    });
+  });
+
+  it('sends Fees back to Home without invoice:readOwn and never asks for a statement', async () => {
+    const api = fakeApi(access(['guardian'], ['student:readOwn']));
+    const router = renderAt('/fees?child=ada', api);
+    await waitFor(() => {
+      expect(router.state.location.pathname).not.toBe('/fees');
+    });
+    expect(api.portal.statement).not.toHaveBeenCalled();
+  });
+
+  it('lists Fees in the navigation only with invoice:readOwn', async () => {
+    renderAt(
+      '/?child=ada',
+      fakeApi(access(['guardian'], ['student:readOwn', 'invoice:readOwn']))
+    );
+    await screen.findByRole('heading', { name: 'Ada Okeke' });
+    expect(
+      screen.getAllByRole('link', { name: 'Fees' }).length
+    ).toBeGreaterThan(0);
   });
 });
