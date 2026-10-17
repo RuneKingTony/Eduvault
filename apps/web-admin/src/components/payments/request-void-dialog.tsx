@@ -25,7 +25,7 @@ import {
   fieldValue,
   toast,
 } from '@eduvault/ui';
-import { NO_ADJUSTMENT_SEARCH } from '../../adjustments-search';
+import { searchFor } from '../../route-search-defaults';
 import { useApi } from '../../api';
 import { invalidatePayments } from '../../queries';
 
@@ -60,7 +60,9 @@ function useRequestVoid(payment: Payment, onClose: () => void) {
                 onClick: () => {
                   void navigate({
                     to: '/finance/adjustments',
-                    search: { ...NO_ADJUSTMENT_SEARCH, tab: 'voids' },
+                    search: searchFor('/finance/adjustments', {
+                      tab: 'voids',
+                    }),
                   });
                 },
               },

@@ -1,32 +1,23 @@
 import { Link } from '@tanstack/react-router';
 import { useCanAny } from '@eduvault/auth-client';
 import { FINANCE_READ_GATE, type Gate } from '@eduvault/policy';
-import { NO_ACCOUNT_FILTERS } from '../../accounts-search';
 import { searchFor } from '../../route-search-defaults';
 
 const TAB =
   'rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground';
 const ACTIVE = { className: 'bg-muted text-foreground' };
 
-type FeeTab =
-  | {
-      id: string;
-      label: string;
-      to: '/finance/accounts';
-      gate: Gate;
-    }
-  | {
-      id: string;
-      label: string;
-      to: '/finance/school-fees' | '/finance/other-fees';
-      gate: Gate;
-    }
-  | {
-      id: string;
-      label: string;
-      to: '/finance/billing' | '/finance/invoices';
-      gate: Gate;
-    };
+interface FeeTab {
+  id: string;
+  label: string;
+  to:
+    | '/finance/accounts'
+    | '/finance/school-fees'
+    | '/finance/other-fees'
+    | '/finance/billing'
+    | '/finance/invoices';
+  gate: Gate;
+}
 
 export const FEE_TABS: readonly FeeTab[] = [
   {
@@ -66,23 +57,11 @@ function Tab({ tab, term }: { tab: FeeTab; term: string | undefined }) {
   if (!allowed) {
     return null;
   }
-  if (tab.to === '/finance/accounts') {
+  if (tab.to === '/finance/school-fees' || tab.to === '/finance/other-fees') {
     return (
       <Link
         to={tab.to}
-        search={NO_ACCOUNT_FILTERS}
-        className={TAB}
-        activeProps={ACTIVE}
-      >
-        {tab.label}
-      </Link>
-    );
-  }
-  if (tab.to === '/finance/billing' || tab.to === '/finance/invoices') {
-    return (
-      <Link
-        to={tab.to}
-        search={searchFor(tab.to)}
+        search={searchFor(tab.to, { term })}
         className={TAB}
         activeProps={ACTIVE}
       >
@@ -93,7 +72,7 @@ function Tab({ tab, term }: { tab: FeeTab; term: string | undefined }) {
   return (
     <Link
       to={tab.to}
-      search={{ term, type: undefined, add: undefined }}
+      search={searchFor(tab.to)}
       className={TAB}
       activeProps={ACTIVE}
     >

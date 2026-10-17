@@ -8,13 +8,6 @@ export interface PaymentsSearch {
   record?: 1;
 }
 
-export const NO_PAYMENT_FILTERS = {
-  q: undefined,
-  status: undefined,
-  page: undefined,
-  record: undefined,
-} as const satisfies PaymentsSearch;
-
 export function parsePaymentsSearch(
   search: Record<string, unknown>
 ): PaymentsSearch {

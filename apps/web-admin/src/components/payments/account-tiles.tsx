@@ -2,7 +2,7 @@ import { Link } from '@tanstack/react-router';
 import type { BalanceSummary } from '@eduvault/api-contract';
 import { countOf, money } from '@eduvault/shared';
 import { Card, CardContent } from '@eduvault/ui';
-import { NO_PAYMENT_FILTERS } from '../../payments-search';
+import { searchFor } from '../../route-search-defaults';
 
 function Tile({
   label,
@@ -66,7 +66,7 @@ export function AccountTiles({
       {showReceived ? (
         <Link
           to="/finance/payments"
-          search={NO_PAYMENT_FILTERS}
+          search={searchFor('/finance/payments')}
           className={TILE}
         >
           <Card className="h-full">

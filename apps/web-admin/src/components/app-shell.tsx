@@ -30,7 +30,6 @@ import {
 } from '@eduvault/ui';
 import { useActing, type ActingState } from '../acting-store';
 import { useCanAdmit } from '../admission-rules';
-import { NO_ADJUSTMENT_SEARCH } from '../adjustments-search';
 import { useApi } from '../api';
 import { mePermissionsQueryOptions } from '../queries';
 import { prepareChargesTarget, searchFor } from '../route-search-defaults';
@@ -109,7 +108,10 @@ const ADD_FEE_ACTION: CommandEntry = {
   id: 'add-fee',
   label: 'Add a fee we charge',
   hint: 'Fees',
-  target: linkOptions({ to: '/finance/school-fees', search: { add: 1 } }),
+  target: linkOptions({
+    to: '/finance/school-fees',
+    search: searchFor('/finance/school-fees', { add: 1 }),
+  }),
   icon: 'wallet',
   keywords: ['new', 'fee', 'levy', 'tuition', 'amount', 'charge'],
 };
@@ -141,7 +143,7 @@ const DISCOUNT_OR_REFUND_ACTION: CommandEntry = {
   hint: 'Finance',
   target: linkOptions({
     to: '/finance/adjustments',
-    search: { ...NO_ADJUSTMENT_SEARCH, new: 1 },
+    search: searchFor('/finance/adjustments', { new: 1 }),
   }),
   icon: 'wallet',
   keywords: [
