@@ -165,6 +165,7 @@ async function renderAt(
   await screen.findByRole('navigation', { name: 'Breadcrumb' });
   return {
     permissions,
+    router,
     changeAccessTo: (next: MePermissions) => {
       current = next;
     },
@@ -942,6 +943,55 @@ describe('AppShell access', () => {
     expect(
       screen.queryByRole('option', { name: /Discount or refund/ })
     ).not.toBeInTheDocument();
+  });
+
+  it('opens Charge students from the palette on its page with the prepare sheet flag', async () => {
+    const { router } = await renderAt('/', { access: starterAccess('bursar') });
+    fireEvent.keyDown(globalThis as unknown as Window, {
+      key: 'k',
+      ctrlKey: true,
+    });
+    fireEvent.change(
+      await screen.findByPlaceholderText('Search pages and actions…'),
+      { target: { value: 'charge students' } }
+    );
+    fireEvent.click(screen.getByRole('option', { name: /Charge students/ }));
+    expect(await screen.findByText('Charge students page')).toBeVisible();
+    expect(router.state.location.pathname).toBe('/finance/billing');
+    expect(router.state.location.search).toEqual({ prepare: 1 });
+  });
+
+  it('opens Record a payment from the palette on Payments with the record flag', async () => {
+    const { router } = await renderAt('/finance/accounts', {
+      access: starterAccess('bursar'),
+    });
+    fireEvent.keyDown(globalThis as unknown as Window, {
+      key: 'k',
+      ctrlKey: true,
+    });
+    fireEvent.change(
+      await screen.findByPlaceholderText('Search pages and actions…'),
+      { target: { value: 'record a payment' } }
+    );
+    fireEvent.click(screen.getByRole('option', { name: /Record a payment/ }));
+    expect(await screen.findByText('Payments page')).toBeVisible();
+    expect(router.state.location.pathname).toBe('/finance/payments');
+    expect(router.state.location.search).toEqual({ record: 1 });
+  });
+
+  it('opens a page entry from the palette', async () => {
+    const { router } = await renderAt('/');
+    fireEvent.keyDown(globalThis as unknown as Window, {
+      key: 'k',
+      ctrlKey: true,
+    });
+    fireEvent.change(
+      await screen.findByPlaceholderText('Search pages and actions…'),
+      { target: { value: 'students' } }
+    );
+    fireEvent.click(screen.getByRole('option', { name: /Students/ }));
+    expect(await screen.findByText('Students page')).toBeVisible();
+    expect(router.state.location.search).toEqual({});
   });
 
   it('shows the approvals bell with its count on every page, and the counts on Approvals and Payments', async () => {

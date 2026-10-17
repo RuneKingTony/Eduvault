@@ -6,21 +6,21 @@ const pages: CommandEntry[] = [
     id: 'dashboard',
     label: 'Dashboard',
     hint: 'Overview',
-    route: '/',
+    target: { to: '/' },
     icon: 'layout-dashboard',
   },
   {
     id: 'students',
     label: 'Students',
     hint: 'People',
-    route: '/students',
+    target: { to: '/students' },
     icon: 'graduation-cap',
   },
   {
     id: 'fees',
     label: 'Who owes',
     hint: 'Finance',
-    route: '/finance/school-fees',
+    target: { to: '/finance/school-fees' },
     icon: 'wallet',
     keywords: ['Fees'],
   },
@@ -30,7 +30,7 @@ const settings: CommandEntry[] = [
     id: 'campuses',
     label: 'Campuses',
     hint: 'Settings',
-    route: '/campuses',
+    target: { to: '/campuses' },
     icon: 'settings',
   },
 ];
@@ -40,7 +40,7 @@ const actions: CommandEntry[] = [
     id: 'add-member',
     label: 'Add a staff member',
     hint: 'People',
-    route: '/members?add=1',
+    target: { to: '/members', search: { add: 1 } },
     icon: 'user-round-plus',
     keywords: ['new', 'hire'],
   },
@@ -48,7 +48,7 @@ const actions: CommandEntry[] = [
     id: 'record-payment',
     label: 'Record a payment',
     hint: 'Finance',
-    route: '/finance/payments?record=1',
+    target: { to: '/finance/payments', search: { record: 1 } },
     icon: 'banknote',
     keywords: ['receipt', 'cash', 'transfer', 'pos', 'paid', 'fees'],
   },
@@ -56,7 +56,7 @@ const actions: CommandEntry[] = [
     id: 'discount-or-refund',
     label: 'Discount or refund',
     hint: 'Finance',
-    route: '/finance/adjustments?new=1',
+    target: { to: '/finance/adjustments', search: { new: 1 } },
     icon: 'wallet',
     keywords: ['refund', 'discount', 'scholarship', 'reduce', 'write off'],
   },
@@ -64,7 +64,7 @@ const actions: CommandEntry[] = [
     id: 'who-owes',
     label: 'See who owes fees',
     hint: 'Fees',
-    route: '/finance/accounts',
+    target: { to: '/finance/accounts' },
     icon: 'wallet',
     keywords: ['balance', 'debt', 'owing', 'statement', 'arrears'],
   },
@@ -72,11 +72,19 @@ const actions: CommandEntry[] = [
     id: 'create-role',
     label: 'Create a custom role',
     hint: 'Roles',
-    route: '/roles/new',
+    target: { to: '/roles/new' },
     icon: 'shield-check',
     keywords: ['permissions', 'access'],
   },
 ];
+
+const targetOf = (entries: readonly CommandEntry[], id: string) => {
+  const entry = entries.find((candidate) => candidate.id === id);
+  if (entry === undefined) {
+    throw new Error(`No fixture entry ${id}`);
+  }
+  return entry.target;
+};
 
 function setup(withActions = false) {
   const onSelect = vi.fn();
@@ -113,11 +121,11 @@ describe('CommandMenu', () => {
     expect(groupHeadings()).toEqual(['Pages', 'Settings']);
   });
 
-  it('lists an Actions group last and opens the action’s route', () => {
+  it('lists an Actions group last and opens the action’s target', () => {
     const { onSelect } = setup(true);
     expect(groupHeadings()).toEqual(['Pages', 'Settings', 'Actions']);
     fireEvent.click(screen.getByRole('option', { name: /Add a staff member/ }));
-    expect(onSelect).toHaveBeenCalledWith('/members?add=1');
+    expect(onSelect).toHaveBeenCalledWith(targetOf(actions, 'add-member'));
   });
 
   it('opens Create a custom role at /roles/new', () => {
@@ -125,19 +133,21 @@ describe('CommandMenu', () => {
     fireEvent.click(
       screen.getByRole('option', { name: /Create a custom role/ })
     );
-    expect(onSelect).toHaveBeenCalledWith('/roles/new');
+    expect(onSelect).toHaveBeenCalledWith(targetOf(actions, 'create-role'));
   });
 
   it('opens Record a payment on the Payments page with the sheet open', () => {
     const { onSelect } = setup(true);
     fireEvent.click(screen.getByRole('option', { name: /Record a payment/ }));
-    expect(onSelect).toHaveBeenCalledWith('/finance/payments?record=1');
+    expect(onSelect).toHaveBeenCalledWith(targetOf(actions, 'record-payment'));
   });
 
   it('opens Discount or refund on its page with the request sheet open', () => {
     const { onSelect } = setup(true);
     fireEvent.click(screen.getByRole('option', { name: /Discount or refund/ }));
-    expect(onSelect).toHaveBeenCalledWith('/finance/adjustments?new=1');
+    expect(onSelect).toHaveBeenCalledWith(
+      targetOf(actions, 'discount-or-refund')
+    );
   });
 
   it('finds Discount or refund by a keyword', () => {
@@ -154,7 +164,7 @@ describe('CommandMenu', () => {
     type('arrears');
     expect(groupHeadings()).toEqual(['Actions']);
     fireEvent.click(screen.getByRole('option', { name: /See who owes fees/ }));
-    expect(onSelect).toHaveBeenCalledWith('/finance/accounts');
+    expect(onSelect).toHaveBeenCalledWith(targetOf(actions, 'who-owes'));
   });
 
   it('finds an action by a keyword', () => {
@@ -224,7 +234,7 @@ describe('CommandMenu', () => {
   it('opens the chosen page', () => {
     const { onSelect } = setup();
     fireEvent.click(screen.getByRole('option', { name: /Students/ }));
-    expect(onSelect).toHaveBeenCalledWith('/students');
+    expect(onSelect).toHaveBeenCalledWith(targetOf(pages, 'students'));
   });
 
   it('closes on Escape', () => {
