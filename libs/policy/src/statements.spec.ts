@@ -71,12 +71,20 @@ describe('statements', () => {
 
   it('has the payment resource with help, none sensitive', () => {
     expect(ALL_PERMISSIONS).toEqual(
-      expect.arrayContaining(['payment:record', 'payment:read', 'payment:void'])
+      expect.arrayContaining([
+        'payment:record',
+        'payment:read',
+        'payment:readOwn',
+        'payment:void',
+      ])
     );
     expect(SENSITIVE.some((p) => p.startsWith('payment'))).toBe(false);
     expect(permLabel('payment:record')).toBe('Payments: record');
     expect(PERM_HELP['payment:record']).toBeDefined();
     expect(PERM_HELP['payment:read']).toBeDefined();
+    expect(PERM_HELP['payment:readOwn']).toBe(
+      'Students see their own payments. Guardians see their children’s.'
+    );
     expect(PERM_HELP['payment:void']).toBeDefined();
   });
 

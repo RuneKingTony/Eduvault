@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { sql } from 'kysely';
+import { sql, type RawBuilder } from 'kysely';
 import {
   classTeacherRoleSchema,
   type ClassTeacher,
@@ -7,6 +7,7 @@ import {
 } from '@eduvault/api-contract';
 import { inStudentScope } from '../../common/db/in-student-scope';
 import { KYSELY_TOKEN, type Database } from '../../common/db/tokens';
+import { receivableBalanceSql } from '../../common/ledger';
 import {
   PortalRepository,
   type PortalProfile,
@@ -97,6 +98,7 @@ export class KyselyPortalRepository extends PortalRepository {
         'student.first_name as student_first_name',
         'organization.name as school_name',
         'school_account.admission_prefix',
+        'school_account.currency',
         'school_account.logo_file_id',
       ])
       .executeTakeFirst();
@@ -109,6 +111,7 @@ export class KyselyPortalRepository extends PortalRepository {
         school: {
           name: row.school_name,
           admissionPrefix: row.admission_prefix,
+          currency: row.currency,
           logoUrl:
             row.logo_file_id === null ? null : `/files/${row.logo_file_id}`,
         },
@@ -116,8 +119,23 @@ export class KyselyPortalRepository extends PortalRepository {
     );
   }
 
-  async children(scope: PortalScope): Promise<PortalChild[]> {
+  children(scope: PortalScope): Promise<PortalChild[]> {
+    return this.childrenOf(scope, sql<string | null>`null`);
+  }
+
+  childrenWithBalance(scope: PortalScope): Promise<PortalChild[]> {
+    return this.childrenOf(
+      scope,
+      sql<string | null>`(${receivableBalanceSql('student')})::text`
+    );
+  }
+
+  private async childrenOf(
+    scope: PortalScope,
+    balance: RawBuilder<string | null>
+  ): Promise<PortalChild[]> {
     const rows = await this.placed(scope)
+      .select(balance.as('balance'))
       .orderBy('student.first_name')
       .orderBy('student.last_name')
       .orderBy('student.id')
@@ -129,6 +147,7 @@ export class KyselyPortalRepository extends PortalRepository {
       className: row.class_name,
       campusName: row.campus_name,
       archived: row.exit_kind !== null,
+      ...(row.balance === null ? {} : { balanceMinor: Number(row.balance) }),
     }));
   }
 

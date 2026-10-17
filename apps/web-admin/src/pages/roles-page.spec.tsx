@@ -82,7 +82,7 @@ describe('RolesPage', () => {
     ).toBeInTheDocument();
     const guardian = screen.getByRole('button', { name: 'Guardian' });
     expect(
-      within(guardian).getByText('1 thing switched on')
+      within(guardian).getByText('2 things switched on')
     ).toBeInTheDocument();
     const hall = screen.getByRole('button', { name: 'Hall monitor' });
     expect(within(hall).getByText('Nothing switched on')).toBeInTheDocument();

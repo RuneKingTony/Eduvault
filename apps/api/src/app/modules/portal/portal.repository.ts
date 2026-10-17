@@ -17,6 +17,7 @@ export interface PortalProfile {
   school: {
     name: string;
     admissionPrefix: string;
+    currency: string;
     logoUrl: string | null;
   };
 }
@@ -33,6 +34,8 @@ export abstract class PortalRepository {
   ): Promise<PortalProfile | undefined>;
 
   abstract children(scope: PortalScope): Promise<PortalChild[]>;
+
+  abstract childrenWithBalance(scope: PortalScope): Promise<PortalChild[]>;
 
   abstract student(
     scope: PortalScope,

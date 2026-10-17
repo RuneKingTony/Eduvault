@@ -7,7 +7,12 @@ import {
   type StudentStatement,
 } from '@eduvault/api-contract';
 import { useCan } from '@eduvault/auth-client';
-import { money } from '@eduvault/shared';
+import {
+  balanceTile,
+  familyDescription,
+  familyTotalSubline,
+  money,
+} from '@eduvault/shared';
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -28,11 +33,6 @@ import {
 import { useApi } from '../api';
 import { RecordPaymentSheet } from '../components/payments/record-payment-sheet';
 import { StatementCard } from '../components/payments/statement-card';
-import {
-  balanceTile,
-  familyDescription,
-  familyTotalSubline,
-} from '../components/payments/statement-text';
 import { familyStatementQueryOptions, statementQueryOptions } from '../queries';
 
 function Crumbs({ last }: { last: string }) {

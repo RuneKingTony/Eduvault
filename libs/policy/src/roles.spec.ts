@@ -130,7 +130,7 @@ describe('roles', () => {
     }
   });
 
-  it('gives the bursar every feeLine write, the administrator feeLine:read and nobody feeLine:readOwn yet', () => {
+  it('gives the bursar every feeLine write, the administrator feeLine:read and only the portal roles feeLine:readOwn', () => {
     expect(starter('bursar').feeLine).toEqual([
       'create',
       'read',
@@ -138,8 +138,11 @@ describe('roles', () => {
       'retire',
     ]);
     expect(starter('administrator').feeLine).toEqual(['read']);
-    for (const slug of ['teacher', 'principal', 'student', 'guardian']) {
+    for (const slug of ['teacher', 'principal']) {
       expect(starter(slug).feeLine).toBeUndefined();
+    }
+    for (const slug of ['student', 'guardian']) {
+      expect(starter(slug).feeLine).toEqual(['readOwn']);
     }
   });
 
@@ -153,12 +156,32 @@ describe('roles', () => {
     }
   });
 
-  it('gives the bursar every payment permission, the administrator and principal payment read, and nobody else any', () => {
+  it('gives the bursar every payment permission, the administrator and principal payment read, and the portal roles payment readOwn', () => {
     expect(starter('bursar').payment).toEqual(['record', 'read', 'void']);
     expect(starter('administrator').payment).toEqual(['read']);
     expect(starter('principal').payment).toEqual(['read']);
-    for (const slug of ['teacher', 'student', 'guardian']) {
-      expect(starter(slug).payment).toBeUndefined();
+    expect(starter('teacher').payment).toBeUndefined();
+    for (const slug of ['student', 'guardian']) {
+      expect(starter(slug).payment).toEqual(['readOwn']);
+    }
+  });
+
+  it('gives the student and guardian roles all four own-record permissions and nobody else any', () => {
+    const own = [
+      'student:readOwn',
+      'invoice:readOwn',
+      'feeLine:readOwn',
+      'payment:readOwn',
+    ];
+    for (const slug of ['student', 'guardian']) {
+      const role = STARTER_ROLES.find((candidate) => candidate.slug === slug);
+      expect(role?.permissions).toEqual(expect.arrayContaining(own));
+    }
+    for (const slug of ['administrator', 'teacher', 'bursar', 'principal']) {
+      const role = STARTER_ROLES.find((candidate) => candidate.slug === slug);
+      for (const permission of own) {
+        expect(role?.permissions).not.toContain(permission);
+      }
     }
   });
 

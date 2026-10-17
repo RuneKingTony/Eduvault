@@ -256,6 +256,7 @@ describe('capSummary', () => {
       'Bank and POS accounts: add and change bank and POS accounts',
       'Money categories: change the accountant’s categories',
       'Own records: can see',
+      'Sees fees',
     ]);
   });
 
@@ -402,8 +403,9 @@ describe('the Fees area', () => {
     expect(capLevel(toPermissionMap(['feeLine:create']), fees)).toBe('custom');
   });
 
-  it('keeps feeLine:readOwn out of the area until the portal grants it', () => {
-    expect(LEGACY_PERMISSIONS).toContain('feeLine:readOwn');
+  it('keeps feeLine:readOwn in the Portal area, not the legacy list', () => {
+    expect(LEGACY_PERMISSIONS).not.toContain('feeLine:readOwn');
+    expect(area('portal').extras[0]?.permissions).toContain('feeLine:readOwn');
   });
 });
 
@@ -429,8 +431,9 @@ describe('the Charges area', () => {
     expect(capLevel(toPermissionMap(['invoice:bill']), charges)).toBe('custom');
   });
 
-  it('keeps invoice:readOwn out of the area until the portal shows charges', () => {
-    expect(LEGACY_PERMISSIONS).toContain('invoice:readOwn');
+  it('keeps invoice:readOwn in the Portal area, not the legacy list', () => {
+    expect(LEGACY_PERMISSIONS).not.toContain('invoice:readOwn');
+    expect(area('portal').extras[0]?.permissions).toContain('invoice:readOwn');
   });
 
   it('summarises the bursar as able to charge and the administrator as able to see', () => {
@@ -512,17 +515,24 @@ describe('the Money areas', () => {
 describe('the Portal area', () => {
   const portal = area('portal');
 
-  it('holds student:readOwn under see, with no change set', () => {
+  it('holds student:readOwn under see, with no change set and a Sees fees extra', () => {
     expect(portal.group).toBe('Portal');
     expect(portal.label).toBe('Own records');
     expect(portal.see).toEqual(['student:readOwn']);
     expect(portal.change).toEqual([]);
-    expect(portal.extras).toEqual([]);
+    expect(portal.extras).toEqual([
+      expect.objectContaining({
+        label: 'Sees fees',
+        description: 'Charges, payments and the family statement.',
+        permissions: ['invoice:readOwn', 'payment:readOwn', 'feeLine:readOwn'],
+        important: false,
+      }),
+    ]);
   });
 
-  it('summarises the student and guardian roles as own records', () => {
+  it('summarises the student and guardian roles as own records that see fees', () => {
     for (const slug of ['student', 'guardian']) {
-      expect(summaryFor(slug)).toEqual(['Own records: can see']);
+      expect(summaryFor(slug)).toEqual(['Own records: can see', 'Sees fees']);
     }
     expect(summaryFor('teacher')).not.toContain('Own records: can see');
   });

@@ -1,33 +1,20 @@
-import type { ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { PortalStudent } from '@eduvault/api-contract';
-import { Card, CardContent, ErrorMessage, Skeleton } from '@eduvault/ui';
-import { daysUntilLabel, fmtDate } from '@eduvault/shared';
+import { useCan } from '@eduvault/auth-client';
+import { ErrorMessage, Skeleton, cn } from '@eduvault/ui';
+import {
+  balanceTone,
+  daysUntilLabel,
+  feesTile,
+  fmtDate,
+} from '@eduvault/shared';
 import { useApi } from '../api';
+import { StatTile } from './stat-tile';
 import {
   daysOffQueryOptions,
   portalAnnouncementsQueryOptions,
+  portalChildrenQueryOptions,
 } from '../queries';
-
-function Tile({
-  label,
-  value,
-  sub,
-}: {
-  label: string;
-  value: ReactNode;
-  sub: string;
-}) {
-  return (
-    <Card>
-      <CardContent className="flex flex-col gap-1">
-        <span className="text-sm text-muted-foreground">{label}</span>
-        <span className="text-2xl font-semibold">{value}</span>
-        <span className="truncate text-sm text-muted-foreground">{sub}</span>
-      </CardContent>
-    </Card>
-  );
-}
 
 const TileSkeleton = () => (
   <Skeleton role="status" aria-label="Loading" className="h-24" />
@@ -43,7 +30,7 @@ function NextHolidayTile({ today }: { today: string }) {
   }
   const [next] = daysOff.data;
   return (
-    <Tile
+    <StatTile
       label="Next holiday"
       value={next === undefined ? '—' : daysUntilLabel(today, next.start)}
       sub={
@@ -64,7 +51,7 @@ function AnnouncementsTile({ studentId }: { studentId: string }) {
     return <ErrorMessage error={news.error} />;
   }
   return (
-    <Tile
+    <StatTile
       label="Announcements"
       value={news.data.newThisWeek}
       sub="New this week"
@@ -72,22 +59,76 @@ function AnnouncementsTile({ studentId }: { studentId: string }) {
   );
 }
 
+function FeesTile({
+  studentId,
+  currency,
+  onOpen,
+}: {
+  studentId: string;
+  currency: string;
+  onOpen: (studentId: string) => void;
+}) {
+  const children = useQuery(portalChildrenQueryOptions(useApi()));
+  if (children.isPending) {
+    return <TileSkeleton />;
+  }
+  if (children.data === undefined) {
+    return <ErrorMessage error={children.error} />;
+  }
+  const balance =
+    children.data.find((child) => child.id === studentId)?.balanceMinor ?? 0;
+  const tile = feesTile(balance, currency);
+  return (
+    <button
+      type="button"
+      className="rounded-xl text-left focus-visible:ring-2 focus-visible:ring-ring"
+      onClick={() => {
+        onOpen(studentId);
+      }}
+    >
+      <StatTile
+        label="Fees"
+        value={tile.value}
+        sub={tile.sub}
+        tone={balanceTone(balance)}
+      />
+    </button>
+  );
+}
+
 export function HomeTiles({
   student,
+  currency,
   today,
+  onSeeFees,
 }: {
   student: PortalStudent;
+  currency: string;
   today: string;
+  onSeeFees: (studentId: string) => void;
 }) {
+  const canSeeFees = useCan('invoice', 'readOwn');
   return (
-    <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
+    <div
+      className={cn(
+        'grid grid-cols-2 gap-4',
+        canSeeFees ? 'lg:grid-cols-4' : 'lg:grid-cols-3'
+      )}
+    >
       <NextHolidayTile today={today} />
       <AnnouncementsTile studentId={student.id} />
-      <Tile
+      <StatTile
         label="Class teacher"
         value={student.classTeacherName ?? '—'}
         sub={student.className ?? '—'}
       />
+      {canSeeFees ? (
+        <FeesTile
+          studentId={student.id}
+          currency={currency}
+          onOpen={onSeeFees}
+        />
+      ) : null}
     </div>
   );
 }

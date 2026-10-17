@@ -4,12 +4,17 @@ import { render } from '@testing-library/react';
 import type {
   CalendarCurrent,
   DayOffEntry,
+  MePermissions,
   PortalAnnouncementList,
   PortalAnnouncements,
   PortalChild,
+  PortalFamilyStatement,
   PortalMe,
+  PortalStatement,
   PortalStudent,
 } from '@eduvault/api-contract';
+import { PermissionsProvider } from '@eduvault/auth-client';
+import { toPermissionMap, type Permission } from '@eduvault/policy';
 import { ApiProvider, type Api } from './api';
 
 export const portalChild = (
@@ -29,7 +34,12 @@ export const portalMe = (overrides: Partial<PortalMe> = {}): PortalMe => ({
   name: 'Ngozi Okeke',
   firstName: 'Ngozi',
   login: { username: 'okeke-family', email: null },
-  school: { name: 'Greenfield College', admissionPrefix: 'GF', logoUrl: null },
+  school: {
+    name: 'Greenfield College',
+    admissionPrefix: 'GF',
+    currency: 'NGN',
+    logoUrl: null,
+  },
   children: [portalChild()],
   ...overrides,
 });
@@ -97,16 +107,88 @@ export const dayOffEntry = (
   ...overrides,
 });
 
+export const portalStatement = (
+  overrides: Partial<PortalStatement> = {}
+): PortalStatement => ({
+  currency: 'NGN',
+  student: {
+    id: '5b0f1e1e-6e53-4c52-9f1c-0a1d7a7f9c11',
+    name: 'Ada Okeke',
+    admissionNumber: 'GF-0123',
+    className: 'JSS 1 Gold',
+    campusName: 'Lekki',
+    archived: false,
+  },
+  totals: {
+    balanceMinor: 6_000_000,
+    totalMinor: 10_000_000,
+    paidMinor: 4_000_000,
+    reducedMinor: 0,
+  },
+  rows: [
+    {
+      effectiveOn: '2026-09-07',
+      description: 'Term fees, First term',
+      status: 'charged',
+      amountMinor: 10_000_000,
+    },
+    {
+      effectiveOn: '2026-09-12',
+      description: 'Payment RCT-0001 from Ngozi Okeke (Bank transfer)',
+      status: 'paid',
+      amountMinor: 4_000_000,
+    },
+  ],
+  total: 2,
+  page: 1,
+  pageSize: 10,
+  unpaid: [{ number: 'CHG-0001', outstandingMinor: 6_000_000 }],
+  ...overrides,
+});
+
+export const portalFamilyStatement = (
+  overrides: Partial<PortalFamilyStatement> = {}
+): PortalFamilyStatement => ({
+  currency: 'NGN',
+  totalOwedMinor: 6_000_000,
+  creditMinor: 0,
+  children: [
+    {
+      studentId: '5b0f1e1e-6e53-4c52-9f1c-0a1d7a7f9c11',
+      name: 'Ada Okeke',
+      className: 'JSS 1 Gold',
+      campusName: 'Lekki',
+      archived: false,
+      balanceMinor: 6_000_000,
+    },
+  ],
+  ...overrides,
+});
+
+const mePermissions = (
+  permissions: readonly Permission[] = ['student:readOwn']
+): MePermissions => ({
+  organizationId: 'o1',
+  roles: ['guardian'],
+  permissions: toPermissionMap(permissions),
+  campusScope: [],
+  classScope: [],
+  acting: null,
+});
+
 export function renderWithApi(
   ui: ReactElement,
-  api: Partial<Record<keyof Api, unknown>>
+  api: Partial<Record<keyof Api, unknown>>,
+  held: readonly Permission[] = ['student:readOwn']
 ) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
   return render(
     <QueryClientProvider client={queryClient}>
-      <ApiProvider api={api as unknown as Api}>{ui}</ApiProvider>
+      <PermissionsProvider value={mePermissions(held)}>
+        <ApiProvider api={api as unknown as Api}>{ui}</ApiProvider>
+      </PermissionsProvider>
     </QueryClientProvider>
   );
 }

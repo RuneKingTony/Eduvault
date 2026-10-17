@@ -95,6 +95,29 @@ export const describeMovement = (
   status: StatementRowStatus
 ): string => DESCRIBERS[movement.kind](movement, status);
 
+export type Describer = typeof describeMovement;
+
+const familyVoidDescription = (movement: MovementRecord): string => {
+  const receipt = VOID_MEMO.exec(movement.memo ?? '')?.groups?.['receipt'];
+  return receipt === undefined
+    ? 'Payment cancelled'
+    : `Payment ${receipt} cancelled`;
+};
+
+const FAMILY_DESCRIBERS: Partial<Record<JournalKind, Describer>> = {
+  payment_void: familyVoidDescription,
+  opening: () => OPENING,
+  adjustment: (_movement, status) =>
+    status === 'refunded' ? 'Refund' : 'Adjustment',
+  store_receive: () => 'Adjustment',
+  store_cost: () => 'Adjustment',
+  store_count: () => 'Adjustment',
+};
+
+/** Staff-typed memos and void reasons are internal, so a family sees none of them. */
+export const describeForFamily: Describer = (movement, status) =>
+  (FAMILY_DESCRIBERS[movement.kind] ?? describeMovement)(movement, status);
+
 export function movementLink(movement: MovementRecord): StatementLink {
   if (movement.invoice !== null) {
     return { type: 'invoice', id: movement.invoice.id };
@@ -105,14 +128,15 @@ export function movementLink(movement: MovementRecord): StatementLink {
 }
 
 export function statementRowsOf(
-  movementsOldestFirst: readonly MovementRecord[]
+  movementsOldestFirst: readonly MovementRecord[],
+  describe: Describer = describeMovement
 ): StatementRow[] {
   return movementsOldestFirst.flatMap((movement) =>
     splitMovement(movement).map(({ status, amountMinor }) => ({
       entryId: movement.entryId,
       effectiveOn: movement.effectiveOn,
       reference: movement.reference,
-      description: describeMovement(movement, status),
+      description: describe(movement, status),
       status,
       amountMinor,
       link: movementLink(movement),

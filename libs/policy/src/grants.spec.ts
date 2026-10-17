@@ -46,12 +46,45 @@ describe('canGrantRole', () => {
           rolePermissions: toPermissionMap([
             'student:readOwn',
             'invoice:readOwn',
+            'feeLine:readOwn',
+            'payment:readOwn',
           ]),
           assignerPermissions: teacher,
           assignerIsOwner: false,
         })
       ).toEqual({ allowed: true, missing: [] });
     }
+  });
+
+  it('still requires the assigner to hold the own-record fee permissions on a custom staff role', () => {
+    const rolePermissions = toPermissionMap([
+      'student:read',
+      'feeLine:readOwn',
+      'payment:readOwn',
+    ]);
+    expect(
+      canGrantRole({
+        slug: 'finance-viewer',
+        rolePermissions,
+        assignerPermissions: teacher,
+        assignerIsOwner: false,
+      })
+    ).toEqual({
+      allowed: false,
+      missing: ['feeLine:readOwn', 'payment:readOwn'],
+    });
+    expect(
+      canGrantRole({
+        slug: 'finance-viewer',
+        rolePermissions,
+        assignerPermissions: toPermissionMap([
+          'student:read',
+          'feeLine:readOwn',
+          'payment:readOwn',
+        ]),
+        assignerIsOwner: false,
+      })
+    ).toEqual({ allowed: true, missing: [] });
   });
 
   it('still names any other permission added to a portal role', () => {

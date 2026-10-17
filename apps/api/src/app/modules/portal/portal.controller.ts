@@ -3,6 +3,7 @@ import {
   contract,
   type PortalAnnouncementListQuery,
   type PortalAnnouncementsQuery,
+  type PortalStatementQuery,
   type RouteOutput,
 } from '@eduvault/api-contract';
 import { Org, OrganizationAuth, type OrgContext } from '../../common/auth';
@@ -57,5 +58,23 @@ export class PortalController {
     query: PortalAnnouncementListQuery
   ): Promise<RouteOutput<typeof routes.announcementList>> {
     return this.portal.announcementListFor(org, params.studentId, query);
+  }
+
+  @Get('students/:studentId/statement')
+  @OrganizationAuth('invoice', 'readOwn')
+  statement(
+    @Org() org: OrgContext,
+    @Param(zod(routes.statement.params)) params: { studentId: string },
+    @Query(zod(routes.statement.query)) query: PortalStatementQuery
+  ): Promise<RouteOutput<typeof routes.statement>> {
+    return this.portal.statement(org, params.studentId, query);
+  }
+
+  @Get('family-statement')
+  @OrganizationAuth('invoice', 'readOwn')
+  familyStatement(
+    @Org() org: OrgContext
+  ): Promise<RouteOutput<typeof routes.familyStatement>> {
+    return this.portal.familyStatement(org);
   }
 }

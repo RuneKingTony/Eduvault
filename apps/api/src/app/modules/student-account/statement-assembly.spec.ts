@@ -1,4 +1,5 @@
 import {
+  describeForFamily,
   describeMovement,
   lastPageOf,
   movementLink,
@@ -116,6 +117,48 @@ describe('describeMovement', () => {
         'refunded'
       )
     ).toBe('Refund: overpaid');
+  });
+});
+
+describe('describeForFamily', () => {
+  it('keeps what a family can read and drops staff notes', () => {
+    expect(describeForFamily(charge, 'charged')).toBe(
+      describeMovement(charge, 'charged')
+    );
+    expect(describeForFamily(receipt, 'paid')).toBe(
+      describeMovement(receipt, 'paid')
+    );
+    expect(
+      describeForFamily(
+        {
+          ...base,
+          kind: 'payment_void',
+          memo: 'Void of RCT-2026-00088: Keyed the wrong amount',
+        },
+        'cancelled'
+      )
+    ).toBe('Payment RCT-2026-00088 cancelled');
+    expect(
+      describeForFamily({ ...base, kind: 'payment_void' }, 'cancelled')
+    ).toBe('Payment cancelled');
+    expect(
+      describeForFamily(
+        { ...base, kind: 'opening', memo: 'Carried from 2025' },
+        'charged'
+      )
+    ).toBe('Opening balance');
+    expect(
+      describeForFamily(
+        { ...base, kind: 'adjustment', memo: 'Refund: overpaid' },
+        'refunded'
+      )
+    ).toBe('Refund');
+    expect(
+      describeForFamily(
+        { ...base, kind: 'adjustment', memo: 'Goodwill' },
+        'reduced'
+      )
+    ).toBe('Adjustment');
   });
 });
 

@@ -2,75 +2,35 @@ import { RequestMethod, type INestApplication } from '@nestjs/common';
 import { METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
 import { ModulesContainer } from '@nestjs/core';
 import type {
-  LoginCredential,
   PortalAnnouncementList,
   PortalAnnouncements,
   PortalChild,
   PortalMe,
   PortalStudent,
 } from '@eduvault/api-contract';
-import { expect, type Fixtures, type TestUser } from './support/base-test';
+import { expect, type Fixtures } from './support/base-test';
 import { YEAR_2027, createSchoolYear } from './support/factories/calendar';
 import { createAnnouncement } from './support/factories/announcements';
 import { assignClassTeacher, createClass } from './support/factories/classes';
 import { createStudent } from './support/factories/students';
 import { makeCurrent } from './support/factories/terms';
 import {
-  schoolsTest,
-  type TwoSchoolsWithoutStudents,
-} from './support/two-schools';
+  NEW_PASSWORD,
+  family,
+  guardianOf,
+  signInAs,
+  signInPortal,
+  studentOf,
+  type Signed,
+} from './support/portal';
+import { schoolsTest } from './support/two-schools';
 
 const test = schoolsTest;
 
 type Api = Fixtures['api'];
-type Signed = Pick<TestUser, 'cookie'>;
 
-const NEW_PASSWORD = 'a-brand-new-password-1';
 const YEAR = '2026/2027';
 const TODAY = '2026-10-11';
-
-let attempts = 0;
-const nextAddress = () => {
-  attempts += 1;
-  return `198.51.100.${(attempts % 250) + 1}`;
-};
-
-const cookieOf = (setCookie: unknown): string =>
-  (setCookie as string[]).map((cookie) => cookie.split(';')[0]).join('; ');
-
-interface Credentials {
-  username?: string;
-  email?: string;
-  password: string;
-}
-
-async function signInPortal(
-  api: Api,
-  credentials: Credentials,
-  settle = true
-): Promise<Signed> {
-  const { username, email, password } = credentials;
-  const attempt =
-    username === undefined
-      ? api().post('/api/auth/sign-in/email').send({ email, password })
-      : api().post('/api/auth/sign-in/username').send({ username, password });
-  const res = await attempt.set('x-forwarded-for', nextAddress()).expect(200);
-  const user = { cookie: cookieOf(res.headers['set-cookie']) };
-  if (settle) {
-    await api(user)
-      .post('/me/password')
-      .send({ newPassword: NEW_PASSWORD })
-      .expect(204);
-  }
-  return user;
-}
-
-const signInAs = (api: Api, login: LoginCredential | undefined) =>
-  signInPortal(api, {
-    ...(login?.username === undefined ? {} : { username: login.username }),
-    ...(login?.email === undefined ? {} : { email: login.email }),
-    password: login?.temporaryPassword ?? '',
-  });
 
 const switchSchool = async (api: Api, user: Signed, organizationId: string) => {
   await api(user)
@@ -79,17 +39,13 @@ const switchSchool = async (api: Api, user: Signed, organizationId: string) => {
     .expect(200);
 };
 
-const guardianOf = (logins: readonly LoginCredential[]) =>
-  logins.find((login) => login.who === 'guardian');
-
-const studentOf = (logins: readonly LoginCredential[]) =>
-  logins.find((login) => login.who === 'student');
-
 const meOf = async (api: Api, user: Signed): Promise<PortalMe> =>
   (await api(user).get('/portal/me').expect(200)).body as PortalMe;
 
 const childrenOf = async (api: Api, user: Signed): Promise<PortalChild[]> =>
-  (await api(user).get('/portal/children').expect(200)).body as PortalChild[];
+  (
+    (await api(user).get('/portal/children').expect(200)).body as PortalChild[]
+  ).map(({ balanceMinor: _balance, ...child }) => child);
 
 const detailOf = async (
   api: Api,
@@ -128,57 +84,15 @@ const studentRoutes = (id: string) => [
   `/portal/students/${id}`,
   `/portal/students/${id}/announcements`,
   `/portal/students/${id}/announcements/all`,
+  `/portal/students/${id}/statement`,
 ];
 
 const allRoutes = (id: string) => [
   '/portal/me',
   '/portal/children',
+  '/portal/family-statement',
   ...studentRoutes(id),
 ];
-
-interface Family {
-  ada: Awaited<ReturnType<typeof createStudent>>;
-  tobi: Awaited<ReturnType<typeof createStudent>>;
-  guardianLogin: LoginCredential | undefined;
-}
-
-async function family(
-  app: INestApplication,
-  schools: Pick<TwoSchoolsWithoutStudents, 'owner' | 'lekki' | 'ikeja'>
-): Promise<Family> {
-  const { owner, lekki, ikeja } = schools;
-  const gold = await createClass(app, owner, {
-    campusId: lekki.id,
-    levelCode: 'JSS1',
-    name: 'Gold',
-  });
-  const blue = await createClass(app, owner, {
-    campusId: ikeja.id,
-    levelCode: 'JSS1',
-    name: 'Blue',
-  });
-  const ada = await createStudent(app, owner, {
-    campusId: lekki.id,
-    classArmId: gold.id,
-    firstName: 'Ada',
-    lastName: 'Okeke',
-  });
-  const guardianLogin = guardianOf(ada.logins);
-  const tobi = await createStudent(app, owner, {
-    campusId: ikeja.id,
-    classArmId: blue.id,
-    firstName: 'Tobi',
-    lastName: 'Okeke',
-    guardians: [
-      {
-        existingGuardianId: guardianLogin?.guardianId ?? '',
-        relationship: 'mother',
-        paysFees: false,
-      },
-    ],
-  });
-  return { ada, tobi, guardianLogin };
-}
 
 test.describe('GET /portal/me and /portal/children', () => {
   test('lists every child linked to a guardian with class and campus', async ({
@@ -193,7 +107,12 @@ test.describe('GET /portal/me and /portal/children', () => {
     expect(me).toMatchObject({
       kind: 'guardian',
       login: { username: guardianLogin?.username, email: null },
-      school: { name: 'School A', admissionPrefix: 'TST', logoUrl: null },
+      school: {
+        name: 'School A',
+        admissionPrefix: 'TST',
+        currency: 'NGN',
+        logoUrl: null,
+      },
     });
     expect(me.name).toBe(guardianLogin?.name);
     expect(me.firstName).toBe(guardianLogin?.name.split(' ')[0]);

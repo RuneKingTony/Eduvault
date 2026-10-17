@@ -417,9 +417,8 @@ describe('capabilityLabel', () => {
   });
 
   it('falls back to the permission label for a legacy permission', () => {
-    expect(capabilityLabel('feeLine:readOwn')).toBe(
-      'School and other fees: read own'
-    );
+    expect(capabilityLabel('payment:void')).toBe('Payments: void');
+    expect(capabilityLabel('feeLine:readOwn')).toBe('Sees fees');
   });
 
   it('lists each label once', () => {

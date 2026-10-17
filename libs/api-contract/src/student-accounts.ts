@@ -28,6 +28,17 @@ export type BalanceFilter = z.infer<typeof balanceFilterSchema>;
 export const statementRowStatusSchema = z.enum(STATEMENT_ROW_STATUSES);
 export type StatementRowStatus = z.infer<typeof statementRowStatusSchema>;
 
+export const ROW_STATUS_LABELS: Record<StatementRowStatus, string> = {
+  charged: 'Charged',
+  paid: 'Paid',
+  reduced: 'Reduced',
+  cancelled: 'Payment cancelled',
+  refunded: 'Refunded',
+};
+
+export const isOwingStatus = (status: StatementRowStatus): boolean =>
+  status === 'charged' || status === 'cancelled' || status === 'refunded';
+
 const minorSchema = z.number().int();
 const countSchema = z.number().int().nonnegative();
 

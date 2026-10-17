@@ -1,5 +1,6 @@
 import { redirect } from '@tanstack/react-router';
 import type { PortalMe } from '@eduvault/api-contract';
+import { holds, type Permission, type PermissionMap } from '@eduvault/policy';
 import { landingRedirect } from './default-page';
 
 export function redirectFromLanding(
@@ -14,5 +15,19 @@ export function redirectFromLanding(
   if (to !== undefined) {
     // eslint-disable-next-line @typescript-eslint/only-throw-error -- redirects are thrown objects
     throw redirect({ to });
+  }
+}
+
+export function redirectHomeWithout(
+  permissions: PermissionMap,
+  permission: Permission,
+  child: string | undefined
+): void {
+  if (!holds(permissions, permission)) {
+    // eslint-disable-next-line @typescript-eslint/only-throw-error -- redirects are thrown objects
+    throw redirect({
+      to: '/',
+      search: child === undefined ? {} : { child },
+    });
   }
 }

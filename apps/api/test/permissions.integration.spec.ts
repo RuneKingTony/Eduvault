@@ -564,6 +564,8 @@ test.describe('starter roles', () => {
       expect(parsePermissionMap(row?.permission ?? '')).toEqual({
         student: ['readOwn'],
         invoice: ['readOwn'],
+        feeLine: ['readOwn'],
+        payment: ['readOwn'],
       });
     }
   });

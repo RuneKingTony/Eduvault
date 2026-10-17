@@ -122,7 +122,7 @@ Terms the code and the people using it share. Adapted from the earlier school-ma
 
 **Who owes** — the list of student balances, split into current students and those who left or graduated.
 
-**Family statement** — a paying guardian's children's accounts shown together. Each child keeps their own account; the family total adds up what is owed and shows credit separately.
+**Family statement** — a guardian's children's accounts shown together. In the portal it covers every child linked to the signed-in guardian, paying or not (D-030). Each child keeps their own account; the family total adds up what is owed and shows credit separately.
 
 ## Store
 

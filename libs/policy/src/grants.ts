@@ -5,6 +5,8 @@ import type { Permission, PermissionMap } from './statements';
 const PORTAL_OWN_PERMISSIONS: ReadonlySet<Permission> = new Set([
   'student:readOwn',
   'invoice:readOwn',
+  'feeLine:readOwn',
+  'payment:readOwn',
 ]);
 
 export interface GrantRequest {

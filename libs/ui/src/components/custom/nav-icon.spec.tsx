@@ -10,4 +10,9 @@ describe('NavIcon', () => {
     );
     expect(container.querySelector('svg')).toHaveClass('lucide-users-round');
   });
+
+  it('draws the receipt icon the portal uses for Fees', () => {
+    const { container } = render(<NavIcon name="receipt" />);
+    expect(container.querySelector('svg')).toHaveClass('lucide-receipt');
+  });
 });

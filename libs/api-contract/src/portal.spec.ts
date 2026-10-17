@@ -5,7 +5,10 @@ import {
   portalAnnouncementListQuerySchema,
   portalAnnouncementsQuerySchema,
   portalChildSchema,
+  portalFamilyStatementSchema,
   portalMeSchema,
+  portalStatementQuerySchema,
+  portalStatementSchema,
   portalStudentParamsSchema,
   portalStudentSchema,
 } from './portal';
@@ -26,13 +29,28 @@ describe('portal schemas', () => {
     expect(portalChildSchema.parse(child)).toEqual(child);
   });
 
+  it('takes an optional whole-number balance, negative when in credit', () => {
+    expect(portalChildSchema.parse({ ...child, balanceMinor: -500 })).toEqual({
+      ...child,
+      balanceMinor: -500,
+    });
+    expect(
+      portalChildSchema.safeParse({ ...child, balanceMinor: 1.5 }).success
+    ).toBe(false);
+  });
+
   it('accepts a guardian login with no email and a student login with no email', () => {
     const me = {
       kind: 'guardian',
       name: 'Ngozi Okeke',
       firstName: 'Ngozi',
       login: { username: 'ngozi.okeke', email: null },
-      school: { name: 'Greenfield', admissionPrefix: 'GF', logoUrl: null },
+      school: {
+        name: 'Greenfield',
+        admissionPrefix: 'GF',
+        currency: 'NGN',
+        logoUrl: null,
+      },
       children: [child],
     };
     expect(portalMeSchema.parse(me)).toEqual(me);
@@ -124,8 +142,141 @@ describe('the portal routes', () => {
       'announcementList',
       'announcements',
       'children',
+      'familyStatement',
       'me',
+      'statement',
       'student',
     ]);
+  });
+});
+
+const statement = {
+  currency: 'NGN',
+  student: {
+    id,
+    name: 'Ada Okeke',
+    admissionNumber: 'GF-0123',
+    className: 'JSS 1 A',
+    campusName: 'Lekki',
+    archived: false,
+  },
+  totals: {
+    balanceMinor: 6_000_000,
+    totalMinor: 10_000_000,
+    paidMinor: 4_000_000,
+    reducedMinor: 0,
+  },
+  rows: [
+    {
+      effectiveOn: '2026-09-01',
+      description: 'Tuition',
+      status: 'charged',
+      amountMinor: 10_000_000,
+    },
+  ],
+  total: 1,
+  page: 1,
+  pageSize: 10,
+  unpaid: [{ number: 'INV-0001', outstandingMinor: 6_000_000 }],
+};
+
+describe('the portal statement query', () => {
+  it('leaves the page open and pages ten at a time', () => {
+    expect(portalStatementQuerySchema.parse({})).toEqual({ pageSize: 10 });
+    expect(portalStatementQuerySchema.parse({ page: '2' }).page).toBe(2);
+    expect(portalStatementQuerySchema.safeParse({ page: '0' }).success).toBe(
+      false
+    );
+    expect(
+      portalStatementQuerySchema.safeParse({ pageSize: '51' }).success
+    ).toBe(false);
+  });
+});
+
+describe('the portal statement', () => {
+  it('takes all five statuses', () => {
+    for (const status of [
+      'charged',
+      'paid',
+      'reduced',
+      'cancelled',
+      'refunded',
+    ]) {
+      const rows = [{ ...statement.rows[0], status }];
+      expect(
+        portalStatementSchema.safeParse({ ...statement, rows }).success
+      ).toBe(true);
+    }
+    const rows = [{ ...statement.rows[0], status: 'void' }];
+    expect(
+      portalStatementSchema.safeParse({ ...statement, rows }).success
+    ).toBe(false);
+  });
+
+  it('strips a reference, link or entry id from a row', () => {
+    const row = {
+      ...statement.rows[0],
+      reference: 'RCT-0001',
+      link: { type: 'payment', id },
+      entryId: id,
+    };
+    const parsed = portalStatementSchema.parse({ ...statement, rows: [row] });
+    expect(parsed.rows[0]).toEqual(statement.rows[0]);
+    expect(parsed.rows[0]).not.toHaveProperty('reference');
+    expect(parsed.rows[0]).not.toHaveProperty('link');
+    expect(parsed.rows[0]).not.toHaveProperty('entryId');
+  });
+
+  it('describes an unpaid charge by number and outstanding amount only', () => {
+    const unpaid = [
+      {
+        number: 'INV-0001',
+        outstandingMinor: 100,
+        link: { type: 'invoice', id },
+      },
+    ];
+    const parsed = portalStatementSchema.parse({ ...statement, unpaid });
+    expect(parsed.unpaid).toEqual([
+      { number: 'INV-0001', outstandingMinor: 100 },
+    ]);
+  });
+});
+
+describe('the portal family statement', () => {
+  const family = {
+    currency: 'NGN',
+    totalOwedMinor: 10_000_000,
+    creditMinor: 2_000_000,
+    children: [
+      {
+        studentId: id,
+        name: 'Ada Okeke',
+        className: null,
+        campusName: 'Lekki',
+        archived: true,
+        balanceMinor: -2_000_000,
+      },
+    ],
+  };
+
+  it('keeps what is owed and the credit apart, neither below zero', () => {
+    expect(portalFamilyStatementSchema.parse(family)).toEqual(family);
+    expect(
+      portalFamilyStatementSchema.safeParse({ ...family, creditMinor: -1 })
+        .success
+    ).toBe(false);
+    expect(
+      portalFamilyStatementSchema.safeParse({ ...family, totalOwedMinor: -1 })
+        .success
+    ).toBe(false);
+  });
+
+  it('is served at its own path with the statement under a student', () => {
+    expect(contract.portal.familyStatement.path).toBe(
+      '/portal/family-statement'
+    );
+    expect(contract.portal.statement.path).toBe(
+      '/portal/students/:studentId/statement'
+    );
   });
 });
