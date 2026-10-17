@@ -28,7 +28,7 @@ export interface PlannedCharge {
   lines: ChargeLine[];
 }
 
-export interface PlannedRound {
+interface PlannedRound {
   charges: PlannedCharge[];
   none: number;
 }
