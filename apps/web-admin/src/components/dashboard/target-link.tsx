@@ -1,6 +1,7 @@
 import type { ComponentPropsWithoutRef } from 'react';
 import { Link } from '@tanstack/react-router';
 import type { BillingSearch } from '../../billing-search';
+import { searchFor } from '../../route-search-defaults';
 import type { StudentsSearch } from '../../students-search';
 
 export type TaskTarget =
@@ -39,7 +40,13 @@ export function TargetLink({
       return <Link to="/members/$memberId" params={dest.params} {...props} />;
     }
     case '/finance/billing': {
-      return <Link to="/finance/billing" search={dest.search} {...props} />;
+      return (
+        <Link
+          to="/finance/billing"
+          search={searchFor('/finance/billing', dest.search)}
+          {...props}
+        />
+      );
     }
     case '/finance/billing/$runId': {
       return (

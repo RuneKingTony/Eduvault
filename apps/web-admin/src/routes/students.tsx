@@ -5,6 +5,7 @@ import { requireGate } from '../access';
 import { admittedToast, admittedToastAction } from '../admit-model';
 import { StudentsPage } from '../pages/students-page';
 import { campusesQueryOptions, studentsQueryOptions } from '../queries';
+import { prepareChargesTarget } from '../route-search-defaults';
 import { parseStudentsSearch } from '../students-search';
 import { useSchool } from '../use-school';
 
@@ -61,7 +62,7 @@ function StudentsRoute() {
         toast.success(
           admittedToast(student),
           admittedToastAction(canCharge, () => {
-            router.history.push('/finance/billing?prepare=1');
+            void navigate(prepareChargesTarget());
           })
         );
         router.history.push(`/students/${student.id}`, {
