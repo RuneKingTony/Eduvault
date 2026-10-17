@@ -7,6 +7,8 @@ import {
   type ExceptionFilter,
 } from '@nestjs/common';
 import {
+  ALREADY_DECIDED_MESSAGE,
+  SELF_APPROVAL_MESSAGE,
   YEAR_OVERLAP_MESSAGE,
   apiErrorCodeSchema,
   type ApiErrorBody,
@@ -45,14 +47,18 @@ const conflict = (message: string, code: ApiErrorCode = 'Conflict') => ({
   body: { code, message },
 });
 
-const describeCheckViolation = (exception: unknown) =>
+function describeCheckViolation(exception: unknown) {
+  const constraint = pgConstraint(exception);
   // Convention: a self-approval CHECK is named `<table>_<action>_not_self`.
-  pgConstraint(exception).includes('not_self')
-    ? conflict(
-        'You created this. Someone else must approve it.',
-        'SelfApproval'
-      )
-    : conflict('The change breaks a rule on this record');
+  if (constraint.includes('not_self')) {
+    return conflict(SELF_APPROVAL_MESSAGE, 'SelfApproval');
+  }
+  // The trigger on a decided approval record is named `<table>_decided_frozen`.
+  if (constraint.endsWith('_decided_frozen')) {
+    return conflict(ALREADY_DECIDED_MESSAGE, 'AlreadyDecided');
+  }
+  return conflict('The change breaks a rule on this record');
+}
 
 const describeExclusionViolation = (exception: unknown) =>
   conflict(
@@ -120,6 +126,9 @@ export class ErrorFilter implements ExceptionFilter {
           typeof payload['message'] === 'string'
             ? payload['message']
             : exception.message,
+        ...(typeof payload['creditMinor'] === 'number'
+          ? { creditMinor: payload['creditMinor'] }
+          : {}),
         ...(Array.isArray(payload['issues'])
           ? { issues: payload['issues'] as ApiErrorBody['issues'] }
           : {}),

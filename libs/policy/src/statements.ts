@@ -11,6 +11,7 @@ export const statements = {
   feeLine: ['create', 'read', 'readOwn', 'update', 'retire'],
   invoice: ['bill', 'read', 'readOwn'],
   payment: ['record', 'read', 'void'],
+  adjustment: ['create', 'read', 'approve'],
   announcement: ['create', 'read', 'update'],
   ledger: ['read', 'manageAccounts'],
   moneyAccount: ['create', 'read', 'update'],
@@ -108,6 +109,12 @@ export const PERM_HELP: Partial<Record<Permission, string>> = {
   'payment:read': 'Sees payments and receipts, and who owes what.',
   'payment:void':
     'Asks for a recorded payment to be cancelled. A second person approves it.',
+  'adjustment:create':
+    'Asks for a refund, a fee reduction, a cancelled balance or a discount. A second person approves it.',
+  'adjustment:read':
+    'Sees refunds, corrections, discounts and cancelled payments.',
+  'adjustment:approve':
+    'Approves or declines money requests from other people, never their own.',
   'store:read':
     'Sees the store: items, stock on hand and deliveries, on the campuses they see.',
   'store:receive':
@@ -127,6 +134,7 @@ const RESOURCE_LABELS: Record<Resource, string> = {
   feeLine: 'School and other fees',
   invoice: 'Charges',
   payment: 'Payments',
+  adjustment: 'Discounts and refunds',
   announcement: 'Announcements',
   ledger: 'Money categories',
   moneyAccount: 'Bank and POS accounts',

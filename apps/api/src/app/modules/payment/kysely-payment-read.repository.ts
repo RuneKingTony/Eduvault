@@ -1,5 +1,6 @@
 import { sql, type RawBuilder } from 'kysely';
 import {
+  approvalStatusSchema,
   paymentMethodSchema,
   paymentStatusSchema,
   type Payment,
@@ -296,6 +297,58 @@ async function entryOf(
   };
 }
 
+interface VoidDetailRow {
+  id: string;
+  status: string;
+  reason: string;
+  created_by_name: string | null;
+  approved_by_name: string | null;
+  rejection_reason: string | null;
+  journal_entry_id: string | null;
+  entry_reference: string | null;
+}
+
+async function voidDetail(
+  db: Database,
+  scope: PaymentScope,
+  paymentId: string
+): Promise<{ void: Payment['void']; voidEntry: Payment['voidEntry'] }> {
+  const { rows } = await sql<VoidDetailRow>`
+    SELECT v.id, v.status, v.reason, cu.name AS created_by_name,
+      au.name AS approved_by_name, v.rejection_reason, v.journal_entry_id,
+      je.reference AS entry_reference
+    FROM payment_void v
+    LEFT JOIN "user" cu ON cu.id = v.created_by
+    LEFT JOIN "user" au ON au.id = v.approved_by
+    LEFT JOIN journal_entry je
+      ON je.id = v.journal_entry_id AND je.organization_id = v.organization_id
+    WHERE v.payment_id = ${paymentId} AND v.organization_id = ${scope.organizationId}
+    ORDER BY v.created_at DESC, v.id
+    LIMIT 1`.execute(db);
+  const row = rows[0];
+  if (row === undefined) {
+    return { void: null, voidEntry: null };
+  }
+  const voidEntry =
+    row.journal_entry_id === null || row.entry_reference === null
+      ? null
+      : await entryOf(db, scope, {
+          entry_reference: row.entry_reference,
+          journal_entry_id: row.journal_entry_id,
+        });
+  return {
+    void: {
+      id: row.id,
+      status: approvalStatusSchema.parse(row.status),
+      reason: row.reason,
+      createdBy: row.created_by_name,
+      approvedBy: row.approved_by_name,
+      rejectionReason: row.rejection_reason,
+    },
+    voidEntry,
+  };
+}
+
 function toPayment(
   row: DetailRow,
   allocations: PaymentAllocation[],
@@ -359,9 +412,10 @@ export async function findPayment(
   if (row === undefined) {
     return undefined;
   }
-  const [allocations, entry] = await Promise.all([
+  const [allocations, entry, cancellation] = await Promise.all([
     allocationDetail(db, scope, id),
     entryOf(db, scope, row),
+    voidDetail(db, scope, id),
   ]);
-  return toPayment(row, allocations, entry);
+  return { ...toPayment(row, allocations, entry), ...cancellation };
 }

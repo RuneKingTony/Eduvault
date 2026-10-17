@@ -53,6 +53,14 @@ const actions: CommandEntry[] = [
     keywords: ['receipt', 'cash', 'transfer', 'pos', 'paid', 'fees'],
   },
   {
+    id: 'discount-or-refund',
+    label: 'Discount or refund',
+    hint: 'Finance',
+    route: '/finance/adjustments?new=1',
+    icon: 'wallet',
+    keywords: ['refund', 'discount', 'scholarship', 'reduce', 'write off'],
+  },
+  {
     id: 'who-owes',
     label: 'See who owes fees',
     hint: 'Fees',
@@ -124,6 +132,21 @@ describe('CommandMenu', () => {
     const { onSelect } = setup(true);
     fireEvent.click(screen.getByRole('option', { name: /Record a payment/ }));
     expect(onSelect).toHaveBeenCalledWith('/finance/payments?record=1');
+  });
+
+  it('opens Discount or refund on its page with the request sheet open', () => {
+    const { onSelect } = setup(true);
+    fireEvent.click(screen.getByRole('option', { name: /Discount or refund/ }));
+    expect(onSelect).toHaveBeenCalledWith('/finance/adjustments?new=1');
+  });
+
+  it('finds Discount or refund by a keyword', () => {
+    const { type } = setup(true);
+    type('scholarship');
+    expect(groupHeadings()).toEqual(['Actions']);
+    expect(
+      screen.getByRole('option', { name: /Discount or refund/ })
+    ).toBeInTheDocument();
   });
 
   it('opens See who owes fees on Who owes, and finds it by a keyword', () => {

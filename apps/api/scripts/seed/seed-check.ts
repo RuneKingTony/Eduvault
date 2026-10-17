@@ -16,6 +16,7 @@ import { SubjectTeacherService } from '../../src/app/modules/subject/subject-tea
 import { orgContextFor } from './actors';
 import { SEEDED_ACTING_REASON } from './acting-requests';
 import { SEED_ANNOUNCEMENTS } from './announcements';
+import { SEED_PAYMENT_MINOR } from './approvals';
 import { CURRENT_CLASS_TEACHERS, SEED_CLASSES } from './classes';
 import {
   OPENING_CREDIT_MINOR,
@@ -482,7 +483,10 @@ async function checkFinance(app: INestApplicationContext, check: Check) {
   check(
     'fees owed to the school',
     balanceOf(1100) ?? 'missing',
-    OPENING_DEBT_MINOR - OPENING_CREDIT_MINOR + charges.chargedMinor
+    OPENING_DEBT_MINOR -
+      OPENING_CREDIT_MINOR +
+      charges.chargedMinor -
+      SEED_PAYMENT_MINOR
   );
   check(
     'opening balance',
@@ -495,7 +499,7 @@ async function checkFinance(app: INestApplicationContext, check: Check) {
   check(
     'journal entries',
     journal.total,
-    SEED_OPENING_BALANCES.length + charges.sentCount + SEED_STORE_ENTRIES
+    SEED_OPENING_BALANCES.length + charges.sentCount + SEED_STORE_ENTRIES + 1
   );
 }
 

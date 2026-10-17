@@ -26,5 +26,13 @@ export const settings = (
   requireGuardian: true,
   paymentMethods: { cash: true, transfer: true, pos: true },
   receiptFooter: 'Thank you for your payment.',
+  approvalRules: {
+    refund: true,
+    writeOff: true,
+    creditNote: true,
+    discount: true,
+    paymentVoid: true,
+  },
+  approvers: ['Owner', 'Principal'],
   ...overrides,
 });

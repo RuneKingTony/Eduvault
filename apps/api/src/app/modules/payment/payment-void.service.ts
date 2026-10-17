@@ -1,0 +1,196 @@
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import {
+  PAYMENT_NOT_FOUND_MESSAGE,
+  PAYMENT_VOID_EXISTS_MESSAGE,
+  PAYMENT_VOID_NOT_FOUND_MESSAGE,
+  PAYMENT_VOID_NOT_RECORDED_MESSAGE,
+  PAYMENT_VOID_OTHER_CAMPUS_MESSAGE,
+  PAYMENT_VOID_REASON_MESSAGE,
+  PAYMENT_VOID_STORE_SALE_MESSAGE,
+  type PaymentVoidItem,
+  type PaymentVoidList,
+  type PaymentVoidListQuery,
+  type RequestPaymentVoidInput,
+  type RequestedPaymentVoid,
+} from '@eduvault/api-contract';
+import { assertDeclineReason, decide } from '../../common/approvals';
+import type { OrgContext } from '../../common/auth';
+import { Clock } from '../../common/clock';
+import { mirrorLines, voidMemo, voidReference } from './payment-void-posting';
+import {
+  PaymentVoidRepository,
+  type PaymentVoidTx,
+  type VoidablePayment,
+} from './payment-void.repository';
+import { PaymentRepository, type PaymentScope } from './payment.repository';
+
+const scopeOf = (ctx: OrgContext): PaymentScope => ({
+  organizationId: ctx.organizationId,
+  campusScope: ctx.campusScope,
+});
+
+const paymentNotFound = () => new NotFoundException(PAYMENT_NOT_FOUND_MESSAGE);
+const voidNotFound = () =>
+  new NotFoundException(PAYMENT_VOID_NOT_FOUND_MESSAGE);
+
+function assertWholePayment(payment: VoidablePayment): void {
+  if (!payment.everyAllocationInScope) {
+    throw new ForbiddenException(PAYMENT_VOID_OTHER_CAMPUS_MESSAGE);
+  }
+}
+
+function assertVoidable(payment: VoidablePayment, hasOpenVoid: boolean): void {
+  if (payment.storeSale !== null) {
+    throw new ConflictException(PAYMENT_VOID_STORE_SALE_MESSAGE);
+  }
+  if (hasOpenVoid) {
+    throw new ConflictException(PAYMENT_VOID_EXISTS_MESSAGE);
+  }
+  if (payment.status !== 'posted') {
+    throw new ConflictException(PAYMENT_VOID_NOT_RECORDED_MESSAGE);
+  }
+}
+
+@Injectable()
+export class PaymentVoidService {
+  constructor(
+    private readonly payments: PaymentRepository,
+    private readonly voids: PaymentVoidRepository,
+    private readonly clock: Clock
+  ) {}
+
+  async list(
+    ctx: OrgContext,
+    query: PaymentVoidListQuery
+  ): Promise<PaymentVoidList> {
+    const [currency, page] = await Promise.all([
+      this.payments.currency(ctx.organizationId),
+      this.voids.listVoids(scopeOf(ctx), query),
+    ]);
+    return { currency, ...page };
+  }
+
+  async request(
+    ctx: OrgContext,
+    paymentId: string,
+    input: RequestPaymentVoidInput
+  ): Promise<RequestedPaymentVoid> {
+    const reason = input.reason.trim();
+    if (reason === '') {
+      throw new BadRequestException(PAYMENT_VOID_REASON_MESSAGE);
+    }
+    const scope = scopeOf(ctx);
+    const made = await this.voids.withTx(scope, ctx.user.id, async (tx) => {
+      const payment = await tx.lockPayment(paymentId);
+      if (payment === undefined) {
+        throw paymentNotFound();
+      }
+      assertWholePayment(payment);
+      assertVoidable(payment, await tx.hasOpenVoid(paymentId));
+      if (await tx.approvalOn()) {
+        const id = await tx.insertSubmitted({ paymentId, reason });
+        await tx.setPaymentStatus(paymentId, 'void_pending');
+        return { id, autoApproved: false };
+      }
+      const entryId = await this.postMirror(tx, payment, reason);
+      const id = await tx.insertApproved({ paymentId, reason, entryId });
+      await tx.setPaymentStatus(paymentId, 'voided');
+      return { id, autoApproved: true };
+    });
+    return {
+      void: await this.item(scope, made.id),
+      autoApproved: made.autoApproved,
+    };
+  }
+
+  async approve(ctx: OrgContext, id: string): Promise<PaymentVoidItem> {
+    const scope = scopeOf(ctx);
+    await this.voids.withTx(scope, ctx.user.id, async (tx) => {
+      const found = await tx.lockVoid(id);
+      if (found === undefined) {
+        throw voidNotFound();
+      }
+      assertWholePayment(found.payment);
+      await decide(
+        { actorId: ctx.user.id, createdBy: found.createdBy },
+        async () => {
+          if (found.status !== 'submitted') {
+            return false;
+          }
+          const entryId = await this.postMirror(
+            tx,
+            found.payment,
+            found.reason
+          );
+          const changed = await tx.approve(id, entryId);
+          if (changed) {
+            await tx.setPaymentStatus(found.payment.id, 'voided');
+          }
+          return changed;
+        }
+      );
+    });
+    return this.item(scope, id);
+  }
+
+  async decline(
+    ctx: OrgContext,
+    id: string,
+    reason: string
+  ): Promise<PaymentVoidItem> {
+    const declineReason = assertDeclineReason(reason);
+    const scope = scopeOf(ctx);
+    await this.voids.withTx(scope, ctx.user.id, async (tx) => {
+      const found = await tx.lockVoid(id);
+      if (found === undefined) {
+        throw voidNotFound();
+      }
+      await decide(
+        { actorId: ctx.user.id, createdBy: found.createdBy },
+        async () => {
+          const changed =
+            found.status === 'submitted' &&
+            (await tx.reject(id, declineReason));
+          if (changed) {
+            await tx.setPaymentStatus(found.payment.id, 'posted');
+          }
+          return changed;
+        }
+      );
+    });
+    return this.item(scope, id);
+  }
+
+  private async item(
+    scope: PaymentScope,
+    id: string
+  ): Promise<PaymentVoidItem> {
+    const found = await this.voids.findVoid(scope, id);
+    if (found === undefined) {
+      throw voidNotFound();
+    }
+    return found;
+  }
+
+  private async postMirror(
+    tx: PaymentVoidTx,
+    payment: VoidablePayment,
+    reason: string
+  ): Promise<string> {
+    return tx.post({
+      reference: voidReference(payment.reference),
+      kind: 'payment_void',
+      effectiveOn: this.clock.today(),
+      memo: voidMemo(payment.receiptNumber, reason),
+      sourceId: payment.id,
+      reversesEntryId: payment.entryId,
+      lines: mirrorLines(await tx.originalLines(payment.entryId)),
+    });
+  }
+}

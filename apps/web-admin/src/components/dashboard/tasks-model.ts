@@ -167,6 +167,18 @@ const lowStock = (task: Counted<'lowStock'>): TaskRow => ({
   extra: null,
 });
 
+const approvalsWaiting = (task: Counted<'approvalsWaiting'>): TaskRow => ({
+  key: task.kind,
+  kind: task.kind,
+  tone: 'default',
+  title: `${countOf(task.count, 'request', 'requests')} waiting for your approval`,
+  subline: task.items
+    .map((item) => `${item.label}: ${item.details}`)
+    .join(' · '),
+  action: { label: 'Review', target: { to: '/approvals' } },
+  extra: null,
+});
+
 const noRole = (task: Counted<'noRole'>): TaskRow => ({
   key: `${task.kind}-${task.memberId}`,
   kind: task.kind,
@@ -206,6 +218,9 @@ export function taskRow(task: DashboardTask): TaskRow {
     }
     case 'lowStock': {
       return lowStock(task);
+    }
+    case 'approvalsWaiting': {
+      return approvalsWaiting(task);
     }
     case 'noRole': {
       return noRole(task);

@@ -1,5 +1,25 @@
 import { z } from 'zod';
 import {
+  adjustmentListQuerySchema,
+  adjustmentListSchema,
+  adjustmentSchema,
+  createAdjustmentSchema,
+  createStudentDiscountSchema,
+  createdAdjustmentSchema,
+  createdStudentDiscountSchema,
+  endStudentDiscountSchema,
+  studentDiscountListQuerySchema,
+  studentDiscountListSchema,
+  termChoiceSchema,
+  studentDiscountSchema,
+} from './adjustments';
+import {
+  approvalListQuerySchema,
+  approvalListSchema,
+  approvalSummarySchema,
+  declineSchema,
+} from './approvals';
+import {
   calendarCurrentSchema,
   createHolidaySchema,
   createSchoolYearSchema,
@@ -116,8 +136,14 @@ import {
 import {
   paymentListQuerySchema,
   paymentListSchema,
+  paymentMoneyAccountSchema,
   paymentSchema,
+  paymentVoidItemSchema,
+  paymentVoidListQuerySchema,
+  paymentVoidListSchema,
   recordPaymentSchema,
+  requestPaymentVoidSchema,
+  requestedPaymentVoidSchema,
   recordedPaymentSchema,
   recordingOptionsSchema,
 } from './payments';
@@ -245,7 +271,9 @@ import {
   updateMemberTitleSchema,
   updatePaymentRulesSchema,
   updateRoleSchema,
+  approvalRulesSchema,
   paymentMethodsSchema,
+  updateApprovalRulesSchema,
 } from './schemas';
 
 const removed = z.object({ id: z.uuid() });
@@ -754,6 +782,11 @@ export const contract = defineContract({
       path: '/finance/money-accounts',
       response: moneyAccountListSchema,
     }),
+    forRecording: defineRoute({
+      method: 'GET',
+      path: '/finance/money-accounts/for-recording',
+      response: z.array(paymentMoneyAccountSchema),
+    }),
     cashBook: defineRoute({
       method: 'GET',
       path: '/finance/money-accounts/:id/cash-book',
@@ -958,6 +991,119 @@ export const contract = defineContract({
       path: '/finance/payments',
       body: recordPaymentSchema,
       response: recordedPaymentSchema,
+    }),
+    requestVoid: defineRoute({
+      method: 'POST',
+      path: '/finance/payments/:id/void-requests',
+      params: idParamsSchema,
+      body: requestPaymentVoidSchema,
+      response: requestedPaymentVoidSchema,
+    }),
+  },
+  paymentVoids: {
+    list: defineRoute({
+      method: 'GET',
+      path: '/finance/payment-voids',
+      query: paymentVoidListQuerySchema,
+      response: paymentVoidListSchema,
+    }),
+    approve: defineRoute({
+      method: 'POST',
+      path: '/finance/payment-voids/:id/approve',
+      params: idParamsSchema,
+      response: paymentVoidItemSchema,
+    }),
+    decline: defineRoute({
+      method: 'POST',
+      path: '/finance/payment-voids/:id/decline',
+      params: idParamsSchema,
+      body: declineSchema,
+      response: paymentVoidItemSchema,
+    }),
+  },
+  adjustments: {
+    list: defineRoute({
+      method: 'GET',
+      path: '/finance/adjustments',
+      query: adjustmentListQuerySchema,
+      response: adjustmentListSchema,
+    }),
+    get: defineRoute({
+      method: 'GET',
+      path: '/finance/adjustments/:id',
+      params: idParamsSchema,
+      response: adjustmentSchema,
+    }),
+    create: defineRoute({
+      method: 'POST',
+      path: '/finance/adjustments',
+      body: createAdjustmentSchema,
+      response: createdAdjustmentSchema,
+    }),
+    approve: defineRoute({
+      method: 'POST',
+      path: '/finance/adjustments/:id/approve',
+      params: idParamsSchema,
+      response: adjustmentSchema,
+    }),
+    decline: defineRoute({
+      method: 'POST',
+      path: '/finance/adjustments/:id/decline',
+      params: idParamsSchema,
+      body: declineSchema,
+      response: adjustmentSchema,
+    }),
+  },
+  studentDiscounts: {
+    list: defineRoute({
+      method: 'GET',
+      path: '/finance/discounts',
+      query: studentDiscountListQuerySchema,
+      response: studentDiscountListSchema,
+    }),
+    create: defineRoute({
+      method: 'POST',
+      path: '/finance/discounts',
+      body: createStudentDiscountSchema,
+      response: createdStudentDiscountSchema,
+    }),
+    terms: defineRoute({
+      method: 'GET',
+      path: '/finance/discounts/terms',
+      response: z.array(termChoiceSchema),
+    }),
+    approve: defineRoute({
+      method: 'POST',
+      path: '/finance/discounts/:id/approve',
+      params: idParamsSchema,
+      response: studentDiscountSchema,
+    }),
+    decline: defineRoute({
+      method: 'POST',
+      path: '/finance/discounts/:id/decline',
+      params: idParamsSchema,
+      body: declineSchema,
+      response: studentDiscountSchema,
+    }),
+    end: defineRoute({
+      method: 'POST',
+      path: '/finance/discounts/:id/end',
+      params: idParamsSchema,
+      body: endStudentDiscountSchema,
+      response: studentDiscountSchema,
+    }),
+  },
+  approvals: {
+    list: defineRoute({
+      method: 'GET',
+      path: '/approvals',
+      query: approvalListQuerySchema,
+      response: approvalListSchema,
+    }),
+    summary: defineRoute({
+      method: 'GET',
+      path: '/approvals/summary',
+      response: approvalSummarySchema,
     }),
   },
   store: {
@@ -1309,6 +1455,12 @@ export const contract = defineContract({
       path: '/school-settings/payment-rules',
       body: updatePaymentRulesSchema,
       response: paymentMethodsSchema,
+    }),
+    updateApprovalRules: defineRoute({
+      method: 'PATCH',
+      path: '/school-settings/approval-rules',
+      body: updateApprovalRulesSchema,
+      response: approvalRulesSchema,
     }),
   },
   files: {

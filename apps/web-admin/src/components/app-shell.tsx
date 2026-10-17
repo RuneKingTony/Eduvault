@@ -125,6 +125,22 @@ const RECORD_PAYMENT_ACTION: CommandEntry = {
   keywords: ['receipt', 'cash', 'transfer', 'pos', 'paid', 'fees'],
 };
 
+const DISCOUNT_OR_REFUND_ACTION: CommandEntry = {
+  id: 'discount-or-refund',
+  label: 'Discount or refund',
+  hint: 'Finance',
+  route: '/finance/adjustments?new=1',
+  icon: 'wallet',
+  keywords: [
+    'refund',
+    'discount',
+    'scholarship',
+    'reduce',
+    'write off',
+    'credit',
+  ],
+};
+
 const WHO_OWES_ACTION: CommandEntry = {
   id: 'who-owes',
   label: 'See who owes fees',
@@ -154,6 +170,9 @@ function commandActions(
       : []),
     ...(allowed('/finance/payments', ['payment:record'])
       ? [RECORD_PAYMENT_ACTION]
+      : []),
+    ...(allowed('/finance/adjustments', ['adjustment:create'])
+      ? [DISCOUNT_OR_REFUND_ACTION]
       : []),
     ...(allowed('/finance/accounts', FINANCE_READ_GATE)
       ? [WHO_OWES_ACTION]
@@ -355,6 +374,9 @@ function ShellFrame({ access }: { access: MePermissions }) {
   const toggleCommand = useCallback(() => {
     setCommandOpen((open) => !open);
   }, []);
+  const openCommand = useCallback(() => {
+    setCommandOpen(true);
+  }, []);
   useCommandShortcut(toggleCommand);
 
   return (
@@ -373,9 +395,7 @@ function ShellFrame({ access }: { access: MePermissions }) {
           railOpen={railOpen}
           navOpen={navOpen}
           onNavOpenChange={setNavOpen}
-          onOpenCommandMenu={() => {
-            setCommandOpen(true);
-          }}
+          onOpenCommandMenu={openCommand}
         />
         <div className="flex min-w-0 flex-1 flex-col">
           <ActingBanner />
@@ -386,9 +406,8 @@ function ShellFrame({ access }: { access: MePermissions }) {
             onOpenNavigation={() => {
               setNavOpen(true);
             }}
-            onOpenSearch={() => {
-              setCommandOpen(true);
-            }}
+            onOpenSearch={openCommand}
+            showApprovals
           />
           <ShellMain compact={compact} pathname={model.pathname} />
         </div>

@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Logger,
   type ArgumentsHost,
@@ -73,6 +74,48 @@ describe('ErrorFilter', () => {
         code: 'SelfApproval',
         message: 'You created this. Someone else must approve it.',
       },
+    });
+  });
+
+  it('maps the new approval tables’ self-approval checks to SelfApproval', () => {
+    for (const constraint of [
+      'adjustment_approved_not_self',
+      'adjustment_rejected_not_self',
+      'payment_void_approved_not_self',
+      'payment_void_rejected_not_self',
+      'student_discount_approved_not_self',
+    ]) {
+      expect(run({ code: '23514', constraint }).body.code).toBe('SelfApproval');
+    }
+  });
+
+  it('maps an update of a decided approval record to AlreadyDecided', () => {
+    for (const constraint of [
+      'adjustment_decided_frozen',
+      'payment_void_decided_frozen',
+    ]) {
+      expect(run({ code: '23514', constraint })).toEqual({
+        status: 409,
+        body: {
+          code: 'AlreadyDecided',
+          message: 'This has already been decided.',
+        },
+      });
+    }
+  });
+
+  it('keeps a creditMinor from the exception in the body', () => {
+    expect(
+      run(
+        new BadRequestException({
+          message: 'A refund pays back credit held.',
+          creditMinor: 500_000,
+        })
+      ).body
+    ).toEqual({
+      code: 'BadRequest',
+      message: 'A refund pays back credit held.',
+      creditMinor: 500_000,
     });
   });
 

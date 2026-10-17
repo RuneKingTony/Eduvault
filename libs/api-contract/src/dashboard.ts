@@ -58,6 +58,11 @@ export const dashboardTaskSchema = z.discriminatedUnion('kind', [
     names: z.array(z.string()).max(DASHBOARD_LOW_STOCK_NAMES),
   }),
   z.object({
+    kind: z.literal('approvalsWaiting'),
+    count: countSchema,
+    items: z.array(z.object({ label: z.string(), details: z.string() })).max(2),
+  }),
+  z.object({
     kind: z.literal('noRole'),
     memberId: idSchema,
     name: z.string(),

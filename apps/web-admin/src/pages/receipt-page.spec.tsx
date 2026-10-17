@@ -1,7 +1,14 @@
-import { screen, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { ApiError } from '@eduvault/api-contract';
+import { toast } from '@eduvault/ui';
 import { PAYMENT_ID, payment, renderPayments } from '../test-payments';
+import { starterAccess } from '../test-utils';
 import { ReceiptPage } from './receipt-page';
+
+vi.mock('@eduvault/ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@eduvault/ui')>()),
+  toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() },
+}));
 
 function setup(
   options: {
@@ -152,5 +159,292 @@ describe('ReceiptPage', () => {
       screen.getByRole('link', { name: 'Back to payments' })
     ).toBeVisible();
     expect(screen.getByRole('heading', { name: 'Not found' })).toBeVisible();
+  });
+});
+
+const entry = (reference: string) => ({
+  reference,
+  balanced: true,
+  lines: [
+    {
+      accountCode: 1100,
+      accountName: 'Fees owed to the school',
+      studentName: 'Ada Okeke',
+      campusName: 'Lekki',
+      debitMinor: 24_000_000,
+      creditMinor: 0,
+    },
+    {
+      accountCode: 1210,
+      accountName: 'GTBank current',
+      studentName: null,
+      campusName: null,
+      debitMinor: 0,
+      creditMinor: 24_000_000,
+    },
+  ],
+});
+
+const waiting = () =>
+  payment({
+    status: 'void_pending',
+    void: {
+      id: 'void-1',
+      status: 'submitted',
+      reason: 'Keyed the wrong amount',
+      createdBy: 'Chika Eze',
+      approvedBy: null,
+      rejectionReason: null,
+    },
+  });
+
+const cancelled = (approvedBy: string | null) =>
+  payment({
+    status: 'voided',
+    void: {
+      id: 'void-1',
+      status: 'approved',
+      reason: 'Keyed the wrong amount',
+      createdBy: 'Chika Eze',
+      approvedBy,
+      rejectionReason: null,
+    },
+    voidEntry: entry('VOID-TRF-20261007-K3Q7ZA'),
+  });
+
+function setupVoid(
+  options: {
+    payment?: ReturnType<typeof payment>;
+    access?: ReturnType<typeof starterAccess>;
+    autoApproved?: boolean;
+    failWith?: Error;
+  } = {}
+) {
+  const api = {
+    payments: {
+      get: vi.fn().mockResolvedValue(options.payment ?? payment()),
+      requestVoid: vi.fn().mockImplementation(() =>
+        options.failWith === undefined
+          ? Promise.resolve({
+              void: { id: 'void-1' },
+              autoApproved: options.autoApproved === true,
+            })
+          : Promise.reject(options.failWith)
+      ),
+    },
+  };
+  renderPayments(<ReceiptPage paymentId={PAYMENT_ID} />, api, {
+    access: options.access ?? starterAccess('bursar'),
+    path: `/finance/payments/${PAYMENT_ID}`,
+  });
+  return api;
+}
+
+describe('ReceiptPage cancellation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('offers Request void on a Recorded receipt to someone who may ask', async () => {
+    setupVoid();
+    expect(
+      await screen.findByRole('button', { name: 'Request void' })
+    ).toBeVisible();
+  });
+
+  it('offers nothing to a member without payment:void, and nothing once it is waiting, cancelled or a store sale', async () => {
+    setupVoid({ access: starterAccess('principal') });
+    await screen.findByRole('heading', { name: /Receipt RCT-2026-00088/ });
+    expect(screen.queryByRole('button', { name: 'Request void' })).toBeNull();
+  });
+
+  it('hides Request void while a cancellation is waiting', async () => {
+    setupVoid({ payment: waiting() });
+    await screen.findByText('Cancellation waiting');
+    expect(screen.queryByRole('button', { name: 'Request void' })).toBeNull();
+  });
+
+  it('hides Request void for the payment of a store sale', async () => {
+    setupVoid({
+      payment: payment({
+        storeSale: { id: 'sale-1', number: 'ISS-2026-0001' },
+      }),
+    });
+    await screen.findByRole('heading', { name: /Receipt RCT-2026-00088/ });
+    expect(screen.queryByRole('button', { name: 'Request void' })).toBeNull();
+  });
+
+  it('asks for a reason, then requests the void and toasts that it needs a second person’s approval', async () => {
+    const api = setupVoid();
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Request void' })
+    );
+    const dialog = await screen.findByRole('dialog');
+    expect(
+      within(dialog).getByText('Void receipt RCT-2026-00088?')
+    ).toBeVisible();
+    expect(within(dialog).getByText('₦240,000 from Ngozi Okeke')).toBeVisible();
+    expect(
+      within(dialog).getByText(
+        'The receipt is kept. Once a boss approves, the payment is cancelled and the family owes that money again.'
+      )
+    ).toBeVisible();
+
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: 'Request void' })
+    );
+    expect(
+      await within(dialog).findByText(
+        'Say why this receipt is being cancelled.'
+      )
+    ).toBeVisible();
+    expect(api.payments.requestVoid).not.toHaveBeenCalled();
+
+    fireEvent.change(within(dialog).getByLabelText('Reason'), {
+      target: { value: 'Keyed the wrong amount' },
+    });
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: 'Request void' })
+    );
+
+    await waitFor(() => {
+      expect(api.payments.requestVoid).toHaveBeenCalledWith({
+        params: { id: PAYMENT_ID },
+        body: { reason: 'Keyed the wrong amount' },
+      });
+    });
+    await waitFor(() => {
+      expect(toast.warning).toHaveBeenCalledWith(
+        'Void requested. It needs a second person’s approval.',
+        expect.anything()
+      );
+    });
+  });
+
+  it('adds an Open voids action for a member who can see the voids list', async () => {
+    setupVoid({ access: starterAccess('bursar') });
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Request void' })
+    );
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.change(within(dialog).getByLabelText('Reason'), {
+      target: { value: 'Wrong child' },
+    });
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: 'Request void' })
+    );
+
+    await waitFor(() => {
+      expect(toast.warning).toHaveBeenCalledWith(
+        'Void requested. It needs a second person’s approval.',
+        expect.objectContaining({
+          action: expect.objectContaining({ label: 'Open voids' }),
+        })
+      );
+    });
+  });
+
+  it('says the payment was cancelled when approval is switched off', async () => {
+    setupVoid({ autoApproved: true });
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Request void' })
+    );
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.change(within(dialog).getByLabelText('Reason'), {
+      target: { value: 'Wrong child' },
+    });
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: 'Request void' })
+    );
+
+    await waitFor(() => {
+      expect(toast.success).toHaveBeenCalledWith(
+        'Payment cancelled. The receipt is kept, and the family owes that money again.'
+      );
+    });
+  });
+
+  it('shows the refusal in the dialog when a void already exists', async () => {
+    setupVoid({
+      failWith: new ApiError(409, {
+        code: 'Conflict',
+        message: 'A void already exists for this payment.',
+      }),
+    });
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Request void' })
+    );
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.change(within(dialog).getByLabelText('Reason'), {
+      target: { value: 'Wrong child' },
+    });
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: 'Request void' })
+    );
+
+    expect(
+      await within(dialog).findByText('A void already exists for this payment.')
+    ).toBeVisible();
+  });
+
+  it('names who asked and why while the cancellation waits, with a link to Approvals', async () => {
+    setupVoid({ payment: waiting() });
+    expect(
+      await screen.findByText(
+        /Cancellation asked for by Chika Eze: “Keyed the wrong amount”\. Waiting for a boss to approve it\./
+      )
+    ).toBeVisible();
+    expect(
+      screen.getByRole('link', { name: 'See in Approvals' })
+    ).toHaveAttribute('href', '/approvals');
+    expect(screen.getByText('Cancellation waiting')).toBeVisible();
+  });
+
+  it('says who approved a cancelled receipt, strikes the amount and adds the VOID entry', async () => {
+    setupVoid({ payment: cancelled('Grace Nwosu') });
+    expect(
+      await screen.findByText(
+        /Cancelled, approved by Grace Nwosu\. The receipt is kept, and the family owes this money again\./
+      )
+    ).toBeVisible();
+    expect(screen.getByText('Cancelled')).toBeVisible();
+    const struck = screen
+      .getAllByText('₦240,000')
+      .filter((element) => element.className.includes('line-through'));
+    expect(struck).toHaveLength(1);
+    expect(
+      screen.getByText(/For your accountant: VOID-TRF-20261007-K3Q7ZA/)
+    ).toBeVisible();
+    expect(screen.getByText(/\(cancellation\)/)).toBeVisible();
+  });
+
+  it('says it was cancelled straight away when approval was switched off', async () => {
+    setupVoid({ payment: cancelled(null) });
+    expect(
+      await screen.findByText(
+        /Cancelled straight away \(approval is switched off\)\. The receipt is kept, and the family owes this money again\./
+      )
+    ).toBeVisible();
+  });
+
+  it('mentions a declined cancellation and offers a new request', async () => {
+    setupVoid({
+      payment: payment({
+        void: {
+          id: 'void-1',
+          status: 'rejected',
+          reason: 'Keyed the wrong amount',
+          createdBy: 'Chika Eze',
+          approvedBy: null,
+          rejectionReason: 'Not agreed with the owner',
+        },
+      }),
+    });
+    expect(
+      await screen.findByText(
+        'A cancellation was asked for and declined: “Not agreed with the owner”.'
+      )
+    ).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Request void' })).toBeVisible();
   });
 });

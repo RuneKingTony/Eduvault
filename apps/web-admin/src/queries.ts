@@ -812,20 +812,107 @@ export const familyStatementQueryOptions = (api: Api, guardianId: string) =>
       api.studentAccounts.guardianStatement({ params: { guardianId } }),
   });
 
-export async function invalidatePayments(
-  queryClient: QueryClient
+const APPROVALS_KEY = ['approvals'] as const;
+const ADJUSTMENTS_KEY = ['adjustments'] as const;
+
+export const APPROVALS_REFRESH_MS = 60_000;
+
+export const approvalsQueryOptions = (api: Api, page: number) =>
+  queryOptions({
+    queryKey: [...APPROVALS_KEY, 'list', page],
+    queryFn: () => api.approvals.list({ query: { page } }),
+    placeholderData: keepPreviousData,
+  });
+
+export const approvalsSummaryQueryOptions = (api: Api) =>
+  queryOptions({
+    queryKey: [...APPROVALS_KEY, 'summary'],
+    queryFn: () => api.approvals.summary({}),
+    refetchInterval: APPROVALS_REFRESH_MS,
+  });
+
+export const adjustmentsQueryOptions = (api: Api, page: number) =>
+  queryOptions({
+    queryKey: [...ADJUSTMENTS_KEY, 'corrections', page],
+    queryFn: () => api.adjustments.list({ query: { page } }),
+    placeholderData: keepPreviousData,
+  });
+
+export const paymentVoidsQueryOptions = (api: Api, page: number) =>
+  queryOptions({
+    queryKey: [...ADJUSTMENTS_KEY, 'voids', page],
+    queryFn: () => api.paymentVoids.list({ query: { page } }),
+    placeholderData: keepPreviousData,
+  });
+
+export const discountsQueryOptions = (api: Api, page: number) =>
+  queryOptions({
+    queryKey: [...ADJUSTMENTS_KEY, 'discounts', page],
+    queryFn: () => api.studentDiscounts.list({ query: { page } }),
+    placeholderData: keepPreviousData,
+  });
+
+export const REQUEST_STUDENT_CHOICES = 20;
+
+export const discountTermsQueryOptions = (api: Api) =>
+  queryOptions({
+    queryKey: [...ADJUSTMENTS_KEY, 'terms'],
+    queryFn: () => api.studentDiscounts.terms({}),
+  });
+
+export const requestStudentsQueryOptions = (api: Api, q: string) =>
+  queryOptions({
+    queryKey: [...ADJUSTMENTS_KEY, 'students', q],
+    queryFn: () =>
+      api.students.list({
+        query: {
+          tab: 'active',
+          pageSize: REQUEST_STUDENT_CHOICES,
+          q: q === '' ? undefined : q,
+        },
+      }),
+    placeholderData: keepPreviousData,
+    gcTime: 0,
+  });
+
+export const moneyAccountsForRecordingQueryOptions = (api: Api) =>
+  queryOptions({
+    queryKey: [...MONEY_ACCOUNTS_KEY, 'for-recording'],
+    queryFn: () => api.moneyAccounts.forRecording({}),
+    gcTime: 0,
+  });
+
+export const requestSheetChargesQueryOptions = (api: Api, studentId: string) =>
+  queryOptions({
+    queryKey: [...ADJUSTMENTS_KEY, 'charges', studentId],
+    queryFn: () =>
+      api.invoices.list({
+        query: { studentId, status: 'issued', pageSize: FINANCE_PAGE_SIZE_MAX },
+      }),
+    gcTime: 0,
+  });
+
+const MONEY_VIEW_KEYS = [
+  APPROVALS_KEY,
+  ADJUSTMENTS_KEY,
+  PAYMENTS_KEY,
+  BALANCES_KEY,
+  STATEMENTS_KEY,
+  INVOICES_KEY,
+  [...DASHBOARD_KEY, 'money'],
+  [...DASHBOARD_KEY, 'finance'],
+  [...DASHBOARD_KEY, 'roll'],
+  LEDGER_KEY,
+  MONEY_ACCOUNTS_KEY,
+];
+
+async function invalidateAll(
+  queryClient: QueryClient,
+  keys: readonly (readonly unknown[])[]
 ): Promise<void> {
-  await Promise.all([
-    queryClient.invalidateQueries({ queryKey: PAYMENTS_KEY }),
-    queryClient.invalidateQueries({ queryKey: BALANCES_KEY }),
-    queryClient.invalidateQueries({ queryKey: STATEMENTS_KEY }),
-    queryClient.invalidateQueries({ queryKey: INVOICES_KEY }),
-    queryClient.invalidateQueries({ queryKey: [...DASHBOARD_KEY, 'money'] }),
-    queryClient.invalidateQueries({ queryKey: [...DASHBOARD_KEY, 'finance'] }),
-    queryClient.invalidateQueries({ queryKey: [...DASHBOARD_KEY, 'roll'] }),
-    queryClient.invalidateQueries({ queryKey: LEDGER_KEY }),
-    queryClient.invalidateQueries({ queryKey: MONEY_ACCOUNTS_KEY }),
-  ]);
+  await Promise.all(
+    keys.map((queryKey) => queryClient.invalidateQueries({ queryKey }))
+  );
 }
 
 const STORE_KEY = ['store'] as const;
@@ -926,3 +1013,13 @@ export async function invalidateStore(queryClient: QueryClient): Promise<void> {
     queryClient.invalidateQueries({ queryKey: MONEY_ACCOUNTS_KEY }),
   ]);
 }
+
+export const invalidateApprovals = (queryClient: QueryClient): Promise<void> =>
+  invalidateAll(queryClient, [
+    ...MONEY_VIEW_KEYS,
+    FEES_KEY,
+    [...DASHBOARD_KEY, 'tasks'],
+  ]);
+
+export const invalidatePayments = (queryClient: QueryClient): Promise<void> =>
+  invalidateAll(queryClient, MONEY_VIEW_KEYS);

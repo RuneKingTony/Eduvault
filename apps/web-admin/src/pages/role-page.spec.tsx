@@ -296,7 +296,7 @@ describe('RolePage Advanced grid', () => {
     expect(
       screen.queryByRole('button', { name: 'Staff: see' })
     ).not.toBeInTheDocument();
-    fireEvent.change(filter, { target: { value: 'approve' } });
+    fireEvent.change(filter, { target: { value: 'zzz' } });
     expect(screen.getByText('No permissions match')).toBeInTheDocument();
     expect(
       screen.getByText('Try “approve”, “publish” or a pillar name.')

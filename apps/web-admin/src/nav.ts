@@ -140,6 +140,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         pageTitle: 'Payments',
         route: '/finance/payments',
         icon: 'banknote',
+        alsoActiveFor: ['/finance/adjustments'],
         gate: ['payment:read'],
       },
       {
@@ -222,6 +223,14 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
     gate: ['schoolAccount:read'],
   },
   {
+    id: 'approvals',
+    label: 'Approval rules',
+    route: '/settings/approvals',
+    group: 'General',
+    icon: 'badge-check',
+    gate: ['schoolAccount:read'],
+  },
+  {
     id: 'payment-rules',
     label: 'Payment rules',
     route: '/settings/payment-rules',
@@ -279,6 +288,7 @@ const ROUTE_GATES = new Map<string, Gate>([
     entry.gate === undefined ? [] : [[entry.route, entry.gate]]
   ),
   ['/roles/new', ['ac:create']],
+  ['/finance/adjustments', ['adjustment:read']],
   ['/finance/ledger', ['ledger:read']],
   ['/finance/other-fees', ['feeLine:read']],
   ...FEES_ENTRIES,
