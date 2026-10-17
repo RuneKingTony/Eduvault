@@ -43,6 +43,11 @@ export interface ChargeSummaryOptions {
   sampleSize: number;
 }
 
+export interface RoundCandidates {
+  candidates: RoundCandidate[];
+  skipped: number;
+}
+
 export interface RoundCandidateOptions {
   filter: RoundFilter;
   today: string;
@@ -106,7 +111,7 @@ export abstract class BillingRepository {
     scope: BillingScope,
     term: TermInfo,
     options: RoundCandidateOptions
-  ): Promise<{ candidates: RoundCandidate[]; skipped: number }>;
+  ): Promise<RoundCandidates>;
 
   abstract chargeSummary(
     scope: BillingScope,

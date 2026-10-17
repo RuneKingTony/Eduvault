@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
-import { sql, type Kysely } from 'kysely';
+import { sql, type Kysely, type RawBuilder } from 'kysely';
 import {
   DISCOUNTS_GIVEN_SYSTEM_KEY,
   FEES_RECEIVABLE_SYSTEM_KEY,
@@ -42,6 +42,7 @@ import {
   type LevelRef,
   type NewRound,
   type RoundCandidateOptions,
+  type RoundCandidates,
   type RunAction,
   type RunHeader,
   type RunOutcome,
@@ -137,7 +138,7 @@ const toCandidate = (row: CandidateRow): RoundCandidate => ({
   classLevelId: row.class_level_id,
 });
 
-// These fragments read the caller's aliases: s (student) and en (enrollment).
+// These fragments read the caller's aliases: s (student) and en (enrollment); roundFilterSql also reads p (placements).
 const termPlacementCampusSql = (termId: string) =>
   sql<string | null>`(
     select tp.campus_id
@@ -156,8 +157,13 @@ const latestPlacementCampusSql = () =>
     limit 1
   )`;
 
+const campusOfSql = (
+  termPlacement: RawBuilder<string | null>,
+  latestPlacement: RawBuilder<string | null>
+) => sql<string>`coalesce(${termPlacement}, ${latestPlacement}, s.campus_id)`;
+
 const termCampusSql = (termId: string) =>
-  sql<string>`coalesce(${termPlacementCampusSql(termId)}, ${latestPlacementCampusSql()}, s.campus_id)`;
+  campusOfSql(termPlacementCampusSql(termId), latestPlacementCampusSql());
 
 const includedSql = (today: string) =>
   sql<boolean>`(
@@ -186,7 +192,10 @@ const roundFilterSql = (filter: RoundFilter) => {
       return sql`true`;
     }
     case 'campus': {
-      return sql`coalesce(p.term_campus_id, p.latest_campus_id, s.campus_id) = ${filter.campusId}`;
+      return sql`${campusOfSql(
+        sql`p.term_campus_id`,
+        sql`p.latest_campus_id`
+      )} = ${filter.campusId}`;
     }
     case 'level': {
       return sql`en.class_level_id = ${filter.classLevelId}`;
@@ -345,7 +354,7 @@ export class KyselyBillingRepository extends BillingRepository {
     scope: BillingScope,
     term: TermInfo,
     options: RoundCandidateOptions
-  ): Promise<{ candidates: RoundCandidate[]; skipped: number }> {
+  ): Promise<RoundCandidates> {
     const { rows } = await sql<RoundRow>`
       with cand as (
         select
