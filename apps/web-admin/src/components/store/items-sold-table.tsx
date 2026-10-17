@@ -1,4 +1,3 @@
-import type { ReactNode } from 'react';
 import { FileCheckIcon, PackageIcon } from 'lucide-react';
 import type { Campus, Sale, SaleList } from '@eduvault/api-contract';
 import { fmtDate, naira } from '@eduvault/shared';
@@ -23,6 +22,7 @@ import {
 } from '@eduvault/ui';
 import { FinancePager } from '../money/query-state';
 import { PersonAvatar } from '../person-avatar';
+import { RowButton } from './row-button';
 
 type CampusRef = Pick<Campus, 'id' | 'name'>;
 
@@ -51,27 +51,6 @@ function NothingSold() {
         </EmptyDescription>
       </EmptyHeader>
     </Empty>
-  );
-}
-
-function RowButton({
-  first = false,
-  onOpen,
-  children,
-}: {
-  first?: boolean;
-  onOpen: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      className="block w-full text-left"
-      onClick={onOpen}
-      {...(first ? {} : { tabIndex: -1, 'aria-hidden': true })}
-    >
-      {children}
-    </button>
   );
 }
 

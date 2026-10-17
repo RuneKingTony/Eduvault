@@ -4,6 +4,7 @@ import { ApprovalsPage } from '../../pages/approvals-page';
 import {
   approvalList,
   approvalSummary,
+  storeWriteOffApproval,
   voidApproval,
 } from '../../test-approvals';
 import { renderPayments } from '../../test-payments';
@@ -84,11 +85,28 @@ describe('ApprovalsBell', () => {
     expect(router.state.location.search).toMatchObject({ tab: 'voids' });
   });
 
+  it('opens the Stock counts tab for a store write-off', async () => {
+    const { router } = setup({
+      summary: approvalSummary({
+        waitingForMe: 1,
+        byNav: { approvals: 1, payments: 0, store: 1 },
+        preview: [storeWriteOffApproval()],
+      }),
+    });
+    fireEvent.click(await screen.findByRole('button', { name: 'Approvals' }));
+    fireEvent.click(await screen.findByText('Store write-off'));
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/finance/store');
+    });
+    expect(router.state.location.search).toMatchObject({ tab: 'counts' });
+  });
+
   it('says All clear with no count when nothing waits', async () => {
     setup({
       summary: approvalSummary({
         waitingForMe: 0,
-        byNav: { approvals: 0, payments: 0 },
+        byNav: { approvals: 0, payments: 0, store: 0 },
         preview: [],
       }),
     });

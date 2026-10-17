@@ -11,6 +11,8 @@ import type {
   Sale,
   SaleList,
   SaleOptions,
+  StockCount,
+  StockCountList,
   StockRow,
   StoreSummary,
   StoreTermFigures,
@@ -22,6 +24,7 @@ export const LEVEL_ID = '00000000-0000-4000-8000-0000000f0201';
 export const SHIRT_ID = '00000000-0000-4000-8000-0000000f0301';
 export const TIE_ID = '00000000-0000-4000-8000-0000000f0302';
 const BOOK_ID = '00000000-0000-4000-8000-0000000f0303';
+const COUNT_ID = '00000000-0000-4000-8000-0000000f0901';
 export const SALE_ID = '00000000-0000-4000-8000-0000000f0601';
 export const ADA_ID = '00000000-0000-4000-8000-0000000f0701';
 export const TOBI_ID = '00000000-0000-4000-8000-0000000f0702';
@@ -297,3 +300,49 @@ export const saleOptions = (over: Partial<SaleOptions> = {}): SaleOptions => ({
   ],
   ...over,
 });
+
+export const stockCount = (over: Partial<StockCount> = {}): StockCount => ({
+  id: COUNT_ID,
+  number: 'CNT-2026-0001',
+  campusId: LEKKI.id,
+  campusName: 'Lekki',
+  status: 'submitted',
+  note: 'Shelf count after mid-term stock check',
+  createdAt: '2026-10-16T09:30:00.000Z',
+  countedBy: { id: '00000000-0000-4000-8000-0000000f0a01', name: 'Chika Eze' },
+  decidedBy: null,
+  rejectionReason: null,
+  netValueMinor: 820_000,
+  differences: 'School shirt, Size 12: 2 missing; School tie: 1 missing',
+  lines: [
+    {
+      itemId: SHIRT_ID,
+      displayName: 'School shirt, Size 12',
+      expectedQuantity: 12,
+      countedQuantity: 10,
+      difference: -2,
+      valueMinor: 700_000,
+    },
+    {
+      itemId: TIE_ID,
+      displayName: 'School tie',
+      expectedQuantity: 5,
+      countedQuantity: 4,
+      difference: -1,
+      valueMinor: 120_000,
+    },
+    {
+      itemId: BOOK_ID,
+      displayName: 'Mathematics',
+      expectedQuantity: 30,
+      countedQuantity: 30,
+      difference: 0,
+      valueMinor: 0,
+    },
+  ],
+  ...over,
+});
+
+export const stockCountList = (
+  items: StockCount[] = [stockCount()]
+): StockCountList => ({ items, total: items.length });

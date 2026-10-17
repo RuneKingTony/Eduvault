@@ -59,3 +59,46 @@ export const openingStockPosting = (
   kind: 'opening',
   memo: `Opening stock · ${input.storeName}`,
 });
+
+interface CountPostingInput {
+  organizationId: string;
+  number: string;
+  countId: string;
+  campusId: string;
+  effectiveOn: string;
+  postedBy: string;
+  storeStockId: string;
+  storeLossesId: string;
+  /** Shortage value minus surplus value: positive is a loss, negative a gain. */
+  netMinor: number;
+}
+
+export function countPosting(input: CountPostingInput): PostInput | undefined {
+  if (input.netMinor === 0) {
+    return undefined;
+  }
+  const amountMinor = Math.abs(input.netMinor);
+  const line = (
+    ledgerAccountId: string,
+    side: 'debit' | 'credit'
+  ): PostInput['lines'][number] => ({
+    ledgerAccountId,
+    campusId: input.campusId,
+    debitMinor: side === 'debit' ? amountMinor : 0,
+    creditMinor: side === 'credit' ? amountMinor : 0,
+  });
+  const loss = input.netMinor > 0;
+  return {
+    organizationId: input.organizationId,
+    reference: input.number,
+    kind: 'store_count',
+    effectiveOn: input.effectiveOn,
+    postedBy: input.postedBy,
+    sourceId: input.countId,
+    memo: `Stock count ${input.number}`,
+    lines: [
+      line(loss ? input.storeLossesId : input.storeStockId, 'debit'),
+      line(loss ? input.storeStockId : input.storeLossesId, 'credit'),
+    ],
+  };
+}

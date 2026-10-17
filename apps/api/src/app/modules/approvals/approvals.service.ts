@@ -60,10 +60,15 @@ export class ApprovalsService {
       this.waiting(ctx),
     ]);
     const mine = items.filter((item) => item.decide === 'yes');
+    const store = mine.filter((item) => item.kind === 'store_write_off').length;
     return {
       currency,
       waitingForMe: mine.length,
-      byNav: { approvals: mine.length, payments: mine.length },
+      byNav: {
+        approvals: mine.length,
+        payments: mine.length - store,
+        store,
+      },
       preview: mine.slice(0, APPROVAL_PREVIEW_SIZE),
     };
   }

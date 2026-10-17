@@ -14,6 +14,12 @@ import {
 } from './support/factories/approvals';
 import { chargeFixture } from './support/factories/billing';
 import { bankAccount, owes, recordCash } from './support/factories/payments';
+import {
+  approveCount,
+  createItem,
+  openStock,
+  submitCount,
+} from './support/factories/store';
 import { schoolsTest as test } from './support/two-schools';
 
 const OWED = 1_200_000;
@@ -126,7 +132,7 @@ test.describe('the approvals queue', () => {
 
     expect(asApprover).toMatchObject({
       waitingForMe: 2,
-      byNav: { approvals: 2, payments: 2 },
+      byNav: { approvals: 2, payments: 2, store: 0 },
     });
     expect(asApprover.preview).toHaveLength(2);
     expect(asOwner.waitingForMe).toBe(3);
@@ -142,6 +148,82 @@ test.describe('the approvals queue', () => {
 
     expect((await summary(api, chika)).waitingForMe).toBe(1);
     expect((await summary(api, owner)).waitingForMe).toBe(2);
+  });
+
+  test('lists a waiting store write-off for the principal, as their own for its counter, and counts it on Store rather than Payments', async ({
+    api,
+    withPermissions,
+    schools: { owner, orgA, lekki, lekkiOnly },
+  }) => {
+    const tie = await createItem(api, owner, {
+      name: 'Tie',
+      variant: null,
+      costPriceMinor: 100_000,
+      sellPriceMinor: 150_000,
+    });
+    await openStock(api, owner, {
+      campusId: lekki.id,
+      lines: [{ itemId: tie.id, quantity: 3, unitCostMinor: 100_000 }],
+    });
+    const chika = await withPermissions(
+      orgA,
+      ['store:read', 'store:count', 'adjustment:approve'],
+      { campuses: [lekki] }
+    );
+    const count = await submitCount(api, chika, {
+      campusId: lekki.id,
+      lines: [{ itemId: tie.id, countedQuantity: 2 }],
+    });
+
+    const forOwner = await queue(api, owner);
+    const forChika = await queue(api, chika);
+    const ownerSummary = await summary(api, owner);
+    const chikaSummary = await summary(api, chika);
+    const tasks = (await api(owner).get('/dashboard/tasks').expect(200))
+      .body as DashboardTask[];
+
+    expect(forOwner.items).toEqual([
+      expect.objectContaining({
+        kind: 'store_write_off',
+        id: count.id,
+        label: 'Store write-off',
+        details: 'Lekki stock count: Tie: 1 missing',
+        amountMinor: 100_000,
+        campusId: lekki.id,
+        createdBy: { id: chika.id, name: expect.any(String) },
+        decide: 'yes',
+      }),
+    ]);
+    expect(forChika.items[0]).toMatchObject({ decide: 'own' });
+    expect(ownerSummary).toMatchObject({
+      waitingForMe: 1,
+      byNav: { approvals: 1, payments: 0, store: 1 },
+    });
+    expect(chikaSummary).toMatchObject({
+      waitingForMe: 0,
+      byNav: { approvals: 0, payments: 0, store: 0 },
+    });
+    expect((await summary(api, lekkiOnly)).waitingForMe).toBe(0);
+    expect(
+      tasks.find((task) => task.kind === 'approvalsWaiting')
+    ).toMatchObject({
+      count: 1,
+      items: [
+        {
+          label: 'Store write-off',
+          details: 'Lekki stock count: Tie: 1 missing',
+        },
+      ],
+    });
+
+    await approveCount(api, owner, count.id);
+
+    expect((await queue(api, owner)).total).toBe(0);
+    expect((await summary(api, owner)).byNav).toEqual({
+      approvals: 0,
+      payments: 0,
+      store: 0,
+    });
   });
 
   test('shows another school’s and another campus’s items to nobody outside their scope', async ({

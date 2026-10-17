@@ -3,6 +3,7 @@ import { requireGate } from '../../access';
 import { searchFor } from '../../route-search-defaults';
 import { StorePage } from '../../pages/store-page';
 import {
+  storeCountsQueryOptions,
   storeDeliveriesQueryOptions,
   storeItemsQueryOptions,
   storeSalesQueryOptions,
@@ -34,6 +35,10 @@ export const Route = createFileRoute('/finance/store')({
         ...storeSalesQueryOptions(api, { campusId: deps.campus }),
         staleTime: 'static',
       }),
+      queryClient.query({
+        ...storeCountsQueryOptions(api, { campusId: deps.campus }),
+        staleTime: 'static',
+      }),
     ]);
   },
   component: StoreRoute,
@@ -48,6 +53,9 @@ function StoreRoute() {
       search={search}
       onSearchChange={(next) => {
         void navigate({ search: next, replace: true });
+      }}
+      onApprovals={() => {
+        void goTo({ to: '/approvals' });
       }}
       onStatement={(studentId) => {
         void goTo({

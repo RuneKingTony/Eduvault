@@ -14,6 +14,7 @@ describe('parseStoreSearch', () => {
         deliver: 1,
         add: '1',
         sell: 1,
+        count: '1',
         sale: ' sale-1 ',
       })
     ).toEqual({
@@ -27,12 +28,14 @@ describe('parseStoreSearch', () => {
       deliver: 1,
       add: 1,
       sell: 1,
+      count: 1,
       sale: 'sale-1',
     });
   });
 
-  it('keeps the Items sold tab', () => {
+  it('keeps the Items sold and Stock counts tabs', () => {
     expect(parseStoreSearch({ tab: 'sold' }).tab).toBe('sold');
+    expect(parseStoreSearch({ tab: 'counts' }).tab).toBe('counts');
   });
 
   it('drops the Items tab, blanks, unknown kinds, other flag values and page one', () => {
@@ -48,6 +51,7 @@ describe('parseStoreSearch', () => {
         deliver: '0',
         add: false,
         sell: 'yes',
+        count: 'yes',
         sale: ' ',
       })
     ).toEqual({
@@ -61,6 +65,7 @@ describe('parseStoreSearch', () => {
       deliver: undefined,
       add: undefined,
       sell: undefined,
+      count: undefined,
       sale: undefined,
     });
   });

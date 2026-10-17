@@ -14,7 +14,10 @@ import { FilesService } from '../../src/app/common/files/files.service';
 import { DeliveryService } from '../../src/app/modules/store/delivery.service';
 import { ItemService } from '../../src/app/modules/store/item.service';
 import { SaleService } from '../../src/app/modules/store/sale.service';
+import { StockCountService } from '../../src/app/modules/store/stock-count.service';
+import { orgContextFor } from './actors';
 import { shiftDate } from './date-shift';
+import { emailOf } from './members';
 
 type SeedCampus = 'Lekki' | 'Ikeja';
 
@@ -230,6 +233,12 @@ const SEED_SALES: readonly SeedSale[] = [
   },
 ];
 
+const COUNT_NOTE = 'Shelf count after mid-term stock check';
+const SEED_COUNT_SHORTAGES: readonly { item: string; missing: number }[] = [
+  { item: 'School shirt, Size 14', missing: 2 },
+  { item: 'School tie', missing: 1 },
+];
+
 const PROOF_METHODS = new Set<PaymentMethod>(['pos', 'transfer']);
 
 export const SEED_SALE_COUNT = SEED_SALES.length;
@@ -404,6 +413,53 @@ async function seedSales(
   }
 }
 
+async function onHand(
+  db: Database,
+  seed: { organizationId: string; campusId: string; itemId: string }
+): Promise<number> {
+  const row = await db
+    .selectFrom('stock_movement')
+    .innerJoin('store', 'store.id', 'stock_movement.store_id')
+    .select(sql<string>`coalesce(sum(stock_movement.quantity), 0)`.as('total'))
+    .where('stock_movement.organization_id', '=', seed.organizationId)
+    .where('store.campus_id', '=', seed.campusId)
+    .where('stock_movement.item_id', '=', seed.itemId)
+    .executeTakeFirstOrThrow();
+  return Number(row.total);
+}
+
+async function seedCount(
+  app: INestApplicationContext,
+  seed: { campusId: string; organizationId: string },
+  stocked: readonly Stocked[]
+) {
+  const counts = app.get(StockCountService, { strict: false });
+  const db = app.get<Database>(KYSELY_TOKEN, { strict: false });
+  const bursar = await orgContextFor(app, emailOf('chika'));
+  const lines = [];
+  for (const shortage of SEED_COUNT_SHORTAGES) {
+    const item = stocked.find(
+      (candidate) => candidate.displayName === shortage.item
+    );
+    if (item === undefined) {
+      throw new Error(`Seed has no item ${shortage.item}`);
+    }
+    const held = await onHand(db, { ...seed, itemId: item.id });
+    if (held < shortage.missing) {
+      throw new Error(`Seed holds too little ${shortage.item} to count short`);
+    }
+    lines.push({
+      itemId: item.id,
+      countedQuantity: held - shortage.missing,
+    });
+  }
+  await counts.submit(bursar, {
+    campusId: seed.campusId,
+    note: COUNT_NOTE,
+    lines,
+  });
+}
+
 export async function seedStore(
   app: INestApplicationContext,
   { owner, campusIds, school, today, offsetDays }: StoreSeed
@@ -452,6 +508,14 @@ export async function seedStore(
       }),
     });
     await seedSales(app, { owner, offsetDays }, stocked);
+    await seedCount(
+      app,
+      {
+        campusId: campusId('Lekki'),
+        organizationId: owner.organizationId,
+      },
+      stocked
+    );
   } finally {
     clock.set(null);
   }

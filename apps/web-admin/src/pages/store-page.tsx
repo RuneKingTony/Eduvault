@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { oneOf } from '@eduvault/shared';
 import {
+  ClipboardCheckIcon,
   EllipsisIcon,
   InfoIcon,
   PackageCheckIcon,
@@ -35,12 +36,15 @@ import { ItemsTable } from '../components/store/items-table';
 import { RetireItemDialog } from '../components/store/retire-item-dialog';
 import { SaleDetailSheet } from '../components/store/sale-detail-sheet';
 import { SaleSheet } from '../components/store/sale-sheet';
+import { StockCountSheet } from '../components/store/stock-count-sheet';
+import { StockCountsTable } from '../components/store/stock-counts-table';
 import { StoreTiles } from '../components/store/store-tiles';
 import { SwitchField } from '../components/store/switch-field';
 import { storeDescription } from '../components/store/store-text';
 import { useShowCosts } from '../components/store/use-show-costs';
 import {
   campusesQueryOptions,
+  storeCountsQueryOptions,
   storeDeliveriesQueryOptions,
   storeItemsQueryOptions,
   storeSalesQueryOptions,
@@ -55,6 +59,7 @@ interface PageProps {
 
 interface StorePageProps extends PageProps {
   onStatement: (studentId: string) => void;
+  onApprovals: () => void;
 }
 
 function InfoPopover() {
@@ -107,40 +112,36 @@ function CampusSelect({
   );
 }
 
-function Actions({
-  canIssue,
-  canReceive,
-  onSell,
-  onDeliver,
-  onAdd,
-}: {
-  canIssue: boolean;
+interface MoreProps {
   canReceive: boolean;
-  onSell: () => void;
+  canCount: boolean;
   onDeliver: () => void;
   onAdd: () => void;
-}) {
+  onCount: () => void;
+}
+
+function MoreActions({
+  canReceive,
+  canCount,
+  onDeliver,
+  onAdd,
+  onCount,
+}: MoreProps) {
   return (
-    <>
-      {canIssue ? (
-        <Button type="button" onClick={onSell}>
-          <PackageCheckIcon />
-          Record student purchase
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          aria-label="More actions"
+        >
+          <EllipsisIcon />
         </Button>
-      ) : null}
-      {canReceive ? (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              aria-label="More actions"
-            >
-              <EllipsisIcon />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        {canReceive ? (
+          <>
             <DropdownMenuItem onSelect={onDeliver}>
               <TruckIcon />
               Record a delivery
@@ -149,9 +150,33 @@ function Actions({
               <PlusIcon />
               Add an item
             </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+          </>
+        ) : null}
+        {canCount ? (
+          <DropdownMenuItem onSelect={onCount}>
+            <ClipboardCheckIcon />
+            Start a stock count
+          </DropdownMenuItem>
+        ) : null}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function Actions({
+  canIssue,
+  onSell,
+  ...more
+}: MoreProps & { canIssue: boolean; onSell: () => void }) {
+  return (
+    <>
+      {canIssue ? (
+        <Button type="button" onClick={onSell}>
+          <PackageCheckIcon />
+          Record student purchase
+        </Button>
       ) : null}
+      {more.canReceive || more.canCount ? <MoreActions {...more} /> : null}
     </>
   );
 }
@@ -165,6 +190,7 @@ function Header({
   const api = useApi();
   const canReceive = useCan('store', 'receive');
   const canIssue = useCan('store', 'issue');
+  const canCount = useCan('store', 'count');
   const { campusScope } = usePermissions();
   const campuses = useQuery(campusesQueryOptions(api)).data ?? [];
   return (
@@ -196,6 +222,10 @@ function Header({
         <Actions
           canIssue={canIssue}
           canReceive={canReceive}
+          canCount={canCount}
+          onCount={() => {
+            onSearchChange({ ...search, count: 1 });
+          }}
           onSell={() => {
             onSearchChange({ ...search, sell: 1 });
           }}
@@ -314,6 +344,39 @@ function SoldPanel({
   );
 }
 
+function CountsPanel({
+  search,
+  onSearchChange,
+  showCosts,
+  onApprovals,
+}: PageProps & {
+  showCosts: boolean;
+  onApprovals: () => void;
+}) {
+  const api = useApi();
+  const campuses = useQuery(campusesQueryOptions(api)).data ?? [];
+  const counts = useQuery(
+    storeCountsQueryOptions(api, { campusId: search.campus, page: search.page })
+  );
+  return (
+    <QueryState query={counts} skeletonClassName="h-48">
+      {(data) => (
+        <StockCountsTable
+          data={data}
+          campuses={campuses}
+          showCampus={search.campus === undefined && campuses.length > 1}
+          showCosts={showCosts}
+          page={search.page ?? 1}
+          onPage={(next) => {
+            onSearchChange({ ...search, page: next > 1 ? next : undefined });
+          }}
+          onApprovals={onApprovals}
+        />
+      )}
+    </QueryState>
+  );
+}
+
 const tabCount = (total: number | undefined) =>
   total === undefined ? '' : ` ${total}`;
 
@@ -328,13 +391,16 @@ function StoreTabs({ search, onSearchChange }: PageProps) {
   const deliveries = useQuery(
     storeDeliveriesQueryOptions(api, { campusId: search.campus })
   );
+  const counts = useQuery(
+    storeCountsQueryOptions(api, { campusId: search.campus })
+  );
   return (
     <Tabs
       value={search.tab ?? 'items'}
       onValueChange={(value) => {
         onSearchChange({
           campus: search.campus,
-          tab: oneOf(['deliveries', 'sold'] as const, value),
+          tab: oneOf(['deliveries', 'sold', 'counts'] as const, value),
         });
       }}
     >
@@ -347,6 +413,9 @@ function StoreTabs({ search, onSearchChange }: PageProps) {
         </TabsTrigger>
         <TabsTrigger value="deliveries">
           Deliveries{tabCount(deliveries.data?.total)}
+        </TabsTrigger>
+        <TabsTrigger value="counts">
+          Stock counts{tabCount(counts.data?.total)}
         </TabsTrigger>
       </TabsList>
     </Tabs>
@@ -432,6 +501,26 @@ function SaleSheets({ search, onSearchChange, onStatement }: StorePageProps) {
   );
 }
 
+function CountSheet({ search, onSearchChange, onApprovals }: StorePageProps) {
+  const canCount = useCan('store', 'count');
+  if (!canCount) {
+    return null;
+  }
+  return (
+    <StockCountSheet
+      open={search.count === 1}
+      campusId={search.campus}
+      onApprovals={onApprovals}
+      onOpenChange={(open) => {
+        onSearchChange({ ...search, count: open ? 1 : undefined });
+      }}
+      onSubmitted={() => {
+        onSearchChange({ campus: search.campus, tab: 'counts' });
+      }}
+    />
+  );
+}
+
 export function StorePage(props: StorePageProps) {
   const { search, onSearchChange } = props;
   const canReceive = useCan('store', 'receive');
@@ -451,8 +540,10 @@ export function StorePage(props: StorePageProps) {
         onOpenSale={(saleId) => {
           onSearchChange({ ...search, sale: saleId });
         }}
+        onApprovals={props.onApprovals}
       />
       <SaleSheets {...props} />
+      <CountSheet {...props} />
       {canReceive ? (
         <WriteDialogs
           search={search}
@@ -478,11 +569,13 @@ function TabPanel({
   onEdit,
   onRetire,
   onOpenSale,
+  onApprovals,
 }: PageProps & {
   showCosts: boolean;
   onEdit: (item: Item) => void;
   onRetire: (item: Item) => void;
   onOpenSale: (saleId: string) => void;
+  onApprovals: () => void;
 }) {
   if (search.tab === 'deliveries') {
     return (
@@ -490,6 +583,16 @@ function TabPanel({
         search={search}
         onSearchChange={onSearchChange}
         showCosts={showCosts}
+      />
+    );
+  }
+  if (search.tab === 'counts') {
+    return (
+      <CountsPanel
+        search={search}
+        onSearchChange={onSearchChange}
+        showCosts={showCosts}
+        onApprovals={onApprovals}
       />
     );
   }

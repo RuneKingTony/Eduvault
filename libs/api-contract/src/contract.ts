@@ -188,8 +188,12 @@ import {
   saleListSchema,
   saleOptionsSchema,
   saleSchema,
+  stockCountListQuerySchema,
+  stockCountListSchema,
+  stockCountSchema,
   storeSummaryQuerySchema,
   storeSummarySchema,
+  submitStockCountSchema,
   updateItemSchema,
 } from './store';
 import {
@@ -1183,6 +1187,39 @@ export const contract = defineContract({
       path: '/store/sales',
       body: recordSaleSchema,
       response: recordedSaleSchema,
+    }),
+  },
+  stockCounts: {
+    list: defineRoute({
+      method: 'GET',
+      path: '/store/counts',
+      query: stockCountListQuerySchema,
+      response: stockCountListSchema,
+    }),
+    get: defineRoute({
+      method: 'GET',
+      path: '/store/counts/:id',
+      params: idParamsSchema,
+      response: stockCountSchema,
+    }),
+    submit: defineRoute({
+      method: 'POST',
+      path: '/store/counts',
+      body: submitStockCountSchema,
+      response: stockCountSchema,
+    }),
+    approve: defineRoute({
+      method: 'POST',
+      path: '/store/counts/:id/approve',
+      params: idParamsSchema,
+      response: stockCountSchema,
+    }),
+    decline: defineRoute({
+      method: 'POST',
+      path: '/store/counts/:id/decline',
+      params: idParamsSchema,
+      body: declineSchema,
+      response: stockCountSchema,
     }),
   },
   studentAccounts: {
