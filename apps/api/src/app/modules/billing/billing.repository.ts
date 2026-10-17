@@ -9,7 +9,7 @@ import type {
   DiscountFacts,
   TermPosition,
 } from '../../common/fees';
-import type { RoundFilter } from './billing-inclusion';
+import type { RoundFilter } from './billing-round';
 import type { PlannedCharge, RoundCandidate } from './round-plan';
 
 export interface BillingScope {
@@ -41,6 +41,16 @@ export interface ChargeSummary {
 export interface ChargeSummaryOptions {
   today: string;
   sampleSize: number;
+}
+
+export interface RoundCandidates {
+  candidates: RoundCandidate[];
+  skipped: number;
+}
+
+export interface RoundCandidateOptions {
+  filter: RoundFilter;
+  today: string;
 }
 
 export type RunHeader = Omit<BillingRun, 'charges' | 'currency'>;
@@ -97,11 +107,11 @@ export abstract class BillingRepository {
     id: string
   ): Promise<LevelRef | undefined>;
 
-  abstract candidates(
+  abstract roundCandidates(
     scope: BillingScope,
     term: TermInfo,
-    today: string
-  ): Promise<RoundCandidate[]>;
+    options: RoundCandidateOptions
+  ): Promise<RoundCandidates>;
 
   abstract chargeSummary(
     scope: BillingScope,

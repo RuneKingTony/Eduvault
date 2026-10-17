@@ -1,12 +1,15 @@
 import type { OrgContext } from '../../common/auth';
 import { Clock } from '../../common/clock';
+import type { ChargeableFeeLine } from '../../common/fees';
 import type { CampusService } from '../campus/campus.service';
+import type { RoundFilter } from './billing-round';
 import { BillingPlanService } from './billing-plan.service';
 import type {
   BillingRepository,
   ChargeSummary,
   TermInfo,
 } from './billing.repository';
+import type { RoundCandidate } from './round-plan';
 
 const termOf = (id: string, sequence: number): TermInfo => ({
   id,
@@ -37,7 +40,7 @@ function setup(summaries: Record<string, ChargeSummary>) {
     chargeSummary: vi.fn((_scope, term: TermInfo) =>
       Promise.resolve(summaries[term.id])
     ),
-    candidates: vi.fn(),
+    roundCandidates: vi.fn(),
     feeLines: vi.fn(),
     optedIn: vi.fn(),
     discounts: vi.fn(),
@@ -130,8 +133,83 @@ describe('BillingPlanService.terms', () => {
       { today: '2026-10-07', sampleSize: 0 }
     );
     expect(billing.chargeSummary).toHaveBeenCalledTimes(2);
-    expect(billing.candidates).not.toHaveBeenCalled();
+    expect(billing.roundCandidates).not.toHaveBeenCalled();
     expect(billing.feeLines).not.toHaveBeenCalled();
     expect(billing.discounts).not.toHaveBeenCalled();
+  });
+});
+
+const candidateOf = (studentId: string): RoundCandidate => ({
+  studentId,
+  enrollmentId: `enrollment-${studentId}`,
+  firstName: studentId,
+  lastName: 'Obi',
+  admissionNumber: `GF/${studentId}`,
+  isNew: false,
+  termPlacementCampusId: 'lekki',
+  latestPlacementCampusId: 'lekki',
+  homeCampusId: 'lekki',
+  classLevelId: 'jss2',
+});
+
+const tuition: ChargeableFeeLine = {
+  id: 'tuition-line',
+  termId: 'term-2',
+  classLevelId: 'jss2',
+  feeTypeId: 'tuition',
+  feeTypeCode: 4010,
+  campusId: null,
+  name: 'JSS 2 Tuition',
+  amountMinor: 18_000_000,
+  appliesTo: 'all',
+  isOptional: false,
+  retiredAt: null,
+};
+
+function planSetup(candidates: RoundCandidate[], skipped: number) {
+  const { service, billing } = setup({});
+  billing.roundCandidates.mockResolvedValue({ candidates, skipped });
+  billing.feeLines.mockResolvedValue([tuition]);
+  billing.optedIn.mockResolvedValue(new Map());
+  billing.discounts.mockResolvedValue(new Map());
+  billing.discountsAccountId.mockResolvedValue('discounts-5000');
+  return { service, billing };
+}
+
+describe('BillingPlanService.plan', () => {
+  it('passes the scope, term, filter and school today to the repository', async () => {
+    const { service, billing } = planSetup([], 0);
+    const filter: RoundFilter = { scope: 'level', classLevelId: 'jss2' };
+    await service.plan(ctx, second, filter);
+    expect(billing.roundCandidates).toHaveBeenCalledWith(
+      { organizationId: 'org-1', campusScope: ['lekki'] },
+      second,
+      { filter, today: '2026-10-07' }
+    );
+  });
+
+  it('adds the skipped count from the repository to the plan counts', async () => {
+    const { service } = planSetup([candidateOf('ada'), candidateOf('bola')], 4);
+    const plan = await service.plan(ctx, second, { scope: 'school' });
+    expect(plan.counts).toEqual({ created: 2, skipped: 4, none: 0 });
+    expect(plan.charges.map((charge) => charge.studentId)).toEqual([
+      'ada',
+      'bola',
+    ]);
+  });
+
+  it('reads options and discounts only for the returned candidates', async () => {
+    const { service, billing } = planSetup([candidateOf('ada')], 7);
+    await service.plan(ctx, second, { scope: 'school' });
+    expect(billing.optedIn).toHaveBeenCalledWith('org-1', ['enrollment-ada']);
+    expect(billing.discounts).toHaveBeenCalledWith('org-1', ['ada']);
+  });
+
+  it('reports only skipped students when every one is already charged', async () => {
+    const { service } = planSetup([], 3);
+    expect(await service.plan(ctx, second, { scope: 'school' })).toEqual({
+      charges: [],
+      counts: { created: 0, skipped: 3, none: 0 },
+    });
   });
 });

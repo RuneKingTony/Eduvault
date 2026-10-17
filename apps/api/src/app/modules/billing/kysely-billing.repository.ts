@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
-import { sql, type Kysely } from 'kysely';
+import { sql, type Kysely, type RawBuilder } from 'kysely';
 import {
   DISCOUNTS_GIVEN_SYSTEM_KEY,
   FEES_RECEIVABLE_SYSTEM_KEY,
@@ -11,7 +11,7 @@ import {
   type BillingRunSummary,
 } from '@eduvault/api-contract';
 import { INACTIVE_AFTER_DAYS } from '@eduvault/shared';
-import { chunks, day, iso, nullableDay } from '../../common/db/rows';
+import { chunks, day, iso } from '../../common/db/rows';
 import { KYSELY_TOKEN, type Database } from '../../common/db/tokens';
 import {
   allocateDocumentNumber,
@@ -31,8 +31,7 @@ import {
 } from '../../common/ledger';
 import { currentCampusSql, inScope } from '../../common/students';
 import type { DB } from '../../../db/db-types';
-import { lifeOf } from '../student/lifecycle';
-import { scopeLabel } from './billing-inclusion';
+import { scopeLabel, type RoundFilter } from './billing-round';
 import {
   BillingRepository,
   type BillingScope,
@@ -42,6 +41,8 @@ import {
   type IssueRound,
   type LevelRef,
   type NewRound,
+  type RoundCandidateOptions,
+  type RoundCandidates,
   type RunAction,
   type RunHeader,
   type RunOutcome,
@@ -112,42 +113,32 @@ interface CandidateRow {
   last_name: string;
   admission_number: string;
   home_campus_id: string;
-  exit_kind: string | null;
-  not_seen_since: string | null;
   enrollment_id: string;
-  enrollment_status: string;
   class_level_id: string;
   is_new_student: boolean;
   term_campus_id: string | null;
   latest_campus_id: string | null;
-  current_campus_id: string;
-  charged_invoice_id: string | null;
 }
 
-const toCandidate = (row: CandidateRow, today: string): RoundCandidate => ({
+interface RoundRow {
+  skipped: number;
+  candidates: CandidateRow[] | null;
+}
+
+const toCandidate = (row: CandidateRow): RoundCandidate => ({
   studentId: row.id,
   enrollmentId: row.enrollment_id,
   firstName: row.first_name,
   lastName: row.last_name,
   admissionNumber: row.admission_number,
   isNew: row.is_new_student,
-  chargedInvoiceId: row.charged_invoice_id,
-  enrollmentStatus: row.enrollment_status as
-    'active' | 'withdrawn' | 'completed',
-  life: lifeOf({
-    notSeenSince: row.not_seen_since,
-    exitKind: row.exit_kind as 'left' | 'graduated' | null,
-    newInCurrentSession: false,
-    today,
-  }),
-  currentCampusId: row.current_campus_id,
   termPlacementCampusId: row.term_campus_id,
   latestPlacementCampusId: row.latest_campus_id,
   homeCampusId: row.home_campus_id,
   classLevelId: row.class_level_id,
 });
 
-// These fragments read the caller's aliases: s (student) and en (enrollment).
+// These fragments read the caller's aliases: s (student) and en (enrollment); roundFilterSql also reads p (placements).
 const termPlacementCampusSql = (termId: string) =>
   sql<string | null>`(
     select tp.campus_id
@@ -166,8 +157,13 @@ const latestPlacementCampusSql = () =>
     limit 1
   )`;
 
+const campusOfSql = (
+  termPlacement: RawBuilder<string | null>,
+  latestPlacement: RawBuilder<string | null>
+) => sql<string>`coalesce(${termPlacement}, ${latestPlacement}, s.campus_id)`;
+
 const termCampusSql = (termId: string) =>
-  sql<string>`coalesce(${termPlacementCampusSql(termId)}, ${latestPlacementCampusSql()}, s.campus_id)`;
+  campusOfSql(termPlacementCampusSql(termId), latestPlacementCampusSql());
 
 const includedSql = (today: string) =>
   sql<boolean>`(
@@ -179,27 +175,33 @@ const includedSql = (today: string) =>
     )
   )`;
 
-const chargedInvoiceMatchSql = (termId: string) =>
-  sql`i.student_id = s.id
-      and i.organization_id = s.organization_id
-      and i.term_id = ${termId}
-      and i.kind = 'term'
-      and i.status <> 'cancelled'`;
-
 const chargedSql = (termId: string) =>
   sql<boolean>`exists (
     select 1
     from invoice i
-    where ${chargedInvoiceMatchSql(termId)}
+    where i.student_id = s.id
+      and i.organization_id = s.organization_id
+      and i.term_id = ${termId}
+      and i.kind = 'term'
+      and i.status <> 'cancelled'
   )`;
 
-const chargedInvoiceIdSql = (termId: string) =>
-  sql<string | null>`(
-    select i.id
-    from invoice i
-    where ${chargedInvoiceMatchSql(termId)}
-    limit 1
-  )`;
+const roundFilterSql = (filter: RoundFilter) => {
+  switch (filter.scope) {
+    case 'school': {
+      return sql`true`;
+    }
+    case 'campus': {
+      return sql`${campusOfSql(
+        sql`p.term_campus_id`,
+        sql`p.latest_campus_id`
+      )} = ${filter.campusId}`;
+    }
+    case 'level': {
+      return sql`en.class_level_id = ${filter.classLevelId}`;
+    }
+  }
+};
 
 const hasLineSql = (termId: string) =>
   sql<boolean>`exists (
@@ -348,40 +350,52 @@ export class KyselyBillingRepository extends BillingRepository {
       .executeTakeFirst();
   }
 
-  async candidates(
+  async roundCandidates(
     scope: BillingScope,
     term: TermInfo,
-    today: string
-  ): Promise<RoundCandidate[]> {
-    const rows = await this.db
-      .selectFrom('student as s')
-      .innerJoin('student_enrollment as en', (join) =>
-        join
-          .onRef('en.student_id', '=', 's.id')
-          .onRef('en.organization_id', '=', 's.organization_id')
+    options: RoundCandidateOptions
+  ): Promise<RoundCandidates> {
+    const { rows } = await sql<RoundRow>`
+      with cand as (
+        select
+          s.id,
+          s.first_name,
+          s.last_name,
+          s.admission_number,
+          s.campus_id as home_campus_id,
+          en.id as enrollment_id,
+          en.class_level_id,
+          en.is_new_student,
+          p.term_campus_id,
+          p.latest_campus_id,
+          ${chargedSql(term.id)} as charged
+        from student s
+        join student_enrollment en
+          on en.student_id = s.id
+          and en.organization_id = s.organization_id
+        cross join lateral (
+          select
+            ${termPlacementCampusSql(term.id)} as term_campus_id,
+            ${latestPlacementCampusSql()} as latest_campus_id
+        ) p
+        where s.organization_id = ${scope.organizationId}
+          and en.session_id = ${term.sessionId}
+          and ${inScope(currentCampusSql('s'), scope.campusScope)}
+          and ${includedSql(options.today)}
+          and ${roundFilterSql(options.filter)}
       )
-      .select([
-        's.id',
-        's.first_name',
-        's.last_name',
-        's.admission_number',
-        's.campus_id as home_campus_id',
-        's.exit_kind',
-        nullableDay('s.not_seen_since').as('not_seen_since'),
-        'en.id as enrollment_id',
-        'en.status as enrollment_status',
-        'en.class_level_id',
-        'en.is_new_student',
-        termPlacementCampusSql(term.id).as('term_campus_id'),
-        latestPlacementCampusSql().as('latest_campus_id'),
-        currentCampusSql('s').as('current_campus_id'),
-        chargedInvoiceIdSql(term.id).as('charged_invoice_id'),
-      ])
-      .where('s.organization_id', '=', scope.organizationId)
-      .where('en.session_id', '=', term.sessionId)
-      .where(inScope(currentCampusSql('s'), scope.campusScope))
-      .execute();
-    return rows.map((row) => toCandidate(row, today));
+      select
+        (count(*) filter (where charged))::int as skipped,
+        json_agg(to_jsonb(cand) - 'charged') filter (where not charged) as candidates
+      from cand
+    `.execute(this.db);
+    const row = rows[0];
+    return {
+      candidates: (row?.candidates ?? []).map((candidate) =>
+        toCandidate(candidate)
+      ),
+      skipped: row?.skipped ?? 0,
+    };
   }
 
   async chargeSummary(

@@ -1,7 +1,6 @@
 import type { FeeLine } from '@eduvault/api-contract';
 import {
   planRound,
-  includedCandidates,
   type RoundCandidate,
   type RoundPlanInput,
 } from './round-plan';
@@ -16,10 +15,6 @@ const candidate = (
   lastName: 'Obi',
   admissionNumber: `GF/${studentId}`,
   isNew: false,
-  chargedInvoiceId: null,
-  enrollmentStatus: 'active',
-  life: 'active',
-  currentCampusId: 'lekki',
   termPlacementCampusId: 'lekki',
   latestPlacementCampusId: 'lekki',
   homeCampusId: 'lekki',
@@ -56,31 +51,13 @@ const input = (over: Partial<RoundPlanInput> = {}): RoundPlanInput => ({
   ...over,
 });
 
-describe('includedCandidates', () => {
-  it('keeps only the students a prepare would include', () => {
-    const all = [
-      candidate('ada'),
-      candidate('uche', { life: 'inactive' }),
-      candidate('bola', { life: 'left' }),
-      candidate('kemi', { enrollmentStatus: 'withdrawn' }),
-      candidate('ikeja-kid', { currentCampusId: 'ikeja' }),
-    ];
-    const kept = includedCandidates(all, { scope: 'school' }, ['lekki']);
-    expect(kept.map((entry) => entry.studentId)).toEqual(['ada']);
-  });
-});
-
 describe('planRound', () => {
-  it('plans a charge for each student with fees and counts the rest', () => {
+  it('plans a charge for each student with fee lines and counts the rest as none', () => {
     const plan = planRound(
-      [
-        candidate('ada'),
-        candidate('chidi', { chargedInvoiceId: 'invoice-1' }),
-        candidate('level-one', { classLevelId: 'jss1' }),
-      ],
+      [candidate('ada'), candidate('level-one', { classLevelId: 'jss1' })],
       input()
     );
-    expect(plan.counts).toEqual({ created: 1, skipped: 1, none: 1 });
+    expect(plan.none).toBe(1);
     expect(plan.charges).toEqual([
       {
         studentId: 'ada',
@@ -171,10 +148,20 @@ describe('planRound', () => {
     ]);
   });
 
+  it('counts a student as none when no fee line applies and create otherwise', () => {
+    const none = planRound([candidate('ada')], input({ feeLines: [] }));
+    expect(none.charges).toEqual([]);
+    expect(none.none).toBe(1);
+
+    const create = planRound([candidate('ada')], input());
+    expect(create.charges.map((charge) => charge.studentId)).toEqual(['ada']);
+    expect(create.none).toBe(0);
+  });
+
   it('plans nothing for an empty list', () => {
     expect(planRound([], input())).toEqual({
       charges: [],
-      counts: { created: 0, skipped: 0, none: 0 },
+      none: 0,
     });
   });
 });
