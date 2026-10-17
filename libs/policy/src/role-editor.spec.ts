@@ -399,6 +399,7 @@ describe('Advanced grid vocabulary', () => {
     expect(RESOURCE_PILLARS.member).toBe('People and access');
     expect(RESOURCE_PILLARS.feeLine).toBe('Finance');
     expect(RESOURCE_PILLARS.invoice).toBe('Finance');
+    expect(RESOURCE_PILLARS.adjustment).toBe('Finance');
   });
 
   it('words the bill action', () => {
@@ -416,8 +417,8 @@ describe('capabilityLabel', () => {
     );
   });
 
-  it('falls back to the permission label for a legacy permission', () => {
-    expect(capabilityLabel('payment:void')).toBe('Payments: void');
+  it('labels an extra switch by its own label', () => {
+    expect(capabilityLabel('payment:void')).toBe('Asks to cancel payments');
     expect(capabilityLabel('feeLine:readOwn')).toBe('Sees fees');
   });
 

@@ -24,6 +24,14 @@ export class MoneyAccountController {
     return this.accounts.list(org);
   }
 
+  @Get('for-recording')
+  @OrganizationAuth(['payment:record', 'adjustment:create'])
+  forRecording(
+    @Org() org: OrgContext
+  ): Promise<RouteOutput<typeof routes.forRecording>> {
+    return this.accounts.listForRecording(org);
+  }
+
   @Get(':id/cash-book')
   @OrganizationAuth('moneyAccount', 'read')
   cashBook(

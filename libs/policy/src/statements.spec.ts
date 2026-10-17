@@ -88,6 +88,23 @@ describe('statements', () => {
     expect(PERM_HELP['payment:void']).toBeDefined();
   });
 
+  it('has the adjustment resource with help and a label, none sensitive', () => {
+    expect(ALL_PERMISSIONS).toEqual(
+      expect.arrayContaining([
+        'adjustment:create',
+        'adjustment:read',
+        'adjustment:approve',
+      ])
+    );
+    expect(SENSITIVE.some((p) => p.startsWith('adjustment'))).toBe(false);
+    expect(permLabel('adjustment:approve')).toBe(
+      'Discounts and refunds: approve'
+    );
+    expect(PERM_HELP['adjustment:create']).toBeDefined();
+    expect(PERM_HELP['adjustment:read']).toBeDefined();
+    expect(PERM_HELP['adjustment:approve']).toBeDefined();
+  });
+
   it('has announcement create, read and update, with no delete and none sensitive', () => {
     expect(ALL_PERMISSIONS).toEqual(
       expect.arrayContaining([

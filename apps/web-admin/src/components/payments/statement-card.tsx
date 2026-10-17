@@ -13,10 +13,13 @@ import {
   statementTiles,
   studentDetail,
 } from '@eduvault/shared';
+import { useCan } from '@eduvault/auth-client';
 import {
   StatementCard as SharedStatementCard,
+  Button,
   type StatementCardRow,
 } from '@eduvault/ui';
+import { NO_ADJUSTMENT_SEARCH } from '../../adjustments-search';
 import { PersonAvatar } from '../person-avatar';
 
 function Described({ row }: { row: StatementRow }) {
@@ -59,6 +62,25 @@ function rowsOf({ rows, currency }: StudentStatement): StatementCardRow[] {
   }));
 }
 
+function PayBackAction({ statement }: { statement: StudentStatement }) {
+  return (
+    <Button asChild size="sm" variant="outline">
+      <Link
+        to="/finance/adjustments"
+        search={{
+          ...NO_ADJUSTMENT_SEARCH,
+          new: 1,
+          kind: 'refund',
+          student: statement.student.id,
+          amount: -statement.totals.balanceMinor,
+        }}
+      >
+        Pay the extra back
+      </Link>
+    </Button>
+  );
+}
+
 export function StatementCard({
   statement,
   onPage,
@@ -67,9 +89,17 @@ export function StatementCard({
   onPage: (page: number) => void;
 }) {
   const { student, totals, currency } = statement;
-  const callout = statementCallout(totals.balanceMinor, currency, {
-    canPayBack: true,
-  });
+  const canPayBack = useCan('adjustment', 'create');
+  const base = statementCallout(totals.balanceMinor, currency, { canPayBack });
+  const callout =
+    base === undefined
+      ? undefined
+      : {
+          ...base,
+          ...(canPayBack
+            ? { action: <PayBackAction statement={statement} /> }
+            : {}),
+        };
   return (
     <SharedStatementCard
       heading={{

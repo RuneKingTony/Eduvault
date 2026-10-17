@@ -24,6 +24,7 @@ import { Route as SubjectsRouteImport } from './routes/subjects'
 import { Route as ClassesClassIdRouteImport } from './routes/classes_.$classId'
 import { Route as DevUiRouteImport } from './routes/dev/ui'
 import { Route as FinanceAccountsRouteImport } from './routes/finance/accounts'
+import { Route as FinanceAdjustmentsRouteImport } from './routes/finance/adjustments'
 import { Route as FinanceBillingRouteImport } from './routes/finance/billing'
 import { Route as FinanceInvoicesRouteImport } from './routes/finance/invoices'
 import { Route as FinanceLedgerRouteImport } from './routes/finance/ledger'
@@ -39,6 +40,7 @@ import { Route as RolesRoleSlugRouteImport } from './routes/roles_.$roleSlug'
 import { Route as RolesNewRouteImport } from './routes/roles_.new'
 import { Route as SettingsIndexRouteImport } from './routes/settings.index'
 import { Route as SettingsAdmissionsRouteImport } from './routes/settings.admissions'
+import { Route as SettingsApprovalsRouteImport } from './routes/settings.approvals'
 import { Route as SettingsDangerRouteImport } from './routes/settings.danger'
 import { Route as SettingsLevelsRouteImport } from './routes/settings.levels'
 import { Route as SettingsPaymentRulesRouteImport } from './routes/settings.payment-rules'
@@ -127,6 +129,11 @@ const FinanceAccountsRoute = FinanceAccountsRouteImport.update({
   path: '/finance/accounts',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FinanceAdjustmentsRoute = FinanceAdjustmentsRouteImport.update({
+  id: '/finance/adjustments',
+  path: '/finance/adjustments',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const FinanceBillingRoute = FinanceBillingRouteImport.update({
   id: '/finance/billing',
   path: '/finance/billing',
@@ -200,6 +207,11 @@ const SettingsIndexRoute = SettingsIndexRouteImport.update({
 const SettingsAdmissionsRoute = SettingsAdmissionsRouteImport.update({
   id: '/admissions',
   path: '/admissions',
+  getParentRoute: () => SettingsRoute,
+} as any)
+const SettingsApprovalsRoute = SettingsApprovalsRouteImport.update({
+  id: '/approvals',
+  path: '/approvals',
   getParentRoute: () => SettingsRoute,
 } as any)
 const SettingsDangerRoute = SettingsDangerRouteImport.update({
@@ -283,6 +295,7 @@ export interface FileRoutesByFullPath {
   '/classes/$classId': typeof ClassesClassIdRoute
   '/dev/ui': typeof DevUiRoute
   '/finance/accounts': typeof FinanceAccountsRoute
+  '/finance/adjustments': typeof FinanceAdjustmentsRoute
   '/finance/billing': typeof FinanceBillingRoute
   '/finance/invoices': typeof FinanceInvoicesRoute
   '/finance/ledger': typeof FinanceLedgerRoute
@@ -296,6 +309,7 @@ export interface FileRoutesByFullPath {
   '/roles/$roleSlug': typeof RolesRoleSlugRoute
   '/roles/new': typeof RolesNewRoute
   '/settings/admissions': typeof SettingsAdmissionsRoute
+  '/settings/approvals': typeof SettingsApprovalsRoute
   '/settings/danger': typeof SettingsDangerRoute
   '/settings/levels': typeof SettingsLevelsRoute
   '/settings/payment-rules': typeof SettingsPaymentRulesRoute
@@ -325,6 +339,7 @@ export interface FileRoutesByTo {
   '/classes/$classId': typeof ClassesClassIdRoute
   '/dev/ui': typeof DevUiRoute
   '/finance/accounts': typeof FinanceAccountsRoute
+  '/finance/adjustments': typeof FinanceAdjustmentsRoute
   '/finance/billing': typeof FinanceBillingRoute
   '/finance/invoices': typeof FinanceInvoicesRoute
   '/finance/ledger': typeof FinanceLedgerRoute
@@ -338,6 +353,7 @@ export interface FileRoutesByTo {
   '/roles/$roleSlug': typeof RolesRoleSlugRoute
   '/roles/new': typeof RolesNewRoute
   '/settings/admissions': typeof SettingsAdmissionsRoute
+  '/settings/approvals': typeof SettingsApprovalsRoute
   '/settings/danger': typeof SettingsDangerRoute
   '/settings/levels': typeof SettingsLevelsRoute
   '/settings/payment-rules': typeof SettingsPaymentRulesRoute
@@ -370,6 +386,7 @@ export interface FileRoutesById {
   '/classes_/$classId': typeof ClassesClassIdRoute
   '/dev/ui': typeof DevUiRoute
   '/finance/accounts': typeof FinanceAccountsRoute
+  '/finance/adjustments': typeof FinanceAdjustmentsRoute
   '/finance/billing': typeof FinanceBillingRoute
   '/finance/invoices': typeof FinanceInvoicesRoute
   '/finance/ledger': typeof FinanceLedgerRoute
@@ -383,6 +400,7 @@ export interface FileRoutesById {
   '/roles_/$roleSlug': typeof RolesRoleSlugRoute
   '/roles_/new': typeof RolesNewRoute
   '/settings/admissions': typeof SettingsAdmissionsRoute
+  '/settings/approvals': typeof SettingsApprovalsRoute
   '/settings/danger': typeof SettingsDangerRoute
   '/settings/levels': typeof SettingsLevelsRoute
   '/settings/payment-rules': typeof SettingsPaymentRulesRoute
@@ -416,6 +434,7 @@ export interface FileRouteTypes {
     | '/classes/$classId'
     | '/dev/ui'
     | '/finance/accounts'
+    | '/finance/adjustments'
     | '/finance/billing'
     | '/finance/invoices'
     | '/finance/ledger'
@@ -429,6 +448,7 @@ export interface FileRouteTypes {
     | '/roles/$roleSlug'
     | '/roles/new'
     | '/settings/admissions'
+    | '/settings/approvals'
     | '/settings/danger'
     | '/settings/levels'
     | '/settings/payment-rules'
@@ -458,6 +478,7 @@ export interface FileRouteTypes {
     | '/classes/$classId'
     | '/dev/ui'
     | '/finance/accounts'
+    | '/finance/adjustments'
     | '/finance/billing'
     | '/finance/invoices'
     | '/finance/ledger'
@@ -471,6 +492,7 @@ export interface FileRouteTypes {
     | '/roles/$roleSlug'
     | '/roles/new'
     | '/settings/admissions'
+    | '/settings/approvals'
     | '/settings/danger'
     | '/settings/levels'
     | '/settings/payment-rules'
@@ -502,6 +524,7 @@ export interface FileRouteTypes {
     | '/classes_/$classId'
     | '/dev/ui'
     | '/finance/accounts'
+    | '/finance/adjustments'
     | '/finance/billing'
     | '/finance/invoices'
     | '/finance/ledger'
@@ -515,6 +538,7 @@ export interface FileRouteTypes {
     | '/roles_/$roleSlug'
     | '/roles_/new'
     | '/settings/admissions'
+    | '/settings/approvals'
     | '/settings/danger'
     | '/settings/levels'
     | '/settings/payment-rules'
@@ -547,6 +571,7 @@ export interface RootRouteChildren {
   ClassesClassIdRoute: typeof ClassesClassIdRoute
   DevUiRoute: typeof DevUiRoute
   FinanceAccountsRoute: typeof FinanceAccountsRoute
+  FinanceAdjustmentsRoute: typeof FinanceAdjustmentsRoute
   FinanceBillingRoute: typeof FinanceBillingRoute
   FinanceInvoicesRoute: typeof FinanceInvoicesRoute
   FinanceLedgerRoute: typeof FinanceLedgerRoute
@@ -673,6 +698,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FinanceAccountsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/finance/adjustments': {
+      id: '/finance/adjustments'
+      path: '/finance/adjustments'
+      fullPath: '/finance/adjustments'
+      preLoaderRoute: typeof FinanceAdjustmentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/finance/billing': {
       id: '/finance/billing'
       path: '/finance/billing'
@@ -776,6 +808,13 @@ declare module '@tanstack/react-router' {
       path: '/admissions'
       fullPath: '/settings/admissions'
       preLoaderRoute: typeof SettingsAdmissionsRouteImport
+      parentRoute: typeof SettingsRoute
+    }
+    '/settings/approvals': {
+      id: '/settings/approvals'
+      path: '/approvals'
+      fullPath: '/settings/approvals'
+      preLoaderRoute: typeof SettingsApprovalsRouteImport
       parentRoute: typeof SettingsRoute
     }
     '/settings/danger': {
@@ -885,6 +924,7 @@ const PlatformRouteWithChildren = PlatformRoute._addFileChildren(
 
 interface SettingsRouteChildren {
   SettingsAdmissionsRoute: typeof SettingsAdmissionsRoute
+  SettingsApprovalsRoute: typeof SettingsApprovalsRoute
   SettingsDangerRoute: typeof SettingsDangerRoute
   SettingsLevelsRoute: typeof SettingsLevelsRoute
   SettingsPaymentRulesRoute: typeof SettingsPaymentRulesRoute
@@ -894,6 +934,7 @@ interface SettingsRouteChildren {
 
 const SettingsRouteChildren: SettingsRouteChildren = {
   SettingsAdmissionsRoute: SettingsAdmissionsRoute,
+  SettingsApprovalsRoute: SettingsApprovalsRoute,
   SettingsDangerRoute: SettingsDangerRoute,
   SettingsLevelsRoute: SettingsLevelsRoute,
   SettingsPaymentRulesRoute: SettingsPaymentRulesRoute,
@@ -921,6 +962,7 @@ const rootRouteChildren: RootRouteChildren = {
   ClassesClassIdRoute: ClassesClassIdRoute,
   DevUiRoute: DevUiRoute,
   FinanceAccountsRoute: FinanceAccountsRoute,
+  FinanceAdjustmentsRoute: FinanceAdjustmentsRoute,
   FinanceBillingRoute: FinanceBillingRoute,
   FinanceInvoicesRoute: FinanceInvoicesRoute,
   FinanceLedgerRoute: FinanceLedgerRoute,

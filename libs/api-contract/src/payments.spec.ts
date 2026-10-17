@@ -6,11 +6,17 @@ import {
   PAYMENT_PAYER_REQUIRED_MESSAGE,
   PAYMENT_PROOF,
   PAYMENT_REFERENCE_REQUIRED_MESSAGE,
+  PAYMENT_VOID_EXISTS_MESSAGE,
+  PAYMENT_VOID_REASON_MESSAGE,
+  PAYMENT_VOID_STORE_SALE_MESSAGE,
   paymentListQuerySchema,
   paymentProviderReferenceUsedMessage,
   paymentReferenceUsedMessage,
   paymentSplitMismatchMessage,
+  paymentVoidListQuerySchema,
+  paymentVoidSchema,
   recordPaymentSchema,
+  requestPaymentVoidSchema,
 } from './payments';
 
 const id = '0b0c8a8e-8a3e-4c6c-a8c4-0e2f0f6b1f11';
@@ -165,5 +171,81 @@ describe('contract.payments', () => {
     );
     expect(contract.payments.get.path).toBe('/finance/payments/:id');
     expect(contract.payments.record.method).toBe('POST');
+  });
+});
+
+describe('requestPaymentVoidSchema', () => {
+  it('trims the reason', () => {
+    expect(requestPaymentVoidSchema.parse({ reason: ' Wrong child ' })).toEqual(
+      {
+        reason: 'Wrong child',
+      }
+    );
+  });
+
+  it('refuses a blank, missing or over-long reason with the PRD words', () => {
+    expect(
+      messages(requestPaymentVoidSchema.safeParse({ reason: '   ' }))
+    ).toEqual([PAYMENT_VOID_REASON_MESSAGE]);
+    expect(messages(requestPaymentVoidSchema.safeParse({}))).toEqual([
+      PAYMENT_VOID_REASON_MESSAGE,
+    ]);
+    expect(
+      requestPaymentVoidSchema.safeParse({ reason: 'a'.repeat(501) }).success
+    ).toBe(false);
+  });
+});
+
+describe('paymentVoidListQuerySchema', () => {
+  it('defaults to page 1 and 10 rows, takes a status and refuses an unknown one', () => {
+    expect(paymentVoidListQuerySchema.parse({})).toEqual({
+      page: 1,
+      pageSize: 10,
+    });
+    expect(
+      paymentVoidListQuerySchema.parse({ status: 'submitted' }).status
+    ).toBe('submitted');
+    expect(
+      paymentVoidListQuerySchema.safeParse({ status: 'gone' }).success
+    ).toBe(false);
+  });
+});
+
+describe('paymentVoidSchema', () => {
+  it('carries the decision and the decline reason', () => {
+    expect(
+      paymentVoidSchema.parse({
+        id,
+        status: 'rejected',
+        reason: 'Wrong child',
+        createdBy: 'Chika',
+        approvedBy: null,
+        rejectionReason: 'Not agreed',
+      }).rejectionReason
+    ).toBe('Not agreed');
+  });
+});
+
+describe('payment void messages', () => {
+  it('keeps the PRD words for a second request and a store sale', () => {
+    expect(PAYMENT_VOID_EXISTS_MESSAGE).toBe(
+      'A void already exists for this payment.'
+    );
+    expect(PAYMENT_VOID_STORE_SALE_MESSAGE).toBe(
+      'This payment is for a store sale. It can’t be cancelled on its own.'
+    );
+  });
+});
+
+describe('contract.paymentVoids', () => {
+  it('asks from the receipt and lists, approves and declines under payment-voids', () => {
+    expect(contract.payments.requestVoid.path).toBe(
+      '/finance/payments/:id/void-requests'
+    );
+    expect(contract.paymentVoids.list.path).toBe('/finance/payment-voids');
+    expect(contract.paymentVoids.approve.path).toBe(
+      '/finance/payment-voids/:id/approve'
+    );
+    expect(contract.paymentVoids.decline.method).toBe('POST');
   });
 });

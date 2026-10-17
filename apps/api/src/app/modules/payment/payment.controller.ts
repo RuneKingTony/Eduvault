@@ -3,13 +3,17 @@ import type { Response } from 'express';
 import { contract, type RouteOutput } from '@eduvault/api-contract';
 import { Org, OrganizationAuth, type OrgContext } from '../../common/auth';
 import { zod } from '../../common/http/zod.pipe';
+import { PaymentVoidService } from './payment-void.service';
 import { PaymentService } from './payment.service';
 
 const routes = contract.payments;
 
 @Controller('finance/payments')
 export class PaymentController {
-  constructor(private readonly payments: PaymentService) {}
+  constructor(
+    private readonly payments: PaymentService,
+    private readonly voids: PaymentVoidService
+  ) {}
 
   @Get()
   @OrganizationAuth('payment', 'read')
@@ -49,5 +53,16 @@ export class PaymentController {
     const recorded = await this.payments.record(org, body);
     response.status(recorded.replayed ? 200 : 201);
     return recorded;
+  }
+
+  @Post(':id/void-requests')
+  @OrganizationAuth('payment', 'void')
+  requestVoid(
+    @Org() org: OrgContext,
+    @Param(zod(routes.requestVoid.params)) params: { id: string },
+    @Body(zod(routes.requestVoid.body))
+    body: Parameters<PaymentVoidService['request']>[2]
+  ): Promise<RouteOutput<typeof routes.requestVoid>> {
+    return this.voids.request(org, params.id, body);
   }
 }

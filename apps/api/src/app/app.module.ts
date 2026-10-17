@@ -10,7 +10,9 @@ import { ClockModule } from './common/clock';
 import { ConfigModule } from './common/config/config.module';
 import { DatabaseModule } from './common/db/database.module';
 import { FilesModule } from './common/files';
+import { AdjustmentModule } from './modules/adjustment/adjustment.module';
 import { AnnouncementModule } from './modules/announcement/announcement.module';
+import { ApprovalsModule } from './modules/approvals/approvals.module';
 import { PaymentModule } from './modules/payment/payment.module';
 import { PortalModule } from './modules/portal/portal.module';
 import { BillingModule } from './modules/billing/billing.module';
@@ -66,6 +68,8 @@ import { SubjectModule } from './modules/subject/subject.module';
     BillingModule,
     PaymentModule,
     StoreModule,
+    AdjustmentModule,
+    ApprovalsModule,
     StudentAccountModule,
   ],
 })

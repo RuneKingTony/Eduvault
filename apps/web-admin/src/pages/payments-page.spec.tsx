@@ -92,6 +92,15 @@ describe('PaymentsPage', () => {
     expect(screen.getByText('Cancelled')).toBeVisible();
   });
 
+  it('labels a receipt with a cancellation waiting and keeps its amount unstruck', async () => {
+    setup({
+      list: paymentList([paymentSummary({ status: 'void_pending' })]),
+    });
+    expect(await screen.findByText('Cancellation waiting')).toBeVisible();
+    const amount = await screen.findByText('₦240,000', { selector: 'a' });
+    expect(amount.closest('td')).not.toHaveClass('line-through');
+  });
+
   it('shows Record payment to a bursar and opens the sheet from the address', async () => {
     setup({ access: starterAccess('bursar'), search: { record: 1 } });
     expect(

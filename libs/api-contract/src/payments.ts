@@ -1,5 +1,6 @@
 import { PROOF_FILE_TYPES, naira } from '@eduvault/shared';
 import { z } from 'zod';
+import { approvalStatusSchema } from './approvals';
 import { FINANCE_PAGE_SIZE, FINANCE_PAGE_SIZE_MAX } from './finance';
 import { invoiceJournalSchema } from './invoices';
 import {
@@ -72,6 +73,23 @@ export const paymentProviderReferenceUsedMessage = (
   reference: string,
   receiptNumber: string
 ): string => `Provider reference ${reference} is already on ${receiptNumber}.`;
+
+export const PAYMENT_VOID_REASON_MAX = 500;
+export const PAYMENT_VOID_REASON_MESSAGE =
+  'Say why this receipt is being cancelled.';
+export const PAYMENT_VOID_EXISTS_MESSAGE =
+  'A void already exists for this payment.';
+export const PAYMENT_VOID_NOT_RECORDED_MESSAGE =
+  'Only a recorded payment can be cancelled.';
+export const PAYMENT_VOID_STORE_SALE_MESSAGE =
+  'This payment is for a store sale. It can’t be cancelled on its own.';
+export const PAYMENT_VOID_OTHER_CAMPUS_MESSAGE =
+  'This payment also covers students on other campuses. Ask someone who can see all of them.';
+export const PAYMENT_VOID_NOT_FOUND_MESSAGE = 'Cancellation not found';
+export const PAYMENT_VOID_SUBMITTED_MESSAGE =
+  'Void requested. It needs a second person’s approval.';
+export const PAYMENT_VOID_APPLIED_MESSAGE =
+  'Payment cancelled. The receipt is kept, and the family owes that money again.';
 
 export const paymentStatusSchema = z.enum(PAYMENT_STATUSES);
 export type PaymentStatus = z.infer<typeof paymentStatusSchema>;
@@ -214,11 +232,14 @@ export const paymentAllocationSchema = z.object({
 export type PaymentAllocation = z.infer<typeof paymentAllocationSchema>;
 
 export const paymentVoidSchema = z.object({
-  status: z.string(),
+  id: idSchema,
+  status: approvalStatusSchema,
   reason: z.string(),
   createdBy: z.string().nullable(),
   approvedBy: z.string().nullable(),
+  rejectionReason: z.string().nullable(),
 });
+export type PaymentVoid = z.infer<typeof paymentVoidSchema>;
 
 export const paymentSchema = z.object({
   currency: currencySchema,
@@ -273,3 +294,52 @@ export const recordingOptionsSchema = z.object({
   students: z.array(recordingChildSchema),
 });
 export type RecordingOptions = z.infer<typeof recordingOptionsSchema>;
+
+export const requestPaymentVoidSchema = z.object({
+  reason: z
+    .string({ error: PAYMENT_VOID_REASON_MESSAGE })
+    .trim()
+    .min(1, PAYMENT_VOID_REASON_MESSAGE)
+    .max(
+      PAYMENT_VOID_REASON_MAX,
+      `Use ${PAYMENT_VOID_REASON_MAX} characters or fewer.`
+    ),
+});
+export type RequestPaymentVoidInput = z.input<typeof requestPaymentVoidSchema>;
+
+export const paymentVoidListQuerySchema = z.object({
+  status: approvalStatusSchema.optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(FINANCE_PAGE_SIZE_MAX)
+    .default(FINANCE_PAGE_SIZE),
+});
+export type PaymentVoidListQuery = z.output<typeof paymentVoidListQuerySchema>;
+
+export const paymentVoidItemSchema = paymentVoidSchema.extend({
+  payment: z.object({
+    id: idSchema,
+    receiptNumber: z.string(),
+    payerName: z.string(),
+  }),
+  amountMinor: minorSchema.positive(),
+  createdAt: z.iso.datetime({ offset: true }),
+});
+export type PaymentVoidItem = z.infer<typeof paymentVoidItemSchema>;
+
+export const paymentVoidListSchema = z.object({
+  currency: currencySchema,
+  items: z.array(paymentVoidItemSchema),
+  total: countSchema,
+  waitingCount: countSchema,
+});
+export type PaymentVoidList = z.infer<typeof paymentVoidListSchema>;
+
+export const requestedPaymentVoidSchema = z.object({
+  void: paymentVoidItemSchema,
+  autoApproved: z.boolean(),
+});
+export type RequestedPaymentVoid = z.infer<typeof requestedPaymentVoidSchema>;

@@ -66,6 +66,28 @@ export interface ActivityEvent {
   text: string;
 }
 
+export interface Adjustment {
+  amount_minor: Int8;
+  approved_at: Timestamp | null;
+  approved_by: string | null;
+  created_at: Generated<Timestamp>;
+  created_by: string | null;
+  id: Generated<string>;
+  invoice_id: string | null;
+  journal_entry_id: string | null;
+  kind: string;
+  ledger_account_id: string | null;
+  money_account_id: string | null;
+  number: string;
+  organization_id: string;
+  reason: string;
+  rejected_at: Timestamp | null;
+  rejected_by: string | null;
+  rejection_reason: string | null;
+  status: Generated<string>;
+  student_id: string;
+}
+
 export interface Announcement {
   body: string;
   campus_id: string | null;
@@ -426,6 +448,22 @@ export interface PaymentAllocation {
   student_id: string;
 }
 
+export interface PaymentVoid {
+  approved_at: Timestamp | null;
+  approved_by: string | null;
+  created_at: Generated<Timestamp>;
+  created_by: string | null;
+  id: Generated<string>;
+  journal_entry_id: string | null;
+  organization_id: string;
+  payment_id: string;
+  reason: string;
+  rejected_at: Timestamp | null;
+  rejected_by: string | null;
+  rejection_reason: string | null;
+  status: Generated<string>;
+}
+
 export interface SchoolAccount {
   address: string | null;
   admission_prefix: string;
@@ -455,6 +493,11 @@ export interface SchoolHoliday {
 }
 
 export interface SchoolSetting {
+  approve_credit_note: Generated<boolean>;
+  approve_discount: Generated<boolean>;
+  approve_payment_void: Generated<boolean>;
+  approve_refund: Generated<boolean>;
+  approve_write_off: Generated<boolean>;
   created_at: Generated<Timestamp>;
   max_guardians: Generated<number>;
   organization_id: string;
@@ -694,6 +737,7 @@ export interface DB {
   academic_session: AcademicSession;
   account: Account;
   activity_event: ActivityEvent;
+  adjustment: Adjustment;
   announcement: Announcement;
   audit_log: AuditLog;
   billing_run: BillingRun;
@@ -723,6 +767,7 @@ export interface DB {
   organizationRole: OrganizationRole;
   payment: Payment;
   payment_allocation: PaymentAllocation;
+  payment_void: PaymentVoid;
   school_account: SchoolAccount;
   school_holiday: SchoolHoliday;
   school_setting: SchoolSetting;

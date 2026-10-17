@@ -1,4 +1,5 @@
 import {
+  BadgeCheckIcon,
   BanknoteIcon,
   BookMarkedIcon,
   Building2Icon,
@@ -46,6 +47,7 @@ const NAV_ICONS = {
   'calendar-days': CalendarDaysIcon,
   wallet: WalletIcon,
   banknote: BanknoteIcon,
+  'badge-check': BadgeCheckIcon,
   store: StoreIcon,
   landmark: LandmarkIcon,
   settings: SettingsIcon,

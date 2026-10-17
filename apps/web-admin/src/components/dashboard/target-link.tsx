@@ -9,6 +9,7 @@ export type TaskTarget =
   | { to: '/students'; search?: StudentsSearch }
   | { to: '/students/$studentId'; params: { studentId: string } }
   | { to: '/announcements' }
+  | { to: '/approvals' }
   | { to: '/classes' }
   | { to: '/classes/$classId'; params: { classId: string } }
   | { to: '/members/$memberId'; params: { memberId: string } }
@@ -18,29 +19,16 @@ export type TaskTarget =
 
 type AnchorProps = Omit<ComponentPropsWithoutRef<'a'>, 'href'>;
 
-export function TargetLink({
+type FinanceTarget = Extract<TaskTarget, { to: `/finance/${string}` }>;
+
+const isFinanceTarget = (dest: TaskTarget): dest is FinanceTarget =>
+  dest.to.startsWith('/finance/');
+
+function FinanceTargetLink({
   dest,
   ...props
-}: AnchorProps & { dest: TaskTarget }) {
+}: AnchorProps & { dest: FinanceTarget }) {
   switch (dest.to) {
-    case '/students': {
-      return <Link to="/students" search={dest.search} {...props} />;
-    }
-    case '/students/$studentId': {
-      return <Link to="/students/$studentId" params={dest.params} {...props} />;
-    }
-    case '/announcements': {
-      return <Link to="/announcements" {...props} />;
-    }
-    case '/classes': {
-      return <Link to="/classes" {...props} />;
-    }
-    case '/classes/$classId': {
-      return <Link to="/classes/$classId" params={dest.params} {...props} />;
-    }
-    case '/members/$memberId': {
-      return <Link to="/members/$memberId" params={dest.params} {...props} />;
-    }
     case '/finance/billing': {
       return (
         <Link
@@ -62,6 +50,38 @@ export function TargetLink({
           {...props}
         />
       );
+    }
+  }
+}
+
+export function TargetLink({
+  dest,
+  ...props
+}: AnchorProps & { dest: TaskTarget }) {
+  if (isFinanceTarget(dest)) {
+    return <FinanceTargetLink dest={dest} {...props} />;
+  }
+  switch (dest.to) {
+    case '/students': {
+      return <Link to="/students" search={dest.search} {...props} />;
+    }
+    case '/students/$studentId': {
+      return <Link to="/students/$studentId" params={dest.params} {...props} />;
+    }
+    case '/announcements': {
+      return <Link to="/announcements" {...props} />;
+    }
+    case '/approvals': {
+      return <Link to="/approvals" {...props} />;
+    }
+    case '/classes': {
+      return <Link to="/classes" {...props} />;
+    }
+    case '/classes/$classId': {
+      return <Link to="/classes/$classId" params={dest.params} {...props} />;
+    }
+    case '/members/$memberId': {
+      return <Link to="/members/$memberId" params={dest.params} {...props} />;
     }
   }
 }

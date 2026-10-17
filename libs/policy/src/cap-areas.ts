@@ -199,7 +199,34 @@ export const CAP_AREAS: readonly CapArea[] = [
     see: ['payment:read'],
     change: ['payment:record'],
     changeDesc: 'Record payments and issue receipts',
-    extras: [],
+    extras: [
+      {
+        label: 'Asks to cancel payments',
+        description:
+          'Asks for a recorded payment to be cancelled. A second person approves it.',
+        permissions: ['payment:void'],
+        important: false,
+      },
+    ],
+  },
+  {
+    id: 'discounts-refunds',
+    group: 'Money',
+    label: 'Discounts and refunds',
+    important: false,
+    see: ['adjustment:read'],
+    change: ['adjustment:create'],
+    changeDesc:
+      'Ask for refunds, fee reductions, cancelled balances and discounts',
+    extras: [
+      {
+        label: 'Approves money requests',
+        description:
+          'Approves or declines requests from other people, never their own.',
+        permissions: ['adjustment:approve'],
+        important: true,
+      },
+    ],
   },
   {
     id: 'money-accounts',
@@ -250,8 +277,7 @@ export const CAP_AREAS: readonly CapArea[] = [
   },
 ];
 
-// payment:void stays out of the role editor until cancelling has an endpoint.
-export const LEGACY_PERMISSIONS: readonly Permission[] = ['payment:void'];
+export const LEGACY_PERMISSIONS: readonly Permission[] = [];
 
 export function capLevel(permissions: PermissionMap, area: CapArea): CapLevel {
   const every = (list: readonly Permission[]) =>

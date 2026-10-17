@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { requireGate } from '../../access';
+import { PaymentsLayout } from '../../components/finance-layout';
 import { PaymentsPage } from '../../pages/payments-page';
 import { parsePaymentsSearch } from '../../payments-search';
 import { paymentsQueryOptions } from '../../queries';
@@ -22,11 +23,13 @@ function PaymentsRoute() {
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
   return (
-    <PaymentsPage
-      search={search}
-      onSearchChange={(next) => {
-        void navigate({ search: next, replace: true });
-      }}
-    />
+    <PaymentsLayout>
+      <PaymentsPage
+        search={search}
+        onSearchChange={(next) => {
+          void navigate({ search: next, replace: true });
+        }}
+      />
+    </PaymentsLayout>
   );
 }

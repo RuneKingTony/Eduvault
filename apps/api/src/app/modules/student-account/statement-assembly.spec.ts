@@ -184,6 +184,51 @@ describe('statementRowsOf', () => {
       link: { type: 'payment', id: 'payment-1' },
     });
   });
+
+  it('writes one row per correction kind from its memo, in the bucket the PRD names', () => {
+    const adjustment = (
+      reference: string,
+      memo: string,
+      side: Pick<MovementRecord, 'debitMinor' | 'creditMinor'>
+    ): MovementRecord => ({
+      ...base,
+      kind: 'adjustment',
+      reference,
+      memo,
+      ...side,
+    });
+
+    const rows = statementRowsOf([
+      adjustment('ADJ-2026-0001', 'Reduce a fee: Late enrolment', {
+        debitMinor: 0,
+        creditMinor: 1_000_000,
+      }),
+      adjustment('ADJ-2026-0002', 'Cancel a balance: Left the school', {
+        debitMinor: 0,
+        creditMinor: 1_200_000,
+      }),
+      adjustment('ADJ-2026-0003', 'Refund: Overpaid', {
+        debitMinor: 500_000,
+        creditMinor: 0,
+      }),
+      {
+        ...base,
+        kind: 'payment_void',
+        reference: 'VOID-CASH-1',
+        memo: 'Void of RCT-2026-00098: Wrong child',
+        debitMinor: 2_000_000,
+      },
+    ]);
+
+    expect(
+      rows.map((row) => [row.description, row.status, row.amountMinor])
+    ).toEqual([
+      ['Reduce a fee: Late enrolment', 'reduced', 1_000_000],
+      ['Cancel a balance: Left the school', 'reduced', 1_200_000],
+      ['Refund: Overpaid', 'refunded', 500_000],
+      ['Cancelled: RCT-2026-00098, Wrong child', 'cancelled', 2_000_000],
+    ]);
+  });
 });
 
 describe('unpaidOf', () => {

@@ -16,6 +16,7 @@ import {
   useSidebar,
 } from '@eduvault/ui';
 import { useActing } from '../acting-store';
+import { ApprovalsBell } from './approvals/approvals-bell';
 
 interface ShellTopbarProps {
   compact: boolean;
@@ -23,6 +24,7 @@ interface ShellTopbarProps {
   pageTitle: string;
   onOpenNavigation: () => void;
   onOpenSearch?: () => void;
+  showApprovals?: boolean;
 }
 
 function RailToggle() {
@@ -89,6 +91,7 @@ export function ShellTopbar({
   pageTitle,
   onOpenNavigation,
   onOpenSearch,
+  showApprovals = false,
 }: ShellTopbarProps) {
   return (
     <AppTopbar
@@ -109,6 +112,7 @@ export function ShellTopbar({
       end={
         <>
           <ActingBadge />
+          {showApprovals ? <ApprovalsBell /> : null}
           {onOpenSearch === undefined ? null : (
             <Button
               variant="outline"

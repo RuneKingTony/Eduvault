@@ -162,6 +162,37 @@ describe('taskRow charges', () => {
       }).title
     ).toBe('1 student not charged for Second term yet');
   });
+
+  it('counts the requests waiting for the viewer and names the first two', () => {
+    const row = taskRow({
+      kind: 'approvalsWaiting',
+      count: 3,
+      items: [
+        {
+          label: 'Cancel a payment',
+          details: 'RCT-2026-00098 from Mrs Danjuma: Wrong child',
+        },
+        { label: 'Cancel a balance', details: 'Bola Johnson: Family moved' },
+      ],
+    });
+    expect(row).toMatchObject({
+      tone: 'default',
+      title: '3 requests waiting for your approval',
+      subline:
+        'Cancel a payment: RCT-2026-00098 from Mrs Danjuma: Wrong child · Cancel a balance: Bola Johnson: Family moved',
+      action: { label: 'Review', target: { to: '/approvals' } },
+      extra: null,
+    });
+  });
+
+  it('says "1 request" for a single waiting request', () => {
+    const row = taskRow({
+      kind: 'approvalsWaiting',
+      count: 1,
+      items: [{ label: 'Refund', details: 'David Eze: Overpaid' }],
+    });
+    expect(row.title).toBe('1 request waiting for your approval');
+  });
 });
 
 describe('taskRow low stock', () => {

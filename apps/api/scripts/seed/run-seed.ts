@@ -15,6 +15,7 @@ import { KYSELY_TOKEN, type Database } from '../../src/app/common/db/tokens';
 import { CampusService } from '../../src/app/modules/campus/campus.service';
 import { PlatformService } from '../../src/app/modules/platform/platform.service';
 import { seedAnnouncements } from './announcements';
+import { seedApprovals } from './approvals';
 import { seedCalendar } from './calendar';
 import { seedCharges } from './charges';
 import { seedClasses } from './classes';
@@ -270,6 +271,7 @@ export async function runSeed(
     offsetDays,
   });
   await seedCharges(app, { owner: greenfieldOwner, today });
+  await seedApprovals(app, { owner: greenfieldOwner, today });
   await addSupportActivity(app, superAdmin, created.organizationIds);
 
   const failures = await runSeedCheck(app, offsetDays);

@@ -36,6 +36,7 @@ export const apiErrorCodeSchema = z.enum([
   'NotFound',
   'Conflict',
   'SelfApproval',
+  'AlreadyDecided',
   'LAST_OWNER',
   'OWNER_BY_HANDOVER',
   'ROLE_COMBINATION',
@@ -57,6 +58,7 @@ export type ApiErrorCode = z.infer<typeof apiErrorCodeSchema>;
 export const errorSchema = z.object({
   code: apiErrorCodeSchema,
   message: z.string(),
+  creditMinor: z.number().int().nonnegative().optional(),
   issues: z
     .array(z.object({ path: z.string(), message: z.string() }))
     .optional(),
@@ -261,11 +263,33 @@ export const updatePaymentRulesSchema = z.strictObject({
 });
 export type UpdatePaymentRulesInput = z.input<typeof updatePaymentRulesSchema>;
 
+export const approvalRulesSchema = z.object({
+  refund: z.boolean(),
+  writeOff: z.boolean(),
+  creditNote: z.boolean(),
+  discount: z.boolean(),
+  paymentVoid: z.boolean(),
+});
+export type ApprovalRules = z.infer<typeof approvalRulesSchema>;
+
+export const updateApprovalRulesSchema = z.strictObject({
+  refund: z.boolean().optional(),
+  writeOff: z.boolean().optional(),
+  creditNote: z.boolean().optional(),
+  discount: z.boolean().optional(),
+  paymentVoid: z.boolean().optional(),
+});
+export type UpdateApprovalRulesInput = z.input<
+  typeof updateApprovalRulesSchema
+>;
+
 export const schoolSettingsSchema = z.object({
   maxGuardians: z.number().int().min(MIN_GUARDIANS).max(MAX_GUARDIANS),
   requireGuardian: z.boolean(),
   paymentMethods: paymentMethodsSchema,
   receiptFooter: z.string(),
+  approvalRules: approvalRulesSchema,
+  approvers: z.array(z.string()),
 });
 export type SchoolSettings = z.infer<typeof schoolSettingsSchema>;
 

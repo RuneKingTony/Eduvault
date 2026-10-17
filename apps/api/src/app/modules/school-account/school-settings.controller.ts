@@ -35,4 +35,14 @@ export class SchoolSettingsController {
   ): Promise<RouteOutput<typeof routes.updatePaymentRules>> {
     return this.settings.updatePaymentRules(org, body);
   }
+
+  @Patch('approval-rules')
+  @OrganizationAuth('schoolAccount', 'update')
+  updateApprovalRules(
+    @Org() org: OrgContext,
+    @Body(zod(routes.updateApprovalRules.body))
+    body: Parameters<SchoolSettingsService['updateApprovalRules']>[1]
+  ): Promise<RouteOutput<typeof routes.updateApprovalRules>> {
+    return this.settings.updateApprovalRules(org, body);
+  }
 }

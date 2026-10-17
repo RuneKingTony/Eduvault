@@ -5,8 +5,10 @@ import {
 } from '@nestjs/common';
 import {
   LAST_PAYMENT_METHOD_MESSAGE,
+  type ApprovalRules,
   type PaymentMethods,
   type SchoolSettings,
+  type UpdateApprovalRulesInput,
   type UpdatePaymentRulesInput,
 } from '@eduvault/api-contract';
 import type { OrgContext } from '../../common/auth';
@@ -60,5 +62,20 @@ export class SchoolSettingsService {
       throw new BadRequestException(LAST_PAYMENT_METHOD_MESSAGE);
     }
     return outcome.methods;
+  }
+
+  async updateApprovalRules(
+    ctx: OrgContext,
+    patch: UpdateApprovalRulesInput
+  ): Promise<ApprovalRules> {
+    const rules = await this.settings.updateApprovalRules(
+      ctx.organizationId,
+      patch,
+      ctx.user.id
+    );
+    if (rules === undefined) {
+      throw notFound();
+    }
+    return rules;
   }
 }

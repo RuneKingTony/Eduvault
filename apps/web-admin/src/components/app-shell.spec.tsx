@@ -27,6 +27,7 @@ import {
 } from '@eduvault/auth-client';
 import {
   ApiError,
+  type ApprovalSummary,
   type CalendarCurrent,
   type MePermissions,
 } from '@eduvault/api-contract';
@@ -36,6 +37,7 @@ import { ApiProvider, type Api } from '../api';
 import { DashboardPage } from '../pages/dashboard-page';
 import { mePermissionsQueryOptions } from '../queries';
 import { createQueryClient } from '../query-client';
+import { approvalSummary } from '../test-approvals';
 import { currentCalendar, noCalendar } from '../test-calendar';
 import { fakeAccess, ownerAccess, starterAccess } from '../test-utils';
 import { profile } from '../test-school';
@@ -80,6 +82,7 @@ interface RenderOptions {
   logoUrl?: string | null;
   calendar?: CalendarCurrent;
   requireGuardian?: boolean;
+  summary?: ApprovalSummary;
 }
 
 async function renderAt(
@@ -91,6 +94,7 @@ async function renderAt(
     logoUrl = null,
     calendar = noCalendar(),
     requireGuardian = false,
+    summary = approvalSummary(),
   }: RenderOptions = {}
 ) {
   let current = access;
@@ -102,6 +106,7 @@ async function renderAt(
     admissions: {
       preview: vi.fn().mockResolvedValue({ maxGuardians: 4, requireGuardian }),
     },
+    approvals: { summary: vi.fn().mockResolvedValue(summary) },
   } as unknown as Api;
   const root = createRootRoute({
     component: AppShell,
@@ -129,6 +134,7 @@ async function renderAt(
       child('/members', page('Members page')),
       child('/finance/accounts', page('Who owes page')),
       child('/finance/payments', page('Payments page')),
+      child('/finance/adjustments', page('Discounts and refunds page')),
       child('/finance/school-fees', page('Fees page')),
       child('/finance/other-fees', page('Other fees page')),
       child('/finance/billing', page('Charge students page')),
@@ -139,6 +145,7 @@ async function renderAt(
       child('/roles/new', page('New role page')),
       child('/settings', page('Settings index page')),
       child('/settings/profile', page('Profile page')),
+      child('/settings/approvals', page('Approval rules page')),
       child('/settings/danger', page('Danger page'), false),
       child('/broken', Broken),
     ]),
@@ -906,6 +913,50 @@ describe('AppShell access', () => {
         name: /Funmi Adeyemi.*Member, no roles/,
       })
     ).toBeInTheDocument();
+  });
+
+  it('offers Discount or refund with adjustment:create and hides it from a principal', async () => {
+    await renderAt('/', { access: starterAccess('bursar') });
+    fireEvent.keyDown(globalThis as unknown as Window, {
+      key: 'k',
+      ctrlKey: true,
+    });
+    fireEvent.change(
+      await screen.findByPlaceholderText('Search pages and actions…'),
+      { target: { value: 'discount or refund' } }
+    );
+    expect(
+      screen.getByRole('option', { name: /Discount or refund/ })
+    ).toBeInTheDocument();
+    cleanup();
+
+    await renderAt('/', { access: starterAccess('principal') });
+    fireEvent.keyDown(globalThis as unknown as Window, {
+      key: 'k',
+      ctrlKey: true,
+    });
+    fireEvent.change(
+      await screen.findByPlaceholderText('Search pages and actions…'),
+      { target: { value: 'discount or refund' } }
+    );
+    expect(
+      screen.queryByRole('option', { name: /Discount or refund/ })
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows the approvals bell with its count on every page, and the counts on Approvals and Payments', async () => {
+    await renderAt('/finance/payments', { access: starterAccess('principal') });
+    const bell = await screen.findByRole('button', { name: 'Approvals' });
+    expect(await within(bell).findByText('2')).toBeVisible();
+    const nav = within(sidebarNav());
+    expect(await nav.findAllByLabelText('2 waiting for you')).toHaveLength(2);
+  });
+
+  it('lists Approval rules in the settings frame after Admissions rules', async () => {
+    await renderAt('/settings/approvals', {
+      access: starterAccess('administrator'),
+    });
+    expect(await screen.findByText('Approval rules page')).toBeVisible();
   });
 });
 

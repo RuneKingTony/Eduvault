@@ -167,6 +167,18 @@ const lowStock = (task: Counted<'lowStock'>): TaskRow => ({
   extra: null,
 });
 
+const approvalsWaiting = (task: Counted<'approvalsWaiting'>): TaskRow => ({
+  key: task.kind,
+  kind: task.kind,
+  tone: 'default',
+  title: `${countOf(task.count, 'request', 'requests')} waiting for your approval`,
+  subline: task.items
+    .map((item) => `${item.label}: ${item.details}`)
+    .join(' · '),
+  action: { label: 'Review', target: { to: '/approvals' } },
+  extra: null,
+});
+
 const noRole = (task: Counted<'noRole'>): TaskRow => ({
   key: `${task.kind}-${task.memberId}`,
   kind: task.kind,
@@ -181,7 +193,42 @@ const noRole = (task: Counted<'noRole'>): TaskRow => ({
   extra: null,
 });
 
+type MoneyTask = Extract<
+  DashboardTask,
+  { kind: 'unsentRound' | 'notCharged' | 'lowStock' | 'approvalsWaiting' }
+>;
+
+function moneyTaskRow(task: MoneyTask): TaskRow {
+  switch (task.kind) {
+    case 'unsentRound': {
+      return unsentRound(task);
+    }
+    case 'notCharged': {
+      return notCharged(task);
+    }
+    case 'lowStock': {
+      return lowStock(task);
+    }
+    case 'approvalsWaiting': {
+      return approvalsWaiting(task);
+    }
+  }
+}
+
+const MONEY_KINDS = new Set<DashboardTask['kind']>([
+  'unsentRound',
+  'notCharged',
+  'lowStock',
+  'approvalsWaiting',
+]);
+
+const isMoneyTask = (task: DashboardTask): task is MoneyTask =>
+  MONEY_KINDS.has(task.kind);
+
 export function taskRow(task: DashboardTask): TaskRow {
+  if (isMoneyTask(task)) {
+    return moneyTaskRow(task);
+  }
   switch (task.kind) {
     case 'dueLeft': {
       return dueLeft(task);
@@ -197,15 +244,6 @@ export function taskRow(task: DashboardTask): TaskRow {
     }
     case 'announcementDrafts': {
       return announcementDrafts(task);
-    }
-    case 'unsentRound': {
-      return unsentRound(task);
-    }
-    case 'notCharged': {
-      return notCharged(task);
-    }
-    case 'lowStock': {
-      return lowStock(task);
     }
     case 'noRole': {
       return noRole(task);

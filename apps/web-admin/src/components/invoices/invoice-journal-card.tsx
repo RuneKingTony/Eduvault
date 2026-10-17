@@ -95,9 +95,11 @@ function JournalTable({
 export function InvoiceJournalCard({
   journal,
   currency,
+  note,
 }: {
   journal: InvoiceJournal;
   currency: string;
+  note?: string;
 }) {
   return (
     <Card>
@@ -112,6 +114,7 @@ export function InvoiceJournalCard({
               <CardTitle className="flex items-center gap-2">
                 <BookOpenIcon className="size-4 text-muted-foreground" />
                 For your accountant: {journal.reference}
+                {note === undefined ? null : ` ${note}`}
               </CardTitle>
               <CardDescription>
                 Each money movement and the category it belongs to.

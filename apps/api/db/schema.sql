@@ -39,6 +39,26 @@ END;
 $$;
 
 --
+-- Name: approval_record_immutable(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.approval_record_immutable() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  IF TG_OP = 'DELETE' THEN
+    RAISE EXCEPTION 'a % is never deleted', TG_TABLE_NAME
+      USING ERRCODE = 'check_violation', CONSTRAINT = TG_TABLE_NAME || '_never_deleted';
+  END IF;
+  IF OLD.status <> 'submitted' THEN
+    RAISE EXCEPTION 'a decided % cannot change', TG_TABLE_NAME
+      USING ERRCODE = 'check_violation', CONSTRAINT = TG_TABLE_NAME || '_decided_frozen';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+--
 -- Name: audit_log_refuse_change(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -469,6 +489,48 @@ CREATE TABLE public.activity_event (
     data jsonb DEFAULT '{}'::jsonb NOT NULL,
     occurred_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT activity_event_pillar_check CHECK ((pillar = ANY (ARRAY['foundation'::text, 'finance'::text, 'access'::text, 'platform'::text])))
+);
+
+--
+-- Name: adjustment; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.adjustment (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id text NOT NULL,
+    number text NOT NULL,
+    kind text NOT NULL,
+    student_id uuid NOT NULL,
+    invoice_id uuid,
+    ledger_account_id uuid,
+    money_account_id uuid,
+    amount_minor bigint NOT NULL,
+    reason text NOT NULL,
+    status text DEFAULT 'submitted'::text NOT NULL,
+    created_by text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    approved_by text,
+    approved_at timestamp with time zone,
+    rejected_by text,
+    rejected_at timestamp with time zone,
+    rejection_reason text,
+    journal_entry_id uuid,
+    CONSTRAINT adjustment_amount_minor_check CHECK ((amount_minor > 0)),
+    CONSTRAINT adjustment_approved_columns CHECK (((status = 'approved'::text) = (approved_at IS NOT NULL))),
+    CONSTRAINT adjustment_approved_not_self CHECK (((approved_by IS NULL) OR (approved_by <> created_by))),
+    CONSTRAINT adjustment_kind_check CHECK ((kind = ANY (ARRAY['credit_note'::text, 'write_off'::text, 'refund'::text]))),
+    CONSTRAINT adjustment_kind_shape CHECK (
+CASE kind
+    WHEN 'credit_note'::text THEN ((ledger_account_id IS NOT NULL) AND (money_account_id IS NULL))
+    WHEN 'write_off'::text THEN ((ledger_account_id IS NULL) AND (money_account_id IS NULL) AND (invoice_id IS NULL))
+    ELSE ((money_account_id IS NOT NULL) AND (ledger_account_id IS NULL) AND (invoice_id IS NULL))
+END),
+    CONSTRAINT adjustment_number_check CHECK ((char_length(btrim(number)) > 0)),
+    CONSTRAINT adjustment_reason_check CHECK (((char_length(btrim(reason)) >= 1) AND (char_length(btrim(reason)) <= 200))),
+    CONSTRAINT adjustment_rejected_columns CHECK (((status = 'rejected'::text) = ((rejected_at IS NOT NULL) AND (rejected_by IS NOT NULL) AND (rejection_reason IS NOT NULL)))),
+    CONSTRAINT adjustment_rejected_not_self CHECK (((rejected_by IS NULL) OR (rejected_by <> created_by))),
+    CONSTRAINT adjustment_rejection_reason_check CHECK (((char_length(btrim(rejection_reason)) >= 1) AND (char_length(btrim(rejection_reason)) <= 500))),
+    CONSTRAINT adjustment_status_check CHECK ((status = ANY (ARRAY['submitted'::text, 'approved'::text, 'rejected'::text])))
 );
 
 --
@@ -1030,6 +1092,33 @@ CREATE TABLE public.payment_allocation (
 );
 
 --
+-- Name: payment_void; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.payment_void (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id text NOT NULL,
+    payment_id uuid NOT NULL,
+    reason text NOT NULL,
+    status text DEFAULT 'submitted'::text NOT NULL,
+    created_by text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    approved_by text,
+    approved_at timestamp with time zone,
+    rejected_by text,
+    rejected_at timestamp with time zone,
+    rejection_reason text,
+    journal_entry_id uuid,
+    CONSTRAINT payment_void_approved_columns CHECK (((status = 'approved'::text) = (approved_at IS NOT NULL))),
+    CONSTRAINT payment_void_approved_not_self CHECK (((approved_by IS NULL) OR (approved_by <> created_by))),
+    CONSTRAINT payment_void_reason_check CHECK (((char_length(btrim(reason)) >= 1) AND (char_length(btrim(reason)) <= 500))),
+    CONSTRAINT payment_void_rejected_columns CHECK (((status = 'rejected'::text) = ((rejected_at IS NOT NULL) AND (rejected_by IS NOT NULL) AND (rejection_reason IS NOT NULL)))),
+    CONSTRAINT payment_void_rejected_not_self CHECK (((rejected_by IS NULL) OR (rejected_by <> created_by))),
+    CONSTRAINT payment_void_rejection_reason_check CHECK (((char_length(btrim(rejection_reason)) >= 1) AND (char_length(btrim(rejection_reason)) <= 500))),
+    CONSTRAINT payment_void_status_check CHECK ((status = ANY (ARRAY['submitted'::text, 'approved'::text, 'rejected'::text])))
+);
+
+--
 -- Name: schema_migrations; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1095,6 +1184,11 @@ CREATE TABLE public.school_setting (
     pay_transfer boolean DEFAULT true NOT NULL,
     pay_pos boolean DEFAULT true NOT NULL,
     receipt_footer text DEFAULT 'Thank you for your payment.'::text NOT NULL,
+    approve_refund boolean DEFAULT true NOT NULL,
+    approve_write_off boolean DEFAULT true NOT NULL,
+    approve_credit_note boolean DEFAULT true NOT NULL,
+    approve_discount boolean DEFAULT true NOT NULL,
+    approve_payment_void boolean DEFAULT true NOT NULL,
     CONSTRAINT school_setting_max_guardians_check CHECK (((max_guardians >= 1) AND (max_guardians <= 6))),
     CONSTRAINT school_setting_pay_method_check CHECK ((pay_cash OR pay_transfer OR pay_pos)),
     CONSTRAINT school_setting_receipt_footer_check CHECK ((char_length(receipt_footer) <= 120))
@@ -1468,6 +1562,27 @@ ALTER TABLE ONLY public.account
 
 ALTER TABLE ONLY public.activity_event
     ADD CONSTRAINT activity_event_pkey PRIMARY KEY (id);
+
+--
+-- Name: adjustment adjustment_id_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.adjustment
+    ADD CONSTRAINT adjustment_id_organization_id_key UNIQUE (id, organization_id);
+
+--
+-- Name: adjustment adjustment_organization_id_number_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.adjustment
+    ADD CONSTRAINT adjustment_organization_id_number_key UNIQUE (organization_id, number);
+
+--
+-- Name: adjustment adjustment_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.adjustment
+    ADD CONSTRAINT adjustment_pkey PRIMARY KEY (id);
 
 --
 -- Name: announcement announcement_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -1911,6 +2026,20 @@ ALTER TABLE ONLY public.payment
     ADD CONSTRAINT payment_pkey PRIMARY KEY (id);
 
 --
+-- Name: payment_void payment_void_id_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.payment_void
+    ADD CONSTRAINT payment_void_id_organization_id_key UNIQUE (id, organization_id);
+
+--
+-- Name: payment_void payment_void_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.payment_void
+    ADD CONSTRAINT payment_void_pkey PRIMARY KEY (id);
+
+--
 -- Name: schema_migrations schema_migrations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2293,6 +2422,48 @@ CREATE INDEX activity_event_subject_idx ON public.activity_event USING btree (or
 CREATE INDEX activity_event_time_idx ON public.activity_event USING btree (organization_id, occurred_at DESC);
 
 --
+-- Name: adjustment_invoice_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX adjustment_invoice_idx ON public.adjustment USING btree (organization_id, invoice_id);
+
+--
+-- Name: adjustment_journal_entry_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX adjustment_journal_entry_key ON public.adjustment USING btree (journal_entry_id) WHERE (journal_entry_id IS NOT NULL);
+
+--
+-- Name: adjustment_ledger_account_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX adjustment_ledger_account_idx ON public.adjustment USING btree (organization_id, ledger_account_id);
+
+--
+-- Name: adjustment_listing_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX adjustment_listing_idx ON public.adjustment USING btree (organization_id, created_at DESC);
+
+--
+-- Name: adjustment_money_account_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX adjustment_money_account_idx ON public.adjustment USING btree (organization_id, money_account_id);
+
+--
+-- Name: adjustment_student_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX adjustment_student_idx ON public.adjustment USING btree (organization_id, student_id, status);
+
+--
+-- Name: adjustment_waiting_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX adjustment_waiting_idx ON public.adjustment USING btree (organization_id, status) WHERE (status = 'submitted'::text);
+
+--
 -- Name: announcement_status_published_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2605,6 +2776,30 @@ CREATE UNIQUE INDEX payment_proof_file_key ON public.payment USING btree (proof_
 CREATE UNIQUE INDEX payment_provider_reference_key ON public.payment USING btree (organization_id, provider_reference) WHERE (provider_reference IS NOT NULL);
 
 --
+-- Name: payment_void_journal_entry_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX payment_void_journal_entry_key ON public.payment_void USING btree (journal_entry_id) WHERE (journal_entry_id IS NOT NULL);
+
+--
+-- Name: payment_void_listing_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX payment_void_listing_idx ON public.payment_void USING btree (organization_id, created_at DESC);
+
+--
+-- Name: payment_void_open_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX payment_void_open_key ON public.payment_void USING btree (payment_id) WHERE (status = ANY (ARRAY['submitted'::text, 'approved'::text]));
+
+--
+-- Name: payment_void_waiting_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX payment_void_waiting_idx ON public.payment_void USING btree (organization_id, status) WHERE (status = 'submitted'::text);
+
+--
 -- Name: session_userId_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2651,6 +2846,12 @@ CREATE INDEX student_discount_ledger_account_idx ON public.student_discount USIN
 --
 
 CREATE INDEX student_discount_student_idx ON public.student_discount USING btree (organization_id, student_id, status);
+
+--
+-- Name: student_discount_waiting_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX student_discount_waiting_idx ON public.student_discount USING btree (organization_id, status) WHERE (status = 'submitted'::text);
 
 --
 -- Name: student_duplicate_idx; Type: INDEX; Schema: public; Owner: -
@@ -2743,6 +2944,12 @@ CREATE INDEX verification_identifier_idx ON public.verification USING btree (ide
 CREATE TRIGGER activity_event_append_only BEFORE DELETE OR UPDATE ON public.activity_event FOR EACH ROW EXECUTE FUNCTION public.activity_event_refuse_change();
 
 --
+-- Name: adjustment adjustment_immutable; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER adjustment_immutable BEFORE DELETE OR UPDATE ON public.adjustment FOR EACH ROW EXECUTE FUNCTION public.approval_record_immutable();
+
+--
 -- Name: audit_log audit_log_append_only; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -2827,6 +3034,12 @@ CREATE TRIGGER payment_allocation_immutable BEFORE DELETE OR UPDATE ON public.pa
 CREATE TRIGGER payment_immutable BEFORE DELETE OR UPDATE ON public.payment FOR EACH ROW EXECUTE FUNCTION public.payment_immutable();
 
 --
+-- Name: payment_void payment_void_immutable; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER payment_void_immutable BEFORE DELETE OR UPDATE ON public.payment_void FOR EACH ROW EXECUTE FUNCTION public.approval_record_immutable();
+
+--
 -- Name: stock_delivery stock_delivery_append_only; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -2877,6 +3090,69 @@ ALTER TABLE ONLY public.activity_event
 
 ALTER TABLE ONLY public.activity_event
     ADD CONSTRAINT activity_event_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE RESTRICT;
+
+--
+-- Name: adjustment adjustment_approved_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.adjustment
+    ADD CONSTRAINT adjustment_approved_by_fkey FOREIGN KEY (approved_by) REFERENCES public."user"(id) ON DELETE SET NULL;
+
+--
+-- Name: adjustment adjustment_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.adjustment
+    ADD CONSTRAINT adjustment_created_by_fkey FOREIGN KEY (created_by) REFERENCES public."user"(id) ON DELETE SET NULL;
+
+--
+-- Name: adjustment adjustment_invoice_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.adjustment
+    ADD CONSTRAINT adjustment_invoice_id_organization_id_fkey FOREIGN KEY (invoice_id, organization_id) REFERENCES public.invoice(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: adjustment adjustment_journal_entry_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.adjustment
+    ADD CONSTRAINT adjustment_journal_entry_id_organization_id_fkey FOREIGN KEY (journal_entry_id, organization_id) REFERENCES public.journal_entry(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: adjustment adjustment_ledger_account_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.adjustment
+    ADD CONSTRAINT adjustment_ledger_account_id_organization_id_fkey FOREIGN KEY (ledger_account_id, organization_id) REFERENCES public.ledger_account(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: adjustment adjustment_money_account_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.adjustment
+    ADD CONSTRAINT adjustment_money_account_id_organization_id_fkey FOREIGN KEY (money_account_id, organization_id) REFERENCES public.money_account(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: adjustment adjustment_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.adjustment
+    ADD CONSTRAINT adjustment_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE RESTRICT;
+
+--
+-- Name: adjustment adjustment_rejected_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.adjustment
+    ADD CONSTRAINT adjustment_rejected_by_fkey FOREIGN KEY (rejected_by) REFERENCES public."user"(id) ON DELETE SET NULL;
+
+--
+-- Name: adjustment adjustment_student_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.adjustment
+    ADD CONSTRAINT adjustment_student_id_organization_id_fkey FOREIGN KEY (student_id, organization_id) REFERENCES public.student(id, organization_id) ON DELETE RESTRICT;
 
 --
 -- Name: announcement announcement_campus_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -3551,6 +3827,48 @@ ALTER TABLE ONLY public.payment
     ADD CONSTRAINT payment_proof_file_id_organization_id_fkey FOREIGN KEY (proof_file_id, organization_id) REFERENCES public.file_object(id, organization_id) ON DELETE RESTRICT;
 
 --
+-- Name: payment_void payment_void_approved_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.payment_void
+    ADD CONSTRAINT payment_void_approved_by_fkey FOREIGN KEY (approved_by) REFERENCES public."user"(id) ON DELETE SET NULL;
+
+--
+-- Name: payment_void payment_void_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.payment_void
+    ADD CONSTRAINT payment_void_created_by_fkey FOREIGN KEY (created_by) REFERENCES public."user"(id) ON DELETE SET NULL;
+
+--
+-- Name: payment_void payment_void_journal_entry_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.payment_void
+    ADD CONSTRAINT payment_void_journal_entry_id_organization_id_fkey FOREIGN KEY (journal_entry_id, organization_id) REFERENCES public.journal_entry(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: payment_void payment_void_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.payment_void
+    ADD CONSTRAINT payment_void_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE RESTRICT;
+
+--
+-- Name: payment_void payment_void_payment_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.payment_void
+    ADD CONSTRAINT payment_void_payment_id_organization_id_fkey FOREIGN KEY (payment_id, organization_id) REFERENCES public.payment(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: payment_void payment_void_rejected_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.payment_void
+    ADD CONSTRAINT payment_void_rejected_by_fkey FOREIGN KEY (rejected_by) REFERENCES public."user"(id) ON DELETE SET NULL;
+
+--
 -- Name: school_account school_account_logo_file_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -4026,4 +4344,5 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20261016090300'),
     ('20261017090000'),
     ('20261017090100'),
-    ('20261017090200');
+    ('20261017090200'),
+    ('20261017100000');

@@ -3,11 +3,14 @@ import { profile, settings } from '../test-school';
 import { PAYMENT_ID, payment, renderPayments } from '../test-payments';
 import { ReceiptPrintPage } from './receipt-print-page';
 
-function setup(over: Partial<ReturnType<typeof settings>> = {}) {
+function setup(
+  over: Partial<ReturnType<typeof settings>> = {},
+  receipt = payment()
+) {
   const print = vi.fn();
   vi.stubGlobal('print', print);
   const api = {
-    payments: { get: vi.fn().mockResolvedValue(payment()) },
+    payments: { get: vi.fn().mockResolvedValue(receipt) },
     schoolAccount: {
       get: vi
         .fn()
@@ -72,6 +75,18 @@ describe('ReceiptPrintPage', () => {
     ]) {
       expect(within(slip).getByText(text)).toBeInTheDocument();
     }
+  });
+
+  it('marks a cancelled receipt on the print sheet and leaves a recorded one unmarked', async () => {
+    setup({}, payment({ status: 'voided' }));
+    const slip = await waitForSlip();
+    expect(within(slip).getByText('Cancelled')).toBeVisible();
+  });
+
+  it('prints no Cancelled mark on a recorded receipt', async () => {
+    setup();
+    const slip = await waitForSlip();
+    expect(within(slip).queryByText('Cancelled')).toBeNull();
   });
 });
 

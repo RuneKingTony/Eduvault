@@ -253,6 +253,9 @@ describe('capSummary', () => {
       'Fees: set and change what each class pays',
       'Charges: charge students and send the charges',
       'Payments: record payments and issue receipts',
+      'Asks to cancel payments',
+      'Discounts and refunds: ask for refunds, fee reductions, cancelled balances and discounts',
+      'Approves money requests',
       'Bank and POS accounts: add and change bank and POS accounts',
       'Store: add items and record deliveries',
       'Money categories: change the accountant’s categories',
@@ -297,6 +300,8 @@ describe('capSummary', () => {
       'Fees: set and change what each class pays',
       'Charges: charge students and send the charges',
       'Payments: record payments and issue receipts',
+      'Asks to cancel payments',
+      'Discounts and refunds: ask for refunds, fee reductions, cancelled balances and discounts',
       'Bank and POS accounts: can see',
       'Store: add items and record deliveries',
       'Money categories: can see',
@@ -314,6 +319,8 @@ describe('capSummary', () => {
       'Announcements: write, publish, pin and withdraw announcements',
       'Charges: can see',
       'Payments: can see',
+      'Discounts and refunds: can see',
+      'Approves money requests',
       'Bank and POS accounts: can see',
       'Store: can see',
     ]);
@@ -453,13 +460,15 @@ describe('the Charges area', () => {
 describe('the Payments area', () => {
   const payments = area('payments');
 
-  it('sits in Money, splitting seeing from recording, and leaves cancelling out until it exists', () => {
+  it('sits in Money, splitting seeing from recording, with cancelling as an extra', () => {
     expect(payments.group).toBe('Money');
     expect(payments.label).toBe('Payments');
     expect(payments.see).toEqual(['payment:read']);
     expect(payments.change).toEqual(['payment:record']);
-    expect(payments.extras).toEqual([]);
-    expect(LEGACY_PERMISSIONS).toContain('payment:void');
+    expect(payments.extras.map((extra) => extra.permissions)).toEqual([
+      ['payment:void'],
+    ]);
+    expect(LEGACY_PERMISSIONS).not.toContain('payment:void');
   });
 
   it('is see for payment:read, change with payment:record and custom for a lone record', () => {
@@ -473,6 +482,40 @@ describe('the Payments area', () => {
   });
 });
 
+describe('the Discounts and refunds area', () => {
+  const adjustments = area('discounts-refunds');
+
+  it('sits in Money after Payments, with approving as an important extra', () => {
+    const ids = CAP_AREAS.map((candidate) => candidate.id);
+    expect(ids.indexOf('discounts-refunds')).toBe(ids.indexOf('payments') + 1);
+    expect(adjustments.group).toBe('Money');
+    expect(adjustments.label).toBe('Discounts and refunds');
+    expect(adjustments.see).toEqual(['adjustment:read']);
+    expect(adjustments.change).toEqual(['adjustment:create']);
+    expect(adjustments.extras).toEqual([
+      expect.objectContaining({
+        permissions: ['adjustment:approve'],
+        important: true,
+      }),
+    ]);
+  });
+
+  it('is see for adjustment:read and change with adjustment:create', () => {
+    expect(capLevel(toPermissionMap(['adjustment:read']), adjustments)).toBe(
+      'see'
+    );
+    expect(
+      capLevel(
+        toPermissionMap(['adjustment:read', 'adjustment:create']),
+        adjustments
+      )
+    ).toBe('change');
+    expect(capLevel(toPermissionMap(['adjustment:approve']), adjustments)).toBe(
+      'none'
+    );
+  });
+});
+
 describe('the Money areas', () => {
   const accounts = area('money-accounts');
   const categories = area('money-categories');
@@ -480,7 +523,9 @@ describe('the Money areas', () => {
   it('sit in Money after Charges and before Own records', () => {
     const ids = CAP_AREAS.map((candidate) => candidate.id);
     expect(ids.indexOf('payments')).toBe(ids.indexOf('charges') + 1);
-    expect(ids.indexOf('money-accounts')).toBe(ids.indexOf('payments') + 1);
+    expect(ids.indexOf('money-accounts')).toBe(
+      ids.indexOf('discounts-refunds') + 1
+    );
     expect(ids.indexOf('store')).toBe(ids.indexOf('money-accounts') + 1);
     expect(ids.indexOf('money-categories')).toBe(ids.indexOf('store') + 1);
     expect(ids.indexOf('portal')).toBe(ids.indexOf('money-categories') + 1);

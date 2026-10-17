@@ -1,4 +1,8 @@
-import type { PaymentMethods, SchoolSettings } from '@eduvault/api-contract';
+import type {
+  ApprovalRules,
+  PaymentMethods,
+  SchoolSettings,
+} from '@eduvault/api-contract';
 
 export interface SchoolSettingsPatch {
   maxGuardians?: number;
@@ -10,6 +14,12 @@ export type PaymentMethodsOutcome =
   { status: 'saved'; methods: PaymentMethods } | { status: 'none_left' };
 
 export abstract class SchoolSettingsRepository {
+  abstract updateApprovalRules(
+    organizationId: string,
+    patch: Partial<ApprovalRules>,
+    updatedBy: string
+  ): Promise<ApprovalRules | undefined>;
+
   abstract find(organizationId: string): Promise<SchoolSettings | undefined>;
 
   abstract update(

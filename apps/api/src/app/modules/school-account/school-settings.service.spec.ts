@@ -1,6 +1,7 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import {
   LAST_PAYMENT_METHOD_MESSAGE,
+  type ApprovalRules,
   type PaymentMethods,
   type SchoolSettings,
 } from '@eduvault/api-contract';
@@ -23,7 +24,17 @@ class FakeSettings extends SchoolSettingsRepository {
     requireGuardian: true,
     paymentMethods: { cash: true, transfer: true, pos: true },
     receiptFooter: 'Thank you for your payment.',
+    approvalRules: {
+      refund: true,
+      writeOff: true,
+      creditNote: true,
+      discount: true,
+      paymentVoid: true,
+    },
+    approvers: ['Owner', 'Principal'],
   };
+  rules: ApprovalRules | undefined = this.settings?.approvalRules;
+  ruleChanges: Partial<ApprovalRules>[] = [];
   outcome: PaymentMethodsOutcome | undefined;
   patched: Partial<PaymentMethods>[] = [];
   updates: SchoolSettingsPatch[] = [];
@@ -40,6 +51,11 @@ class FakeSettings extends SchoolSettingsRepository {
         receiptFooter: patch.receiptFooter ?? this.settings.receiptFooter,
       }
     );
+  }
+
+  updateApprovalRules(_organizationId: string, patch: Partial<ApprovalRules>) {
+    this.ruleChanges.push(patch);
+    return Promise.resolve(this.rules && { ...this.rules, ...patch });
   }
 
   updatePaymentMethods(
@@ -62,6 +78,20 @@ describe('SchoolSettingsService', () => {
     await expect(service.get(ctx)).resolves.toMatchObject({
       paymentMethods: { cash: true, transfer: true, pos: true },
       receiptFooter: 'Thank you for your payment.',
+    });
+  });
+
+  it('carries the five approval switches and who can approve', async () => {
+    const { service } = setup();
+    await expect(service.get(ctx)).resolves.toMatchObject({
+      approvalRules: {
+        refund: true,
+        writeOff: true,
+        creditNote: true,
+        discount: true,
+        paymentVoid: true,
+      },
+      approvers: ['Owner', 'Principal'],
     });
   });
 
@@ -113,6 +143,31 @@ describe('SchoolSettingsService.updatePaymentRules', () => {
     const { service } = setup();
     await expect(
       service.updatePaymentRules(ctx, { cash: false })
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+});
+
+describe('SchoolSettingsService.updateApprovalRules', () => {
+  it('returns the switches with the change applied', async () => {
+    const { repository, service } = setup();
+
+    await expect(
+      service.updateApprovalRules(ctx, { refund: false })
+    ).resolves.toEqual({
+      refund: false,
+      writeOff: true,
+      creditNote: true,
+      discount: true,
+      paymentVoid: true,
+    });
+    expect(repository.ruleChanges).toEqual([{ refund: false }]);
+  });
+
+  it('answers 404 when the school has no settings row', async () => {
+    const { repository, service } = setup();
+    repository.rules = undefined;
+    await expect(
+      service.updateApprovalRules(ctx, { discount: false })
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 });

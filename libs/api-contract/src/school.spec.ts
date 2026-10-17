@@ -3,6 +3,7 @@ import {
   RECEIPT_FOOTER_MESSAGE,
   createCampusSchema,
   schoolSettingsSchema,
+  updateApprovalRulesSchema,
   updatePaymentRulesSchema,
   updateSchoolProfileSchema,
   updateSchoolSettingsSchema,
@@ -117,8 +118,36 @@ describe('schoolSettingsSchema', () => {
         requireGuardian: true,
         paymentMethods: { cash: true, transfer: true, pos: false },
         receiptFooter: 'Thank you for your payment.',
+        approvalRules: {
+          refund: true,
+          writeOff: true,
+          creditNote: true,
+          discount: true,
+          paymentVoid: true,
+        },
+        approvers: ['Owner', 'Principal'],
       }).paymentMethods
     ).toEqual({ cash: true, transfer: true, pos: false });
+  });
+});
+
+describe('updateApprovalRulesSchema', () => {
+  it('takes any subset of the five switches', () => {
+    expect(updateApprovalRulesSchema.parse({ refund: false })).toEqual({
+      refund: false,
+    });
+    expect(
+      updateApprovalRulesSchema.parse({ writeOff: true, paymentVoid: false })
+    ).toEqual({ writeOff: true, paymentVoid: false });
+  });
+
+  it('refuses a kind that has no switch and a non-boolean', () => {
+    expect(updateApprovalRulesSchema.safeParse({ leave: false }).success).toBe(
+      false
+    );
+    expect(updateApprovalRulesSchema.safeParse({ refund: 'no' }).success).toBe(
+      false
+    );
   });
 });
 
