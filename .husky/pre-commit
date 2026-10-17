@@ -4,4 +4,4 @@ if [ -n "$staged" ]; then
   echo "$staged" | xargs git add
 fi
 
-pnpm nx affected -t lint typecheck
+pnpm nx affected -t lint typecheck --parallel=2
