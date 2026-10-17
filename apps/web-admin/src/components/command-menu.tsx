@@ -1,3 +1,4 @@
+import type { RegisteredRouter, ToOptions } from '@tanstack/react-router';
 import {
   Command,
   CommandDialog,
@@ -12,11 +13,13 @@ import {
   type NavIconName,
 } from '@eduvault/ui';
 
+export type CommandTarget = ToOptions<RegisteredRouter, string, string>;
+
 export interface CommandEntry {
   id: string;
   label: string;
   hint: string;
-  route: string;
+  target: CommandTarget;
   icon: NavIconName;
   keywords?: readonly string[];
 }
@@ -27,7 +30,7 @@ interface CommandMenuProps {
   pages: readonly CommandEntry[];
   settings: readonly CommandEntry[];
   actions?: readonly CommandEntry[];
-  onSelect: (route: string) => void;
+  onSelect: (target: CommandTarget) => void;
 }
 
 function matchesEveryWord(
@@ -47,7 +50,7 @@ function EntryGroup({
 }: {
   heading: string;
   entries: readonly CommandEntry[];
-  onSelect: (route: string) => void;
+  onSelect: (target: CommandTarget) => void;
 }) {
   if (entries.length === 0) {
     return null;
@@ -60,7 +63,7 @@ function EntryGroup({
           value={`${heading}:${entry.id}`}
           keywords={[entry.label, entry.hint, ...(entry.keywords ?? [])]}
           onSelect={() => {
-            onSelect(entry.route);
+            onSelect(entry.target);
           }}
         >
           <NavIcon name={entry.icon} />

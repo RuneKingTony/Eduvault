@@ -8,6 +8,7 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import {
   Outlet,
+  linkOptions,
   useRouteContext,
   useRouter,
   useRouterState,
@@ -29,8 +30,10 @@ import {
 } from '@eduvault/ui';
 import { useActing, type ActingState } from '../acting-store';
 import { useCanAdmit } from '../admission-rules';
+import { NO_ADJUSTMENT_SEARCH } from '../adjustments-search';
 import { useApi } from '../api';
 import { mePermissionsQueryOptions } from '../queries';
+import { prepareChargesTarget, searchFor } from '../route-search-defaults';
 import {
   EXTRA_PAGE_TITLES,
   NAV_GROUPS,
@@ -41,7 +44,11 @@ import {
   visibleSettings,
   type NavGroup,
 } from '../nav';
-import { CommandMenu, type CommandEntry } from './command-menu';
+import {
+  CommandMenu,
+  type CommandEntry,
+  type CommandTarget,
+} from './command-menu';
 import { MyAccessProvider, useMyAccess } from './my-access';
 import { ShellSidebar } from './shell-sidebar';
 import { useRailOpen } from './shell-state';
@@ -57,7 +64,7 @@ function commandEntries(groups: readonly NavGroup[]): CommandEntry[] {
         id: item.id,
         label: item.pageTitle,
         hint: group.label ?? '',
-        route: item.route,
+        target: { to: item.route },
         icon: item.icon,
         keywords: [item.label],
       }))
@@ -75,7 +82,7 @@ const ADD_MEMBER_ACTION: CommandEntry = {
   id: 'add-member',
   label: 'Add a staff member',
   hint: 'People',
-  route: '/members?add=1',
+  target: linkOptions({ to: '/members', search: { add: 1 } }),
   icon: 'user-round-plus',
   keywords: ['new', 'hire', 'invite', 'staff', 'member'],
 };
@@ -84,7 +91,7 @@ const ADMIT_STUDENT_ACTION: CommandEntry = {
   id: 'admit-student',
   label: 'Admit a student',
   hint: 'People',
-  route: '/students?admit=1',
+  target: linkOptions({ to: '/students', search: { admit: 1 } }),
   icon: 'user-plus',
   keywords: ['new', 'student', 'enrol', 'enroll', 'admission'],
 };
@@ -93,7 +100,7 @@ const CREATE_ROLE_ACTION: CommandEntry = {
   id: 'create-role',
   label: 'Create a custom role',
   hint: 'Roles',
-  route: '/roles/new',
+  target: linkOptions({ to: '/roles/new' }),
   icon: 'shield-check',
   keywords: ['new', 'role', 'permissions', 'access'],
 };
@@ -102,7 +109,7 @@ const ADD_FEE_ACTION: CommandEntry = {
   id: 'add-fee',
   label: 'Add a fee we charge',
   hint: 'Fees',
-  route: '/finance/school-fees?add=1',
+  target: linkOptions({ to: '/finance/school-fees', search: { add: 1 } }),
   icon: 'wallet',
   keywords: ['new', 'fee', 'levy', 'tuition', 'amount', 'charge'],
 };
@@ -111,7 +118,7 @@ const CHARGE_STUDENTS_ACTION: CommandEntry = {
   id: 'charge-students',
   label: 'Charge students',
   hint: 'Fees',
-  route: '/finance/billing?prepare=1',
+  target: linkOptions(prepareChargesTarget()),
   icon: 'wallet',
   keywords: ['bill', 'invoice', 'charge', 'term', 'fees', 'send'],
 };
@@ -120,7 +127,10 @@ const RECORD_PAYMENT_ACTION: CommandEntry = {
   id: 'record-payment',
   label: 'Record a payment',
   hint: 'Finance',
-  route: '/finance/payments?record=1',
+  target: linkOptions({
+    to: '/finance/payments',
+    search: searchFor('/finance/payments', { record: 1 }),
+  }),
   icon: 'banknote',
   keywords: ['receipt', 'cash', 'transfer', 'pos', 'paid', 'fees'],
 };
@@ -129,7 +139,10 @@ const DISCOUNT_OR_REFUND_ACTION: CommandEntry = {
   id: 'discount-or-refund',
   label: 'Discount or refund',
   hint: 'Finance',
-  route: '/finance/adjustments?new=1',
+  target: linkOptions({
+    to: '/finance/adjustments',
+    search: { ...NO_ADJUSTMENT_SEARCH, new: 1 },
+  }),
   icon: 'wallet',
   keywords: [
     'refund',
@@ -145,7 +158,10 @@ const WHO_OWES_ACTION: CommandEntry = {
   id: 'who-owes',
   label: 'See who owes fees',
   hint: 'Fees',
-  route: '/finance/accounts',
+  target: linkOptions({
+    to: '/finance/accounts',
+    search: searchFor('/finance/accounts'),
+  }),
   icon: 'wallet',
   keywords: ['balance', 'debt', 'owing', 'statement', 'arrears'],
 };
@@ -155,29 +171,29 @@ function commandActions(
   access: MePermissions,
   canAdmitStudent: boolean
 ): CommandEntry[] {
-  const allowed = (route: string, gate: Gate) =>
-    builtRoutes.has(route) && canAny(access.permissions, gate);
+  const built = ({ target: { to } }: CommandEntry) =>
+    to !== undefined && builtRoutes.has(to);
+  const allowed = (action: CommandEntry, gate: Gate) =>
+    built(action) && canAny(access.permissions, gate);
   return [
-    ...(builtRoutes.has('/students') && canAdmitStudent
+    ...(built(ADMIT_STUDENT_ACTION) && canAdmitStudent
       ? [ADMIT_STUDENT_ACTION]
       : []),
-    ...(allowed('/members', ['member:create']) ? [ADD_MEMBER_ACTION] : []),
-    ...(allowed('/finance/school-fees', ['feeLine:create'])
-      ? [ADD_FEE_ACTION]
+    ...(allowed(ADD_MEMBER_ACTION, ['member:create'])
+      ? [ADD_MEMBER_ACTION]
       : []),
-    ...(allowed('/finance/billing', ['invoice:bill'])
+    ...(allowed(ADD_FEE_ACTION, ['feeLine:create']) ? [ADD_FEE_ACTION] : []),
+    ...(allowed(CHARGE_STUDENTS_ACTION, ['invoice:bill'])
       ? [CHARGE_STUDENTS_ACTION]
       : []),
-    ...(allowed('/finance/payments', ['payment:record'])
+    ...(allowed(RECORD_PAYMENT_ACTION, ['payment:record'])
       ? [RECORD_PAYMENT_ACTION]
       : []),
-    ...(allowed('/finance/adjustments', ['adjustment:create'])
+    ...(allowed(DISCOUNT_OR_REFUND_ACTION, ['adjustment:create'])
       ? [DISCOUNT_OR_REFUND_ACTION]
       : []),
-    ...(allowed('/finance/accounts', FINANCE_READ_GATE)
-      ? [WHO_OWES_ACTION]
-      : []),
-    ...(allowed('/roles/new', ['ac:create']) ? [CREATE_ROLE_ACTION] : []),
+    ...(allowed(WHO_OWES_ACTION, FINANCE_READ_GATE) ? [WHO_OWES_ACTION] : []),
+    ...(allowed(CREATE_ROLE_ACTION, ['ac:create']) ? [CREATE_ROLE_ACTION] : []),
   ];
 }
 
@@ -217,7 +233,7 @@ function settingsEntries(
     id: section.id,
     label: section.label,
     hint: 'Settings',
-    route: section.route,
+    target: { to: section.route },
     icon: section.icon,
   }));
 }
@@ -253,8 +269,8 @@ function useShellModel(access: MePermissions) {
     settings: settingsEntries(builtRoutes, access),
     actions: commandActions(builtRoutes, access, canAdmitStudent),
     ...crumbs(current, pathname),
-    open: (route: string) => {
-      router.history.push(route);
+    open: (target: CommandTarget) => {
+      void router.navigate(target);
     },
   };
 }
@@ -417,9 +433,9 @@ function ShellFrame({ access }: { access: MePermissions }) {
           pages={model.pages}
           settings={model.settings}
           actions={model.actions}
-          onSelect={(route) => {
+          onSelect={(target) => {
             setCommandOpen(false);
-            model.open(route);
+            model.open(target);
           }}
         />
       </SidebarProvider>
