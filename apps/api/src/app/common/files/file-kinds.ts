@@ -2,17 +2,26 @@ import {
   GUARDIAN_PHOTO_INVALID_MESSAGE,
   GUARDIAN_PHOTO_SIZE_MESSAGE,
   GUARDIAN_PHOTO_TYPE_MESSAGE,
+  PAYMENT_PROOF,
+  PAYMENT_PROOF_DENIED_MESSAGE,
+  PAYMENT_PROOF_INVALID_MESSAGE,
+  PAYMENT_PROOF_LOCKED_MESSAGE,
+  PAYMENT_PROOF_SIZE_MESSAGE,
+  PAYMENT_PROOF_TYPE_MESSAGE,
   type FileKind,
 } from '@eduvault/api-contract';
 import type { Permission } from '@eduvault/policy';
-import type { ImageType } from './sniff-image';
+import type { SniffedType } from './sniff-file';
 
 export interface FileKindRule {
   maxBytes: number;
-  types: readonly ImageType[];
+  types: readonly SniffedType[];
   write: readonly Permission[];
   /** Who may read an attached file; undefined means any member of the school. */
   read: Permission | undefined;
+  campusScoped: boolean;
+  /** Why an attached file cannot be removed; undefined means it can. */
+  locked: string | undefined;
   denied: string;
   tooLarge: string;
   wrongType: string;
@@ -27,6 +36,8 @@ export const FILE_KIND_RULES: Record<FileKind, FileKindRule> = {
     types: ['image/png', 'image/jpeg', 'image/webp'],
     write: ['schoolAccount:update'],
     read: undefined,
+    campusScoped: false,
+    locked: undefined,
     denied: 'You need permission to change school settings.',
     tooLarge: 'That logo is over 1 MB. Please choose a smaller one.',
     wrongType: 'Choose a PNG, JPG or WebP logo.',
@@ -37,10 +48,24 @@ export const FILE_KIND_RULES: Record<FileKind, FileKindRule> = {
     types: ['image/png', 'image/jpeg', 'image/webp'],
     write: ['guardian:create', 'guardian:update'],
     read: 'guardian:read',
+    campusScoped: false,
+    locked: undefined,
     denied: 'You need permission to add or change guardians.',
     tooLarge: GUARDIAN_PHOTO_SIZE_MESSAGE,
     wrongType: GUARDIAN_PHOTO_TYPE_MESSAGE,
     unusable: GUARDIAN_PHOTO_INVALID_MESSAGE,
+  },
+  payment_proof: {
+    maxBytes: PAYMENT_PROOF.maxBytes,
+    types: PAYMENT_PROOF.types,
+    write: ['payment:record'],
+    read: 'payment:read',
+    campusScoped: true,
+    locked: PAYMENT_PROOF_LOCKED_MESSAGE,
+    denied: PAYMENT_PROOF_DENIED_MESSAGE,
+    tooLarge: PAYMENT_PROOF_SIZE_MESSAGE,
+    wrongType: PAYMENT_PROOF_TYPE_MESSAGE,
+    unusable: PAYMENT_PROOF_INVALID_MESSAGE,
   },
 };
 

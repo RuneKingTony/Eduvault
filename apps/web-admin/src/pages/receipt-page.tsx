@@ -1,0 +1,155 @@
+import { useQuery } from '@tanstack/react-query';
+import { CheckCircle2Icon, InfoIcon } from 'lucide-react';
+import { ApiError, type Payment } from '@eduvault/api-contract';
+import { fmtDate, money } from '@eduvault/shared';
+import {
+  Alert,
+  AlertDescription,
+  Badge,
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+  BreadcrumbLink,
+  Button,
+  ErrorMessage,
+  NotFoundState,
+  PageSkeleton,
+} from '@eduvault/ui';
+import { useApi } from '../api';
+import { InvoiceJournalCard } from '../components/invoices/invoice-journal-card';
+import { STATUS_LABELS } from '../components/payments/payment-text';
+import {
+  PaymentsLink,
+  PrintReceiptButton,
+} from '../components/payments/payment-links';
+import {
+  AllocationCard,
+  ReceiptDetailsCard,
+} from '../components/payments/receipt-cards';
+import { paymentQueryOptions } from '../queries';
+
+function Crumbs({ last }: { last: string }) {
+  return (
+    <Breadcrumb>
+      <BreadcrumbList>
+        <BreadcrumbItem>
+          <BreadcrumbLink asChild>
+            <PaymentsLink>Payments</PaymentsLink>
+          </BreadcrumbLink>
+        </BreadcrumbItem>
+        <BreadcrumbSeparator />
+        <BreadcrumbItem>
+          <BreadcrumbPage>{last}</BreadcrumbPage>
+        </BreadcrumbItem>
+      </BreadcrumbList>
+    </Breadcrumb>
+  );
+}
+
+function BackToPayments() {
+  return (
+    <Button asChild variant="outline">
+      <PaymentsLink>Back to payments</PaymentsLink>
+    </Button>
+  );
+}
+
+function ReceiptNotFound() {
+  return (
+    <section className="flex flex-col gap-4">
+      <Crumbs last="Not found" />
+      <h1>Not found</h1>
+      <NotFoundState
+        title="No receipt here"
+        description="It may have been moved, or it may belong to a campus you don’t look after."
+      >
+        <BackToPayments />
+      </NotFoundState>
+    </section>
+  );
+}
+
+function ReceiptHeader({ payment }: { payment: Payment }) {
+  return (
+    <header className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex flex-col gap-1">
+        <h1 className="flex items-center gap-2">
+          Receipt {payment.receiptNumber}
+          <Badge variant={payment.status === 'posted' ? 'success' : 'outline'}>
+            {STATUS_LABELS[payment.status]}
+          </Badge>
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          {money(payment.amountMinor, payment.currency)} from{' '}
+          {payment.payerName} on {fmtDate(payment.paidOn)}
+        </p>
+      </div>
+      <PrintReceiptButton paymentId={payment.id} />
+    </header>
+  );
+}
+
+function ReceiptBody({
+  payment,
+  recorded,
+}: {
+  payment: Payment;
+  recorded: boolean;
+}) {
+  return (
+    <section className="flex flex-col gap-4">
+      <Crumbs last={payment.receiptNumber} />
+      <ReceiptHeader payment={payment} />
+      {recorded ? (
+        <Alert>
+          <CheckCircle2Icon />
+          <AlertDescription>
+            Payment recorded. Entering it again by mistake will not record it
+            twice.
+          </AlertDescription>
+        </Alert>
+      ) : null}
+      <div className="grid gap-4 lg:grid-cols-[1fr_20rem]">
+        <div className="flex flex-col gap-4">
+          <AllocationCard payment={payment} />
+          {payment.entry === null ? (
+            <Alert>
+              <InfoIcon />
+              <AlertDescription>
+                Nothing is recorded in the books for this payment.
+              </AlertDescription>
+            </Alert>
+          ) : (
+            <InvoiceJournalCard
+              journal={payment.entry}
+              currency={payment.currency}
+            />
+          )}
+        </div>
+        <ReceiptDetailsCard payment={payment} />
+      </div>
+    </section>
+  );
+}
+
+export function ReceiptPage({
+  paymentId,
+  recorded = false,
+}: {
+  paymentId: string;
+  recorded?: boolean;
+}) {
+  const payment = useQuery(paymentQueryOptions(useApi(), paymentId));
+  if (payment.error instanceof ApiError && payment.error.status === 404) {
+    return <ReceiptNotFound />;
+  }
+  if (payment.isError) {
+    return <ErrorMessage error={payment.error} />;
+  }
+  if (payment.data === undefined) {
+    return <PageSkeleton rows={2} />;
+  }
+  return <ReceiptBody payment={payment.data} recorded={recorded} />;
+}

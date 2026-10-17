@@ -62,6 +62,7 @@ interface CashRow {
   in_minor: string;
   out_minor: string;
   running_minor: string;
+  payment_id: string | null;
 }
 
 const toCashItem = (row: CashRow): CashBookItem => ({
@@ -70,7 +71,8 @@ const toCashItem = (row: CashRow): CashBookItem => ({
   reference: row.reference,
   kind: journalKindSchema.parse(row.kind),
   memo: row.memo,
-  link: null,
+  link:
+    row.payment_id === null ? null : { type: 'payment', id: row.payment_id },
   inMinor: Number(row.in_minor),
   outMinor: Number(row.out_minor),
   runningBalanceMinor: Number(row.running_minor),
@@ -187,6 +189,10 @@ export class KyselyMoneyAccountRepository extends MoneyAccountRepository {
           SELECT e.id AS entry_id, e.reference, e.kind, e.memo, e.sequence,
             e.effective_on AS sort_day,
             to_char(e.effective_on, 'YYYY-MM-DD') AS effective_on,
+            (
+              SELECT p.id FROM payment p
+              WHERE p.journal_entry_id = e.id AND p.organization_id = e.organization_id
+            ) AS payment_id,
             SUM(l.debit_minor) AS in_minor,
             SUM(l.credit_minor) AS out_minor
           FROM journal_line l
@@ -201,7 +207,7 @@ export class KyselyMoneyAccountRepository extends MoneyAccountRepository {
           FROM moves
         )
         SELECT entry_id, reference, kind, memo, effective_on,
-          in_minor, out_minor, running_minor
+          in_minor, out_minor, running_minor, payment_id
         FROM running
         ORDER BY sort_day DESC, sequence DESC
         LIMIT ${paging.pageSize} OFFSET ${offset}`.execute(this.db),

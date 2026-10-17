@@ -45,6 +45,22 @@ const actions: CommandEntry[] = [
     keywords: ['new', 'hire'],
   },
   {
+    id: 'record-payment',
+    label: 'Record a payment',
+    hint: 'Finance',
+    route: '/finance/payments?record=1',
+    icon: 'banknote',
+    keywords: ['receipt', 'cash', 'transfer', 'pos', 'paid', 'fees'],
+  },
+  {
+    id: 'who-owes',
+    label: 'See who owes fees',
+    hint: 'Fees',
+    route: '/finance/accounts',
+    icon: 'wallet',
+    keywords: ['balance', 'debt', 'owing', 'statement', 'arrears'],
+  },
+  {
     id: 'create-role',
     label: 'Create a custom role',
     hint: 'Roles',
@@ -102,6 +118,20 @@ describe('CommandMenu', () => {
       screen.getByRole('option', { name: /Create a custom role/ })
     );
     expect(onSelect).toHaveBeenCalledWith('/roles/new');
+  });
+
+  it('opens Record a payment on the Payments page with the sheet open', () => {
+    const { onSelect } = setup(true);
+    fireEvent.click(screen.getByRole('option', { name: /Record a payment/ }));
+    expect(onSelect).toHaveBeenCalledWith('/finance/payments?record=1');
+  });
+
+  it('opens See who owes fees on Who owes, and finds it by a keyword', () => {
+    const { type, onSelect } = setup(true);
+    type('arrears');
+    expect(groupHeadings()).toEqual(['Actions']);
+    fireEvent.click(screen.getByRole('option', { name: /See who owes fees/ }));
+    expect(onSelect).toHaveBeenCalledWith('/finance/accounts');
   });
 
   it('finds an action by a keyword', () => {

@@ -192,6 +192,16 @@ export const CAP_AREAS: readonly CapArea[] = [
     extras: [],
   },
   {
+    id: 'payments',
+    group: 'Money',
+    label: 'Payments',
+    important: false,
+    see: ['payment:read'],
+    change: ['payment:record'],
+    changeDesc: 'Record payments and issue receipts',
+    extras: [],
+  },
+  {
     id: 'money-accounts',
     group: 'Money',
     label: 'Bank and POS accounts',
@@ -223,9 +233,11 @@ export const CAP_AREAS: readonly CapArea[] = [
   },
 ];
 
+// payment:void stays out of the role editor until cancelling has an endpoint.
 export const LEGACY_PERMISSIONS: readonly Permission[] = [
   'feeLine:readOwn',
   'invoice:readOwn',
+  'payment:void',
 ];
 
 export function capLevel(permissions: PermissionMap, area: CapArea): CapLevel {

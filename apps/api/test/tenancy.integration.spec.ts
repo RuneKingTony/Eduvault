@@ -313,7 +313,7 @@ test.describe('school account', () => {
       expect(after.rows).toEqual(before.rows);
       expect(
         (await api(ownerB).get('/school-settings').expect(200)).body
-      ).toEqual({ maxGuardians: 4, requireGuardian: true });
+      ).toMatchObject({ maxGuardians: 4, requireGuardian: true });
     });
 
     test('5: members without schoolAccount:update read but cannot write', async ({

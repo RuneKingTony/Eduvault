@@ -33,7 +33,10 @@ test.describe('reading', () => {
         logoUrl: null,
       });
       const rules = await api(user).get('/school-settings').expect(200);
-      expect(rules.body).toEqual({ maxGuardians: 4, requireGuardian: true });
+      expect(rules.body).toMatchObject({
+        maxGuardians: 4,
+        requireGuardian: true,
+      });
     }
   });
 });
@@ -160,7 +163,7 @@ test.describe('admissions rules', () => {
       .send({ maxGuardians: 3, requireGuardian: false })
       .expect(200);
 
-    expect(res.body).toEqual({ maxGuardians: 3, requireGuardian: false });
+    expect(res.body).toMatchObject({ maxGuardians: 3, requireGuardian: false });
     expect((await api(owner).get('/school-settings').expect(200)).body).toEqual(
       res.body
     );

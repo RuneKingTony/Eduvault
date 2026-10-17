@@ -1,5 +1,14 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import type { SchoolSettings } from '@eduvault/api-contract';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import {
+  LAST_PAYMENT_METHOD_MESSAGE,
+  type PaymentMethods,
+  type SchoolSettings,
+  type UpdatePaymentRulesInput,
+} from '@eduvault/api-contract';
 import type { OrgContext } from '../../common/auth';
 import {
   SchoolSettingsRepository,
@@ -33,5 +42,23 @@ export class SchoolSettingsService {
       throw notFound();
     }
     return updated;
+  }
+
+  async updatePaymentRules(
+    ctx: OrgContext,
+    patch: UpdatePaymentRulesInput
+  ): Promise<PaymentMethods> {
+    const outcome = await this.settings.updatePaymentMethods(
+      ctx.organizationId,
+      patch,
+      ctx.user.id
+    );
+    if (outcome === undefined) {
+      throw notFound();
+    }
+    if (outcome.status === 'none_left') {
+      throw new BadRequestException(LAST_PAYMENT_METHOD_MESSAGE);
+    }
+    return outcome.methods;
   }
 }

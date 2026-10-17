@@ -1,5 +1,9 @@
 import {
+  FILE_KINDS,
+  RECEIPT_FOOTER_MESSAGE,
   createCampusSchema,
+  schoolSettingsSchema,
+  updatePaymentRulesSchema,
   updateSchoolProfileSchema,
   updateSchoolSettingsSchema,
 } from './schemas';
@@ -62,5 +66,64 @@ describe('updateSchoolSettingsSchema', () => {
         messages(updateSchoolSettingsSchema.safeParse({ maxGuardians }))
       ).toEqual(['Choose a number from 1 to 6.']);
     }
+  });
+});
+
+describe('receipt footer in updateSchoolSettingsSchema', () => {
+  it('keeps 120 characters and refuses 121', () => {
+    expect(
+      updateSchoolSettingsSchema.parse({
+        receiptFooter: ` ${'a'.repeat(120)} `,
+      }).receiptFooter
+    ).toBe('a'.repeat(120));
+    expect(
+      messages(
+        updateSchoolSettingsSchema.safeParse({
+          receiptFooter: 'a'.repeat(121),
+        })
+      )
+    ).toEqual([RECEIPT_FOOTER_MESSAGE]);
+  });
+
+  it('allows an empty footer', () => {
+    expect(
+      updateSchoolSettingsSchema.parse({ receiptFooter: '  ' }).receiptFooter
+    ).toBe('');
+  });
+});
+
+describe('updatePaymentRulesSchema', () => {
+  it('takes any subset of the three methods', () => {
+    expect(updatePaymentRulesSchema.parse({ pos: false })).toEqual({
+      pos: false,
+    });
+    expect(
+      updatePaymentRulesSchema.parse({ cash: true, transfer: false, pos: true })
+    ).toEqual({ cash: true, transfer: false, pos: true });
+  });
+
+  it('refuses a method that is not one of the three', () => {
+    expect(updatePaymentRulesSchema.safeParse({ gateway: true }).success).toBe(
+      false
+    );
+  });
+});
+
+describe('schoolSettingsSchema', () => {
+  it('carries the payment methods and the receipt footer', () => {
+    expect(
+      schoolSettingsSchema.parse({
+        maxGuardians: 4,
+        requireGuardian: true,
+        paymentMethods: { cash: true, transfer: true, pos: false },
+        receiptFooter: 'Thank you for your payment.',
+      }).paymentMethods
+    ).toEqual({ cash: true, transfer: true, pos: false });
+  });
+});
+
+describe('FILE_KINDS', () => {
+  it('includes the payment proof', () => {
+    expect(FILE_KINDS).toContain('payment_proof');
   });
 });

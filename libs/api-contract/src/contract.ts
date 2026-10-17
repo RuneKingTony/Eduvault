@@ -112,6 +112,14 @@ import {
   invoiceSchema,
 } from './invoices';
 import {
+  paymentListQuerySchema,
+  paymentListSchema,
+  paymentSchema,
+  recordPaymentSchema,
+  recordedPaymentSchema,
+  recordingOptionsSchema,
+} from './payments';
+import {
   portalAnnouncementListQuerySchema,
   portalAnnouncementListSchema,
   portalAnnouncementsQuerySchema,
@@ -122,6 +130,15 @@ import {
   portalStudentSchema,
 } from './portal';
 import { defineContract, defineRoute } from './route';
+import {
+  balanceListQuerySchema,
+  balanceListSchema,
+  guardianStatementParamsSchema,
+  guardianStatementSchema,
+  statementParamsSchema,
+  statementQuerySchema,
+  studentStatementSchema,
+} from './student-accounts';
 import {
   assignSubjectTeacherSchema,
   assignedSubjectTeacherSchema,
@@ -204,7 +221,9 @@ import {
   updateMemberCampusesSchema,
   updateMemberRolesSchema,
   updateMemberTitleSchema,
+  updatePaymentRulesSchema,
   updateRoleSchema,
+  paymentMethodsSchema,
 } from './schemas';
 
 const removed = z.object({ id: z.uuid() });
@@ -884,6 +903,52 @@ export const contract = defineContract({
       response: invoiceSchema,
     }),
   },
+  payments: {
+    list: defineRoute({
+      method: 'GET',
+      path: '/finance/payments',
+      query: paymentListQuerySchema,
+      response: paymentListSchema,
+    }),
+    recordingOptions: defineRoute({
+      method: 'GET',
+      path: '/finance/payments/recording-options',
+      response: recordingOptionsSchema,
+    }),
+    get: defineRoute({
+      method: 'GET',
+      path: '/finance/payments/:id',
+      params: idParamsSchema,
+      response: paymentSchema,
+    }),
+    record: defineRoute({
+      method: 'POST',
+      path: '/finance/payments',
+      body: recordPaymentSchema,
+      response: recordedPaymentSchema,
+    }),
+  },
+  studentAccounts: {
+    balances: defineRoute({
+      method: 'GET',
+      path: '/finance/balances',
+      query: balanceListQuerySchema,
+      response: balanceListSchema,
+    }),
+    statement: defineRoute({
+      method: 'GET',
+      path: '/finance/students/:studentId/statement',
+      params: statementParamsSchema,
+      query: statementQuerySchema,
+      response: studentStatementSchema,
+    }),
+    guardianStatement: defineRoute({
+      method: 'GET',
+      path: '/finance/guardians/:guardianId/statement',
+      params: guardianStatementParamsSchema,
+      response: guardianStatementSchema,
+    }),
+  },
   portal: {
     me: defineRoute({
       method: 'GET',
@@ -1139,6 +1204,12 @@ export const contract = defineContract({
       path: '/school-settings',
       body: updateSchoolSettingsSchema,
       response: schoolSettingsSchema,
+    }),
+    updatePaymentRules: defineRoute({
+      method: 'PATCH',
+      path: '/school-settings/payment-rules',
+      body: updatePaymentRulesSchema,
+      response: paymentMethodsSchema,
     }),
   },
   files: {

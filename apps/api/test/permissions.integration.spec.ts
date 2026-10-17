@@ -328,6 +328,7 @@ test.describe('/me/permissions', () => {
         campus: ['readAll'],
         announcement: ['create', 'read', 'update'],
         invoice: ['read'],
+        payment: ['read'],
         moneyAccount: ['read'],
       },
       campusScope: 'all',
@@ -363,6 +364,7 @@ test.describe('/me/permissions', () => {
       enrollment: ['read'],
       feeLine: ['create', 'read', 'update', 'retire'],
       invoice: ['bill', 'read'],
+      payment: ['record', 'read', 'void'],
       moneyAccount: ['read'],
       ledger: ['read'],
     });

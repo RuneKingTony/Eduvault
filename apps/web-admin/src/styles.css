@@ -1,6 +1,15 @@
 @import '../../../libs/ui/src/styles/theme.css';
 
 @media print {
+  @page receipt {
+    size: A5 portrait;
+    margin: 10mm;
+  }
+
+  [data-print-receipt] {
+    page: receipt;
+  }
+
   body > *:not([data-print-slips]) {
     display: none !important;
   }

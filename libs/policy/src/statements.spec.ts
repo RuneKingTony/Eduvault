@@ -69,6 +69,17 @@ describe('statements', () => {
     expect(PERM_HELP['invoice:readOwn']).toBeDefined();
   });
 
+  it('has the payment resource with help, none sensitive', () => {
+    expect(ALL_PERMISSIONS).toEqual(
+      expect.arrayContaining(['payment:record', 'payment:read', 'payment:void'])
+    );
+    expect(SENSITIVE.some((p) => p.startsWith('payment'))).toBe(false);
+    expect(permLabel('payment:record')).toBe('Payments: record');
+    expect(PERM_HELP['payment:record']).toBeDefined();
+    expect(PERM_HELP['payment:read']).toBeDefined();
+    expect(PERM_HELP['payment:void']).toBeDefined();
+  });
+
   it('has announcement create, read and update, with no delete and none sensitive', () => {
     expect(ALL_PERMISSIONS).toEqual(
       expect.arrayContaining([

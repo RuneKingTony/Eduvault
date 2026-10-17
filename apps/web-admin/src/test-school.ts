@@ -24,5 +24,7 @@ export const settings = (
 ): SchoolSettings => ({
   maxGuardians: 4,
   requireGuardian: true,
+  paymentMethods: { cash: true, transfer: true, pos: true },
+  receiptFooter: 'Thank you for your payment.',
   ...overrides,
 });

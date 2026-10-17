@@ -2,6 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { basename } from 'node:path';
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Inject,
   Injectable,
@@ -13,7 +14,7 @@ import type { OrgContext } from '../auth';
 import { FILE_STORE_TOKEN, type FileStore } from './file-store';
 import { FILE_KIND_RULES, type FileKindRule } from './file-kinds';
 import { FilesRepository, type FileRecord } from './files.repository';
-import { sniffImageType, type ImageType } from './sniff-image';
+import { sniffFileType, type SniffedType } from './sniff-file';
 
 export interface UploadedFile {
   originalname: string;
@@ -23,6 +24,7 @@ export interface UploadedFile {
 interface FileDownload {
   bytes: Buffer;
   contentType: string;
+  originalName: string;
 }
 
 const NAME_MAX = 200;
@@ -32,11 +34,11 @@ const mayWrite = (permissions: PermissionMap, rule: FileKindRule): boolean =>
 
 const notFound = () => new NotFoundException('File not found');
 
-function checkContent(rule: FileKindRule, bytes: Buffer): ImageType {
+function checkContent(rule: FileKindRule, bytes: Buffer): SniffedType {
   if (bytes.byteLength > rule.maxBytes) {
     throw new BadRequestException(rule.tooLarge);
   }
-  const type = sniffImageType(bytes);
+  const type = sniffFileType(bytes);
   if (type === undefined || !rule.types.includes(type)) {
     throw new BadRequestException(rule.wrongType);
   }
@@ -95,7 +97,11 @@ export class FilesService {
     if (bytes === undefined) {
       throw notFound();
     }
-    return { bytes, contentType: file.contentType };
+    return {
+      bytes,
+      contentType: file.contentType,
+      originalName: file.originalName,
+    };
   }
 
   async remove(ctx: OrgContext, id: string): Promise<void> {
@@ -108,6 +114,9 @@ export class FilesService {
       throw (await this.canRead(ctx, file))
         ? new ForbiddenException(rule.denied)
         : notFound();
+    }
+    if (rule.locked !== undefined && (await this.files.isAttached(file))) {
+      throw new ConflictException(rule.locked);
     }
     await this.discard(file);
   }
@@ -136,10 +145,11 @@ export class FilesService {
   }
 
   private async canRead(ctx: OrgContext, file: FileRecord): Promise<boolean> {
-    const { read } = FILE_KIND_RULES[file.kind];
+    const { read, campusScoped } = FILE_KIND_RULES[file.kind];
     return (
       (read === undefined || holds(ctx.permissions, read)) &&
-      (await this.files.isAttached(file))
+      (await this.files.isAttached(file)) &&
+      (!campusScoped || (await this.files.isVisible(file, ctx.campusScope)))
     );
   }
 }

@@ -153,6 +153,15 @@ describe('roles', () => {
     }
   });
 
+  it('gives the bursar every payment permission, the administrator and principal payment read, and nobody else any', () => {
+    expect(starter('bursar').payment).toEqual(['record', 'read', 'void']);
+    expect(starter('administrator').payment).toEqual(['read']);
+    expect(starter('principal').payment).toEqual(['read']);
+    for (const slug of ['teacher', 'student', 'guardian']) {
+      expect(starter(slug).payment).toBeUndefined();
+    }
+  });
+
   it('counts invoice:read but not invoice:bill in READ_PERMS', () => {
     expect(READ_PERMS).toContain('invoice:read');
     expect(READ_PERMS).not.toContain('invoice:bill');
@@ -303,6 +312,7 @@ describe('roles', () => {
       campus: ['readAll'],
       announcement: ['create', 'read', 'update'],
       invoice: ['read'],
+      payment: ['read'],
       moneyAccount: ['read'],
     });
   });

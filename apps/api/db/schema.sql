@@ -237,6 +237,55 @@ END;
 $$;
 
 --
+-- Name: payment_allocation_immutable(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.payment_allocation_immutable() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  RAISE EXCEPTION 'a payment allocation cannot change'
+    USING ERRCODE = 'check_violation', CONSTRAINT = 'payment_allocation_frozen';
+END;
+$$;
+
+--
+-- Name: payment_immutable(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.payment_immutable() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  IF TG_OP = 'DELETE' THEN
+    RAISE EXCEPTION 'a payment is never deleted'
+      USING ERRCODE = 'check_violation', CONSTRAINT = 'payment_never_deleted';
+  END IF;
+  IF NEW.id IS DISTINCT FROM OLD.id
+    OR NEW.organization_id IS DISTINCT FROM OLD.organization_id
+    OR NEW.reference IS DISTINCT FROM OLD.reference
+    OR NEW.receipt_number IS DISTINCT FROM OLD.receipt_number
+    OR NEW.payer_guardian_id IS DISTINCT FROM OLD.payer_guardian_id
+    OR NEW.payer_name IS DISTINCT FROM OLD.payer_name
+    OR NEW.money_account_id IS DISTINCT FROM OLD.money_account_id
+    OR NEW.method IS DISTINCT FROM OLD.method
+    OR NEW.provider_reference IS DISTINCT FROM OLD.provider_reference
+    OR NEW.proof_file_id IS DISTINCT FROM OLD.proof_file_id
+    OR NEW.amount_minor IS DISTINCT FROM OLD.amount_minor
+    OR NEW.paid_on IS DISTINCT FROM OLD.paid_on
+    OR NEW.request_hash IS DISTINCT FROM OLD.request_hash
+    OR NEW.journal_entry_id IS DISTINCT FROM OLD.journal_entry_id
+    OR NEW.created_by IS DISTINCT FROM OLD.created_by
+    OR NEW.created_at IS DISTINCT FROM OLD.created_at
+  THEN
+    RAISE EXCEPTION 'only the status of a payment can change'
+      USING ERRCODE = 'check_violation', CONSTRAINT = 'payment_frozen_fields';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+--
 -- Name: seed_ledger_accounts(text); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -551,7 +600,7 @@ CREATE TABLE public.file_object (
     uploaded_by text,
     uploaded_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT file_object_byte_size_check CHECK ((byte_size > 0)),
-    CONSTRAINT file_object_kind_check CHECK ((kind = ANY (ARRAY['school_logo'::text, 'guardian_photo'::text])))
+    CONSTRAINT file_object_kind_check CHECK ((kind = ANY (ARRAY['school_logo'::text, 'guardian_photo'::text, 'payment_proof'::text])))
 );
 
 --
@@ -806,6 +855,49 @@ CREATE TABLE public."organizationRole" (
 );
 
 --
+-- Name: payment; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.payment (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id text NOT NULL,
+    reference text NOT NULL,
+    receipt_number text NOT NULL,
+    payer_guardian_id uuid,
+    payer_name text NOT NULL,
+    money_account_id uuid NOT NULL,
+    method text NOT NULL,
+    provider_reference text,
+    proof_file_id uuid,
+    amount_minor bigint NOT NULL,
+    paid_on date NOT NULL,
+    status text DEFAULT 'posted'::text NOT NULL,
+    request_hash text NOT NULL,
+    journal_entry_id uuid NOT NULL,
+    created_by text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT payment_amount_minor_check CHECK ((amount_minor > 0)),
+    CONSTRAINT payment_method_check CHECK ((method = ANY (ARRAY['cash'::text, 'transfer'::text, 'pos'::text]))),
+    CONSTRAINT payment_payer_name_check CHECK (((char_length(btrim(payer_name)) >= 1) AND (char_length(btrim(payer_name)) <= 120))),
+    CONSTRAINT payment_provider_reference_check CHECK (((char_length(btrim(provider_reference)) >= 1) AND (char_length(btrim(provider_reference)) <= 80))),
+    CONSTRAINT payment_receipt_number_check CHECK ((char_length(btrim(receipt_number)) > 0)),
+    CONSTRAINT payment_reference_check CHECK (((char_length(btrim(reference)) >= 1) AND (char_length(btrim(reference)) <= 80))),
+    CONSTRAINT payment_status_check CHECK ((status = ANY (ARRAY['posted'::text, 'void_pending'::text, 'voided'::text])))
+);
+
+--
+-- Name: payment_allocation; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.payment_allocation (
+    payment_id uuid NOT NULL,
+    organization_id text NOT NULL,
+    student_id uuid NOT NULL,
+    amount_minor bigint NOT NULL,
+    CONSTRAINT payment_allocation_amount_minor_check CHECK ((amount_minor > 0))
+);
+
+--
 -- Name: schema_migrations; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -867,7 +959,13 @@ CREATE TABLE public.school_setting (
     updated_by text,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT school_setting_max_guardians_check CHECK (((max_guardians >= 1) AND (max_guardians <= 6)))
+    pay_cash boolean DEFAULT true NOT NULL,
+    pay_transfer boolean DEFAULT true NOT NULL,
+    pay_pos boolean DEFAULT true NOT NULL,
+    receipt_footer text DEFAULT 'Thank you for your payment.'::text NOT NULL,
+    CONSTRAINT school_setting_max_guardians_check CHECK (((max_guardians >= 1) AND (max_guardians <= 6))),
+    CONSTRAINT school_setting_pay_method_check CHECK ((pay_cash OR pay_transfer OR pay_pos)),
+    CONSTRAINT school_setting_receipt_footer_check CHECK ((char_length(receipt_footer) <= 120))
 );
 
 --
@@ -1541,6 +1639,41 @@ ALTER TABLE ONLY public.organization
     ADD CONSTRAINT organization_slug_key UNIQUE (slug);
 
 --
+-- Name: payment_allocation payment_allocation_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.payment_allocation
+    ADD CONSTRAINT payment_allocation_pkey PRIMARY KEY (payment_id, student_id);
+
+--
+-- Name: payment payment_id_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.payment
+    ADD CONSTRAINT payment_id_organization_id_key UNIQUE (id, organization_id);
+
+--
+-- Name: payment payment_organization_id_receipt_number_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.payment
+    ADD CONSTRAINT payment_organization_id_receipt_number_key UNIQUE (organization_id, receipt_number);
+
+--
+-- Name: payment payment_organization_id_reference_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.payment
+    ADD CONSTRAINT payment_organization_id_reference_key UNIQUE (organization_id, reference);
+
+--
+-- Name: payment payment_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.payment
+    ADD CONSTRAINT payment_pkey PRIMARY KEY (id);
+
+--
 -- Name: schema_migrations schema_migrations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2026,7 +2159,7 @@ CREATE UNIQUE INDEX journal_entry_reverses_key ON public.journal_entry USING btr
 -- Name: journal_line_account_student_idx; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX journal_line_account_student_idx ON public.journal_line USING btree (organization_id, ledger_account_id, student_id);
+CREATE INDEX journal_line_account_student_idx ON public.journal_line USING btree (organization_id, ledger_account_id, student_id) INCLUDE (debit_minor, credit_minor);
 
 --
 -- Name: journal_line_entry_idx; Type: INDEX; Schema: public; Owner: -
@@ -2081,6 +2214,42 @@ CREATE UNIQUE INDEX "organizationRole_organizationId_role_key" ON public."organi
 --
 
 CREATE INDEX "organizationRole_role_idx" ON public."organizationRole" USING btree (role);
+
+--
+-- Name: payment_allocation_student_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX payment_allocation_student_idx ON public.payment_allocation USING btree (organization_id, student_id);
+
+--
+-- Name: payment_journal_entry_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX payment_journal_entry_key ON public.payment USING btree (journal_entry_id);
+
+--
+-- Name: payment_listing_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX payment_listing_idx ON public.payment USING btree (organization_id, paid_on DESC, created_at DESC);
+
+--
+-- Name: payment_payer_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX payment_payer_idx ON public.payment USING btree (organization_id, payer_guardian_id);
+
+--
+-- Name: payment_proof_file_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX payment_proof_file_key ON public.payment USING btree (proof_file_id) WHERE (proof_file_id IS NOT NULL);
+
+--
+-- Name: payment_provider_reference_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX payment_provider_reference_key ON public.payment USING btree (organization_id, provider_reference) WHERE (provider_reference IS NOT NULL);
 
 --
 -- Name: session_userId_idx; Type: INDEX; Schema: public; Owner: -
@@ -2249,6 +2418,18 @@ CREATE TRIGGER journal_line_requires_student BEFORE INSERT ON public.journal_lin
 --
 
 CREATE TRIGGER ledger_account_system_fixed BEFORE UPDATE ON public.ledger_account FOR EACH ROW EXECUTE FUNCTION public.ledger_account_system_fixed();
+
+--
+-- Name: payment_allocation payment_allocation_immutable; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER payment_allocation_immutable BEFORE DELETE OR UPDATE ON public.payment_allocation FOR EACH ROW EXECUTE FUNCTION public.payment_allocation_immutable();
+
+--
+-- Name: payment payment_immutable; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER payment_immutable BEFORE DELETE OR UPDATE ON public.payment FOR EACH ROW EXECUTE FUNCTION public.payment_immutable();
 
 --
 -- Name: academic_session academic_session_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -2860,6 +3041,69 @@ ALTER TABLE ONLY public."organizationRole"
     ADD CONSTRAINT "organizationRole_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES public.organization(id) ON DELETE CASCADE;
 
 --
+-- Name: payment_allocation payment_allocation_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.payment_allocation
+    ADD CONSTRAINT payment_allocation_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE RESTRICT;
+
+--
+-- Name: payment_allocation payment_allocation_payment_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.payment_allocation
+    ADD CONSTRAINT payment_allocation_payment_id_organization_id_fkey FOREIGN KEY (payment_id, organization_id) REFERENCES public.payment(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: payment_allocation payment_allocation_student_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.payment_allocation
+    ADD CONSTRAINT payment_allocation_student_id_organization_id_fkey FOREIGN KEY (student_id, organization_id) REFERENCES public.student(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: payment payment_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.payment
+    ADD CONSTRAINT payment_created_by_fkey FOREIGN KEY (created_by) REFERENCES public."user"(id) ON DELETE SET NULL;
+
+--
+-- Name: payment payment_journal_entry_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.payment
+    ADD CONSTRAINT payment_journal_entry_id_organization_id_fkey FOREIGN KEY (journal_entry_id, organization_id) REFERENCES public.journal_entry(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: payment payment_money_account_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.payment
+    ADD CONSTRAINT payment_money_account_id_organization_id_fkey FOREIGN KEY (money_account_id, organization_id) REFERENCES public.money_account(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: payment payment_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.payment
+    ADD CONSTRAINT payment_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE RESTRICT;
+
+--
+-- Name: payment payment_payer_guardian_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.payment
+    ADD CONSTRAINT payment_payer_guardian_id_organization_id_fkey FOREIGN KEY (payer_guardian_id, organization_id) REFERENCES public.guardian(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: payment payment_proof_file_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.payment
+    ADD CONSTRAINT payment_proof_file_id_organization_id_fkey FOREIGN KEY (proof_file_id, organization_id) REFERENCES public.file_object(id, organization_id) ON DELETE RESTRICT;
+
+--
 -- Name: school_account school_account_logo_file_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3248,4 +3492,6 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20261016090000'),
     ('20261016090100'),
     ('20261016090200'),
-    ('20261016090300');
+    ('20261016090300'),
+    ('20261017090000'),
+    ('20261017090100');

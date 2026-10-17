@@ -252,6 +252,7 @@ describe('capSummary', () => {
       'Announcements: write, publish, pin and withdraw announcements',
       'Fees: set and change what each class pays',
       'Charges: charge students and send the charges',
+      'Payments: record payments and issue receipts',
       'Bank and POS accounts: add and change bank and POS accounts',
       'Money categories: change the accountant’s categories',
       'Own records: can see',
@@ -276,6 +277,7 @@ describe('capSummary', () => {
       'Announcements: write, publish, pin and withdraw announcements',
       'Fees: can see',
       'Charges: can see',
+      'Payments: can see',
     ]);
   });
 
@@ -291,6 +293,7 @@ describe('capSummary', () => {
       'Parents and guardians: can see',
       'Fees: set and change what each class pays',
       'Charges: charge students and send the charges',
+      'Payments: record payments and issue receipts',
       'Bank and POS accounts: can see',
       'Money categories: can see',
     ]);
@@ -306,6 +309,7 @@ describe('capSummary', () => {
       'Students: can see',
       'Announcements: write, publish, pin and withdraw announcements',
       'Charges: can see',
+      'Payments: can see',
       'Bank and POS accounts: can see',
     ]);
   });
@@ -439,13 +443,37 @@ describe('the Charges area', () => {
   });
 });
 
+describe('the Payments area', () => {
+  const payments = area('payments');
+
+  it('sits in Money, splitting seeing from recording, and leaves cancelling out until it exists', () => {
+    expect(payments.group).toBe('Money');
+    expect(payments.label).toBe('Payments');
+    expect(payments.see).toEqual(['payment:read']);
+    expect(payments.change).toEqual(['payment:record']);
+    expect(payments.extras).toEqual([]);
+    expect(LEGACY_PERMISSIONS).toContain('payment:void');
+  });
+
+  it('is see for payment:read, change with payment:record and custom for a lone record', () => {
+    expect(capLevel(toPermissionMap(['payment:read']), payments)).toBe('see');
+    expect(
+      capLevel(toPermissionMap(['payment:read', 'payment:record']), payments)
+    ).toBe('change');
+    expect(capLevel(toPermissionMap(['payment:record']), payments)).toBe(
+      'custom'
+    );
+  });
+});
+
 describe('the Money areas', () => {
   const accounts = area('money-accounts');
   const categories = area('money-categories');
 
   it('sit in Money after Charges and before Own records', () => {
     const ids = CAP_AREAS.map((candidate) => candidate.id);
-    expect(ids.indexOf('money-accounts')).toBe(ids.indexOf('charges') + 1);
+    expect(ids.indexOf('payments')).toBe(ids.indexOf('charges') + 1);
+    expect(ids.indexOf('money-accounts')).toBe(ids.indexOf('payments') + 1);
     expect(ids.indexOf('money-categories')).toBe(
       ids.indexOf('money-accounts') + 1
     );

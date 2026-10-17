@@ -23,11 +23,13 @@ import { Route as StudentsRouteImport } from './routes/students'
 import { Route as SubjectsRouteImport } from './routes/subjects'
 import { Route as ClassesClassIdRouteImport } from './routes/classes_.$classId'
 import { Route as DevUiRouteImport } from './routes/dev/ui'
+import { Route as FinanceAccountsRouteImport } from './routes/finance/accounts'
 import { Route as FinanceBillingRouteImport } from './routes/finance/billing'
 import { Route as FinanceInvoicesRouteImport } from './routes/finance/invoices'
 import { Route as FinanceLedgerRouteImport } from './routes/finance/ledger'
 import { Route as FinanceMoneyAccountsRouteImport } from './routes/finance/money-accounts'
 import { Route as FinanceOtherFeesRouteImport } from './routes/finance/other-fees'
+import { Route as FinancePaymentsRouteImport } from './routes/finance/payments'
 import { Route as FinanceSchoolFeesRouteImport } from './routes/finance/school-fees'
 import { Route as MembersMemberIdRouteImport } from './routes/members_.$memberId'
 import { Route as PlatformIndexRouteImport } from './routes/platform.index'
@@ -38,12 +40,16 @@ import { Route as SettingsIndexRouteImport } from './routes/settings.index'
 import { Route as SettingsAdmissionsRouteImport } from './routes/settings.admissions'
 import { Route as SettingsDangerRouteImport } from './routes/settings.danger'
 import { Route as SettingsLevelsRouteImport } from './routes/settings.levels'
+import { Route as SettingsPaymentRulesRouteImport } from './routes/settings.payment-rules'
 import { Route as SettingsProfileRouteImport } from './routes/settings.profile'
 import { Route as StudentsStudentIdRouteImport } from './routes/students_.$studentId'
+import { Route as FinanceAccountsStudentIdRouteImport } from './routes/finance/accounts_.$studentId'
 import { Route as FinanceBillingRunIdRouteImport } from './routes/finance/billing_.$runId'
 import { Route as FinanceInvoicesInvoiceIdRouteImport } from './routes/finance/invoices_.$invoiceId'
+import { Route as FinancePaymentsPaymentIdRouteImport } from './routes/finance/payments_.$paymentId'
 import { Route as PlatformSchoolsIndexRouteImport } from './routes/platform.schools.index'
 import { Route as PlatformSchoolsSchoolIdRouteImport } from './routes/platform.schools.$schoolId'
+import { Route as FinancePaymentsPaymentIdPrintRouteImport } from './routes/finance/payments_.$paymentId_.print'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -115,6 +121,11 @@ const DevUiRoute = DevUiRouteImport.update({
   path: '/dev/ui',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FinanceAccountsRoute = FinanceAccountsRouteImport.update({
+  id: '/finance/accounts',
+  path: '/finance/accounts',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const FinanceBillingRoute = FinanceBillingRouteImport.update({
   id: '/finance/billing',
   path: '/finance/billing',
@@ -138,6 +149,11 @@ const FinanceMoneyAccountsRoute = FinanceMoneyAccountsRouteImport.update({
 const FinanceOtherFeesRoute = FinanceOtherFeesRouteImport.update({
   id: '/finance/other-fees',
   path: '/finance/other-fees',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FinancePaymentsRoute = FinancePaymentsRouteImport.update({
+  id: '/finance/payments',
+  path: '/finance/payments',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FinanceSchoolFeesRoute = FinanceSchoolFeesRouteImport.update({
@@ -190,6 +206,11 @@ const SettingsLevelsRoute = SettingsLevelsRouteImport.update({
   path: '/levels',
   getParentRoute: () => SettingsRoute,
 } as any)
+const SettingsPaymentRulesRoute = SettingsPaymentRulesRouteImport.update({
+  id: '/payment-rules',
+  path: '/payment-rules',
+  getParentRoute: () => SettingsRoute,
+} as any)
 const SettingsProfileRoute = SettingsProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
@@ -200,6 +221,12 @@ const StudentsStudentIdRoute = StudentsStudentIdRouteImport.update({
   path: '/students/$studentId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FinanceAccountsStudentIdRoute =
+  FinanceAccountsStudentIdRouteImport.update({
+    id: '/finance/accounts_/$studentId',
+    path: '/finance/accounts/$studentId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const FinanceBillingRunIdRoute = FinanceBillingRunIdRouteImport.update({
   id: '/finance/billing_/$runId',
   path: '/finance/billing/$runId',
@@ -209,6 +236,12 @@ const FinanceInvoicesInvoiceIdRoute =
   FinanceInvoicesInvoiceIdRouteImport.update({
     id: '/finance/invoices_/$invoiceId',
     path: '/finance/invoices/$invoiceId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const FinancePaymentsPaymentIdRoute =
+  FinancePaymentsPaymentIdRouteImport.update({
+    id: '/finance/payments_/$paymentId',
+    path: '/finance/payments/$paymentId',
     getParentRoute: () => rootRouteImport,
   } as any)
 const PlatformSchoolsIndexRoute = PlatformSchoolsIndexRouteImport.update({
@@ -221,6 +254,12 @@ const PlatformSchoolsSchoolIdRoute = PlatformSchoolsSchoolIdRouteImport.update({
   path: '/schools/$schoolId',
   getParentRoute: () => PlatformRoute,
 } as any)
+const FinancePaymentsPaymentIdPrintRoute =
+  FinancePaymentsPaymentIdPrintRouteImport.update({
+    id: '/finance/payments_/$paymentId_/print',
+    path: '/finance/payments/$paymentId/print',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -237,11 +276,13 @@ export interface FileRoutesByFullPath {
   '/subjects': typeof SubjectsRoute
   '/classes/$classId': typeof ClassesClassIdRoute
   '/dev/ui': typeof DevUiRoute
+  '/finance/accounts': typeof FinanceAccountsRoute
   '/finance/billing': typeof FinanceBillingRoute
   '/finance/invoices': typeof FinanceInvoicesRoute
   '/finance/ledger': typeof FinanceLedgerRoute
   '/finance/money-accounts': typeof FinanceMoneyAccountsRoute
   '/finance/other-fees': typeof FinanceOtherFeesRoute
+  '/finance/payments': typeof FinancePaymentsRoute
   '/finance/school-fees': typeof FinanceSchoolFeesRoute
   '/members/$memberId': typeof MembersMemberIdRoute
   '/platform/audit': typeof PlatformAuditRoute
@@ -250,14 +291,18 @@ export interface FileRoutesByFullPath {
   '/settings/admissions': typeof SettingsAdmissionsRoute
   '/settings/danger': typeof SettingsDangerRoute
   '/settings/levels': typeof SettingsLevelsRoute
+  '/settings/payment-rules': typeof SettingsPaymentRulesRoute
   '/settings/profile': typeof SettingsProfileRoute
   '/students/$studentId': typeof StudentsStudentIdRoute
   '/platform/': typeof PlatformIndexRoute
   '/settings/': typeof SettingsIndexRoute
+  '/finance/accounts/$studentId': typeof FinanceAccountsStudentIdRoute
   '/finance/billing/$runId': typeof FinanceBillingRunIdRoute
   '/finance/invoices/$invoiceId': typeof FinanceInvoicesInvoiceIdRoute
+  '/finance/payments/$paymentId': typeof FinancePaymentsPaymentIdRoute
   '/platform/schools/$schoolId': typeof PlatformSchoolsSchoolIdRoute
   '/platform/schools/': typeof PlatformSchoolsIndexRoute
+  '/finance/payments/$paymentId/print': typeof FinancePaymentsPaymentIdPrintRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -272,11 +317,13 @@ export interface FileRoutesByTo {
   '/subjects': typeof SubjectsRoute
   '/classes/$classId': typeof ClassesClassIdRoute
   '/dev/ui': typeof DevUiRoute
+  '/finance/accounts': typeof FinanceAccountsRoute
   '/finance/billing': typeof FinanceBillingRoute
   '/finance/invoices': typeof FinanceInvoicesRoute
   '/finance/ledger': typeof FinanceLedgerRoute
   '/finance/money-accounts': typeof FinanceMoneyAccountsRoute
   '/finance/other-fees': typeof FinanceOtherFeesRoute
+  '/finance/payments': typeof FinancePaymentsRoute
   '/finance/school-fees': typeof FinanceSchoolFeesRoute
   '/members/$memberId': typeof MembersMemberIdRoute
   '/platform/audit': typeof PlatformAuditRoute
@@ -285,14 +332,18 @@ export interface FileRoutesByTo {
   '/settings/admissions': typeof SettingsAdmissionsRoute
   '/settings/danger': typeof SettingsDangerRoute
   '/settings/levels': typeof SettingsLevelsRoute
+  '/settings/payment-rules': typeof SettingsPaymentRulesRoute
   '/settings/profile': typeof SettingsProfileRoute
   '/students/$studentId': typeof StudentsStudentIdRoute
   '/platform': typeof PlatformIndexRoute
   '/settings': typeof SettingsIndexRoute
+  '/finance/accounts/$studentId': typeof FinanceAccountsStudentIdRoute
   '/finance/billing/$runId': typeof FinanceBillingRunIdRoute
   '/finance/invoices/$invoiceId': typeof FinanceInvoicesInvoiceIdRoute
+  '/finance/payments/$paymentId': typeof FinancePaymentsPaymentIdRoute
   '/platform/schools/$schoolId': typeof PlatformSchoolsSchoolIdRoute
   '/platform/schools': typeof PlatformSchoolsIndexRoute
+  '/finance/payments/$paymentId/print': typeof FinancePaymentsPaymentIdPrintRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -310,11 +361,13 @@ export interface FileRoutesById {
   '/subjects': typeof SubjectsRoute
   '/classes_/$classId': typeof ClassesClassIdRoute
   '/dev/ui': typeof DevUiRoute
+  '/finance/accounts': typeof FinanceAccountsRoute
   '/finance/billing': typeof FinanceBillingRoute
   '/finance/invoices': typeof FinanceInvoicesRoute
   '/finance/ledger': typeof FinanceLedgerRoute
   '/finance/money-accounts': typeof FinanceMoneyAccountsRoute
   '/finance/other-fees': typeof FinanceOtherFeesRoute
+  '/finance/payments': typeof FinancePaymentsRoute
   '/finance/school-fees': typeof FinanceSchoolFeesRoute
   '/members_/$memberId': typeof MembersMemberIdRoute
   '/platform/audit': typeof PlatformAuditRoute
@@ -323,14 +376,18 @@ export interface FileRoutesById {
   '/settings/admissions': typeof SettingsAdmissionsRoute
   '/settings/danger': typeof SettingsDangerRoute
   '/settings/levels': typeof SettingsLevelsRoute
+  '/settings/payment-rules': typeof SettingsPaymentRulesRoute
   '/settings/profile': typeof SettingsProfileRoute
   '/students_/$studentId': typeof StudentsStudentIdRoute
   '/platform/': typeof PlatformIndexRoute
   '/settings/': typeof SettingsIndexRoute
+  '/finance/accounts_/$studentId': typeof FinanceAccountsStudentIdRoute
   '/finance/billing_/$runId': typeof FinanceBillingRunIdRoute
   '/finance/invoices_/$invoiceId': typeof FinanceInvoicesInvoiceIdRoute
+  '/finance/payments_/$paymentId': typeof FinancePaymentsPaymentIdRoute
   '/platform/schools/$schoolId': typeof PlatformSchoolsSchoolIdRoute
   '/platform/schools/': typeof PlatformSchoolsIndexRoute
+  '/finance/payments_/$paymentId_/print': typeof FinancePaymentsPaymentIdPrintRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -349,11 +406,13 @@ export interface FileRouteTypes {
     | '/subjects'
     | '/classes/$classId'
     | '/dev/ui'
+    | '/finance/accounts'
     | '/finance/billing'
     | '/finance/invoices'
     | '/finance/ledger'
     | '/finance/money-accounts'
     | '/finance/other-fees'
+    | '/finance/payments'
     | '/finance/school-fees'
     | '/members/$memberId'
     | '/platform/audit'
@@ -362,14 +421,18 @@ export interface FileRouteTypes {
     | '/settings/admissions'
     | '/settings/danger'
     | '/settings/levels'
+    | '/settings/payment-rules'
     | '/settings/profile'
     | '/students/$studentId'
     | '/platform/'
     | '/settings/'
+    | '/finance/accounts/$studentId'
     | '/finance/billing/$runId'
     | '/finance/invoices/$invoiceId'
+    | '/finance/payments/$paymentId'
     | '/platform/schools/$schoolId'
     | '/platform/schools/'
+    | '/finance/payments/$paymentId/print'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -384,11 +447,13 @@ export interface FileRouteTypes {
     | '/subjects'
     | '/classes/$classId'
     | '/dev/ui'
+    | '/finance/accounts'
     | '/finance/billing'
     | '/finance/invoices'
     | '/finance/ledger'
     | '/finance/money-accounts'
     | '/finance/other-fees'
+    | '/finance/payments'
     | '/finance/school-fees'
     | '/members/$memberId'
     | '/platform/audit'
@@ -397,14 +462,18 @@ export interface FileRouteTypes {
     | '/settings/admissions'
     | '/settings/danger'
     | '/settings/levels'
+    | '/settings/payment-rules'
     | '/settings/profile'
     | '/students/$studentId'
     | '/platform'
     | '/settings'
+    | '/finance/accounts/$studentId'
     | '/finance/billing/$runId'
     | '/finance/invoices/$invoiceId'
+    | '/finance/payments/$paymentId'
     | '/platform/schools/$schoolId'
     | '/platform/schools'
+    | '/finance/payments/$paymentId/print'
   id:
     | '__root__'
     | '/'
@@ -421,11 +490,13 @@ export interface FileRouteTypes {
     | '/subjects'
     | '/classes_/$classId'
     | '/dev/ui'
+    | '/finance/accounts'
     | '/finance/billing'
     | '/finance/invoices'
     | '/finance/ledger'
     | '/finance/money-accounts'
     | '/finance/other-fees'
+    | '/finance/payments'
     | '/finance/school-fees'
     | '/members_/$memberId'
     | '/platform/audit'
@@ -434,14 +505,18 @@ export interface FileRouteTypes {
     | '/settings/admissions'
     | '/settings/danger'
     | '/settings/levels'
+    | '/settings/payment-rules'
     | '/settings/profile'
     | '/students_/$studentId'
     | '/platform/'
     | '/settings/'
+    | '/finance/accounts_/$studentId'
     | '/finance/billing_/$runId'
     | '/finance/invoices_/$invoiceId'
+    | '/finance/payments_/$paymentId'
     | '/platform/schools/$schoolId'
     | '/platform/schools/'
+    | '/finance/payments_/$paymentId_/print'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -459,18 +534,23 @@ export interface RootRouteChildren {
   SubjectsRoute: typeof SubjectsRoute
   ClassesClassIdRoute: typeof ClassesClassIdRoute
   DevUiRoute: typeof DevUiRoute
+  FinanceAccountsRoute: typeof FinanceAccountsRoute
   FinanceBillingRoute: typeof FinanceBillingRoute
   FinanceInvoicesRoute: typeof FinanceInvoicesRoute
   FinanceLedgerRoute: typeof FinanceLedgerRoute
   FinanceMoneyAccountsRoute: typeof FinanceMoneyAccountsRoute
   FinanceOtherFeesRoute: typeof FinanceOtherFeesRoute
+  FinancePaymentsRoute: typeof FinancePaymentsRoute
   FinanceSchoolFeesRoute: typeof FinanceSchoolFeesRoute
   MembersMemberIdRoute: typeof MembersMemberIdRoute
   RolesRoleSlugRoute: typeof RolesRoleSlugRoute
   RolesNewRoute: typeof RolesNewRoute
   StudentsStudentIdRoute: typeof StudentsStudentIdRoute
+  FinanceAccountsStudentIdRoute: typeof FinanceAccountsStudentIdRoute
   FinanceBillingRunIdRoute: typeof FinanceBillingRunIdRoute
   FinanceInvoicesInvoiceIdRoute: typeof FinanceInvoicesInvoiceIdRoute
+  FinancePaymentsPaymentIdRoute: typeof FinancePaymentsPaymentIdRoute
+  FinancePaymentsPaymentIdPrintRoute: typeof FinancePaymentsPaymentIdPrintRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -573,6 +653,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DevUiRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/finance/accounts': {
+      id: '/finance/accounts'
+      path: '/finance/accounts'
+      fullPath: '/finance/accounts'
+      preLoaderRoute: typeof FinanceAccountsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/finance/billing': {
       id: '/finance/billing'
       path: '/finance/billing'
@@ -606,6 +693,13 @@ declare module '@tanstack/react-router' {
       path: '/finance/other-fees'
       fullPath: '/finance/other-fees'
       preLoaderRoute: typeof FinanceOtherFeesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/finance/payments': {
+      id: '/finance/payments'
+      path: '/finance/payments'
+      fullPath: '/finance/payments'
+      preLoaderRoute: typeof FinancePaymentsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/finance/school-fees': {
@@ -678,6 +772,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsLevelsRouteImport
       parentRoute: typeof SettingsRoute
     }
+    '/settings/payment-rules': {
+      id: '/settings/payment-rules'
+      path: '/payment-rules'
+      fullPath: '/settings/payment-rules'
+      preLoaderRoute: typeof SettingsPaymentRulesRouteImport
+      parentRoute: typeof SettingsRoute
+    }
     '/settings/profile': {
       id: '/settings/profile'
       path: '/profile'
@@ -690,6 +791,13 @@ declare module '@tanstack/react-router' {
       path: '/students/$studentId'
       fullPath: '/students/$studentId'
       preLoaderRoute: typeof StudentsStudentIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/finance/accounts_/$studentId': {
+      id: '/finance/accounts_/$studentId'
+      path: '/finance/accounts/$studentId'
+      fullPath: '/finance/accounts/$studentId'
+      preLoaderRoute: typeof FinanceAccountsStudentIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/finance/billing_/$runId': {
@@ -706,6 +814,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FinanceInvoicesInvoiceIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/finance/payments_/$paymentId': {
+      id: '/finance/payments_/$paymentId'
+      path: '/finance/payments/$paymentId'
+      fullPath: '/finance/payments/$paymentId'
+      preLoaderRoute: typeof FinancePaymentsPaymentIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/platform/schools/': {
       id: '/platform/schools/'
       path: '/schools'
@@ -719,6 +834,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/platform/schools/$schoolId'
       preLoaderRoute: typeof PlatformSchoolsSchoolIdRouteImport
       parentRoute: typeof PlatformRoute
+    }
+    '/finance/payments_/$paymentId_/print': {
+      id: '/finance/payments_/$paymentId_/print'
+      path: '/finance/payments/$paymentId/print'
+      fullPath: '/finance/payments/$paymentId/print'
+      preLoaderRoute: typeof FinancePaymentsPaymentIdPrintRouteImport
+      parentRoute: typeof rootRouteImport
     }
   }
 }
@@ -745,6 +867,7 @@ interface SettingsRouteChildren {
   SettingsAdmissionsRoute: typeof SettingsAdmissionsRoute
   SettingsDangerRoute: typeof SettingsDangerRoute
   SettingsLevelsRoute: typeof SettingsLevelsRoute
+  SettingsPaymentRulesRoute: typeof SettingsPaymentRulesRoute
   SettingsProfileRoute: typeof SettingsProfileRoute
   SettingsIndexRoute: typeof SettingsIndexRoute
 }
@@ -753,6 +876,7 @@ const SettingsRouteChildren: SettingsRouteChildren = {
   SettingsAdmissionsRoute: SettingsAdmissionsRoute,
   SettingsDangerRoute: SettingsDangerRoute,
   SettingsLevelsRoute: SettingsLevelsRoute,
+  SettingsPaymentRulesRoute: SettingsPaymentRulesRoute,
   SettingsProfileRoute: SettingsProfileRoute,
   SettingsIndexRoute: SettingsIndexRoute,
 }
@@ -776,18 +900,23 @@ const rootRouteChildren: RootRouteChildren = {
   SubjectsRoute: SubjectsRoute,
   ClassesClassIdRoute: ClassesClassIdRoute,
   DevUiRoute: DevUiRoute,
+  FinanceAccountsRoute: FinanceAccountsRoute,
   FinanceBillingRoute: FinanceBillingRoute,
   FinanceInvoicesRoute: FinanceInvoicesRoute,
   FinanceLedgerRoute: FinanceLedgerRoute,
   FinanceMoneyAccountsRoute: FinanceMoneyAccountsRoute,
   FinanceOtherFeesRoute: FinanceOtherFeesRoute,
+  FinancePaymentsRoute: FinancePaymentsRoute,
   FinanceSchoolFeesRoute: FinanceSchoolFeesRoute,
   MembersMemberIdRoute: MembersMemberIdRoute,
   RolesRoleSlugRoute: RolesRoleSlugRoute,
   RolesNewRoute: RolesNewRoute,
   StudentsStudentIdRoute: StudentsStudentIdRoute,
+  FinanceAccountsStudentIdRoute: FinanceAccountsStudentIdRoute,
   FinanceBillingRunIdRoute: FinanceBillingRunIdRoute,
   FinanceInvoicesInvoiceIdRoute: FinanceInvoicesInvoiceIdRoute,
+  FinancePaymentsPaymentIdRoute: FinancePaymentsPaymentIdRoute,
+  FinancePaymentsPaymentIdPrintRoute: FinancePaymentsPaymentIdPrintRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

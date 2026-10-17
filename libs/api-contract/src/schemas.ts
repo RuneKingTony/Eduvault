@@ -9,7 +9,13 @@ import {
   ROLE_LABEL_MAX,
   toPermissionMap,
 } from '@eduvault/policy';
-import { countOf, fmtDate, fmtDateRange } from '@eduvault/shared';
+import {
+  PAYMENT_METHODS,
+  countOf,
+  fmtDate,
+  fmtDateRange,
+  type PaymentMethod,
+} from '@eduvault/shared';
 import { z } from 'zod';
 
 export const idSchema = z.uuid();
@@ -227,9 +233,39 @@ export type UpdateSchoolProfile = z.output<typeof updateSchoolProfileSchema>;
 
 export const setLogoSchema = z.object({ fileId: idSchema });
 
+export { PAYMENT_METHODS, type PaymentMethod } from '@eduvault/shared';
+export const paymentMethodSchema = z.enum(PAYMENT_METHODS);
+
+export const PAYMENT_METHOD_LABELS = {
+  cash: 'Cash',
+  transfer: 'Bank transfer',
+  pos: 'POS',
+} as const satisfies Record<PaymentMethod, string>;
+
+export const RECEIPT_FOOTER_MAX = 120;
+export const RECEIPT_FOOTER_MESSAGE = `Use ${RECEIPT_FOOTER_MAX} characters or fewer.`;
+export const LAST_PAYMENT_METHOD_MESSAGE =
+  'Keep at least one way to record a payment.';
+
+export const paymentMethodsSchema = z.object({
+  cash: z.boolean(),
+  transfer: z.boolean(),
+  pos: z.boolean(),
+});
+export type PaymentMethods = z.infer<typeof paymentMethodsSchema>;
+
+export const updatePaymentRulesSchema = z.strictObject({
+  cash: z.boolean().optional(),
+  transfer: z.boolean().optional(),
+  pos: z.boolean().optional(),
+});
+export type UpdatePaymentRulesInput = z.input<typeof updatePaymentRulesSchema>;
+
 export const schoolSettingsSchema = z.object({
   maxGuardians: z.number().int().min(MIN_GUARDIANS).max(MAX_GUARDIANS),
   requireGuardian: z.boolean(),
+  paymentMethods: paymentMethodsSchema,
+  receiptFooter: z.string(),
 });
 export type SchoolSettings = z.infer<typeof schoolSettingsSchema>;
 
@@ -241,9 +277,18 @@ export const updateSchoolSettingsSchema = z.strictObject({
     .max(MAX_GUARDIANS, MAX_GUARDIANS_MESSAGE)
     .optional(),
   requireGuardian: z.boolean().optional(),
+  receiptFooter: z
+    .string()
+    .trim()
+    .max(RECEIPT_FOOTER_MAX, RECEIPT_FOOTER_MESSAGE)
+    .optional(),
 });
 
-export const FILE_KINDS = ['school_logo', 'guardian_photo'] as const;
+export const FILE_KINDS = [
+  'school_logo',
+  'guardian_photo',
+  'payment_proof',
+] as const;
 export const fileKindSchema = z.enum(FILE_KINDS);
 export type FileKind = z.infer<typeof fileKindSchema>;
 

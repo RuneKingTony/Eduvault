@@ -35,6 +35,10 @@ class FakeFiles extends FilesRepository {
     return Promise.resolve(this.attached.has(file.id));
   }
 
+  isVisible() {
+    return Promise.resolve(true);
+  }
+
   delete(_organizationId: string, id: string) {
     this.rows = this.rows.filter((row) => row.id !== id);
     return Promise.resolve();

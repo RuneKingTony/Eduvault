@@ -32,6 +32,7 @@ const SETTINGS_ITEM_ID = 'settings';
 const FEES_ITEM_ID = 'fees';
 
 const FEES_ENTRIES: readonly (readonly [route: string, gate: Gate])[] = [
+  ['/finance/accounts', ['invoice:read', 'payment:read']],
   ['/finance/school-fees', ['feeLine:read']],
   ['/finance/billing', ['invoice:bill', 'invoice:read']],
   ['/finance/invoices', ['invoice:read']],
@@ -121,6 +122,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         route: '/finance/school-fees',
         icon: 'wallet',
         alsoActiveFor: [
+          '/finance/accounts',
           '/finance/school-fees',
           '/finance/other-fees',
           '/finance/billing',
@@ -133,6 +135,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         pageTitle: 'Payments',
         route: '/finance/payments',
         icon: 'banknote',
+        gate: ['payment:read'],
       },
       {
         id: 'store',
@@ -210,6 +213,14 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
     route: '/settings/admissions',
     group: 'General',
     icon: 'users',
+    gate: ['schoolAccount:read'],
+  },
+  {
+    id: 'payment-rules',
+    label: 'Payment rules',
+    route: '/settings/payment-rules',
+    group: 'Finance',
+    icon: 'banknote',
     gate: ['schoolAccount:read'],
   },
   {

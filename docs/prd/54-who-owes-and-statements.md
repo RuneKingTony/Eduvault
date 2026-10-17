@@ -1,6 +1,6 @@
 # PRD: Who owes and statements
 
-- Status: draft (pre-spec)
+- Status: implemented (M3.4, EDU-36); Pay the extra back follows with refunds in M3.5
 - Source: brand prototype `https://claude.ai/artifact/1hsDyr1KdUaYD2hnuA9sfY`, version `1791539787-0c53`
 - Milestone and slice: `M3.4` (who owes, statements) (see [roadmap](README.md))
 - Related: [data-model-finance.md](../brainstorming/data-model-finance.md) (Decisions: balances over time, student account shape; Journal; Reports), [data-model-overview.md](../brainstorming/data-model-overview.md) (Foundation model: opening balances; student lifecycle), [53-payments.md](53-payments.md), [55-discounts-and-refunds.md](55-discounts-and-refunds.md), [56-money-accounts-and-categories.md](56-money-accounts-and-categories.md), [technical reference](../technical-reference.md) decisions [D-001](../technical-reference.md#decision-log), [D-012](../technical-reference.md#decision-log), [D-026](../technical-reference.md#decision-log), [D-038](../technical-reference.md#decision-log), [D-042](../technical-reference.md#decision-log)

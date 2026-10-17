@@ -10,6 +10,7 @@ export const statements = {
   class: ['create', 'read', 'readAll', 'update', 'assignTeacher'],
   feeLine: ['create', 'read', 'readOwn', 'update', 'retire'],
   invoice: ['bill', 'read', 'readOwn'],
+  payment: ['record', 'read', 'void'],
   announcement: ['create', 'read', 'update'],
   ledger: ['read', 'manageAccounts'],
   moneyAccount: ['create', 'read', 'update'],
@@ -100,6 +101,11 @@ export const PERM_HELP: Partial<Record<Permission, string>> = {
   'invoice:read': 'Sees rounds and charges, and what each one posted.',
   'invoice:readOwn':
     'Students see their own charges. Guardians see their children’s.',
+  'payment:record':
+    'Records cash, transfer and POS payments and issues receipts, on the campuses they see.',
+  'payment:read': 'Sees payments and receipts, and who owes what.',
+  'payment:void':
+    'Asks for a recorded payment to be cancelled. A second person approves it.',
 };
 
 const RESOURCE_LABELS: Record<Resource, string> = {
@@ -114,6 +120,7 @@ const RESOURCE_LABELS: Record<Resource, string> = {
   class: 'Classes',
   feeLine: 'School and other fees',
   invoice: 'Charges',
+  payment: 'Payments',
   announcement: 'Announcements',
   ledger: 'Money categories',
   moneyAccount: 'Bank and POS accounts',

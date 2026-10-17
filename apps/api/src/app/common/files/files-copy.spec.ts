@@ -34,6 +34,10 @@ class FakeFiles extends FilesRepository {
     return Promise.resolve(false);
   }
 
+  isVisible() {
+    return Promise.resolve(true);
+  }
+
   delete() {
     return Promise.resolve();
   }

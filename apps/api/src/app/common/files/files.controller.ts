@@ -27,6 +27,15 @@ import { UploadInterceptor } from './upload.interceptor';
 
 const routes = contract.files;
 
+// No `sandbox` directive: Chrome refuses to render a PDF served with it.
+const FILE_CSP = "default-src 'none'; frame-ancestors 'none'";
+
+/** Browsers cannot display HEIC, so it is offered as a download. */
+const dispositionOf = (contentType: string, originalName: string): string =>
+  contentType === 'image/heic'
+    ? `attachment; filename*=UTF-8''${encodeURIComponent(originalName)}`
+    : 'inline';
+
 @Controller('files')
 export class FilesController {
   constructor(private readonly files: FilesService) {}
@@ -52,11 +61,15 @@ export class FilesController {
     @Param(zod(idParamsSchema)) params: { id: string },
     @Res({ passthrough: true }) response: Response
   ): Promise<StreamableFile> {
-    const { bytes, contentType } = await this.files.read(org, params.id);
+    const { bytes, contentType, originalName } = await this.files.read(
+      org,
+      params.id
+    );
     response.set({
       'Content-Type': contentType,
-      'Content-Disposition': 'inline',
+      'Content-Disposition': dispositionOf(contentType, originalName),
       'X-Content-Type-Options': 'nosniff',
+      'Content-Security-Policy': FILE_CSP,
       'Cache-Control': 'private',
     });
     return new StreamableFile(bytes);
