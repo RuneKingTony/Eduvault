@@ -7,17 +7,6 @@ export interface AccountsSearch {
   page?: number;
 }
 
-export const NO_ACCOUNT_FILTERS = {
-  filter: undefined,
-  q: undefined,
-  page: undefined,
-} as const satisfies AccountsSearch;
-
-export const NO_STATEMENT_FILTERS = {
-  view: undefined,
-  page: undefined,
-} as const;
-
 export function parseAccountsSearch(
   search: Record<string, unknown>
 ): AccountsSearch {

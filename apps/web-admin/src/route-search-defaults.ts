@@ -1,5 +1,7 @@
-import type { AccountsSearch } from './accounts-search';
+import type { AccountsSearch, StatementSearch } from './accounts-search';
+import type { AdjustmentsSearch } from './adjustments-search';
 import type { BillingSearch } from './billing-search';
+import type { FeesSearch } from './fees-search';
 import type { InvoicesSearch } from './invoices-search';
 import type { PaymentsSearch } from './payments-search';
 
@@ -8,6 +10,10 @@ interface RouteSearch {
   '/finance/invoices': InvoicesSearch;
   '/finance/payments': PaymentsSearch;
   '/finance/accounts': AccountsSearch;
+  '/finance/accounts/$studentId': StatementSearch;
+  '/finance/adjustments': AdjustmentsSearch;
+  '/finance/school-fees': FeesSearch;
+  '/finance/other-fees': FeesSearch;
 }
 
 type DefaultSearch<S> = {
@@ -29,6 +35,17 @@ export const SEARCH_DEFAULTS = {
     record: undefined,
   },
   '/finance/accounts': { filter: undefined, q: undefined, page: undefined },
+  '/finance/accounts/$studentId': { view: undefined, page: undefined },
+  '/finance/adjustments': {
+    tab: undefined,
+    page: undefined,
+    new: undefined,
+    kind: undefined,
+    student: undefined,
+    amount: undefined,
+  },
+  '/finance/school-fees': { term: undefined, type: undefined, add: undefined },
+  '/finance/other-fees': { term: undefined, type: undefined, add: undefined },
 } as const satisfies {
   [To in keyof RouteSearch]: DefaultSearch<RouteSearch[To]>;
 };

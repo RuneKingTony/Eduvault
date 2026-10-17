@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { requireGate } from '../../access';
-import { NO_STATEMENT_FILTERS } from '../../accounts-search';
+import { searchFor } from '../../route-search-defaults';
 import { StorePage } from '../../pages/store-page';
 import {
   storeDeliveriesQueryOptions,
@@ -53,7 +53,7 @@ function StoreRoute() {
         void goTo({
           to: '/finance/accounts/$studentId',
           params: { studentId },
-          search: NO_STATEMENT_FILTERS,
+          search: searchFor('/finance/accounts/$studentId'),
         });
       }}
     />

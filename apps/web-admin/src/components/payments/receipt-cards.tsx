@@ -21,7 +21,7 @@ import {
   TableHeader,
   TableRow,
 } from '@eduvault/ui';
-import { NO_STATEMENT_FILTERS } from '../../accounts-search';
+import { searchFor } from '../../route-search-defaults';
 import { API_URL } from '../../env';
 import { PersonAvatar } from '../person-avatar';
 import { BalanceBadge } from './balance-badge';
@@ -43,7 +43,7 @@ function AllocationRow({
               <Link
                 to="/finance/accounts/$studentId"
                 params={{ studentId: row.studentId }}
-                search={NO_STATEMENT_FILTERS}
+                search={searchFor('/finance/accounts/$studentId')}
                 className="font-medium hover:underline"
               >
                 {row.studentName}

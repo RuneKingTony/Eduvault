@@ -2,12 +2,11 @@ import type { ReactNode } from 'react';
 import { Link } from '@tanstack/react-router';
 import { ArrowLeftIcon, PrinterIcon, UsersIcon } from 'lucide-react';
 import { Button } from '@eduvault/ui';
-import { NO_ACCOUNT_FILTERS } from '../../accounts-search';
-import { NO_PAYMENT_FILTERS } from '../../payments-search';
+import { searchFor } from '../../route-search-defaults';
 
 export function PaymentsLink({ children }: { children: ReactNode }) {
   return (
-    <Link to="/finance/payments" search={NO_PAYMENT_FILTERS}>
+    <Link to="/finance/payments" search={searchFor('/finance/payments')}>
       {children}
     </Link>
   );
@@ -15,7 +14,7 @@ export function PaymentsLink({ children }: { children: ReactNode }) {
 
 export function AccountsLink({ children }: { children: ReactNode }) {
   return (
-    <Link to="/finance/accounts" search={NO_ACCOUNT_FILTERS}>
+    <Link to="/finance/accounts" search={searchFor('/finance/accounts')}>
       {children}
     </Link>
   );

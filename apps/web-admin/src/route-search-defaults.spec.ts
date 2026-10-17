@@ -1,5 +1,9 @@
+import { parseAccountsSearch, parseStatementSearch } from './accounts-search';
+import { parseAdjustmentsSearch } from './adjustments-search';
 import { parseBillingSearch } from './billing-search';
+import { parseFeesSearch } from './fees-search';
 import { parseInvoicesSearch } from './invoices-search';
+import { parsePaymentsSearch } from './payments-search';
 import {
   prepareChargesTarget,
   hasSearchDefaults,
@@ -11,6 +15,10 @@ describe('hasSearchDefaults', () => {
   it('is true for the routes in the registry and false for others', () => {
     expect(hasSearchDefaults('/finance/billing')).toBe(true);
     expect(hasSearchDefaults('/finance/invoices')).toBe(true);
+    expect(hasSearchDefaults('/finance/adjustments')).toBe(true);
+    expect(hasSearchDefaults('/finance/accounts/$studentId')).toBe(true);
+    expect(hasSearchDefaults('/finance/school-fees')).toBe(true);
+    expect(hasSearchDefaults('/finance/other-fees')).toBe(true);
     expect(hasSearchDefaults('/students')).toBe(false);
     expect(hasSearchDefaults('toString')).toBe(false);
   });
@@ -23,6 +31,24 @@ describe('SEARCH_DEFAULTS', () => {
     );
     expect(SEARCH_DEFAULTS['/finance/invoices']).toStrictEqual(
       parseInvoicesSearch({})
+    );
+    expect(SEARCH_DEFAULTS['/finance/payments']).toStrictEqual(
+      parsePaymentsSearch({})
+    );
+    expect(SEARCH_DEFAULTS['/finance/accounts']).toStrictEqual(
+      parseAccountsSearch({})
+    );
+    expect(SEARCH_DEFAULTS['/finance/adjustments']).toStrictEqual(
+      parseAdjustmentsSearch({})
+    );
+    expect(SEARCH_DEFAULTS['/finance/accounts/$studentId']).toStrictEqual(
+      parseStatementSearch({})
+    );
+    expect(SEARCH_DEFAULTS['/finance/school-fees']).toStrictEqual(
+      parseFeesSearch({})
+    );
+    expect(SEARCH_DEFAULTS['/finance/other-fees']).toStrictEqual(
+      parseFeesSearch({})
     );
   });
 });
@@ -47,6 +73,22 @@ describe('searchFor', () => {
       kind: undefined,
       status: 'draft',
       page: undefined,
+    });
+  });
+
+  it('merges overrides over the fees and adjustments defaults', () => {
+    expect(searchFor('/finance/school-fees', { term: 't1' })).toEqual({
+      term: 't1',
+      type: undefined,
+      add: undefined,
+    });
+    expect(searchFor('/finance/adjustments', { tab: 'voids' })).toEqual({
+      tab: 'voids',
+      page: undefined,
+      new: undefined,
+      kind: undefined,
+      student: undefined,
+      amount: undefined,
     });
   });
 

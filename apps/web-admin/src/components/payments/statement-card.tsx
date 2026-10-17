@@ -19,7 +19,7 @@ import {
   Button,
   type StatementCardRow,
 } from '@eduvault/ui';
-import { NO_ADJUSTMENT_SEARCH } from '../../adjustments-search';
+import { searchFor } from '../../route-search-defaults';
 import { PersonAvatar } from '../person-avatar';
 
 function Described({ row }: { row: StatementRow }) {
@@ -67,13 +67,12 @@ function PayBackAction({ statement }: { statement: StudentStatement }) {
     <Button asChild size="sm" variant="outline">
       <Link
         to="/finance/adjustments"
-        search={{
-          ...NO_ADJUSTMENT_SEARCH,
+        search={searchFor('/finance/adjustments', {
           new: 1,
           kind: 'refund',
           student: statement.student.id,
           amount: -statement.totals.balanceMinor,
-        }}
+        })}
       >
         Pay the extra back
       </Link>
