@@ -1,3 +1,4 @@
+import { textOf } from '@eduvault/shared';
 import { parsePage } from './search-page';
 
 export interface MembersSearch {
@@ -6,14 +7,6 @@ export interface MembersSearch {
   page?: number;
   add?: 1;
 }
-
-const textOf = (value: unknown): string | undefined => {
-  if (typeof value !== 'string' && typeof value !== 'number') {
-    return undefined;
-  }
-  const text = String(value).trim();
-  return text === '' ? undefined : text;
-};
 
 /** Search params arrive as parsed JSON, so "123" may be the number 123. */
 export function parseMembersSearch(

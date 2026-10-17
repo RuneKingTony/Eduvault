@@ -1,5 +1,6 @@
 import { parsePage } from './search-page';
 import { STUDENT_TABS, type StudentTab } from '@eduvault/api-contract';
+import { textOf } from '@eduvault/shared';
 
 export interface StudentsSearch {
   tab?: StudentTab;
@@ -10,14 +11,6 @@ export interface StudentsSearch {
   admit?: 1;
   dialog?: 'start-year';
 }
-
-const textOf = (value: unknown): string | undefined => {
-  if (typeof value !== 'string' && typeof value !== 'number') {
-    return undefined;
-  }
-  const text = String(value).trim();
-  return text === '' ? undefined : text;
-};
 
 const tabOf = (value: unknown): StudentTab | undefined =>
   STUDENT_TABS.find((tab) => tab !== 'active' && tab === value);
