@@ -1,10 +1,28 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import type { Subject } from '@eduvault/api-contract';
-import { SUBJECT_IDS, arm, subject, subjectTeachers } from '../test-subjects';
-import { actingAccess, ownerAccess, renderWithApi } from '../test-utils';
+import { toast } from '@eduvault/ui';
+import {
+  SUBJECT_IDS,
+  arm,
+  electiveList,
+  levelRow,
+  subject,
+  subjectTeachers,
+} from '../test-subjects';
+import {
+  actingAccess,
+  ownerAccess,
+  renderWithApi,
+  starterAccess,
+} from '../test-utils';
 import { SubjectsPage } from './subjects-page';
 
-const LEVEL_JSS2 = '00000000-0000-4000-8000-000000000201';
+vi.mock('@eduvault/ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@eduvault/ui')>()),
+  toast: { success: vi.fn(), error: vi.fn() },
+}));
+
+const LEVEL_JSS2 = SUBJECT_IDS.jss2;
 
 const apiFor = (overrides: Record<string, unknown> = {}) => ({
   subjects: {
@@ -33,6 +51,14 @@ const apiFor = (overrides: Record<string, unknown> = {}) => ({
   classLevels: {
     list: vi.fn().mockResolvedValue([
       {
+        id: SUBJECT_IDS.jss1,
+        code: 'JSS1',
+        name: 'JSS 1',
+        sequence: 0,
+        nextLevelId: LEVEL_JSS2,
+        isFinalYear: false,
+      },
+      {
         id: LEVEL_JSS2,
         code: 'JSS2',
         name: 'JSS 2',
@@ -44,23 +70,28 @@ const apiFor = (overrides: Record<string, unknown> = {}) => ({
   },
   levelSubjects: {
     list: vi.fn().mockResolvedValue([
-      {
-        classLevelId: LEVEL_JSS2,
-        subjectId: SUBJECT_IDS.maths,
-        subjectCode: 'MTH',
-        subjectName: 'Mathematics',
-        kind: 'core',
-        sequence: 1,
-      },
-      {
-        classLevelId: LEVEL_JSS2,
-        subjectId: SUBJECT_IDS.english,
+      levelRow(),
+      levelRow({
+        subjectId: SUBJECT_IDS.french,
         subjectCode: 'FRE',
         subjectName: 'French',
         kind: 'elective',
         sequence: 2,
-      },
+        takerCount: 3,
+      }),
+      levelRow({
+        subjectId: SUBJECT_IDS.music,
+        subjectCode: 'MUS',
+        subjectName: 'Music',
+        kind: 'elective',
+        sequence: 3,
+      }),
     ]),
+    replace: vi.fn().mockResolvedValue([]),
+  },
+  electives: {
+    list: vi.fn().mockResolvedValue(electiveList()),
+    set: vi.fn(),
   },
   subjectTeachers: {
     list: vi.fn().mockResolvedValue(subjectTeachers()),
@@ -188,9 +219,327 @@ describe('SubjectsPage by level', () => {
   it('lists each level with its subjects in sequence and Core or Elective', async () => {
     renderWithApi(page('by-level'), apiFor());
     expect(await screen.findByText('JSS 2')).toBeInTheDocument();
-    expect(screen.getByText('Core')).toBeInTheDocument();
-    expect(screen.getByText('Elective')).toBeInTheDocument();
-    expect(screen.getByText('French')).toBeInTheDocument();
+    const card = (await screen.findByText('JSS 2')).closest(
+      '[data-slot="card"]'
+    );
+    expect(card).not.toBeNull();
+    const cells = within(card as HTMLElement);
+    expect(cells.getByText('Core')).toBeInTheDocument();
+    expect(cells.getAllByText('Elective')).toHaveLength(2);
+    expect(cells.getByText('French')).toBeInTheDocument();
+  });
+
+  it('gives an empty level a card that reads No subjects yet', async () => {
+    renderWithApi(page('by-level'), apiFor());
+    const card = (await screen.findByText('JSS 1')).closest(
+      '[data-slot="card"]'
+    );
+    expect(
+      within(card as HTMLElement).getByText('No subjects yet')
+    ).toBeInTheDocument();
+  });
+});
+
+const openEditor = async (level: 'JSS 1' | 'JSS 2' = 'JSS 2') => {
+  const card = (await screen.findByText(level)).closest('[data-slot="card"]');
+  fireEvent.click(
+    within(card as HTMLElement).getByRole('button', { name: 'Edit subjects' })
+  );
+  await screen.findByText(`Subjects for ${level}`);
+};
+
+const save = () => {
+  fireEvent.click(screen.getByRole('button', { name: 'Save subjects' }));
+};
+
+describe('SubjectsPage level subjects sheet', () => {
+  it('reorders with Move up and Move down and saves that order', async () => {
+    const api = apiFor();
+    renderWithApi(page('by-level'), api);
+    await openEditor();
+    expect(
+      screen.getByRole('button', { name: 'Move Mathematics up' })
+    ).toBeDisabled();
+    expect(
+      screen.getByRole('button', { name: 'Move Music down' })
+    ).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Move Music up' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Move Mathematics down' })
+    );
+    save();
+    await waitFor(() => {
+      expect(api.levelSubjects.replace).toHaveBeenCalledWith({
+        params: { id: LEVEL_JSS2 },
+        body: {
+          subjects: [
+            { subjectId: SUBJECT_IDS.music, kind: 'elective' },
+            { subjectId: SUBJECT_IDS.maths, kind: 'core' },
+            { subjectId: SUBJECT_IDS.french, kind: 'elective' },
+          ],
+        },
+      });
+    });
+    await waitFor(() => {
+      expect(toast.success).toHaveBeenCalledWith('JSS 2 subjects saved.');
+    });
+  });
+
+  it('sends a changed kind and a subject added last as Core', async () => {
+    const api = apiFor();
+    renderWithApi(page('by-level'), api);
+    await openEditor();
+    fireEvent.change(screen.getByLabelText('Kind of Mathematics'), {
+      target: { value: 'elective' },
+    });
+    await waitFor(() => {
+      expect(
+        screen.getByRole('option', { name: 'English Language' })
+      ).toBeInTheDocument();
+    });
+    fireEvent.change(screen.getByLabelText('Add a subject'), {
+      target: { value: SUBJECT_IDS.english },
+    });
+    expect(
+      screen.queryByRole('option', { name: 'English Language' })
+    ).not.toBeInTheDocument();
+    save();
+    await waitFor(() => {
+      expect(api.levelSubjects.replace).toHaveBeenCalledWith({
+        params: { id: LEVEL_JSS2 },
+        body: {
+          subjects: [
+            { subjectId: SUBJECT_IDS.maths, kind: 'elective' },
+            { subjectId: SUBJECT_IDS.french, kind: 'elective' },
+            { subjectId: SUBJECT_IDS.music, kind: 'elective' },
+            { subjectId: SUBJECT_IDS.english, kind: 'core' },
+          ],
+        },
+      });
+    });
+  });
+
+  it('says when the Add a subject select is not showing every active subject', async () => {
+    const api = apiFor();
+    api.subjects.list.mockResolvedValue({ items: [subject()], total: 120 });
+    renderWithApi(page('by-level'), api);
+    await openEditor();
+    expect(
+      await screen.findByText('Showing 1 of 120 active subjects.')
+    ).toBeInTheDocument();
+  });
+
+  it('asks before removing an elective that has takers, and keeps the row on Cancel', async () => {
+    const api = apiFor();
+    renderWithApi(page('by-level'), api);
+    await openEditor();
+    fireEvent.click(screen.getByRole('button', { name: 'Remove French' }));
+    expect(
+      await screen.findByText(
+        '3 students take French as an elective this session. Remove it anyway?'
+      )
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    await waitFor(() => {
+      expect(
+        screen.queryByText(/take French as an elective/)
+      ).not.toBeInTheDocument();
+    });
+    expect(
+      screen.getByRole('button', { name: 'Remove French' })
+    ).toBeInTheDocument();
+    expect(api.levelSubjects.replace).not.toHaveBeenCalled();
+  });
+
+  it('removes the row from the draft once the confirmation is accepted', async () => {
+    const api = apiFor();
+    renderWithApi(page('by-level'), api);
+    await openEditor();
+    fireEvent.click(screen.getByRole('button', { name: 'Remove French' }));
+    await screen.findByText(/take French as an elective/);
+    fireEvent.click(screen.getByRole('button', { name: 'Remove' }));
+    await waitFor(() => {
+      expect(
+        screen.queryByRole('button', { name: 'Remove French' })
+      ).not.toBeInTheDocument();
+    });
+    save();
+    await waitFor(() => {
+      expect(api.levelSubjects.replace).toHaveBeenCalledWith({
+        params: { id: LEVEL_JSS2 },
+        body: {
+          subjects: [
+            { subjectId: SUBJECT_IDS.maths, kind: 'core' },
+            { subjectId: SUBJECT_IDS.music, kind: 'elective' },
+          ],
+        },
+      });
+    });
+  });
+
+  it('asks before making an elective with takers core, and keeps it elective on Cancel', async () => {
+    const api = apiFor();
+    renderWithApi(page('by-level'), api);
+    await openEditor();
+    fireEvent.change(screen.getByLabelText('Kind of French'), {
+      target: { value: 'core' },
+    });
+    expect(
+      await screen.findByText(
+        '3 students take French as an elective this session. Making it core clears those choices. Continue?'
+      )
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    await waitFor(() => {
+      expect(
+        screen.queryByText(/Making it core clears/)
+      ).not.toBeInTheDocument();
+    });
+    expect(screen.getByLabelText('Kind of French')).toHaveValue('elective');
+    expect(api.levelSubjects.replace).not.toHaveBeenCalled();
+  });
+
+  it('makes the elective core in the draft once the confirmation is accepted', async () => {
+    const api = apiFor();
+    renderWithApi(page('by-level'), api);
+    await openEditor();
+    fireEvent.change(screen.getByLabelText('Kind of French'), {
+      target: { value: 'core' },
+    });
+    await screen.findByText(/Making it core clears/);
+    fireEvent.click(screen.getByRole('button', { name: 'Make core' }));
+    await waitFor(() => {
+      expect(screen.getByLabelText('Kind of French')).toHaveValue('core');
+    });
+    save();
+    await waitFor(() => {
+      expect(api.levelSubjects.replace).toHaveBeenCalledWith({
+        params: { id: LEVEL_JSS2 },
+        body: {
+          subjects: [
+            { subjectId: SUBJECT_IDS.maths, kind: 'core' },
+            { subjectId: SUBJECT_IDS.french, kind: 'core' },
+            { subjectId: SUBJECT_IDS.music, kind: 'elective' },
+          ],
+        },
+      });
+    });
+  });
+
+  it('removes an elective without takers straight away', async () => {
+    renderWithApi(page('by-level'), apiFor());
+    await openEditor();
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Music' }));
+    expect(
+      screen.queryByRole('button', { name: 'Remove Music' })
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/Remove it anyway/)).not.toBeInTheDocument();
+  });
+
+  it('toasts the API message when the save is refused', async () => {
+    const api = apiFor();
+    api.levelSubjects.replace.mockRejectedValue(
+      new Error('Each subject can be on a level once.')
+    );
+    renderWithApi(page('by-level'), api);
+    await openEditor();
+    save();
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith(
+        'Each subject can be on a level once.'
+      );
+    });
+    expect(screen.getByText('Subjects for JSS 2')).toBeInTheDocument();
+  });
+});
+
+describe('SubjectsPage electives card', () => {
+  it('shows an avatar per taker and Nobody yet for an elective with none', async () => {
+    renderWithApi(page('by-level'), apiFor());
+    const card = (
+      await screen.findByText('Electives taken this session')
+    ).closest('[data-slot="collapsible"]');
+    const inside = within(card as HTMLElement);
+    expect(await inside.findByText('AO')).toBeInTheDocument();
+    expect(inside.getByText('Nobody yet')).toBeInTheDocument();
+    expect(inside.getByText('2')).toBeInTheDocument();
+  });
+
+  it('says No electives. when the school has none', async () => {
+    const api = apiFor();
+    api.electives.list.mockResolvedValue(electiveList({ electives: [] }));
+    renderWithApi(page('by-level'), api);
+    expect(await screen.findByText('No electives.')).toBeInTheDocument();
+  });
+
+  it('filters the picker by name and by GF number and saves the ticked students', async () => {
+    const api = apiFor();
+    api.electives.set.mockResolvedValue({
+      subjectId: SUBJECT_IDS.french,
+      studentIds: [SUBJECT_IDS.ada, SUBJECT_IDS.bola],
+    });
+    renderWithApi(page('by-level'), api);
+    fireEvent.click(
+      (await screen.findAllByRole('button', { name: 'Choose students' }))[0]!
+    );
+    expect(await screen.findByText('French · 2026/2027')).toBeInTheDocument();
+    expect(
+      screen.getByText('Students at levels where French is an elective.')
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Chi Ude/)).not.toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: /Ada Obi/ })).toBeChecked();
+    expect(
+      screen.getByRole('checkbox', { name: /Bola Ade/ })
+    ).not.toBeChecked();
+
+    const search = screen.getByPlaceholderText('Search name or GF number');
+    fireEvent.change(search, { target: { value: 'GF-0124' } });
+    expect(screen.queryByText(/Ada Obi/)).not.toBeInTheDocument();
+    fireEvent.change(search, { target: { value: 'ada' } });
+    expect(screen.queryByText(/Bola Ade/)).not.toBeInTheDocument();
+    fireEvent.change(search, { target: { value: '' } });
+
+    fireEvent.click(screen.getByRole('checkbox', { name: /Bola Ade/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => {
+      expect(api.electives.set).toHaveBeenCalledWith({
+        params: { subjectId: SUBJECT_IDS.french },
+        body: {
+          sessionId: SUBJECT_IDS.session,
+          studentIds: [SUBJECT_IDS.ada, SUBJECT_IDS.bola],
+        },
+      });
+    });
+    await waitFor(() => {
+      expect(toast.success).toHaveBeenCalledWith(
+        '2 students take French this session.'
+      );
+    });
+  });
+});
+
+describe('SubjectsPage by level without write access', () => {
+  it.each([
+    ['a teacher', starterAccess('teacher')],
+    ['a super admin acting without a reason', actingAccess(false)],
+  ])('hides Edit subjects and Choose students for %s', async (_who, access) => {
+    renderWithApi(page('by-level'), apiFor(), access);
+    await screen.findByText('Electives taken this session');
+    await screen.findByText('Nobody yet');
+    expect(screen.queryByRole('button', { name: 'Edit subjects' })).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: 'Choose students' })
+    ).toBeNull();
+  });
+
+  it('shows both controls to a holder of subject:update', async () => {
+    renderWithApi(page('by-level'), apiFor(), starterAccess('administrator'));
+    expect(
+      await screen.findAllByRole('button', { name: 'Edit subjects' })
+    ).toHaveLength(2);
+    expect(
+      screen.getAllByRole('button', { name: 'Choose students' })
+    ).toHaveLength(2);
   });
 });
 

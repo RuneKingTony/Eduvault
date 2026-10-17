@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -6,10 +7,10 @@ import {
 import {
   LEVEL_SUBJECT_LEVEL_NOT_FOUND_MESSAGE,
   SUBJECT_NOT_FOUND_MESSAGE,
-  SUBJECT_PAGE_SIZE,
   contract,
   subjectCodeTakenMessage,
   subjectOnLevelMessage,
+  subjectRetiredMessage,
   type LevelSubject,
   type RouteBody,
   type RouteQuery,
@@ -24,6 +25,7 @@ import { SubjectRepository, type SubjectRecord } from './subject.repository';
 type ListQuery = RouteQuery<typeof contract.subjects.list>;
 type LevelQuery = RouteQuery<typeof contract.levelSubjects.list>;
 type NewSubjectBody = RouteBody<typeof contract.subjects.create>;
+type ReplaceBody = RouteBody<typeof contract.levelSubjects.replace>;
 
 const notFound = () => new NotFoundException(SUBJECT_NOT_FOUND_MESSAGE);
 
@@ -45,8 +47,8 @@ export class SubjectService {
   list(ctx: OrgContext, query: ListQuery): Promise<SubjectList> {
     return this.subjects.listSubjects(ctx.organizationId, {
       includeRetired: query.includeRetired,
-      limit: SUBJECT_PAGE_SIZE,
-      offset: (query.page - 1) * SUBJECT_PAGE_SIZE,
+      limit: query.pageSize,
+      offset: (query.page - 1) * query.pageSize,
     });
   }
 
@@ -116,6 +118,7 @@ export class SubjectService {
         subjectName,
         kind,
         sequence,
+        takerCount,
       }) => ({
         classLevelId,
         subjectId,
@@ -123,7 +126,42 @@ export class SubjectService {
         subjectName,
         kind,
         sequence,
+        takerCount,
       })
     );
+  }
+
+  replaceLevelSubjects(
+    ctx: OrgContext,
+    levelId: string,
+    body: ReplaceBody
+  ): Promise<LevelSubject[]> {
+    const organizationId = ctx.organizationId;
+    return this.lock.run(organizationId, async () => {
+      if (!(await this.subjects.levelExists(organizationId, levelId))) {
+        throw new NotFoundException(LEVEL_SUBJECT_LEVEL_NOT_FOUND_MESSAGE);
+      }
+      const found = await this.subjects.subjectsByIds(
+        organizationId,
+        body.subjects.map((row) => row.subjectId)
+      );
+      const byId = new Map(found.map((record) => [record.id, record]));
+      for (const row of body.subjects) {
+        if (!byId.has(row.subjectId)) {
+          throw notFound();
+        }
+      }
+      for (const record of byId.values()) {
+        if (record.retiredAt !== null) {
+          throw new BadRequestException(subjectRetiredMessage(record.name));
+        }
+      }
+      await this.subjects.replaceLevelList(
+        organizationId,
+        levelId,
+        body.subjects
+      );
+      return this.levelSubjects(ctx, { classLevelId: levelId });
+    });
   }
 }

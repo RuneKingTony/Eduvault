@@ -276,8 +276,18 @@ describe('ClassService.get', () => {
     const { repository, service } = setup();
     addClass(repository, 'gold');
     repository.rosters['gold'] = [
-      { studentId: 's1', name: 'Ada Okeke', admissionNumber: 'GF-0001' },
-      { studentId: 's2', name: 'Tobi Lawal', admissionNumber: 'GF-0002' },
+      {
+        studentId: 's1',
+        name: 'Ada Okeke',
+        admissionNumber: 'GF-0001',
+        electives: ['French'],
+      },
+      {
+        studentId: 's2',
+        name: 'Tobi Lawal',
+        admissionNumber: 'GF-0002',
+        electives: [],
+      },
     ];
 
     expect(await service.get(admin, 'gold')).toMatchObject({

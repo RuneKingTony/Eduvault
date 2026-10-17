@@ -5,6 +5,7 @@ import {
 } from '@tanstack/react-query';
 import {
   FINANCE_PAGE_SIZE_MAX,
+  SUBJECT_PAGE_SIZE_MAX,
   type AnnouncementStatus,
   type BalanceFilter,
   type ClassStatus,
@@ -428,6 +429,21 @@ export const levelSubjectsQueryOptions = (api: Api) =>
     queryFn: () => api.levelSubjects.list({ query: {} }),
   });
 
+export const electivesQueryOptions = (api: Api) =>
+  queryOptions({
+    queryKey: [...SUBJECTS_KEY, 'electives'],
+    queryFn: () => api.electives.list({ query: {} }),
+  });
+
+export const allActiveSubjectsQueryOptions = (api: Api) =>
+  queryOptions({
+    queryKey: [...SUBJECTS_KEY, 'active'],
+    queryFn: () =>
+      api.subjects.list({
+        query: { includeRetired: 'false', pageSize: SUBJECT_PAGE_SIZE_MAX },
+      }),
+  });
+
 export const subjectTeachersQueryOptions = (api: Api) =>
   queryOptions({
     queryKey: [...SUBJECTS_KEY, 'teachers'],
@@ -438,6 +454,16 @@ export async function invalidateSubjects(
   queryClient: QueryClient
 ): Promise<void> {
   await queryClient.invalidateQueries({ queryKey: SUBJECTS_KEY });
+}
+
+/** A level list or an elective save changes the By level cards and the class roster column. */
+export async function invalidateLevelLists(
+  queryClient: QueryClient
+): Promise<void> {
+  await Promise.all([
+    invalidateSubjects(queryClient),
+    queryClient.invalidateQueries({ queryKey: CLASSES_KEY }),
+  ]);
 }
 
 export async function invalidateSubjectTeachers(

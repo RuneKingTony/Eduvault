@@ -96,7 +96,8 @@ export const PERM_HELP: Partial<Record<Permission, string>> = {
     'Changes a fee amount and sets which students take optional fees.',
   'feeLine:retire': 'Retires a fee. A fee for every campus needs every campus.',
   'subject:create': 'Adds subjects to the school. A code never changes.',
-  'subject:update': 'Renames, retires and restores subjects.',
+  'subject:update':
+    'Renames, retires and restores subjects, sets each level’s subjects and chooses elective students.',
   'invoice:bill':
     'Prepares, sends and cancels rounds of student charges, on the campuses they see.',
   'invoice:read': 'Sees rounds and charges, and what each one posted.',

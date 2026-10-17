@@ -274,7 +274,7 @@ async function checkSubjects(
   const organizationId = funmi.organizationId;
   const subjects = await app
     .get(SubjectService, { strict: false })
-    .list(funmi, { page: 1, includeRetired: true });
+    .list(funmi, { page: 1, includeRetired: true, pageSize: 10 });
   check('Greenfield subjects', subjects.total, SEED_SUBJECTS.length);
   const retired = subjects.items.filter((row) => row.retiredAt !== null);
   check(

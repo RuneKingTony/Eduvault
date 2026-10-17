@@ -41,6 +41,7 @@ export * from './lib/contrast';
 export * from './lib/theme-preference';
 export * from './hooks-custom/use-is-compact';
 export * from './components/custom/text-field';
+export * from './components/custom/search-input';
 export * from './components/custom/select-field';
 export * from './components/custom/nav-icon';
 export * from './components/custom/day-off-list';
