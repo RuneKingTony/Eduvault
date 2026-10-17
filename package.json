@@ -24,7 +24,8 @@
     "ui:add": "pnpm --filter @eduvault/ui exec shadcn add",
     "ui:localize": "tsx --tsconfig scripts/tsconfig.json scripts/ui-localize-imports.ts && pnpm install && prettier --write libs/ui",
     "drift": "tsx --tsconfig scripts/tsconfig.json scripts/drift-check.ts",
-    "validate:quick": "nx affected -t lint typecheck test",
+    "validate:quick": "nx affected -t lint typecheck test --parallel=2",
+    "validate:one": "nx run-many -t lint typecheck test --parallel=2 -p",
     "validate": "pnpm format:check && pnpm knip && nx run-many -t typecheck lint --nxBail && nx run-many -t test build --nxBail && pnpm drift && nx run api:test-integration",
     "drift:fix": "tsx --tsconfig scripts/tsconfig.json scripts/drift-check.ts --write",
     "db:migrate:up": "nx run api:db-migrate-up"
