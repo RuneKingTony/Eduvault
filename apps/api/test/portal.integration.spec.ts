@@ -784,7 +784,7 @@ async function shopFor(
   app: INestApplication,
   api: Api,
   where: {
-    schools: TwoSchoolsWithoutStudents & { orgA: { id: string } };
+    schools: Parameters<typeof family>[1] & { orgA: { id: string } };
     pool: Parameters<typeof classLevelId>[0];
   }
 ) {

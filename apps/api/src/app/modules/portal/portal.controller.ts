@@ -8,13 +8,17 @@ import {
 } from '@eduvault/api-contract';
 import { Org, OrganizationAuth, type OrgContext } from '../../common/auth';
 import { zod } from '../../common/http/zod.pipe';
+import { PortalStoreService } from './portal-store.service';
 import { PortalService } from './portal.service';
 
 const routes = contract.portal;
 
 @Controller('portal')
 export class PortalController {
-  constructor(private readonly portal: PortalService) {}
+  constructor(
+    private readonly portal: PortalService,
+    private readonly portalStore: PortalStoreService
+  ) {}
 
   @Get('me')
   @OrganizationAuth('student', 'readOwn')
@@ -84,7 +88,7 @@ export class PortalController {
     @Org() org: OrgContext,
     @Param(zod(routes.purchases.params)) params: { studentId: string }
   ): Promise<RouteOutput<typeof routes.purchases>> {
-    return this.portal.purchasesFor(org, params.studentId);
+    return this.portalStore.purchasesFor(org, params.studentId);
   }
 
   @Get('students/:studentId/price-list')
@@ -93,6 +97,6 @@ export class PortalController {
     @Org() org: OrgContext,
     @Param(zod(routes.priceList.params)) params: { studentId: string }
   ): Promise<RouteOutput<typeof routes.priceList>> {
-    return this.portal.priceListFor(org, params.studentId);
+    return this.portalStore.priceListFor(org, params.studentId);
   }
 }

@@ -15,11 +15,12 @@ const idsFor = (
   );
 
 describe('portal nav', () => {
-  it('lists My children, Home then Fees', () => {
+  it('lists My children, Home, Fees then Purchases', () => {
     expect(PORTAL_NAV.map((entry) => [entry.label, entry.route])).toEqual([
       ['My children', '/children'],
       ['Home', '/'],
       ['Fees', '/fees'],
+      ['Purchases', '/purchases'],
     ]);
   });
 
