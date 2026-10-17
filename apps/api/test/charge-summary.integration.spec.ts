@@ -1,8 +1,13 @@
 import type { INestApplication } from '@nestjs/common';
+import type { Pool } from 'pg';
 import { DASHBOARD_SAMPLE_SIZE } from '@eduvault/api-contract';
+import type { OrgContext } from '../src/app/common/auth';
 import { BillingPlanService } from '../src/app/modules/billing/billing-plan.service';
 import { scopeOf } from '../src/app/modules/billing/billing-scope';
-import { BillingRepository } from '../src/app/modules/billing/billing.repository';
+import {
+  BillingRepository,
+  type TermInfo,
+} from '../src/app/modules/billing/billing.repository';
 import { expect, type TestUser } from './support/base-test';
 import {
   addDiscount,
@@ -33,6 +38,31 @@ const cmp = (a: string, b: string) => {
 
 const byFirstLastId = (a: Names & { id: string }, b: Names & { id: string }) =>
   cmp(a.first, b.first) || cmp(a.last, b.last) || cmp(a.id, b.id);
+
+async function levelIdsOn(pool: Pool, ctx: OrgContext, term: TermInfo) {
+  const { rows } = await pool.query<{ class_level_id: string }>(
+    `SELECT DISTINCT en.class_level_id
+     FROM student s
+     JOIN student_enrollment en
+       ON en.student_id = s.id AND en.organization_id = s.organization_id
+     WHERE s.organization_id = $1
+       AND en.session_id = $2
+       AND ($3::text[] IS NULL OR coalesce((
+         SELECT p.campus_id
+         FROM enrollment_placement p
+         JOIN term t ON t.id = p.term_id AND t.is_current
+         JOIN student_enrollment e ON e.id = p.enrollment_id
+         WHERE e.student_id = s.id
+         LIMIT 1
+       ), s.campus_id)::text = ANY($3::text[]))`,
+    [
+      ctx.organizationId,
+      term.sessionId,
+      ctx.campusScope === 'all' ? null : ctx.campusScope,
+    ]
+  );
+  return rows.map((row) => row.class_level_id).toSorted(cmp);
+}
 
 async function termInfos(app: INestApplication, owner: TestUser) {
   const ctx = await orgContextFor(app, owner);
@@ -317,8 +347,8 @@ test.describe('chargeSummary equals the round plan', () => {
 
         expect(summary.created, where).toBe(plan.counts.created);
         expect(summary.skipped, where).toBe(plan.counts.skipped);
-        expect(summary.levelIds.toSorted(cmp), where).toEqual(
-          plan.levelIds.toSorted(cmp)
+        expect(summary.levelIds, where).toEqual(
+          await levelIdsOn(pool, ctx, term)
         );
         expect(summary.levelIds, where).toEqual(summary.levelIds.toSorted(cmp));
         expect(plan.counts.created, where).toBe(expectedCreated[label][which]);

@@ -336,6 +336,51 @@ test.describe('charge students', () => {
       runId: null,
     });
   });
+
+  test('reports the already-charged students of a campus or level round as skipped and leaves the others uncounted', async ({
+    api,
+    app,
+    pool,
+    schools: { owner, orgA, lekki },
+  }) => {
+    const fixture = await chargeFixture(app, api, owner);
+    const upper = await createClass(app, owner, {
+      campusId: lekki.id,
+      levelCode: 'JSS2',
+    });
+    await createStudent(app, owner, {
+      campusId: lekki.id,
+      classArmId: upper.id,
+    });
+    const { rows } = await pool.query<{ id: string }>(
+      `SELECT id FROM class_level WHERE organization_id = $1 AND code = 'JSS1'`,
+      [orgA.id]
+    );
+    const campus = {
+      termId: fixture.secondTermId,
+      scope: 'campus',
+      scopeId: lekki.id,
+    } as const;
+
+    expect(await prepare(api, owner, campus)).toMatchObject({
+      created: 1,
+      skipped: 0,
+      none: 1,
+    });
+    expect(await prepare(api, owner, campus)).toMatchObject({
+      created: 0,
+      skipped: 1,
+      none: 1,
+      runId: null,
+    });
+
+    const level = await prepare(api, owner, {
+      termId: fixture.secondTermId,
+      scope: 'level',
+      scopeId: rows[0]?.id ?? '',
+    });
+    expect(level).toMatchObject({ created: 1, skipped: 1, none: 0 });
+  });
 });
 
 test.describe('send and cancel', () => {

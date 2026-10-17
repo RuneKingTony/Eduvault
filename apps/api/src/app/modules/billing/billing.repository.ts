@@ -43,6 +43,11 @@ export interface ChargeSummaryOptions {
   sampleSize: number;
 }
 
+export interface RoundCandidateOptions {
+  filter: RoundFilter;
+  today: string;
+}
+
 export type RunHeader = Omit<BillingRun, 'charges' | 'currency'>;
 
 export interface RunPage {
@@ -97,11 +102,11 @@ export abstract class BillingRepository {
     id: string
   ): Promise<LevelRef | undefined>;
 
-  abstract candidates(
+  abstract roundCandidates(
     scope: BillingScope,
     term: TermInfo,
-    today: string
-  ): Promise<RoundCandidate[]>;
+    options: RoundCandidateOptions
+  ): Promise<{ candidates: RoundCandidate[]; skipped: number }>;
 
   abstract chargeSummary(
     scope: BillingScope,

@@ -1,4 +1,3 @@
-import type { CampusScope } from '../../common/campus-scope';
 import {
   chargeLines,
   type ChargeLine,
@@ -8,13 +7,8 @@ import {
 } from '../../common/fees';
 import {
   campusForTerm,
-  isIncluded,
-  outcomeOf,
-  tallyOutcomes,
-  type ChargeOutcome,
   type InclusionFacts,
   type OutcomeCounts,
-  type RoundFilter,
 } from './billing-inclusion';
 
 export interface RoundCandidate extends InclusionFacts {
@@ -24,7 +18,7 @@ export interface RoundCandidate extends InclusionFacts {
   lastName: string;
   admissionNumber: string;
   isNew: boolean;
-  chargedInvoiceId: string | null;
+  classLevelId: string;
 }
 
 export interface PlannedCharge {
@@ -32,6 +26,11 @@ export interface PlannedCharge {
   name: string;
   campusId: string;
   lines: ChargeLine[];
+}
+
+export interface PlannedRound {
+  charges: PlannedCharge[];
+  none: number;
 }
 
 export interface RoundPlan {
@@ -48,19 +47,12 @@ export interface RoundPlanInput {
   discountsAccountId: string;
 }
 
-export const includedCandidates = (
-  candidates: readonly RoundCandidate[],
-  filter: RoundFilter,
-  campusScope: CampusScope
-): RoundCandidate[] =>
-  candidates.filter((candidate) => isIncluded(candidate, filter, campusScope));
-
 const NO_FEE_TYPES: ReadonlySet<string> = new Set();
 
 function planStudent(
   candidate: RoundCandidate,
   input: RoundPlanInput
-): { outcome: ChargeOutcome; charge: PlannedCharge } {
+): PlannedCharge {
   const campusId = campusForTerm(candidate);
   const lines = chargeLines({
     feeLines: input.feeLines,
@@ -77,28 +69,18 @@ function planStudent(
     discountsAccountId: input.discountsAccountId,
   });
   return {
-    outcome: outcomeOf({
-      alreadyCharged: candidate.chargedInvoiceId !== null,
-      lineCount: lines.length,
-    }),
-    charge: {
-      studentId: candidate.studentId,
-      name: `${candidate.firstName} ${candidate.lastName}`,
-      campusId,
-      lines,
-    },
+    studentId: candidate.studentId,
+    name: `${candidate.firstName} ${candidate.lastName}`,
+    campusId,
+    lines,
   };
 }
 
 export function planRound(
   included: readonly RoundCandidate[],
   input: RoundPlanInput
-): RoundPlan {
+): PlannedRound {
   const planned = included.map((candidate) => planStudent(candidate, input));
-  return {
-    charges: planned
-      .filter((entry) => entry.outcome === 'create')
-      .map((entry) => entry.charge),
-    counts: tallyOutcomes(planned.map((entry) => entry.outcome)),
-  };
+  const charges = planned.filter((charge) => charge.lines.length > 0);
+  return { charges, none: planned.length - charges.length };
 }

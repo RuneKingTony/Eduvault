@@ -27,7 +27,7 @@ import {
   type ChargeSummary,
   type TermInfo,
 } from './billing.repository';
-import { includedCandidates, planRound, type RoundPlan } from './round-plan';
+import { planRound, type RoundPlan } from './round-plan';
 
 const NO_SAMPLE = 0;
 
@@ -128,36 +128,33 @@ export class BillingPlanService {
     ctx: OrgContext,
     term: TermInfo,
     filter: RoundFilter
-  ): Promise<RoundPlan & { levelIds: string[] }> {
-    const candidates = await this.billing.candidates(
+  ): Promise<RoundPlan> {
+    const { candidates, skipped } = await this.billing.roundCandidates(
       scopeOf(ctx),
       term,
-      schoolToday(ctx, this.clock)
+      { filter, today: schoolToday(ctx, this.clock) }
     );
-    const included = includedCandidates(candidates, filter, ctx.campusScope);
     const [feeLines, optedIn, discounts, discountsAccountId] =
       await Promise.all([
         this.billing.feeLines(ctx.organizationId, term.id),
         this.billing.optedIn(
           ctx.organizationId,
-          included.map((candidate) => candidate.enrollmentId)
+          candidates.map((candidate) => candidate.enrollmentId)
         ),
         this.billing.discounts(
           ctx.organizationId,
-          included.map((candidate) => candidate.studentId)
+          candidates.map((candidate) => candidate.studentId)
         ),
         this.billing.discountsAccountId(ctx.organizationId),
       ]);
-    return {
-      ...planRound(included, {
-        termId: term.id,
-        term: term.position,
-        feeLines,
-        optedIn,
-        discounts,
-        discountsAccountId,
-      }),
-      levelIds: [...new Set(candidates.map((row) => row.classLevelId))],
-    };
+    const { charges, none } = planRound(candidates, {
+      termId: term.id,
+      term: term.position,
+      feeLines,
+      optedIn,
+      discounts,
+      discountsAccountId,
+    });
+    return { charges, counts: { created: charges.length, skipped, none } };
   }
 }
