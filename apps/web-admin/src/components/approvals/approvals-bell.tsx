@@ -19,7 +19,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@eduvault/ui';
-import { NO_ADJUSTMENT_SEARCH } from '../../adjustments-search';
+import { searchFor } from '../../route-search-defaults';
 import { APPROVAL_KIND_UI, amountOf } from './approval-copy';
 import { useApprovalsSummary } from './use-approvals-summary';
 
@@ -137,7 +137,7 @@ export function ApprovalsBell() {
     }
     void router.navigate({
       to: '/finance/adjustments',
-      search: { ...NO_ADJUSTMENT_SEARCH, tab },
+      search: searchFor('/finance/adjustments', { tab }),
     });
   };
   const openQueue = () => {

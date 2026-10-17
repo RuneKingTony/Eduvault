@@ -2,7 +2,7 @@ import { Link } from '@tanstack/react-router';
 import { InfoIcon, WalletIcon } from 'lucide-react';
 import type { Invoice } from '@eduvault/api-contract';
 import { Button, Tooltip, TooltipContent, TooltipTrigger } from '@eduvault/ui';
-import { NO_STATEMENT_FILTERS } from '../../accounts-search';
+import { searchFor } from '../../route-search-defaults';
 import { KIND_LABELS } from '../billing/billing-text';
 import { StatusBadge } from '../billing/status-badge';
 
@@ -35,7 +35,7 @@ export function InvoiceHeader({ invoice }: { invoice: Invoice }) {
           <Link
             to="/finance/accounts/$studentId"
             params={{ studentId: student.id }}
-            search={NO_STATEMENT_FILTERS}
+            search={searchFor('/finance/accounts/$studentId')}
             className="hover:underline"
           >
             {student.name}
@@ -47,7 +47,7 @@ export function InvoiceHeader({ invoice }: { invoice: Invoice }) {
         <Link
           to="/finance/accounts/$studentId"
           params={{ studentId: student.id }}
-          search={NO_STATEMENT_FILTERS}
+          search={searchFor('/finance/accounts/$studentId')}
         >
           <WalletIcon />
           Student statement
