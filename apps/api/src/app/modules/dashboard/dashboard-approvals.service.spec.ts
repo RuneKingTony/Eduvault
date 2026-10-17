@@ -37,10 +37,16 @@ const setup = (summary: ApprovalSummary) => {
   };
 };
 
-const ctxFor = (approve: boolean) =>
+const GRANTS = {
+  money: ['adjustment:approve'],
+  leave: ['leave:approve'],
+  none: [],
+} as const;
+
+const ctxFor = (grant: keyof typeof GRANTS) =>
   ({
     organizationId: 'school-a',
-    permissions: toPermissionMap(approve ? ['adjustment:approve'] : []),
+    permissions: toPermissionMap([...GRANTS[grant]]),
   }) as unknown as OrgContext;
 
 describe('DashboardApprovalsService.tasks', () => {
@@ -56,7 +62,7 @@ describe('DashboardApprovalsService.tasks', () => {
       ])
     );
 
-    expect(await service.tasks(ctxFor(true))).toEqual([
+    expect(await service.tasks(ctxFor('money'))).toEqual([
       {
         kind: 'approvalsWaiting',
         count: 3,
@@ -71,14 +77,41 @@ describe('DashboardApprovalsService.tasks', () => {
     ]);
   });
 
+  it('gives a leave-only approver the task with the leave items', async () => {
+    const leave: ApprovalItem = {
+      ...item(
+        'Leave',
+        'Ayo Bassey · Sick leave · 12 Oct 2026 – 13 Oct 2026. Malaria'
+      ),
+      kind: 'leave',
+      amountMinor: null,
+      amountText: '2 days',
+    };
+    const { approvals, service } = setup(summaryOf(1, [leave]));
+    expect(await service.tasks(ctxFor('leave'))).toEqual([
+      {
+        kind: 'approvalsWaiting',
+        count: 1,
+        items: [
+          {
+            label: 'Leave',
+            details:
+              'Ayo Bassey · Sick leave · 12 Oct 2026 – 13 Oct 2026. Malaria',
+          },
+        ],
+      },
+    ]);
+    expect(approvals.summary).toHaveBeenCalled();
+  });
+
   it('adds nothing when nothing waits for the viewer', async () => {
     const { service } = setup(summaryOf(0, []));
-    expect(await service.tasks(ctxFor(true))).toEqual([]);
+    expect(await service.tasks(ctxFor('money'))).toEqual([]);
   });
 
   it('asks nothing of the queue for a member who cannot approve', async () => {
     const { approvals, service } = setup(summaryOf(2, []));
-    expect(await service.tasks(ctxFor(false))).toEqual([]);
+    expect(await service.tasks(ctxFor('none'))).toEqual([]);
     expect(approvals.summary).not.toHaveBeenCalled();
   });
 });

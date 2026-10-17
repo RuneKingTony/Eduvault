@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { CheckIcon, XIcon } from 'lucide-react';
 import {
+  ApiError,
   DECLINE_REASON_MESSAGE,
   type ApprovalItem,
 } from '@eduvault/api-contract';
@@ -22,7 +23,13 @@ import {
 } from '@eduvault/ui';
 import { useApi, type Api } from '../../api';
 import { invalidateApprovals } from '../../queries';
-import { APPROVAL_KIND_UI, DECLINED_TOAST, amountOf } from './approval-copy';
+import {
+  ALREADY_DECIDED_TOAST,
+  APPROVAL_KIND_UI,
+  DECLINED_TOAST,
+  amountOf,
+  approvedMessage,
+} from './approval-copy';
 
 function approveRequest(api: Api, item: ApprovalItem): Promise<unknown> {
   return api[APPROVAL_KIND_UI[item.kind].resource].approve({
@@ -41,11 +48,19 @@ function declineRequest(
   });
 }
 
+const isDecidedElsewhere = (error: unknown): boolean =>
+  error instanceof ApiError &&
+  error.status === 409 &&
+  error.body.code === 'AlreadyDecided';
+
 function useDecision(onClose: () => void) {
   const queryClient = useQueryClient();
   return {
-    settled: async () => {
+    settled: async (error: unknown) => {
       await invalidateApprovals(queryClient);
+      if (isDecidedElsewhere(error)) {
+        toast.warning(ALREADY_DECIDED_TOAST);
+      }
     },
     done: async () => {
       await invalidateApprovals(queryClient);
@@ -54,7 +69,7 @@ function useDecision(onClose: () => void) {
   };
 }
 
-function useApprove(item: ApprovalItem | null, onClose: () => void) {
+function useApprove(onClose: () => void) {
   const api = useApi();
   const navigate = useNavigate();
   const decision = useDecision(onClose);
@@ -62,9 +77,9 @@ function useApprove(item: ApprovalItem | null, onClose: () => void) {
     mutationFn: (target: ApprovalItem) => approveRequest(api, target),
     onSuccess: async (_result, target) => {
       await decision.done();
-      const { message, action } = APPROVAL_KIND_UI[target.kind].approvedToast;
+      const { action } = APPROVAL_KIND_UI[target.kind].approvedToast;
       toast.success(
-        message,
+        approvedMessage(target),
         action === null
           ? undefined
           : {
@@ -77,10 +92,8 @@ function useApprove(item: ApprovalItem | null, onClose: () => void) {
             }
       );
     },
-    onError: async () => {
-      if (item !== null) {
-        await decision.settled();
-      }
+    onError: async (error) => {
+      await decision.settled(error);
     },
   });
 }
@@ -113,7 +126,7 @@ interface DialogProps {
 }
 
 export function ApproveDialog({ item, currency, onClose }: DialogProps) {
-  const approve = useApprove(item, onClose);
+  const approve = useApprove(onClose);
   return (
     <Dialog
       open={item !== null}
@@ -172,8 +185,8 @@ function useDecline(onClose: () => void) {
       await decision.done();
       toast.warning(DECLINED_TOAST);
     },
-    onError: async () => {
-      await decision.settled();
+    onError: async (error) => {
+      await decision.settled(error);
     },
   });
 }

@@ -12,6 +12,7 @@ import { expect, type Fixtures, type TestUser } from './support/base-test';
 import { YEAR_2027, createSchoolYear } from './support/factories/calendar';
 import { assignClassTeacher, createClass } from './support/factories/classes';
 import { createAnnouncement } from './support/factories/announcements';
+import { askLeave, approveLeave } from './support/factories/leave';
 import { bankAccount, owes, recordCash } from './support/factories/payments';
 import { createStudent } from './support/factories/students';
 import { createItem, openStock } from './support/factories/store';
@@ -1298,5 +1299,91 @@ test.describe('finance tiles and the roll owed column', () => {
     expect(plain).not.toHaveProperty('currency');
     expect(plain).not.toHaveProperty('owedMinor');
     expect(plain).not.toHaveProperty('formerOwedMinor');
+  });
+});
+
+test.describe('leave on the dashboard', () => {
+  test.beforeEach(({ clock }) => {
+    clock.set('2026-10-12');
+  });
+
+  test('shows a leave approver the leave requests waiting, and nobody else', async ({
+    api,
+    withPermissions,
+    schools: { orgA, lekki, lekkiOnly, noPermission },
+  }) => {
+    const approver = await withPermissions(orgA, ['leave:approve'], {
+      campuses: [lekki],
+    });
+    await askLeave(api, lekkiOnly, { startsOn: '2026-10-22' });
+    await askLeave(api, approver, { startsOn: '2026-10-29' });
+
+    const task = taskOf(await tasksOf(api, approver), 'approvalsWaiting');
+
+    expect(task).toMatchObject({ count: 1 });
+    expect(task?.items[0]?.label).toBe('Leave');
+    expect(task?.items[0]?.details).toContain('Annual leave · 22 Oct 2026');
+    expect(
+      taskOf(await tasksOf(api, lekkiOnly), 'approvalsWaiting')
+    ).toBeUndefined();
+    expect(
+      taskOf(await tasksOf(api, noPermission), 'approvalsWaiting')
+    ).toBeUndefined();
+  });
+
+  test('writes the leave sentences to the people allowed to read them', async ({
+    api,
+    addMember,
+    createUser,
+    withPermissions,
+    schools: { owner, orgA, lekki, ikeja, lekkiOnly },
+  }) => {
+    const emeka = await addMember(
+      orgA,
+      await createUser({ name: 'Emeka Obi' }),
+      {
+        roles: ['teacher'],
+        campuses: [lekki],
+      }
+    );
+    const ikejaApprover = await withPermissions(orgA, ['leave:approve'], {
+      campuses: [ikeja],
+    });
+    const lekkiApprover = await withPermissions(orgA, ['leave:approve'], {
+      campuses: [lekki],
+    });
+    const leave = await askLeave(api, emeka, {
+      type: 'sick',
+      startsOn: '2026-10-12',
+      endsOn: '2026-10-13',
+    });
+    const asked = 'Emeka Obi asked for sick leave: 12 Oct 2026 – 13 Oct 2026.';
+
+    const texts = async (actor: Actor) =>
+      (await activityOf(api, actor)).items.map((item) => item.text);
+    expect(await texts(owner)).toContain(asked);
+    expect(await texts(emeka)).toContain(asked);
+    expect(await texts(lekkiApprover)).toContain(asked);
+    expect(await texts(ikejaApprover)).not.toContain(asked);
+    expect(await texts(lekkiOnly)).not.toContain(asked);
+
+    await approveLeave(api, owner, leave.id);
+    const approved =
+      'Emeka Obi’s sick leave (12 Oct 2026 – 13 Oct 2026) was approved.';
+    expect(await texts(emeka)).toContain(approved);
+    expect(await texts(owner)).toContain(approved);
+    expect(await texts(lekkiOnly)).not.toContain(approved);
+
+    const another = await askLeave(api, emeka, { startsOn: '2026-10-22' });
+    await api(owner)
+      .post(`/leave/${another.id}/decline`)
+      .send({ reason: 'Exams that week' })
+      .expect(200);
+    expect(await texts(emeka)).toContain(
+      'A request was declined: Exams that week'
+    );
+    expect(await texts(ikejaApprover)).not.toContain(
+      'A request was declined: Exams that week'
+    );
   });
 });

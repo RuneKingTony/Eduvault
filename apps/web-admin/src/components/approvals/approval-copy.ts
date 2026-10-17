@@ -1,3 +1,4 @@
+import { CalendarDaysIcon, WalletIcon, type LucideIcon } from 'lucide-react';
 import type { ApprovalItem, ApprovalKind } from '@eduvault/api-contract';
 import { money } from '@eduvault/shared';
 import type { AdjustmentsTab } from '../../adjustments-search';
@@ -10,8 +11,9 @@ interface ApprovedToast {
 }
 
 interface KindUi {
-  resource: 'paymentVoids' | 'adjustments' | 'studentDiscounts';
-  tab: AdjustmentsTab;
+  resource: 'paymentVoids' | 'adjustments' | 'studentDiscounts' | 'leave';
+  tab: AdjustmentsTab | 'leave';
+  icon: LucideIcon;
   approveEffect: string;
   declineEffect: string;
   approvedToast: ApprovedToast;
@@ -26,6 +28,7 @@ export const APPROVAL_KIND_UI: Record<ApprovalKind, KindUi> = {
   payment_void: {
     resource: 'paymentVoids',
     tab: 'voids',
+    icon: WalletIcon,
     approveEffect:
       'The receipt is kept but marked cancelled, and the family owes that money again.',
     declineEffect:
@@ -38,6 +41,7 @@ export const APPROVAL_KIND_UI: Record<ApprovalKind, KindUi> = {
   credit_note: {
     resource: 'adjustments',
     tab: 'corrections',
+    icon: WalletIcon,
     approveEffect:
       'Reduces what the family owes. The original charge is untouched.',
     declineEffect:
@@ -47,6 +51,7 @@ export const APPROVAL_KIND_UI: Record<ApprovalKind, KindUi> = {
   write_off: {
     resource: 'adjustments',
     tab: 'corrections',
+    icon: WalletIcon,
     approveEffect:
       'Cancels what the family still owes, because it will not be paid. The original charge is untouched.',
     declineEffect: 'The balance stays owed and nothing is cancelled.',
@@ -55,6 +60,7 @@ export const APPROVAL_KIND_UI: Record<ApprovalKind, KindUi> = {
   refund: {
     resource: 'adjustments',
     tab: 'corrections',
+    icon: WalletIcon,
     approveEffect:
       'Posts the refund from the money account and reduces the credit held for the student.',
     declineEffect:
@@ -64,13 +70,46 @@ export const APPROVAL_KIND_UI: Record<ApprovalKind, KindUi> = {
   discount: {
     resource: 'studentDiscounts',
     tab: 'discounts',
+    icon: WalletIcon,
     approveEffect:
       'Applies the discount to the student from the next round of charges.',
     declineEffect:
       'The discount is not applied and later charges stay as they are.',
     approvedToast: { message: 'Discount approved.', action: null },
   },
+  leave: {
+    resource: 'leave',
+    tab: 'leave',
+    icon: CalendarDaysIcon,
+    approveEffect:
+      'The staff member is marked on leave for those school days and sees your decision on their Approvals page.',
+    declineEffect: 'Nothing is changed.',
+    approvedToast: { message: 'Leave approved for {name}.', action: null },
+  },
 };
+
+export const approvedMessage = (item: ApprovalItem): string =>
+  APPROVAL_KIND_UI[item.kind].approvedToast.message.replace(
+    '{name}',
+    item.createdBy.name
+  );
+
+export const ALREADY_DECIDED_TOAST =
+  'Someone has already decided this request.';
+
+const OWN_TIP: Partial<Record<ApprovalKind, string>> = {
+  leave: 'You asked for this. Someone else must decide.',
+};
+const OTHER_TIP: Partial<Record<ApprovalKind, string>> = {
+  leave: 'Someone with leave approval decides.',
+};
+const MONEY_OTHER_TIP = 'Needs someone who can approve money changes';
+
+export const ownTip = (kind: ApprovalKind, fallback: string): string =>
+  OWN_TIP[kind] ?? fallback;
+
+export const otherTip = (kind: ApprovalKind): string =>
+  OTHER_TIP[kind] ?? MONEY_OTHER_TIP;
 
 export const DECLINED_TOAST = 'Declined. The request is kept with your reason.';
 

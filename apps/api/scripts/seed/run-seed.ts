@@ -20,6 +20,7 @@ import { seedCalendar } from './calendar';
 import { seedCharges } from './charges';
 import { seedClasses } from './classes';
 import { seedFinance } from './finance';
+import { seedLeave } from './leave';
 import { seedStore } from './store';
 import { seedStudents } from './student-seed';
 import { seedSubjects } from './subjects';
@@ -272,6 +273,7 @@ export async function runSeed(
   });
   await seedCharges(app, { owner: greenfieldOwner, today });
   await seedApprovals(app, { owner: greenfieldOwner, today });
+  await seedLeave(app, { owner: greenfieldOwner, today });
   await addSupportActivity(app, superAdmin, created.organizationIds);
 
   const failures = await runSeedCheck(app, offsetDays);

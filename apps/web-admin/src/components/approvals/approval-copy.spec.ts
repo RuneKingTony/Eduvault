@@ -1,5 +1,13 @@
 import { APPROVAL_KINDS, type ApprovalItem } from '@eduvault/api-contract';
-import { APPROVAL_KIND_UI, DECLINED_TOAST, amountOf } from './approval-copy';
+import {
+  ALREADY_DECIDED_TOAST,
+  APPROVAL_KIND_UI,
+  DECLINED_TOAST,
+  amountOf,
+  approvedMessage,
+  otherTip,
+  ownTip,
+} from './approval-copy';
 
 const item = (over: Partial<ApprovalItem> = {}): ApprovalItem => ({
   kind: 'write_off',
@@ -71,7 +79,46 @@ describe('where each kind is decided and listed', () => {
       ['write_off', 'adjustments', 'corrections'],
       ['refund', 'adjustments', 'corrections'],
       ['discount', 'studentDiscounts', 'discounts'],
+      ['leave', 'leave', 'leave'],
     ]);
+  });
+});
+
+describe('leave copy', () => {
+  it('says what approving leave does, in the PRD words', () => {
+    expect(APPROVAL_KIND_UI.leave.approveEffect).toBe(
+      'The staff member is marked on leave for those school days and sees your decision on their Approvals page.'
+    );
+    expect(APPROVAL_KIND_UI.leave.declineEffect).toBe('Nothing is changed.');
+  });
+
+  it('toasts the approval with the requester’s name', () => {
+    expect(
+      approvedMessage(
+        item({ kind: 'leave', createdBy: { id: 'a', name: 'Ayo Bassey' } })
+      )
+    ).toBe('Leave approved for Ayo Bassey.');
+    expect(approvedMessage(item({ kind: 'discount' }))).toBe(
+      'Discount approved.'
+    );
+  });
+
+  it('words the cells for leave and keeps the money words for the rest', () => {
+    expect(ownTip('leave', 'x')).toBe(
+      'You asked for this. Someone else must decide.'
+    );
+    expect(ownTip('refund', 'fallback')).toBe('fallback');
+    expect(otherTip('leave')).toBe('Someone with leave approval decides.');
+    expect(otherTip('refund')).toBe(
+      'Needs someone who can approve money changes'
+    );
+    expect(ALREADY_DECIDED_TOAST).toBe(
+      'Someone has already decided this request.'
+    );
+  });
+
+  it('uses a calendar for leave and a wallet for money', () => {
+    expect(APPROVAL_KIND_UI.leave.icon).not.toBe(APPROVAL_KIND_UI.refund.icon);
   });
 });
 

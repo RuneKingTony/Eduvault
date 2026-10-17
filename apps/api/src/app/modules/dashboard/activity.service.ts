@@ -16,7 +16,7 @@ export class ActivityService {
   list(ctx: OrgContext, page: number): Promise<ActivityPage> {
     return this.repository.list(
       dashboardScope(ctx, this.clock),
-      activityAccess(ctx.permissions),
+      activityAccess(ctx.permissions, ctx.user.id),
       page
     );
   }

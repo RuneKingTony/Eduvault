@@ -143,7 +143,7 @@ Scopes: a leave request is visible to an approver when the requester shares at l
 
 ## Data
 
-- `staff_leave`: `id`, `organization_id`, `type`, `starts_on`, `ends_on`, `reason`, `cover`, `status` (`submitted`, `approved`, `rejected`, `cancelled`), and the shared approval columns `created_by` (the requester), `created_at`, `approved_by`, `approved_at`, `rejected_by`, `rejected_at`, `rejection_reason` ([D-025](../technical-reference.md#decision-log)), plus `updated_at`. This replaces the overview's [Foundation model](../brainstorming/data-model-overview.md#foundation-model) columns `user_id`, `decided_by` and `decided_at`; the overview should be amended.
+- `staff_leave`: `id`, `organization_id`, `type`, `starts_on`, `ends_on`, `reason`, `cover`, `status` (`submitted`, `approved`, `rejected`, `cancelled`), and the shared approval columns `created_by` (the requester), `created_at`, `approved_by`, `approved_at`, `rejected_by`, `rejected_at`, `rejection_reason` ([D-025](../technical-reference.md#decision-log)), plus `cancelled_at` (set when the requester withdraws) and `updated_at` (set on a withdrawal; a decision is stamped by `approved_at` or `rejected_at`). This replaces the overview's [Foundation model](../brainstorming/data-model-overview.md#foundation-model) columns `user_id`, `decided_by` and `decided_at`; the overview should be amended.
 - Constraints this module adds:
   - `CHECK (ends_on >= starts_on)`.
   - `CHECK (type IN ('annual','sick','personal','study','parental'))`; the doc names the types but not the stored keys.
@@ -151,11 +151,14 @@ Scopes: a leave request is visible to an approver when the requester shares at l
   - `CHECK ((status = 'approved') = (approved_by IS NOT NULL AND approved_at IS NOT NULL))`.
   - `CHECK ((status = 'rejected') = (rejected_by IS NOT NULL AND rejected_at IS NOT NULL AND rejection_reason IS NOT NULL))`.
   - FKs: `created_by`, `approved_by` and `rejected_by` to `user.id` with `ON DELETE RESTRICT`, so a removed member's history keeps their name; `organization_id` to `organization`.
+  - `CHECK ((status = 'cancelled') = (cancelled_at IS NOT NULL))`, `UNIQUE (id, organization_id)`.
+  - `staff_leave_no_overlap`, an exclusion constraint on `(organization_id, created_by, daterange(starts_on, ends_on, '[]'))` for `submitted` and `approved` rows: the backstop for the service's overlap check, mapped to 409 by `ErrorFilter` ([D-299](../technical-reference.md#decision-log)).
+  - The shared `approval_record_immutable()` trigger: a row is never deleted and is frozen once it leaves `submitted`.
   - Index `(organization_id, status)` for the queue and `(organization_id, created_by, starts_on)` for "my leave".
 - The prototype stores a declined request's decider as `rejectedBy` with no date; the build records `rejected_by` and `rejected_at`, and `approved_by` and `approved_at` for approvals.
 - No campus column: scope comes from the requester's `teamMember` rows (LV-3).
 - Reads `school_holiday`, `academic_session` and `term` from M2.1.
-- Migration: one dbmate migration creating `staff_leave`. `leave:approve` joins `libs/policy` in this slice and is added to the Principal starter role ([D-010](../technical-reference.md#decision-log)); the same migration adds it to each existing school's Principal role that the school hasn't edited ([21](21-roles-and-permissions.md), RP-11).
+- Migration: one dbmate migration creating `staff_leave`. `leave:approve` joins `libs/policy` in this slice and is added to the owner and Principal starter roles ([D-010](../technical-reference.md#decision-log)); existing schools get it for an unedited Principal role from the boot-time starter-role sync, not a migration backfill ([D-294](../technical-reference.md#decision-log), [21](21-roles-and-permissions.md), RP-11).
 
 ## API
 
@@ -171,7 +174,7 @@ Scopes: a leave request is visible to an approver when the requester shares at l
 | POST   | `/leave/:id/decline`  | `leave:approve`                   | `{ reason }`                                  | `LeaveDto`                                                                                                                            | 400 empty reason; 403; 404; 409 `SelfApproval` (own), or not `submitted`                       |
 
 - The leave module registers its provider with the M3.5 Approvals queue ([D-036](../technical-reference.md#decision-log)); `GET /approvals` lists leave rows from it with `kind: 'leave'`, `amountText: '{n} days'`, `askedBy`, `canDecide` and `isOwn`. Counts and the bell leave out the viewer's own requests.
-- "Staff member" endpoints use `@OrganizationAuth()` with no permission plus a portal-only check in the service (LV-1).
+- "Staff member" endpoints use `@StaffOnlyAuth(message)`: the organization guard with no permission that refuses a portal-only member with 403 (LV-1, [D-299](../technical-reference.md#decision-log)). A super admin acting in the school is refused on `POST /leave` and the withdraw route.
 - The service pre-checks self-decision; the `23514` → 409 mapping in `ErrorFilter` (from M1.1, [D-013](../technical-reference.md#decision-log)) is the backstop.
 
 ## Acceptance criteria

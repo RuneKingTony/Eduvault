@@ -20,6 +20,12 @@ import {
   declineSchema,
 } from './approvals';
 import {
+  createLeaveSchema,
+  leaveDtoSchema,
+  leaveListQuerySchema,
+  myLeaveSchema,
+} from './leave';
+import {
   calendarCurrentSchema,
   createHolidaySchema,
   createSchoolYearSchema,
@@ -1115,6 +1121,44 @@ export const contract = defineContract({
       method: 'GET',
       path: '/approvals/summary',
       response: approvalSummarySchema,
+    }),
+  },
+  leave: {
+    me: defineRoute({
+      method: 'GET',
+      path: '/me/leave',
+      response: myLeaveSchema,
+    }),
+    create: defineRoute({
+      method: 'POST',
+      path: '/leave',
+      body: createLeaveSchema,
+      response: leaveDtoSchema,
+    }),
+    withdraw: defineRoute({
+      method: 'POST',
+      path: '/leave/:id/withdraw',
+      params: idParamsSchema,
+      response: leaveDtoSchema,
+    }),
+    list: defineRoute({
+      method: 'GET',
+      path: '/leave',
+      query: leaveListQuerySchema,
+      response: z.array(leaveDtoSchema),
+    }),
+    approve: defineRoute({
+      method: 'POST',
+      path: '/leave/:id/approve',
+      params: idParamsSchema,
+      response: leaveDtoSchema,
+    }),
+    decline: defineRoute({
+      method: 'POST',
+      path: '/leave/:id/decline',
+      params: idParamsSchema,
+      body: declineSchema,
+      response: leaveDtoSchema,
     }),
   },
   store: {

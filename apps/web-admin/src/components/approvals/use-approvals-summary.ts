@@ -10,6 +10,7 @@ export function useApprovalsSummary(): ApprovalSummary | undefined {
   const enabled =
     access !== null &&
     (can(access.permissions, 'adjustment', 'approve') ||
+      can(access.permissions, 'leave', 'approve') ||
       access.acting !== null);
   return useQuery({
     ...approvalsSummaryQueryOptions(useApi()),

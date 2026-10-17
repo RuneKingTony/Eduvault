@@ -105,6 +105,13 @@ describe('statements', () => {
     expect(PERM_HELP['adjustment:approve']).toBeDefined();
   });
 
+  it('has leave:approve with help and a label, not sensitive', () => {
+    expect(ALL_PERMISSIONS).toContain('leave:approve');
+    expect(SENSITIVE).not.toContain('leave:approve');
+    expect(permLabel('leave:approve')).toBe('Staff leave: approve');
+    expect(PERM_HELP['leave:approve']).toBeDefined();
+  });
+
   it('has announcement create, read and update, with no delete and none sensitive', () => {
     expect(ALL_PERMISSIONS).toEqual(
       expect.arrayContaining([

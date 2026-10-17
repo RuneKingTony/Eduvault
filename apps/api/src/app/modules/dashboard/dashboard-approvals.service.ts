@@ -11,7 +11,10 @@ export class DashboardApprovalsService {
   constructor(private readonly approvals: ApprovalsService) {}
 
   async tasks(ctx: OrgContext): Promise<DashboardTask[]> {
-    if (!can(ctx.permissions, 'adjustment', 'approve')) {
+    if (
+      !can(ctx.permissions, 'adjustment', 'approve') &&
+      !can(ctx.permissions, 'leave', 'approve')
+    ) {
       return [];
     }
     const { waitingForMe, preview } = await this.approvals.summary(ctx);

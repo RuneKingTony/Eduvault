@@ -16,6 +16,7 @@ import {
   type Fixtures,
 } from './support/base-test';
 import { createSchoolYear } from './support/factories/calendar';
+import { approveLeave, askLeave } from './support/factories/leave';
 import { assignClassTeacher, createClass } from './support/factories/classes';
 import {
   twoSchoolsWithoutStudents,
@@ -213,6 +214,49 @@ test.describe('members', () => {
       const seen = list.items.find((item) => item.userId === both.user.id);
       expect(seen?.campusIds).toEqual([lekki.id]);
       expect(seen?.roles).toEqual(['member']);
+    });
+  });
+
+  test.describe('on leave', () => {
+    test('flags a member on approved leave covering today, on the list and the detail', async ({
+      api,
+      clock,
+      hire,
+      schools: { owner, lekki },
+    }) => {
+      clock.set('2026-10-12');
+      const emeka = await hire(owner, {
+        campusIds: [lekki.id],
+        name: 'Emeka Obi',
+      });
+      const waiting = await hire(owner, {
+        campusIds: [lekki.id],
+        name: 'Waiting Staff',
+      });
+      const leave = await askLeave(api, emeka.user, {
+        type: 'sick',
+        startsOn: '2026-10-12',
+        endsOn: '2026-10-13',
+      });
+      await askLeave(api, waiting.user, { startsOn: '2026-10-12' });
+      await approveLeave(api, owner, leave.id);
+
+      const flag = async (userId: string) =>
+        (await listAll(api, owner)).find((item) => item.userId === userId)
+          ?.onLeave;
+      expect(await flag(emeka.user.id)).toBe(true);
+      expect(await flag(waiting.user.id)).toBe(false);
+      const detail = (
+        await api(owner).get(`/members/${emeka.member.id}`).expect(200)
+      ).body as MemberDetail;
+      expect(detail.onLeave).toBe(true);
+
+      clock.set('2026-10-13');
+      expect(await flag(emeka.user.id)).toBe(true);
+      clock.set('2026-10-14');
+      expect(await flag(emeka.user.id)).toBe(false);
+      clock.set('2026-10-09');
+      expect(await flag(emeka.user.id)).toBe(false);
     });
   });
 

@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import {
   ALREADY_DECIDED_MESSAGE,
+  LEAVE_OVERLAP_MESSAGE,
   SELF_APPROVAL_MESSAGE,
   STORE_PAYMENT_VOID_MESSAGE,
   YEAR_OVERLAP_MESSAGE,
@@ -64,11 +65,15 @@ function describeCheckViolation(exception: unknown) {
   return conflict('The change breaks a rule on this record');
 }
 
+const OVERLAP_MESSAGES: Partial<Record<string, string>> = {
+  academic_session_no_overlap: YEAR_OVERLAP_MESSAGE,
+  staff_leave_no_overlap: LEAVE_OVERLAP_MESSAGE,
+};
+
 const describeExclusionViolation = (exception: unknown) =>
   conflict(
-    pgConstraint(exception) === 'academic_session_no_overlap'
-      ? YEAR_OVERLAP_MESSAGE
-      : 'The change overlaps another record'
+    OVERLAP_MESSAGES[pgConstraint(exception)] ??
+      'The change overlaps another record'
   );
 
 const POSTGRES_VIOLATIONS: Partial<

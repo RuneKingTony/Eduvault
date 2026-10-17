@@ -30,13 +30,43 @@ const campusPredicate = (scope: Scope): RawBuilder<boolean> =>
         OR ${inScope(sql`e.campus_id`, scope)}
       )`;
 
-const rowAccess = (access: ActivityAccess): RawBuilder<boolean> => {
+const leaveRow = (
+  access: ActivityAccess,
+  scope: Scope
+): RawBuilder<boolean> => {
+  const overlap =
+    scope === 'all'
+      ? sql<boolean>`TRUE`
+      : sql<boolean>`EXISTS (
+          SELECT 1 FROM "teamMember" tm
+          WHERE tm."userId" = sl.created_by AND ${inScope(sql`tm."teamId"`, scope)}
+        )`;
+  return sql<boolean>`(
+    e.pillar = 'foundation' AND e.subject_type = 'staff_leave'
+    AND EXISTS (
+      SELECT 1 FROM staff_leave sl
+      WHERE sl.id::text = e.subject_id AND sl.organization_id = e.organization_id
+        AND (
+          sl.created_by = ${access.viewerId}
+          OR (${access.leaveApprover} AND ${overlap})
+        )
+    )
+  )`;
+};
+
+const rowAccess = (
+  access: ActivityAccess,
+  scope: Scope
+): RawBuilder<boolean> => {
   const pillars = sql.join(
     access.pillars
       .filter((pillar) => pillar !== 'foundation')
       .map((pillar) => sql`${pillar}`)
   );
-  const parts = [sql<boolean>`e.pillar IN (${pillars})`];
+  const parts = [
+    sql<boolean>`e.pillar IN (${pillars})`,
+    leaveRow(access, scope),
+  ];
   if (access.foundationSubjects.includes('school_year')) {
     parts.push(
       sql<boolean>`(e.pillar = 'foundation' AND e.subject_type = 'school_year')`
@@ -92,7 +122,7 @@ export class KyselyActivityRepository extends ActivityRepository {
         FROM activity_event e
         WHERE e.organization_id = ${scope.organizationId}
           AND ${campusPredicate(scope.campusScope)}
-          AND ${rowAccess(access)}
+          AND ${rowAccess(access, scope.campusScope)}
       )
       SELECT counted.total, picked.id, picked.occurred_at, picked.pillar, picked.text
       FROM (SELECT count(*)::int AS total FROM allowed) counted

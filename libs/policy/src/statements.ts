@@ -13,6 +13,7 @@ export const statements = {
   payment: ['record', 'read', 'readOwn', 'void'],
   adjustment: ['create', 'read', 'approve'],
   announcement: ['create', 'read', 'update'],
+  leave: ['approve'],
   ledger: ['read', 'manageAccounts'],
   moneyAccount: ['create', 'read', 'update'],
   store: ['read', 'receive', 'issue'],
@@ -117,6 +118,8 @@ export const PERM_HELP: Partial<Record<Permission, string>> = {
     'Sees refunds, corrections, discounts and cancelled payments.',
   'adjustment:approve':
     'Approves or declines money requests from other people, never their own.',
+  'leave:approve':
+    'Approves or declines staff leave requests from other people, never their own.',
   'store:read':
     'Sees the store: items, stock on hand and deliveries, on the campuses they see.',
   'store:receive':
@@ -140,6 +143,7 @@ const RESOURCE_LABELS: Record<Resource, string> = {
   payment: 'Payments',
   adjustment: 'Discounts and refunds',
   announcement: 'Announcements',
+  leave: 'Staff leave',
   ledger: 'Money categories',
   moneyAccount: 'Bank and POS accounts',
   store: 'Store',

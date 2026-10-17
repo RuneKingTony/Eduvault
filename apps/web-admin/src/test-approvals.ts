@@ -59,6 +59,19 @@ export const discountApproval = (
     ...over,
   });
 
+export const leaveApproval = (over: Partial<ApprovalItem> = {}): ApprovalItem =>
+  approvalItem({
+    kind: 'leave',
+    id: id(704),
+    label: 'Leave',
+    details: 'Ayo Bassey · Sick leave · 12 Oct 2026 – 13 Oct 2026. Malaria',
+    amountMinor: null,
+    amountText: '2 days',
+    createdBy: { id: id(802), name: 'Ayo Bassey' },
+    createdAt: '2026-10-14T08:00:00.000Z',
+    ...over,
+  });
+
 export const approvalList = (
   items: ApprovalItem[] = [voidApproval(), approvalItem()],
   over: Partial<ApprovalList> = {}
@@ -66,6 +79,11 @@ export const approvalList = (
   currency: 'NGN',
   items,
   total: items.length,
+  othersCount: 0,
+  pillars: {
+    money: items.filter((item) => item.kind !== 'leave').length,
+    leave: items.filter((item) => item.kind === 'leave').length,
+  },
   ...over,
 });
 

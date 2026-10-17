@@ -330,6 +330,7 @@ test.describe('/me/permissions', () => {
         invoice: ['read'],
         payment: ['read'],
         adjustment: ['read', 'approve'],
+        leave: ['approve'],
         moneyAccount: ['read'],
         store: ['read'],
       },

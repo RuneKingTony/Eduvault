@@ -37,6 +37,7 @@ const member = (roles: string[]): MemberDetail => ({
   title: 'New member',
   roles,
   campusIds: ['c1'],
+  onLeave: false,
   permissions: {},
   campusScope: ['c1'],
   classScope: 'all',

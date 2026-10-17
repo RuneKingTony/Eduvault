@@ -507,6 +507,7 @@ export const memberSummarySchema = z.object({
   title: z.string(),
   roles: z.array(z.string()),
   campusIds: z.array(idSchema),
+  onLeave: z.boolean(),
 });
 export type MemberSummary = z.infer<typeof memberSummarySchema>;
 

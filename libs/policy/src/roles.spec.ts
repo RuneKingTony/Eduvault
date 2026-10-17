@@ -185,6 +185,14 @@ describe('roles', () => {
     }
   });
 
+  it('gives only the principal leave approval', () => {
+    expect(starter('principal').leave).toEqual(['approve']);
+    const others = STARTER_ROLES.filter((role) => role.slug !== 'principal');
+    for (const other of others) {
+      expect(toPermissionMap(other.permissions).leave).toBeUndefined();
+    }
+  });
+
   it('gives the bursar adjustment read and create, the principal read and approve, and nobody else any', () => {
     expect(starter('bursar').adjustment).toEqual(['read', 'create']);
     expect(starter('principal').adjustment).toEqual(['read', 'approve']);
@@ -357,6 +365,7 @@ describe('roles', () => {
       invoice: ['read'],
       payment: ['read'],
       adjustment: ['read', 'approve'],
+      leave: ['approve'],
       moneyAccount: ['read'],
       store: ['read'],
     });

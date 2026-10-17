@@ -569,6 +569,18 @@ describe('CalendarService reads', () => {
     });
   });
 
+  it('lists every holiday date for the school', async () => {
+    const { service, repository } = setup();
+    repository.holidays.push(
+      { id: 'h1', termId: 't1', date: '2026-10-01', name: 'Independence Day' },
+      { id: 'h2', termId: 't1', date: '2026-10-14', name: 'Mid-term' }
+    );
+    await expect(service.holidayDates(ORG)).resolves.toEqual([
+      '2026-10-01',
+      '2026-10-14',
+    ]);
+  });
+
   it('answers 404 for a year that is not there', async () => {
     const { service } = setup();
     await expect(service.get(ctx, 'nope')).rejects.toThrow(NotFoundException);

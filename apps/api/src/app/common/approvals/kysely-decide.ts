@@ -1,13 +1,17 @@
 import { sql, type Kysely, type RawBuilder } from 'kysely';
 import type { DB } from '../../../db/db-types';
 
-type DecidableTable = 'adjustment' | 'payment_void' | 'student_discount';
+type DecidableTable =
+  'adjustment' | 'payment_void' | 'staff_leave' | 'student_discount';
 
 interface DecisionTarget {
   table: DecidableTable;
   organizationId: string;
   id: string;
 }
+
+const touched = (table: DecidableTable): RawBuilder<unknown> =>
+  table === 'staff_leave' ? sql`, updated_at = now()` : sql``;
 
 async function approveWaiting(
   db: Kysely<DB>,
@@ -20,7 +24,7 @@ async function approveWaiting(
       : sql`, journal_entry_id = ${approval.journalEntryId}`;
   const result = await sql`
     UPDATE ${sql.table(target.table)}
-    SET status = 'approved', approved_by = ${approval.userId}, approved_at = ${new Date()}${entry}
+    SET status = 'approved', approved_by = ${approval.userId}, approved_at = ${new Date()}${entry}${touched(target.table)}
     WHERE organization_id = ${target.organizationId} AND id = ${target.id}
       AND status = 'submitted'`.execute(db);
   return (result.numAffectedRows ?? 0n) > 0n;
@@ -34,7 +38,7 @@ async function rejectWaiting(
   const result = await sql`
     UPDATE ${sql.table(target.table)}
     SET status = 'rejected', rejected_by = ${rejection.userId},
-      rejected_at = ${new Date()}, rejection_reason = ${rejection.reason}
+      rejected_at = ${new Date()}, rejection_reason = ${rejection.reason}${touched(target.table)}
     WHERE organization_id = ${target.organizationId} AND id = ${target.id}
       AND status = 'submitted'`.execute(db);
   return (result.numAffectedRows ?? 0n) > 0n;

@@ -59,6 +59,15 @@ describe('ErrorFilter', () => {
         message: 'These dates overlap another school year.',
       },
     });
+    expect(
+      run({ code: '23P01', constraint: 'staff_leave_no_overlap' })
+    ).toEqual({
+      status: 409,
+      body: {
+        code: 'Conflict',
+        message: 'You already asked for leave on some of these days.',
+      },
+    });
     expect(run({ code: '23P01', constraint: 'other_no_overlap' })).toEqual({
       status: 409,
       body: { code: 'Conflict', message: 'The change overlaps another record' },
@@ -84,6 +93,8 @@ describe('ErrorFilter', () => {
       'payment_void_approved_not_self',
       'payment_void_rejected_not_self',
       'student_discount_approved_not_self',
+      'staff_leave_approved_not_self',
+      'staff_leave_rejected_not_self',
     ]) {
       expect(run({ code: '23514', constraint }).body.code).toBe('SelfApproval');
     }
@@ -93,6 +104,7 @@ describe('ErrorFilter', () => {
     for (const constraint of [
       'adjustment_decided_frozen',
       'payment_void_decided_frozen',
+      'staff_leave_decided_frozen',
     ]) {
       expect(run({ code: '23514', constraint })).toEqual({
         status: 409,

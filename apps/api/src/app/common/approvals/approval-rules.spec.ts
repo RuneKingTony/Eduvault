@@ -1,4 +1,4 @@
-import { APPROVAL_KINDS } from '@eduvault/api-contract';
+import { APPROVAL_KINDS, isMoneyApproval } from '@eduvault/api-contract';
 import { approvalRulesOf, isApprovalOn, isRuleOn } from './approval-rules';
 
 const row = {
@@ -24,7 +24,9 @@ describe('approvalRulesOf', () => {
 describe('isRuleOn', () => {
   it('reads the switch of each kind', () => {
     const rules = approvalRulesOf(row);
-    const on = APPROVAL_KINDS.filter((kind) => isRuleOn(rules, kind));
+    const on = APPROVAL_KINDS.filter(isMoneyApproval).filter((kind) =>
+      isRuleOn(rules, kind)
+    );
     expect(on).toEqual(['payment_void', 'credit_note', 'refund']);
   });
 });

@@ -7,11 +7,15 @@ import {
   approvalItem,
   approvalList,
   discountApproval,
+  leaveApproval,
   voidApproval,
 } from '../test-approvals';
+import { leaveDto, myLeave } from '../test-leave';
 import { APPROVAL_KIND_UI } from '../components/approvals/approval-copy';
 import { renderPayments } from '../test-payments';
-import { actingAccess, starterAccess } from '../test-utils';
+import { actingAccess, fakeAccess, starterAccess } from '../test-utils';
+import { toPermissionMap, type Permission } from '@eduvault/policy';
+import type { ApprovalsSearch } from '../approvals-search';
 import { ApprovalsPage } from './approvals-page';
 
 vi.mock('@eduvault/ui', async (importOriginal) => ({
@@ -25,6 +29,9 @@ function setup(
     listFor?: (page: number) => ReturnType<typeof approvalList>;
     access?: ReturnType<typeof starterAccess>;
     approveFails?: Error;
+    mine?: ReturnType<typeof myLeave>;
+    search?: ApprovalsSearch;
+    onSearch?: (next: ApprovalsSearch) => void;
   } = {}
 ) {
   const done = { id: 'x', status: 'approved' };
@@ -56,11 +63,25 @@ function setup(
       approve: vi.fn().mockResolvedValue(done),
       decline: vi.fn().mockResolvedValue(done),
     },
+    leave: {
+      me: vi.fn().mockResolvedValue(options.mine ?? myLeave()),
+      approve: vi.fn().mockResolvedValue(done),
+      decline: vi.fn().mockResolvedValue(done),
+      withdraw: vi.fn().mockResolvedValue(done),
+      create: vi.fn().mockResolvedValue(leaveDto()),
+    },
   };
-  renderPayments(<ApprovalsPage />, api, {
-    access: options.access ?? starterAccess('principal'),
-    path: '/approvals',
-  });
+  renderPayments(
+    <ApprovalsPage
+      search={options.search ?? {}}
+      onSearchChange={options.onSearch ?? vi.fn()}
+    />,
+    api,
+    {
+      access: options.access ?? starterAccess('principal'),
+      path: '/approvals',
+    }
+  );
   return api;
 }
 
@@ -69,10 +90,15 @@ describe('ApprovalsPage', () => {
     vi.clearAllMocks();
   });
 
-  it('shows a member who cannot approve the empty state and asks nothing', async () => {
+  it('shows a member who cannot approve the leave-only page and asks nothing of the queue', async () => {
     const api = setup({ access: starterAccess('bursar') });
-    expect(await screen.findByText('Nothing to approve')).toBeVisible();
+    expect(
+      await screen.findByText('Ask for leave and see what the school decides.')
+    ).toBeVisible();
+    expect(await screen.findByText('My requests')).toBeVisible();
+    expect(screen.getByText('School holidays')).toBeVisible();
     expect(api.approvals.list).not.toHaveBeenCalled();
+    expect(api.leave.me).toHaveBeenCalled();
   });
 
   it('lists each waiting request with its kind, details, amount, who asked and both actions', async () => {
@@ -261,6 +287,230 @@ describe('ApprovalsPage', () => {
       expect(toast.warning).toHaveBeenCalledWith(
         'Declined. The request is kept with your reason.'
       );
+    });
+  });
+});
+
+const accessWith = (...permissions: Permission[]) =>
+  fakeAccess({
+    roles: [],
+    permissions: toPermissionMap(permissions),
+    campusScope: 'all',
+  });
+
+describe('ApprovalsPage by permission', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('gives a leave-only approver the queue and My leave, not the leave-only page', async () => {
+    const api = setup({
+      access: accessWith('leave:approve'),
+      list: approvalList([leaveApproval()]),
+    });
+    expect(
+      await screen.findByText(
+        'Requests waiting for you to approve: money corrections and staff leave.'
+      )
+    ).toBeVisible();
+    expect(await screen.findByText('Leave')).toBeVisible();
+    expect(await screen.findByText('My leave')).toBeVisible();
+    expect(
+      screen.queryByText('Ask for leave and see what the school decides.')
+    ).toBeNull();
+    expect(api.approvals.list).toHaveBeenCalled();
+  });
+
+  it('gives a money-only approver the queue too', async () => {
+    setup({ access: accessWith('adjustment:approve') });
+    expect(await screen.findByText('Cancel a payment')).toBeVisible();
+    expect(await screen.findByText('My leave')).toBeVisible();
+  });
+
+  it('shows someone holding neither the leave-only body', async () => {
+    setup({ access: accessWith('student:read') });
+    expect(
+      await screen.findByText('Ask for leave and see what the school decides.')
+    ).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Request leave' })).toBeVisible();
+  });
+
+  it('hides My leave and Request leave from a super admin acting', async () => {
+    setup({
+      access: actingAccess(false),
+      list: approvalList([leaveApproval()]),
+    });
+    expect(await screen.findByText('2 days')).toBeVisible();
+    expect(screen.queryByText('My leave')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Request leave' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Approve/ })).toBeNull();
+  });
+});
+
+describe('ApprovalsPage leave rows', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('shows a leave row with its details and days', async () => {
+    setup({ list: approvalList([leaveApproval()]) });
+    const row = (await screen.findByText('2 days')).closest('tr');
+    const cells = within(row as HTMLElement);
+    expect(
+      cells.getByText(
+        'Ayo Bassey · Sick leave · 12 Oct 2026 – 13 Oct 2026. Malaria'
+      )
+    ).toBeVisible();
+    expect(cells.getByText('Leave')).toBeVisible();
+    expect(cells.getByRole('button', { name: /^Approve/ })).toBeVisible();
+  });
+
+  it('marks someone else’s row and the viewer’s own, with no buttons on either', async () => {
+    setup({
+      list: approvalList([
+        leaveApproval({ decide: 'other' }),
+        leaveApproval({ id: 'mine', decide: 'own' }),
+      ]),
+    });
+    expect(await screen.findByText('Someone else')).toBeVisible();
+    expect(screen.getByText('Your own')).toBeVisible();
+    expect(screen.queryByRole('button', { name: /^Approve/ })).toBeNull();
+    fireEvent.focus(screen.getByText('Someone else'));
+    expect(
+      (await screen.findAllByText('Someone with leave approval decides.'))[0]
+    ).toBeVisible();
+  });
+
+  it('shows the tabs with counts only when both pillars have rows and filters by tab', async () => {
+    const onSearch = vi.fn();
+    const both = approvalList([voidApproval(), leaveApproval()]);
+    const api = setup({ list: both, onSearch });
+
+    expect(await screen.findByRole('tab', { name: /All/ })).toBeVisible();
+    expect(screen.getByRole('tab', { name: /Money/ })).toHaveTextContent('1');
+    expect(screen.getByRole('tab', { name: /Leave/ })).toHaveTextContent('1');
+    fireEvent.mouseDown(screen.getByRole('tab', { name: /Leave/ }));
+    fireEvent.click(screen.getByRole('tab', { name: /Leave/ }));
+    await waitFor(() => {
+      expect(onSearch).toHaveBeenCalledWith({ tab: 'leave' });
+    });
+    expect(api.approvals.list).toHaveBeenCalledWith({
+      query: { page: 1, includeOthers: false },
+    });
+  });
+
+  it('asks for the leave pillar when the Leave tab is chosen', async () => {
+    const api = setup({
+      list: approvalList([leaveApproval()], {
+        pillars: { money: 1, leave: 1 },
+      }),
+      search: { tab: 'leave' },
+    });
+    expect(await screen.findByText('2 days')).toBeVisible();
+    expect(api.approvals.list).toHaveBeenCalledWith({
+      query: { page: 1, includeOthers: false, pillar: 'leave' },
+    });
+  });
+
+  it('has no tabs with a single pillar', async () => {
+    setup({ list: approvalList([leaveApproval()]) });
+    await screen.findByText('2 days');
+    expect(screen.queryByRole('tab')).toBeNull();
+  });
+
+  it('offers “Include {n} that others approve” and asks for them when it is on', async () => {
+    const api = setup({
+      list: approvalList([voidApproval()], { othersCount: 1 }),
+    });
+    const toggle = await screen.findByRole('switch', {
+      name: 'Include 1 that others approve',
+    });
+    fireEvent.click(toggle);
+    await waitFor(() => {
+      expect(api.approvals.list).toHaveBeenCalledWith({
+        query: { page: 1, includeOthers: true },
+      });
+    });
+  });
+
+  it('leaves the switch out when nothing is held back', async () => {
+    setup({ list: approvalList([voidApproval()]) });
+    await screen.findByText('Cancel a payment');
+    expect(screen.queryByRole('switch')).toBeNull();
+  });
+
+  it('approves leave after saying what it does, then toasts the requester', async () => {
+    const api = setup({ list: approvalList([leaveApproval()]) });
+    fireEvent.click(await screen.findByRole('button', { name: /^Approve/ }));
+    const dialog = await screen.findByRole('dialog');
+    expect(
+      within(dialog).getByText('Leave · asked by Ayo Bassey')
+    ).toBeVisible();
+    expect(
+      within(dialog).getByText(
+        'The staff member is marked on leave for those school days and sees your decision on their Approvals page.'
+      )
+    ).toBeVisible();
+    expect(within(dialog).getByText('2 days')).toBeVisible();
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Approve' }));
+
+    await waitFor(() => {
+      expect(api.leave.approve).toHaveBeenCalledWith({
+        params: { id: leaveApproval().id },
+      });
+    });
+    await waitFor(() => {
+      expect(toast.success).toHaveBeenCalledWith(
+        'Leave approved for Ayo Bassey.',
+        undefined
+      );
+    });
+  });
+
+  it('declines leave with a reason', async () => {
+    const api = setup({ list: approvalList([leaveApproval()]) });
+    fireEvent.click(await screen.findByRole('button', { name: /^Decline/ }));
+    const dialog = await screen.findByRole('dialog');
+    expect(
+      within(dialog).getByText(
+        'The request stays on record with your reason. Nothing is changed.'
+      )
+    ).toBeVisible();
+    fireEvent.change(within(dialog).getByLabelText('Reason'), {
+      target: { value: 'Exams that week' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Decline' }));
+
+    await waitFor(() => {
+      expect(api.leave.decline).toHaveBeenCalledWith({
+        params: { id: leaveApproval().id },
+        body: { reason: 'Exams that week' },
+      });
+    });
+  });
+
+  it('toasts that someone has already decided, and refreshes, on a 409', async () => {
+    const api = setup({ list: approvalList([leaveApproval()]) });
+    api.leave.approve.mockRejectedValue(
+      new ApiError(409, {
+        code: 'AlreadyDecided',
+        message: 'This has already been decided.',
+      })
+    );
+    fireEvent.click(await screen.findByRole('button', { name: /^Approve/ }));
+    fireEvent.click(
+      within(await screen.findByRole('dialog')).getByRole('button', {
+        name: 'Approve',
+      })
+    );
+    await waitFor(() => {
+      expect(toast.warning).toHaveBeenCalledWith(
+        'Someone has already decided this request.'
+      );
+    });
+    await waitFor(() => {
+      expect(api.approvals.list.mock.calls.length).toBeGreaterThan(1);
     });
   });
 });

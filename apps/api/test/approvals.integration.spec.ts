@@ -13,6 +13,7 @@ import {
   approveVoid,
 } from './support/factories/approvals';
 import { chargeFixture } from './support/factories/billing';
+import { askLeave } from './support/factories/leave';
 import { bankAccount, owes, recordCash } from './support/factories/payments';
 import { schoolsTest as test } from './support/two-schools';
 
@@ -384,5 +385,187 @@ test.describe('accounts for recording', () => {
     schools: { lekkiOnly },
   }) => {
     await api(lekkiOnly).get('/finance/payments/recording-options').expect(200);
+  });
+});
+
+const queueWith = async (
+  api: Parameters<typeof askVoid>[0],
+  actor: Parameters<typeof askVoid>[1],
+  includeOthers: boolean
+): Promise<ApprovalList> =>
+  (
+    await api(actor)
+      .get(`/approvals?includeOthers=${String(includeOthers)}`)
+      .expect(200)
+  ).body as ApprovalList;
+
+test.describe('leave in the queue', () => {
+  const TODAY = '2026-10-12';
+
+  test.beforeEach(({ clock }) => {
+    clock.set(TODAY);
+  });
+
+  test('lists a leave row with its details and days, and leaves the viewer’s own out of the count', async ({
+    api,
+    addMember,
+    createUser,
+    schools: { owner, orgA, lekki },
+  }) => {
+    const emeka = await addMember(
+      orgA,
+      await createUser({ name: 'Emeka Obi' }),
+      {
+        roles: ['teacher'],
+        campuses: [lekki],
+      }
+    );
+    await askLeave(api, emeka, {
+      type: 'sick',
+      startsOn: '2026-10-12',
+      endsOn: '2026-10-13',
+      reason: 'Malaria',
+    });
+    await askLeave(api, owner, { startsOn: '2026-10-22' });
+
+    const list = await queue(api, owner);
+    const theirs = list.items.find(
+      (item) => item.createdBy.name === 'Emeka Obi'
+    );
+    const own = list.items.find((item) => item.decide === 'own');
+
+    expect(theirs).toMatchObject({
+      kind: 'leave',
+      label: 'Leave',
+      details: 'Emeka Obi · Sick leave · 12 Oct 2026 – 13 Oct 2026. Malaria',
+      amountMinor: null,
+      amountText: '2 days',
+      decide: 'yes',
+    });
+    expect(own?.kind).toBe('leave');
+    expect(list).toMatchObject({ total: 2, othersCount: 0 });
+    expect(await summary(api, owner)).toMatchObject({
+      waitingForMe: 1,
+      byNav: { approvals: 1, payments: 0 },
+    });
+  });
+
+  test('counts the pillars and filters the queue to one of them', async ({
+    api,
+    app,
+    schools: { owner, lekkiOnly, studentLekki },
+  }) => {
+    await owes(app, owner, { studentId: studentLekki.id, amountMinor: OWED });
+    await askAdjustment(api, lekkiOnly, {
+      kind: 'write_off',
+      studentId: studentLekki.id,
+      amountMinor: 100_000,
+      reason: 'Left the school',
+    });
+    const leave = await askLeave(api, lekkiOnly, { startsOn: '2026-10-22' });
+
+    const all = await queue(api, owner);
+    const onlyLeave = (
+      await api(owner).get('/approvals?pillar=leave').expect(200)
+    ).body as ApprovalList;
+
+    expect(all).toMatchObject({ total: 2, pillars: { money: 1, leave: 1 } });
+    expect(onlyLeave.items.map((item) => item.id)).toEqual([leave.id]);
+    expect(onlyLeave.pillars).toEqual({ money: 1, leave: 1 });
+  });
+
+  test('shows a money approver the leave rows only behind the switch, as someone else’s to decide', async ({
+    api,
+    withPermissions,
+    schools: { orgA, lekki, lekkiOnly },
+  }) => {
+    const boss = await withPermissions(orgA, ['adjustment:approve'], {
+      campuses: [lekki],
+    });
+    const leave = await askLeave(api, lekkiOnly, { startsOn: '2026-10-22' });
+
+    const hidden = await queueWith(api, boss, false);
+    const shown = await queueWith(api, boss, true);
+
+    expect(hidden).toMatchObject({ items: [], total: 0, othersCount: 1 });
+    expect(shown.items).toHaveLength(1);
+    expect(shown.items[0]).toMatchObject({ id: leave.id, decide: 'other' });
+    expect(await summary(api, boss)).toMatchObject({ waitingForMe: 0 });
+    await api(boss).post(`/leave/${leave.id}/approve`).expect(403);
+  });
+
+  test('gives a leave-only approver money rows only with adjustment:read', async ({
+    api,
+    app,
+    withPermissions,
+    schools: { owner, orgA, lekki, lekkiOnly, studentLekki },
+  }) => {
+    await owes(app, owner, { studentId: studentLekki.id, amountMinor: OWED });
+    await askAdjustment(api, lekkiOnly, {
+      kind: 'write_off',
+      studentId: studentLekki.id,
+      amountMinor: 100_000,
+      reason: 'Left the school',
+    });
+    const leave = await askLeave(api, lekkiOnly, { startsOn: '2026-10-22' });
+    const leaveOnly = await withPermissions(orgA, ['leave:approve'], {
+      campuses: [lekki],
+    });
+    const reader = await withPermissions(
+      orgA,
+      ['leave:approve', 'adjustment:read'],
+      { campuses: [lekki] }
+    );
+
+    const blind = await queueWith(api, leaveOnly, true);
+    const sighted = await queueWith(api, reader, true);
+
+    expect(blind.items.map((item) => item.id)).toEqual([leave.id]);
+    expect(blind.othersCount).toBe(0);
+    expect(sighted.items.map((item) => item.decide)).toEqual(['other', 'yes']);
+    expect(sighted.othersCount).toBe(1);
+    expect(await summary(api, reader)).toMatchObject({
+      waitingForMe: 1,
+      byNav: { approvals: 1, payments: 0 },
+    });
+  });
+
+  test('shows a bursar with neither approve permission nothing, leave included', async ({
+    api,
+    schools: { lekkiOnly, noPermission },
+  }) => {
+    await askLeave(api, noPermission, { startsOn: '2026-10-22' });
+
+    expect(await queueWith(api, lekkiOnly, true)).toMatchObject({
+      items: [],
+      total: 0,
+      othersCount: 0,
+    });
+  });
+
+  test('drops a leave row once it is decided or withdrawn', async ({
+    api,
+    schools: { owner, lekkiOnly, noPermission },
+  }) => {
+    const decided = await askLeave(api, lekkiOnly, { startsOn: '2026-10-22' });
+    const withdrawn = await askLeave(api, noPermission, {
+      startsOn: '2026-10-22',
+    });
+    await api(owner).post(`/leave/${decided.id}/approve`).expect(200);
+    await api(noPermission).post(`/leave/${withdrawn.id}/withdraw`).expect(200);
+
+    expect((await queue(api, owner)).total).toBe(0);
+  });
+
+  test('keeps a leave request out of another school’s queue', async ({
+    api,
+    schools: { ownerB, lekkiOnly },
+  }) => {
+    await askLeave(api, lekkiOnly, { startsOn: '2026-10-22' });
+
+    expect(await queueWith(api, ownerB, true)).toMatchObject({
+      items: [],
+      othersCount: 0,
+    });
   });
 });

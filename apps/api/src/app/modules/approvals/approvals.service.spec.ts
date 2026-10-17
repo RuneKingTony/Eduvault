@@ -1,5 +1,5 @@
 import { APPROVAL_PAGE_SIZE } from '@eduvault/api-contract';
-import { toPermissionMap } from '@eduvault/policy';
+import { toPermissionMap, type Permission } from '@eduvault/policy';
 import {
   ApprovalRegistry,
   type ApprovalProvider,
@@ -28,17 +28,24 @@ const provider = (...items: WaitingApproval[]): ApprovalProvider => ({
 
 const org = (
   userId: string,
-  options: { approve?: boolean; acting?: boolean } = {}
+  options: {
+    approve?: boolean;
+    acting?: boolean;
+    permissions?: Permission[];
+  } = {}
 ) =>
   ({
     organizationId: 'school-a',
     user: { id: userId },
     campusScope: 'all',
     permissions: toPermissionMap(
-      options.approve === false ? ['payment:read'] : ['adjustment:approve']
+      options.permissions ??
+        (options.approve === false ? ['payment:read'] : ['adjustment:approve'])
     ),
     acting: options.acting === true ? { writes: false } : null,
   }) as unknown as OrgContext;
+
+const page1 = { page: 1, includeOthers: false };
 
 class FakeApprovals extends ApprovalsRepository {
   currency() {
@@ -79,7 +86,7 @@ describe('ApprovalsService.list', () => {
       provider(voidItem)
     );
 
-    const list = await service.list(org('grace'), { page: 1 });
+    const list = await service.list(org('grace'), page1);
 
     expect(list.items.map((item) => item.id)).toEqual([
       'void-1',
@@ -92,9 +99,8 @@ describe('ApprovalsService.list', () => {
 
   it('maps the kind label, details, amount text and creator for each item', async () => {
     const service = serviceOver(provider(voidItem, discountItem));
-    const [first, second] = (await service.list(org('grace'), { page: 1 }))
-      .items;
-    expect(first).toMatchObject({
+    const [one, second] = (await service.list(org('grace'), page1)).items;
+    expect(one).toMatchObject({
       kind: 'payment_void',
       label: 'Cancel a payment',
       details: 'RCT-2026-00098 from Mrs Danjuma: Wrong child',
@@ -112,7 +118,7 @@ describe('ApprovalsService.list', () => {
 
   it('marks the viewer’s own request as own and still lists it', async () => {
     const service = serviceOver(provider(balanceItem, voidItem));
-    const list = await service.list(org('chika'), { page: 1 });
+    const list = await service.list(org('chika'), page1);
     expect(list.items.map((item) => item.decide)).toEqual(['own', 'own']);
   });
 
@@ -125,9 +131,7 @@ describe('ApprovalsService.list', () => {
       )
     );
     expect(
-      (await service.list(org('grace'), { page: 1 })).items.map(
-        (item) => item.id
-      )
+      (await service.list(org('grace'), page1)).items.map((item) => item.id)
     ).toEqual(['a', 'b']);
   });
 
@@ -139,29 +143,163 @@ describe('ApprovalsService.list', () => {
       })
     );
     const service = serviceOver(provider(...many));
-    const first = await service.list(org('grace'), { page: 1 });
-    const second = await service.list(org('grace'), { page: 2 });
-    expect(first.items).toHaveLength(APPROVAL_PAGE_SIZE);
+    const onFirst = await service.list(org('grace'), page1);
+    const second = await service.list(org('grace'), { ...page1, page: 2 });
+    expect(onFirst.items).toHaveLength(APPROVAL_PAGE_SIZE);
     expect(second.items.map((item) => item.id)).toEqual(['adj-10', 'adj-11']);
     expect(second.total).toBe(12);
   });
 
   it('shows nothing to a member who cannot approve', async () => {
     const service = serviceOver(provider(voidItem));
-    expect(
-      await service.list(org('yemi', { approve: false }), { page: 1 })
-    ).toEqual({ currency: 'NGN', items: [], total: 0 });
+    expect(await service.list(org('yemi', { approve: false }), page1)).toEqual({
+      currency: 'NGN',
+      items: [],
+      total: 0,
+      othersCount: 0,
+      pillars: { money: 0, leave: 0 },
+    });
   });
 
   it('shows the queue to a super admin acting in the school', async () => {
     const service = serviceOver(provider(voidItem));
     const list = await service.list(
       org('root', { approve: false, acting: true }),
-      {
-        page: 1,
-      }
+      page1
     );
     expect(list.items).toHaveLength(1);
+  });
+});
+
+const leaveItem = waiting({
+  kind: 'leave',
+  id: 'leave-1',
+  details: 'Ayo Bassey · Sick leave · 12 Oct 2026 – 13 Oct 2026. Malaria',
+  amountMinor: null,
+  amountText: '2 days',
+  createdById: 'ayo',
+  createdByName: 'Ayo Bassey',
+  createdAt: '2026-10-16T09:00:00.000Z',
+});
+const leaveOnly: Permission[] = ['leave:approve'];
+
+describe('ApprovalsService leave rows', () => {
+  it('lists leave to a leave approver as theirs to decide, and a money row only behind others with read access', async () => {
+    const service = serviceOver(provider(leaveItem, voidItem));
+    const grace = org('grace', { permissions: leaveOnly });
+    const list = await service.list(grace, page1);
+    expect(list.items.map((item) => [item.id, item.decide])).toEqual([
+      ['leave-1', 'yes'],
+    ]);
+    expect(list.othersCount).toBe(0);
+
+    const reader = org('grace', {
+      permissions: ['leave:approve', 'adjustment:read'],
+    });
+    expect((await service.list(reader, page1)).othersCount).toBe(1);
+    const withOthers = await service.list(reader, {
+      ...page1,
+      includeOthers: true,
+    });
+    expect(withOthers.items.map((item) => [item.id, item.decide])).toEqual([
+      ['void-1', 'other'],
+      ['leave-1', 'yes'],
+    ]);
+    expect(withOthers.total).toBe(2);
+  });
+
+  it('gives a money approver the leave rows as someone else’s to decide, behind the switch', async () => {
+    const service = serviceOver(provider(leaveItem, voidItem));
+    const bursarBoss = org('boss');
+    const hidden = await service.list(bursarBoss, page1);
+    expect(hidden.items.map((item) => item.id)).toEqual(['void-1']);
+    expect(hidden).toMatchObject({ total: 1, othersCount: 1 });
+    const shown = await service.list(bursarBoss, {
+      ...page1,
+      includeOthers: true,
+    });
+    expect(shown.items.map((item) => [item.id, item.decide])).toEqual([
+      ['void-1', 'yes'],
+      ['leave-1', 'other'],
+    ]);
+  });
+
+  it('counts each pillar and filters the table to one', async () => {
+    const service = serviceOver(provider(leaveItem, voidItem, balanceItem));
+    const both = org('grace', {
+      permissions: ['adjustment:approve', 'leave:approve'],
+    });
+
+    const all = await service.list(both, page1);
+    const leave = await service.list(both, { ...page1, pillar: 'leave' });
+    const money = await service.list(both, { ...page1, pillar: 'money' });
+
+    expect(all).toMatchObject({ total: 3, pillars: { money: 2, leave: 1 } });
+    expect(leave.items.map((item) => item.id)).toEqual(['leave-1']);
+    expect(leave).toMatchObject({ total: 1, pillars: { money: 2, leave: 1 } });
+    expect(money.items.map((item) => item.id)).toEqual(['void-1', 'adj-1']);
+    expect(money.total).toBe(2);
+  });
+
+  it('counts the others’ rows in the pillars only once the switch adds them', async () => {
+    const service = serviceOver(provider(leaveItem, voidItem));
+    const boss = org('boss');
+    expect((await service.list(boss, page1)).pillars).toEqual({
+      money: 1,
+      leave: 0,
+    });
+    expect(
+      (await service.list(boss, { ...page1, includeOthers: true })).pillars
+    ).toEqual({ money: 1, leave: 1 });
+  });
+
+  it('marks the requester’s own leave as own', async () => {
+    const service = serviceOver(provider(leaveItem));
+    const ayo = org('ayo', { permissions: leaveOnly });
+    expect((await service.list(ayo, page1)).items[0]?.decide).toBe('own');
+  });
+
+  it('lets a super admin acting in the school decide everything', async () => {
+    const service = serviceOver(provider(leaveItem, voidItem));
+    const list = await service.list(
+      org('root', { approve: false, acting: true }),
+      page1
+    );
+    expect(list.items.map((item) => item.decide)).toEqual(['yes', 'yes']);
+  });
+
+  it('shows nothing to someone holding neither approve permission', async () => {
+    const service = serviceOver(provider(leaveItem, voidItem));
+    expect(
+      await service.list(org('yemi', { approve: false }), {
+        ...page1,
+        includeOthers: true,
+      })
+    ).toMatchObject({ items: [], total: 0, othersCount: 0 });
+  });
+
+  it('counts leave in the summary only for a leave approver and leaves it out of the payments count', async () => {
+    const service = serviceOver(provider(leaveItem, voidItem, balanceItem));
+    const both = org('grace', {
+      permissions: ['adjustment:approve', 'leave:approve'],
+    });
+    expect(await service.summary(both)).toMatchObject({
+      waitingForMe: 3,
+      byNav: { approvals: 3, payments: 2 },
+    });
+    const money = await service.summary(org('boss'));
+    expect(money).toMatchObject({
+      waitingForMe: 2,
+      byNav: { approvals: 2, payments: 2 },
+    });
+    expect(money.preview.map((item) => item.id)).not.toContain('leave-1');
+    const leave = await service.summary(
+      org('grace', { permissions: leaveOnly })
+    );
+    expect(leave).toMatchObject({
+      waitingForMe: 1,
+      byNav: { approvals: 1, payments: 0 },
+    });
   });
 });
 

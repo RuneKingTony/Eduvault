@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useRouter } from '@tanstack/react-router';
-import { ArrowRightIcon, BellIcon, CheckIcon, WalletIcon } from 'lucide-react';
+import { ArrowRightIcon, BellIcon, CheckIcon } from 'lucide-react';
 import type { ApprovalItem, ApprovalSummary } from '@eduvault/api-contract';
 import {
   Badge,
@@ -32,6 +32,7 @@ function WaitingItem({
   currency: string;
   onOpen: (item: ApprovalItem) => void;
 }) {
+  const Icon = APPROVAL_KIND_UI[item.kind].icon;
   return (
     <li>
       <button
@@ -41,7 +42,7 @@ function WaitingItem({
           onOpen(item);
         }}
       >
-        <WalletIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+        <Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="font-medium">{item.label}</span>
           <span className="text-xs text-muted-foreground">{item.details}</span>
@@ -129,9 +130,14 @@ export function ApprovalsBell() {
   const count = summary?.waitingForMe ?? 0;
   const openItem = (item: ApprovalItem) => {
     setOpen(false);
+    const { tab } = APPROVAL_KIND_UI[item.kind];
+    if (tab === 'leave') {
+      void router.navigate({ to: '/approvals', search: { tab } });
+      return;
+    }
     void router.navigate({
       to: '/finance/adjustments',
-      search: { ...NO_ADJUSTMENT_SEARCH, tab: APPROVAL_KIND_UI[item.kind].tab },
+      search: { ...NO_ADJUSTMENT_SEARCH, tab },
     });
   };
   const openQueue = () => {

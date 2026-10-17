@@ -47,7 +47,15 @@ export const CAP_AREAS: readonly CapArea[] = [
     see: ['member:read'],
     change: ['member:create', 'member:update', 'member:delete'],
     changeDesc: 'Add and remove staff, and give them roles',
-    extras: [],
+    extras: [
+      {
+        label: 'Approves staff leave',
+        description:
+          'Approves or declines leave requests from other people, never their own.',
+        permissions: ['leave:approve'],
+        important: true,
+      },
+    ],
   },
   {
     id: 'roles',

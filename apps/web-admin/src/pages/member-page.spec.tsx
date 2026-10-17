@@ -1,4 +1,4 @@
-import { fireEvent, screen } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import {
   ApiError,
   type MePermissions,
@@ -12,6 +12,7 @@ import {
   starterAccess,
 } from '../test-utils';
 import { CATALOGUE, IKEJA, LEKKI, detail } from '../test-members';
+import { approvedLeave, leaveDto } from '../test-leave';
 import { MemberPage, type NewAccountNotice } from './member-page';
 
 interface Options {
@@ -33,6 +34,17 @@ function setup({ member = detail(), notice, access }: Options = {}) {
     },
     campuses: { list: vi.fn().mockResolvedValue([LEKKI, IKEJA]) },
     me: { get: vi.fn().mockResolvedValue({ user: { id: 'someone-else' } }) },
+    leave: {
+      list: vi.fn().mockResolvedValue([
+        approvedLeave({ reason: 'Private reason' }),
+        leaveDto({
+          id: 'two',
+          startsOn: '2026-10-20',
+          endsOn: '2026-10-20',
+          days: 1,
+        }),
+      ]),
+    },
   };
   renderWithApi(
     <MemberPage
@@ -239,5 +251,35 @@ describe('MemberPage', () => {
     expect(
       screen.queryByRole('button', { name: 'Edit job title' })
     ).not.toBeInTheDocument();
+  });
+});
+
+describe('MemberPage leave card', () => {
+  it('lists the member’s leave, with no reasons, for a leave approver', async () => {
+    const { api } = setup({
+      access: starterAccess('principal'),
+      member: detail({ userId: 'user-emeka' }),
+    });
+
+    expect(await screen.findByText('Leave')).toBeVisible();
+    expect(await screen.findAllByText('Sick leave')).toHaveLength(2);
+    expect(
+      screen.getByText('12 Oct 2026 – 13 Oct 2026 · 2 days')
+    ).toBeVisible();
+    expect(screen.getByText('Approved')).toBeVisible();
+    expect(screen.getByText('Waiting')).toBeVisible();
+    expect(screen.queryByText('Private reason')).toBeNull();
+    expect(api.leave.list).toHaveBeenCalledWith({
+      query: { status: 'all', userId: 'user-emeka' },
+    });
+  });
+
+  it('leaves the card, and the request, out for someone who cannot approve leave', async () => {
+    const { api } = setup({ access: starterAccess('administrator') });
+    await screen.findByRole('heading', { name: 'Ada Obi' });
+    await waitFor(() => {
+      expect(screen.queryByText('Sick leave')).toBeNull();
+    });
+    expect(api.leave.list).not.toHaveBeenCalled();
   });
 });

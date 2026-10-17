@@ -1251,6 +1251,41 @@ CREATE TABLE public.session (
 );
 
 --
+-- Name: staff_leave; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.staff_leave (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id text NOT NULL,
+    type text NOT NULL,
+    starts_on date NOT NULL,
+    ends_on date NOT NULL,
+    reason text NOT NULL,
+    cover text,
+    status text DEFAULT 'submitted'::text NOT NULL,
+    created_by text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    approved_by text,
+    approved_at timestamp with time zone,
+    rejected_by text,
+    rejected_at timestamp with time zone,
+    rejection_reason text,
+    cancelled_at timestamp with time zone,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT staff_leave_approved_columns CHECK (((status = 'approved'::text) = ((approved_by IS NOT NULL) AND (approved_at IS NOT NULL)))),
+    CONSTRAINT staff_leave_approved_not_self CHECK (((approved_by IS NULL) OR (approved_by <> created_by))),
+    CONSTRAINT staff_leave_cancelled_columns CHECK (((status = 'cancelled'::text) = (cancelled_at IS NOT NULL))),
+    CONSTRAINT staff_leave_cover_check CHECK ((char_length(cover) <= 200)),
+    CONSTRAINT staff_leave_dates CHECK ((ends_on >= starts_on)),
+    CONSTRAINT staff_leave_reason_check CHECK (((char_length(btrim(reason)) >= 1) AND (char_length(btrim(reason)) <= 500))),
+    CONSTRAINT staff_leave_rejected_columns CHECK (((status = 'rejected'::text) = ((rejected_by IS NOT NULL) AND (rejected_at IS NOT NULL) AND (rejection_reason IS NOT NULL)))),
+    CONSTRAINT staff_leave_rejected_not_self CHECK (((rejected_by IS NULL) OR (rejected_by <> created_by))),
+    CONSTRAINT staff_leave_rejection_reason_check CHECK (((char_length(btrim(rejection_reason)) >= 1) AND (char_length(btrim(rejection_reason)) <= 500))),
+    CONSTRAINT staff_leave_status_check CHECK ((status = ANY (ARRAY['submitted'::text, 'approved'::text, 'rejected'::text, 'cancelled'::text]))),
+    CONSTRAINT staff_leave_type_check CHECK ((type = ANY (ARRAY['annual'::text, 'sick'::text, 'personal'::text, 'study'::text, 'parental'::text])))
+);
+
+--
 -- Name: stock_delivery; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2180,6 +2215,27 @@ ALTER TABLE ONLY public.session
     ADD CONSTRAINT session_token_key UNIQUE (token);
 
 --
+-- Name: staff_leave staff_leave_id_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.staff_leave
+    ADD CONSTRAINT staff_leave_id_organization_id_key UNIQUE (id, organization_id);
+
+--
+-- Name: staff_leave staff_leave_no_overlap; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.staff_leave
+    ADD CONSTRAINT staff_leave_no_overlap EXCLUDE USING gist (organization_id WITH =, created_by WITH =, daterange(starts_on, ends_on, '[]'::text) WITH &&) WHERE ((status = ANY (ARRAY['submitted'::text, 'approved'::text])));
+
+--
+-- Name: staff_leave staff_leave_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.staff_leave
+    ADD CONSTRAINT staff_leave_pkey PRIMARY KEY (id);
+
+--
 -- Name: stock_delivery stock_delivery_id_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2946,6 +3002,18 @@ CREATE INDEX payment_void_waiting_idx ON public.payment_void USING btree (organi
 CREATE INDEX "session_userId_idx" ON public.session USING btree ("userId");
 
 --
+-- Name: staff_leave_requester_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX staff_leave_requester_idx ON public.staff_leave USING btree (organization_id, created_by, starts_on);
+
+--
+-- Name: staff_leave_status_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX staff_leave_status_idx ON public.staff_leave USING btree (organization_id, status);
+
+--
 -- Name: stock_delivery_journal_entry_key; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3202,6 +3270,12 @@ CREATE TRIGGER payment_store_sale_stays_posted BEFORE UPDATE ON public.payment F
 --
 
 CREATE TRIGGER payment_void_immutable BEFORE DELETE OR UPDATE ON public.payment_void FOR EACH ROW EXECUTE FUNCTION public.approval_record_immutable();
+
+--
+-- Name: staff_leave staff_leave_immutable; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER staff_leave_immutable BEFORE DELETE OR UPDATE ON public.staff_leave FOR EACH ROW EXECUTE FUNCTION public.approval_record_immutable();
 
 --
 -- Name: stock_delivery stock_delivery_append_only; Type: TRIGGER; Schema: public; Owner: -
@@ -4114,6 +4188,34 @@ ALTER TABLE ONLY public.session
     ADD CONSTRAINT "session_userId_fkey" FOREIGN KEY ("userId") REFERENCES public."user"(id) ON DELETE CASCADE;
 
 --
+-- Name: staff_leave staff_leave_approved_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.staff_leave
+    ADD CONSTRAINT staff_leave_approved_by_fkey FOREIGN KEY (approved_by) REFERENCES public."user"(id) ON DELETE RESTRICT;
+
+--
+-- Name: staff_leave staff_leave_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.staff_leave
+    ADD CONSTRAINT staff_leave_created_by_fkey FOREIGN KEY (created_by) REFERENCES public."user"(id) ON DELETE RESTRICT;
+
+--
+-- Name: staff_leave staff_leave_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.staff_leave
+    ADD CONSTRAINT staff_leave_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE RESTRICT;
+
+--
+-- Name: staff_leave staff_leave_rejected_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.staff_leave
+    ADD CONSTRAINT staff_leave_rejected_by_fkey FOREIGN KEY (rejected_by) REFERENCES public."user"(id) ON DELETE RESTRICT;
+
+--
 -- Name: stock_delivery stock_delivery_journal_entry_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -4591,4 +4693,5 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20261017090100'),
     ('20261017090200'),
     ('20261017090300'),
-    ('20261017100000');
+    ('20261017100000'),
+    ('20261017110000');

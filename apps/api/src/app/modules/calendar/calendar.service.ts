@@ -388,6 +388,11 @@ export class CalendarService {
     };
   }
 
+  async holidayDates(organizationId: string): Promise<string[]> {
+    const holidays = await this.calendar.listHolidays(organizationId);
+    return holidays.map((holiday) => holiday.date);
+  }
+
   async daysOff(ctx: OrgContext, limit: number): Promise<DayOffEntry[]> {
     const [terms, holidays] = await Promise.all([
       this.calendar.listTerms(ctx.organizationId),

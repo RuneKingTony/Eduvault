@@ -13,6 +13,7 @@ import { initials } from '@eduvault/shared';
 import {
   Avatar,
   AvatarFallback,
+  Badge,
   Button,
   Empty,
   EmptyDescription,
@@ -148,6 +149,33 @@ function Toolbar({
   );
 }
 
+function MemberName({
+  member,
+  onOpen,
+}: {
+  member: MemberSummary;
+  onOpen: (id: string) => void;
+}) {
+  return (
+    <div className="flex flex-col">
+      <span className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          className="text-left font-medium hover:underline"
+          onClick={(event) => {
+            event.stopPropagation();
+            onOpen(member.id);
+          }}
+        >
+          {member.name}
+        </button>
+        {member.onLeave ? <Badge variant="secondary">On leave</Badge> : null}
+      </span>
+      <span className="text-xs text-muted-foreground">{member.title}</span>
+    </div>
+  );
+}
+
 function MemberRow({
   member,
   roles,
@@ -178,21 +206,7 @@ function MemberRow({
               {initials(member.name)}
             </AvatarFallback>
           </Avatar>
-          <div className="flex flex-col">
-            <button
-              type="button"
-              className="text-left font-medium hover:underline"
-              onClick={(event) => {
-                event.stopPropagation();
-                onOpen(member.id);
-              }}
-            >
-              {member.name}
-            </button>
-            <span className="text-xs text-muted-foreground">
-              {member.title}
-            </span>
-          </div>
+          <MemberName member={member} onOpen={onOpen} />
         </div>
       </TableCell>
       <TableCell>

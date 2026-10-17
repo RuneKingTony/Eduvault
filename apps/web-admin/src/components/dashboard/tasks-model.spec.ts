@@ -185,6 +185,30 @@ describe('taskRow charges', () => {
     });
   });
 
+  it('names a waiting leave request as "Leave: {details}"', () => {
+    const row = taskRow({
+      kind: 'approvalsWaiting',
+      count: 2,
+      items: [
+        {
+          label: 'Leave',
+          details:
+            'Ayo Bassey · Sick leave · 12 Oct 2026 – 13 Oct 2026. Malaria',
+        },
+        {
+          label: 'Leave',
+          details: 'Emeka Obi · Personal leave · 20 Oct 2026. Family',
+        },
+      ],
+    });
+    expect(row).toMatchObject({
+      title: '2 requests waiting for your approval',
+      subline:
+        'Leave: Ayo Bassey · Sick leave · 12 Oct 2026 – 13 Oct 2026. Malaria · Leave: Emeka Obi · Personal leave · 20 Oct 2026. Family',
+      action: { label: 'Review', target: { to: '/approvals' } },
+    });
+  });
+
   it('says "1 request" for a single waiting request', () => {
     const row = taskRow({
       kind: 'approvalsWaiting',
