@@ -5,10 +5,13 @@ import {
   STUDENT_ACCOUNT_NOT_FOUND_MESSAGE,
   type BalanceList,
   type BalanceListQuery,
+  type DashboardFinance,
   type GuardianStatement,
   type StatementQuery,
   type StudentStatement,
+  type OwedByLife,
 } from '@eduvault/api-contract';
+import { can } from '@eduvault/policy';
 import type { OrgContext } from '../../common/auth';
 import { Clock } from '../../common/clock';
 import { familyTotals, statementTotals } from '../../common/ledger';
@@ -22,6 +25,16 @@ import {
   StudentAccountRepository,
   type AccountScope,
 } from './student-account.repository';
+
+interface Received {
+  minor: number;
+  count: number;
+}
+
+const whenReceived = <T extends object>(
+  received: Received | undefined,
+  fields: (received: Received) => T
+): T | undefined => (received === undefined ? undefined : fields(received));
 
 @Injectable()
 export class StudentAccountService {
@@ -47,7 +60,7 @@ export class StudentAccountService {
       this.accounts.currency(ctx.organizationId),
       this.accounts.balancePage(scope, query),
       this.accounts.balanceCounts(scope),
-      this.accounts.receivedThisTerm(scope),
+      this.receivedFor(ctx, scope),
       scope.campusScope === 'all'
         ? Promise.resolve<string[]>([])
         : this.accounts.campusNames(scope),
@@ -61,11 +74,53 @@ export class StudentAccountService {
       }),
       summary: {
         ...counts,
-        receivedThisTermMinor: received.minor,
-        paymentsThisTerm: received.count,
+        ...whenReceived(received, ({ minor, count }) => ({
+          receivedThisTermMinor: minor,
+          paymentsThisTerm: count,
+        })),
         scopeNote: scopeNote(scope.campusScope === 'all' ? 'all' : names),
       },
     };
+  }
+
+  async dashboardFinance(ctx: OrgContext): Promise<DashboardFinance | null> {
+    if (!(await this.accounts.hasCurrentTerm(ctx.organizationId))) {
+      return null;
+    }
+    const scope = this.scopeOf(ctx);
+    const [currency, counts, received] = await Promise.all([
+      this.accounts.currency(ctx.organizationId),
+      this.accounts.balanceCounts(scope),
+      this.receivedFor(ctx, scope),
+    ]);
+    return {
+      currency,
+      owedMinor: counts.totalOwedMinor,
+      owingStudents: counts.studentsOwing,
+      ...whenReceived(received, ({ minor, count }) => ({
+        receivedMinor: minor,
+        paymentCount: count,
+      })),
+    };
+  }
+
+  async owedByLife(
+    ctx: OrgContext
+  ): Promise<{ currency: string; owed: OwedByLife }> {
+    const [currency, owed] = await Promise.all([
+      this.accounts.currency(ctx.organizationId),
+      this.accounts.owedByLife(this.scopeOf(ctx)),
+    ]);
+    return { currency, owed };
+  }
+
+  private async receivedFor(
+    ctx: OrgContext,
+    scope: AccountScope
+  ): Promise<Received | undefined> {
+    return can(ctx.permissions, 'payment', 'read')
+      ? this.accounts.receivedThisTerm(scope)
+      : undefined;
   }
 
   async statement(

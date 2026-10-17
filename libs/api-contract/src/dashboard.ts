@@ -59,6 +59,15 @@ export const dashboardTaskSchema = z.discriminatedUnion('kind', [
 ]);
 export type DashboardTask = z.infer<typeof dashboardTaskSchema>;
 
+export const owedByLifeSchema = z.object({
+  active: z.number().int().nonnegative(),
+  newIntakes: z.number().int().nonnegative(),
+  inactive: z.number().int().nonnegative(),
+  left: z.number().int().nonnegative(),
+  graduated: z.number().int().nonnegative(),
+});
+export type OwedByLife = z.infer<typeof owedByLifeSchema>;
+
 export const dashboardRollSchema = z.object({
   active: z.number().int().nonnegative(),
   newIntakes: z.number().int().nonnegative(),
@@ -68,6 +77,9 @@ export const dashboardRollSchema = z.object({
   leftThisTerm: z.number().int().nonnegative(),
   graduated: z.number().int().nonnegative(),
   campusNames: z.array(z.string()).nullable(),
+  currency: currencySchema.optional(),
+  owedMinor: owedByLifeSchema.optional(),
+  formerOwedMinor: z.number().int().nonnegative().optional(),
 });
 export type DashboardRoll = z.infer<typeof dashboardRollSchema>;
 
@@ -133,3 +145,12 @@ export const dashboardChargedSchema = z.object({
   chargeCount: z.number().int().nonnegative(),
 });
 export type DashboardCharged = z.infer<typeof dashboardChargedSchema>;
+
+export const dashboardFinanceSchema = z.object({
+  currency: currencySchema,
+  receivedMinor: z.number().int().nonnegative().optional(),
+  paymentCount: z.number().int().nonnegative().optional(),
+  owedMinor: z.number().int().nonnegative(),
+  owingStudents: z.number().int().nonnegative(),
+});
+export type DashboardFinance = z.infer<typeof dashboardFinanceSchema>;

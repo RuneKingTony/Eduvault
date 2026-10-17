@@ -1,5 +1,6 @@
 import { Controller, Get, Param, Query } from '@nestjs/common';
 import { contract, type RouteOutput } from '@eduvault/api-contract';
+import { FINANCE_READ_GATE } from '@eduvault/policy';
 import { Org, OrganizationAuth, type OrgContext } from '../../common/auth';
 import { zod } from '../../common/http/zod.pipe';
 import { StudentAccountService } from './student-account.service';
@@ -11,7 +12,7 @@ export class StudentAccountController {
   constructor(private readonly accounts: StudentAccountService) {}
 
   @Get('balances')
-  @OrganizationAuth(['invoice:read', 'payment:read'])
+  @OrganizationAuth(FINANCE_READ_GATE)
   balances(
     @Org() org: OrgContext,
     @Query(zod(routes.balances.query))
@@ -21,7 +22,7 @@ export class StudentAccountController {
   }
 
   @Get('students/:studentId/statement')
-  @OrganizationAuth(['invoice:read', 'payment:read'])
+  @OrganizationAuth(FINANCE_READ_GATE)
   statement(
     @Org() org: OrgContext,
     @Param(zod(routes.statement.params)) params: { studentId: string },
@@ -32,7 +33,7 @@ export class StudentAccountController {
   }
 
   @Get('guardians/:guardianId/statement')
-  @OrganizationAuth(['invoice:read', 'payment:read'])
+  @OrganizationAuth(FINANCE_READ_GATE)
   guardianStatement(
     @Org() org: OrgContext,
     @Param(zod(routes.guardianStatement.params))

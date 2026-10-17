@@ -6,6 +6,7 @@ import {
   announcementSummary,
   dashboardApi,
   dayOff,
+  finance,
   myClass,
   person,
   renderInRouter,
@@ -415,5 +416,55 @@ describe('DashboardPage Charged this term', () => {
     expect(
       screen.getByRole('link', { name: /Charge students/ })
     ).toHaveAttribute('href', '/finance/billing?prepare=1');
+  });
+});
+
+const asReader = (...permissions: Parameters<typeof toPermissionMap>[0]) =>
+  fakeAccess({
+    permissions: toPermissionMap(['student:read', ...permissions]),
+    campusScope: 'all',
+  });
+
+describe('DashboardPage Received and Still owed', () => {
+  it('shows Charged, Received and Still owed to an owner', async () => {
+    render(ownerAccess(), dashboardApi({ charged: null }));
+    expect(await screen.findByText('Received')).toBeInTheDocument();
+    expect(screen.getByText('₦900,000')).toBeInTheDocument();
+    expect(screen.getByText('Still owed')).toBeInTheDocument();
+    expect(screen.getByText('₦250,000')).toBeInTheDocument();
+  });
+
+  it('shows only Still owed to an invoice reader, from the finance answer', async () => {
+    const api = dashboardApi({
+      finance: finance({ receivedMinor: undefined, paymentCount: undefined }),
+    });
+    render(asReader('invoice:read'), api);
+    expect(await screen.findByText('Still owed')).toBeInTheDocument();
+    expect(screen.queryByText('Received')).not.toBeInTheDocument();
+    expect(api.dashboard.finance).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows Received and Still owed to a payment reader', async () => {
+    render(asReader('payment:read'), dashboardApi());
+    expect(await screen.findByText('Received')).toBeInTheDocument();
+    expect(screen.getByText('Still owed')).toBeInTheDocument();
+    expect(screen.queryByText('Charged this term')).not.toBeInTheDocument();
+  });
+
+  it('asks for no money figures and shows none without a finance read', async () => {
+    const api = dashboardApi();
+    render(asReader(), api);
+    expect(await screen.findByText('Students by status')).toBeInTheDocument();
+    expect(api.dashboard.finance).not.toHaveBeenCalled();
+    expect(screen.queryByText('Still owed')).not.toBeInTheDocument();
+    expect(screen.queryByText('Received')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Owed/)).not.toBeInTheDocument();
+  });
+
+  it('leaves both tiles out when there is no current term to count', async () => {
+    render(ownerAccess(), dashboardApi({ finance: null }));
+    expect(await screen.findByText('Students by status')).toBeInTheDocument();
+    expect(screen.queryByText('Still owed')).not.toBeInTheDocument();
+    expect(screen.queryByText('Received')).not.toBeInTheDocument();
   });
 });

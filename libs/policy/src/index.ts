@@ -1,6 +1,7 @@
 export * from './statements';
 export * from './cap-areas';
 export * from './roles';
+export * from './finance-gate';
 export * from './grants';
 export * from './better-auth-access';
 export * from './platform-access';

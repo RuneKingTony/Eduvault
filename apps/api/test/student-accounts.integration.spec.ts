@@ -507,6 +507,14 @@ test.describe('isolation', () => {
       campuses: [lekki],
     });
 
+    const invoiceSummary = (await balancesOf(api, viaInvoice)).summary;
+    expect(invoiceSummary).not.toHaveProperty('receivedThisTermMinor');
+    expect(invoiceSummary).not.toHaveProperty('paymentsThisTerm');
+    expect((await balancesOf(api, viaPayment)).summary).toMatchObject({
+      receivedThisTermMinor: expect.any(Number),
+      paymentsThisTerm: expect.any(Number),
+    });
+
     for (const user of [viaInvoice, viaPayment]) {
       await api(user).get('/finance/balances').expect(200);
       await api(user)
