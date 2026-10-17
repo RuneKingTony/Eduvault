@@ -960,12 +960,12 @@ interface StoreItemFilters {
   pageSize?: number;
 }
 
-interface StoreDeliveryFilters {
+interface StorePagedFilters {
   campusId?: string;
   page?: number;
 }
 
-interface StoreSaleFilters extends StoreDeliveryFilters {
+interface StoreSaleFilters extends StorePagedFilters {
   studentId?: string;
 }
 
@@ -1027,7 +1027,7 @@ export const storeAllItemsQueryOptions = (api: Api) =>
 
 export const storeDeliveriesQueryOptions = (
   api: Api,
-  { campusId, page = 1 }: StoreDeliveryFilters = {}
+  { campusId, page = 1 }: StorePagedFilters = {}
 ) =>
   queryOptions({
     queryKey: [...STORE_KEY, 'deliveries', { campusId, page }],
@@ -1042,6 +1042,16 @@ export const storeSalesQueryOptions = (
   queryOptions({
     queryKey: [...STORE_KEY, 'sales', { campusId, studentId, page }],
     queryFn: () => api.store.sales({ query: { campusId, studentId, page } }),
+    placeholderData: keepPreviousData,
+  });
+
+export const storeCountsQueryOptions = (
+  api: Api,
+  { campusId, page = 1 }: StorePagedFilters = {}
+) =>
+  queryOptions({
+    queryKey: [...STORE_KEY, 'counts', { campusId, page }],
+    queryFn: () => api.stockCounts.list({ query: { campusId, page } }),
     placeholderData: keepPreviousData,
   });
 
@@ -1080,7 +1090,9 @@ export const invalidateApprovals = (queryClient: QueryClient): Promise<void> =>
     FEES_KEY,
     LEAVE_KEY,
     MEMBERS_KEY,
+    STORE_KEY,
     [...DASHBOARD_KEY, 'tasks'],
+    [...DASHBOARD_KEY, 'store'],
     ACTIVITY_KEY,
   ]);
 

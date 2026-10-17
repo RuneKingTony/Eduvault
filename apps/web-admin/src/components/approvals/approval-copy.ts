@@ -1,18 +1,31 @@
-import { CalendarDaysIcon, WalletIcon, type LucideIcon } from 'lucide-react';
+import {
+  CalendarDaysIcon,
+  PackageIcon,
+  WalletIcon,
+  type LucideIcon,
+} from 'lucide-react';
 import type { ApprovalItem, ApprovalKind } from '@eduvault/api-contract';
 import { money } from '@eduvault/shared';
 import type { AdjustmentsTab } from '../../adjustments-search';
 
-type ToastDestination = '/finance/accounts' | '/finance/payments';
+type ToastDestination =
+  '/finance/accounts' | '/finance/payments' | '/finance/store';
 
 interface ApprovedToast {
   message: string;
   action: { label: string; to: ToastDestination } | null;
 }
 
+type KindTab = AdjustmentsTab | 'counts';
+
 interface KindUi {
-  resource: 'paymentVoids' | 'adjustments' | 'studentDiscounts' | 'leave';
-  tab: AdjustmentsTab | 'leave';
+  resource:
+    | 'paymentVoids'
+    | 'adjustments'
+    | 'studentDiscounts'
+    | 'leave'
+    | 'stockCounts';
+  tab: KindTab | 'leave';
   icon: LucideIcon;
   approveEffect: string;
   declineEffect: string;
@@ -85,6 +98,18 @@ export const APPROVAL_KIND_UI: Record<ApprovalKind, KindUi> = {
       'The staff member is marked on leave for those school days and sees your decision on their Approvals page.',
     declineEffect: 'Nothing is changed.',
     approvedToast: { message: 'Leave approved for {name}.', action: null },
+  },
+  store_write_off: {
+    resource: 'stockCounts',
+    tab: 'counts',
+    icon: PackageIcon,
+    approveEffect:
+      'Brings store stock in line with the count and records the missing items as a loss at their average cost.',
+    declineEffect: 'Stock stays as it is.',
+    approvedToast: {
+      message: 'Approved. Stock now matches the count.',
+      action: { label: 'Store', to: '/finance/store' },
+    },
   },
 };
 

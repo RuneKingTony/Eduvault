@@ -407,6 +407,25 @@ CREATE FUNCTION public.seed_ledger_accounts(org text) RETURNS void
 $$;
 
 --
+-- Name: stock_count_not_empty(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.stock_count_not_empty() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM stock_count_line
+    WHERE stock_count_id = NEW.id AND organization_id = NEW.organization_id
+  ) THEN
+    RAISE EXCEPTION 'stock count % has no lines', NEW.id
+      USING ERRCODE = 'check_violation', CONSTRAINT = 'stock_count_not_empty';
+  END IF;
+  RETURN NULL;
+END;
+$$;
+
+--
 -- Name: stock_delivery_not_empty(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -1283,6 +1302,53 @@ CREATE TABLE public.staff_leave (
     CONSTRAINT staff_leave_rejection_reason_check CHECK (((char_length(btrim(rejection_reason)) >= 1) AND (char_length(btrim(rejection_reason)) <= 500))),
     CONSTRAINT staff_leave_status_check CHECK ((status = ANY (ARRAY['submitted'::text, 'approved'::text, 'rejected'::text, 'cancelled'::text]))),
     CONSTRAINT staff_leave_type_check CHECK ((type = ANY (ARRAY['annual'::text, 'sick'::text, 'personal'::text, 'study'::text, 'parental'::text])))
+);
+
+--
+-- Name: stock_count; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.stock_count (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id text NOT NULL,
+    number text NOT NULL,
+    store_id uuid NOT NULL,
+    status text NOT NULL,
+    note text,
+    journal_entry_id uuid,
+    created_by text,
+    approved_by text,
+    approved_at timestamp with time zone,
+    rejected_by text,
+    rejected_at timestamp with time zone,
+    rejection_reason text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT stock_count_approved_columns CHECK (((status = 'approved'::text) = (approved_at IS NOT NULL))),
+    CONSTRAINT stock_count_approved_not_self CHECK (((approved_by IS NULL) OR (approved_by <> created_by))),
+    CONSTRAINT stock_count_note_check CHECK (((char_length(btrim(note)) >= 1) AND (char_length(btrim(note)) <= 500))),
+    CONSTRAINT stock_count_number_check CHECK ((char_length(btrim(number)) > 0)),
+    CONSTRAINT stock_count_rejected_columns CHECK (((status = 'rejected'::text) = ((rejected_at IS NOT NULL) AND (rejected_by IS NOT NULL) AND (rejection_reason IS NOT NULL)))),
+    CONSTRAINT stock_count_rejected_not_self CHECK (((rejected_by IS NULL) OR (rejected_by <> created_by))),
+    CONSTRAINT stock_count_rejection_reason_check CHECK (((char_length(btrim(rejection_reason)) >= 1) AND (char_length(btrim(rejection_reason)) <= 500))),
+    CONSTRAINT stock_count_status_check CHECK ((status = ANY (ARRAY['matched'::text, 'submitted'::text, 'approved'::text, 'rejected'::text])))
+);
+
+--
+-- Name: stock_count_line; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.stock_count_line (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id text NOT NULL,
+    stock_count_id uuid NOT NULL,
+    item_id uuid NOT NULL,
+    expected_quantity integer NOT NULL,
+    counted_quantity integer NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT stock_count_line_counted_quantity_check CHECK ((counted_quantity >= 0)),
+    CONSTRAINT stock_count_line_expected_quantity_check CHECK ((expected_quantity >= 0))
 );
 
 --
@@ -2236,6 +2302,48 @@ ALTER TABLE ONLY public.staff_leave
     ADD CONSTRAINT staff_leave_pkey PRIMARY KEY (id);
 
 --
+-- Name: stock_count stock_count_id_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stock_count
+    ADD CONSTRAINT stock_count_id_organization_id_key UNIQUE (id, organization_id);
+
+--
+-- Name: stock_count_line stock_count_line_id_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stock_count_line
+    ADD CONSTRAINT stock_count_line_id_organization_id_key UNIQUE (id, organization_id);
+
+--
+-- Name: stock_count_line stock_count_line_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stock_count_line
+    ADD CONSTRAINT stock_count_line_pkey PRIMARY KEY (id);
+
+--
+-- Name: stock_count_line stock_count_line_stock_count_id_item_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stock_count_line
+    ADD CONSTRAINT stock_count_line_stock_count_id_item_id_key UNIQUE (stock_count_id, item_id);
+
+--
+-- Name: stock_count stock_count_organization_id_number_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stock_count
+    ADD CONSTRAINT stock_count_organization_id_number_key UNIQUE (organization_id, number);
+
+--
+-- Name: stock_count stock_count_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stock_count
+    ADD CONSTRAINT stock_count_pkey PRIMARY KEY (id);
+
+--
 -- Name: stock_delivery stock_delivery_id_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3014,6 +3122,36 @@ CREATE INDEX staff_leave_requester_idx ON public.staff_leave USING btree (organi
 CREATE INDEX staff_leave_status_idx ON public.staff_leave USING btree (organization_id, status);
 
 --
+-- Name: stock_count_journal_entry_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX stock_count_journal_entry_key ON public.stock_count USING btree (journal_entry_id) WHERE (journal_entry_id IS NOT NULL);
+
+--
+-- Name: stock_count_line_item_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX stock_count_line_item_idx ON public.stock_count_line USING btree (organization_id, item_id);
+
+--
+-- Name: stock_count_listing_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX stock_count_listing_idx ON public.stock_count USING btree (organization_id, created_at DESC);
+
+--
+-- Name: stock_count_waiting_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX stock_count_waiting_idx ON public.stock_count USING btree (organization_id, status) WHERE (status = 'submitted'::text);
+
+--
+-- Name: stock_count_waiting_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX stock_count_waiting_key ON public.stock_count USING btree (store_id) WHERE (status = 'submitted'::text);
+
+--
 -- Name: stock_delivery_journal_entry_key; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3276,6 +3414,24 @@ CREATE TRIGGER payment_void_immutable BEFORE DELETE OR UPDATE ON public.payment_
 --
 
 CREATE TRIGGER staff_leave_immutable BEFORE DELETE OR UPDATE ON public.staff_leave FOR EACH ROW EXECUTE FUNCTION public.approval_record_immutable();
+
+--
+-- Name: stock_count stock_count_immutable; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER stock_count_immutable BEFORE DELETE OR UPDATE ON public.stock_count FOR EACH ROW EXECUTE FUNCTION public.approval_record_immutable();
+
+--
+-- Name: stock_count_line stock_count_line_append_only; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER stock_count_line_append_only BEFORE DELETE OR UPDATE ON public.stock_count_line FOR EACH ROW EXECUTE FUNCTION public.store_record_append_only();
+
+--
+-- Name: stock_count stock_count_not_empty; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE CONSTRAINT TRIGGER stock_count_not_empty AFTER INSERT ON public.stock_count DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.stock_count_not_empty();
 
 --
 -- Name: stock_delivery stock_delivery_append_only; Type: TRIGGER; Schema: public; Owner: -
@@ -4216,6 +4372,69 @@ ALTER TABLE ONLY public.staff_leave
     ADD CONSTRAINT staff_leave_rejected_by_fkey FOREIGN KEY (rejected_by) REFERENCES public."user"(id) ON DELETE RESTRICT;
 
 --
+-- Name: stock_count stock_count_approved_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stock_count
+    ADD CONSTRAINT stock_count_approved_by_fkey FOREIGN KEY (approved_by) REFERENCES public."user"(id) ON DELETE SET NULL;
+
+--
+-- Name: stock_count stock_count_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stock_count
+    ADD CONSTRAINT stock_count_created_by_fkey FOREIGN KEY (created_by) REFERENCES public."user"(id) ON DELETE SET NULL;
+
+--
+-- Name: stock_count stock_count_journal_entry_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stock_count
+    ADD CONSTRAINT stock_count_journal_entry_id_organization_id_fkey FOREIGN KEY (journal_entry_id, organization_id) REFERENCES public.journal_entry(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: stock_count_line stock_count_line_item_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stock_count_line
+    ADD CONSTRAINT stock_count_line_item_id_organization_id_fkey FOREIGN KEY (item_id, organization_id) REFERENCES public.item(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: stock_count_line stock_count_line_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stock_count_line
+    ADD CONSTRAINT stock_count_line_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE RESTRICT;
+
+--
+-- Name: stock_count_line stock_count_line_stock_count_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stock_count_line
+    ADD CONSTRAINT stock_count_line_stock_count_id_organization_id_fkey FOREIGN KEY (stock_count_id, organization_id) REFERENCES public.stock_count(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: stock_count stock_count_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stock_count
+    ADD CONSTRAINT stock_count_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE RESTRICT;
+
+--
+-- Name: stock_count stock_count_rejected_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stock_count
+    ADD CONSTRAINT stock_count_rejected_by_fkey FOREIGN KEY (rejected_by) REFERENCES public."user"(id) ON DELETE SET NULL;
+
+--
+-- Name: stock_count stock_count_store_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stock_count
+    ADD CONSTRAINT stock_count_store_id_organization_id_fkey FOREIGN KEY (store_id, organization_id) REFERENCES public.store(id, organization_id) ON DELETE RESTRICT;
+
+--
 -- Name: stock_delivery stock_delivery_journal_entry_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -4694,4 +4913,5 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20261017090200'),
     ('20261017090300'),
     ('20261017100000'),
-    ('20261017110000');
+    ('20261017110000'),
+    ('20261017110100');

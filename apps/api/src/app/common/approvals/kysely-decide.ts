@@ -2,7 +2,11 @@ import { sql, type Kysely, type RawBuilder } from 'kysely';
 import type { DB } from '../../../db/db-types';
 
 type DecidableTable =
-  'adjustment' | 'payment_void' | 'staff_leave' | 'student_discount';
+  | 'adjustment'
+  | 'payment_void'
+  | 'staff_leave'
+  | 'stock_count'
+  | 'student_discount';
 
 interface DecisionTarget {
   table: DecidableTable;

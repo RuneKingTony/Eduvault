@@ -544,6 +544,35 @@ export interface StaffLeave {
   updated_at: Generated<Timestamp>;
 }
 
+export interface StockCount {
+  approved_at: Timestamp | null;
+  approved_by: string | null;
+  created_at: Generated<Timestamp>;
+  created_by: string | null;
+  id: Generated<string>;
+  journal_entry_id: string | null;
+  note: string | null;
+  number: string;
+  organization_id: string;
+  rejected_at: Timestamp | null;
+  rejected_by: string | null;
+  rejection_reason: string | null;
+  status: string;
+  store_id: string;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface StockCountLine {
+  counted_quantity: number;
+  created_at: Generated<Timestamp>;
+  expected_quantity: number;
+  id: Generated<string>;
+  item_id: string;
+  organization_id: string;
+  stock_count_id: string;
+  updated_at: Generated<Timestamp>;
+}
+
 export interface StockDelivery {
   created_at: Generated<Timestamp>;
   id: Generated<string>;
@@ -819,6 +848,8 @@ export interface DB {
   school_setting: SchoolSetting;
   session: Session;
   staff_leave: StaffLeave;
+  stock_count: StockCount;
+  stock_count_line: StockCountLine;
   stock_delivery: StockDelivery;
   stock_delivery_line: StockDeliveryLine;
   stock_movement: StockMovement;

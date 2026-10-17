@@ -7,6 +7,7 @@ import {
 } from './finance';
 import {
   idSchema,
+  memberRefSchema,
   paymentMethodSchema,
   paymentMethodsSchema,
   paymentMethodWord,
@@ -67,6 +68,29 @@ export const deliveryReferenceUsedMessage = (
   reference: string,
   number: string
 ): string => `Reference ${reference} is already used by ${number}.`;
+
+export const STOCK_COUNT_STATUSES = [
+  'matched',
+  'submitted',
+  'approved',
+  'rejected',
+] as const;
+export const STOCK_COUNT_NOTE_MAX = 500;
+
+export const STOCK_COUNT_REQUIRED_MESSAGE = 'Count at least one item.';
+export const STOCK_COUNT_NEGATIVE_MESSAGE =
+  'Counted quantities are whole numbers from 0.';
+export const STOCK_COUNT_QUANTITY_MAX_MESSAGE = `Count ${DELIVERY_QUANTITY_MAX.toLocaleString('en-NG')} or fewer of an item.`;
+export const STOCK_COUNT_LINES_MAX_MESSAGE = `List ${DELIVERY_LINES_MAX} items or fewer in one count.`;
+export const STOCK_COUNT_NOT_FOUND_MESSAGE = 'Stock count not found';
+export const STOCK_MOVED_MESSAGE =
+  'Stock has moved since this count. Count again.';
+export const STOCK_COUNT_CLASH_MESSAGE =
+  'Another count for this campus was submitted at the same time. Try again.';
+export const stockCountWaitingMessage = (number: string): string =>
+  `${number} for this campus is still waiting for approval. Approve or decline it first.`;
+export const stockCountRetiredItemMessage = (displayName: string): string =>
+  `${displayName} is retired and can’t be counted.`;
 
 export const STORE_SALE_REQUIRED_MESSAGE =
   'Choose a student and at least one item.';
@@ -379,7 +403,7 @@ export const recordDeliverySchema = z.object({
 export type RecordDeliveryInput = z.input<typeof recordDeliverySchema>;
 export type RecordDelivery = z.output<typeof recordDeliverySchema>;
 
-export const deliveryListQuerySchema = z.object({
+const pagedQueryShape = {
   campusId: idSchema.optional(),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce
@@ -388,7 +412,9 @@ export const deliveryListQuerySchema = z.object({
     .min(1)
     .max(FINANCE_PAGE_SIZE_MAX)
     .default(FINANCE_PAGE_SIZE),
-});
+};
+
+export const deliveryListQuerySchema = z.object(pagedQueryShape);
 export type DeliveryListQueryInput = z.input<typeof deliveryListQuerySchema>;
 export type DeliveryListQuery = z.output<typeof deliveryListQuerySchema>;
 
@@ -574,3 +600,87 @@ export const saleOptionsSchema = z.object({
   ),
 });
 export type SaleOptions = z.infer<typeof saleOptionsSchema>;
+
+export const stockCountStatusSchema = z.enum(STOCK_COUNT_STATUSES);
+export type StockCountStatus = z.infer<typeof stockCountStatusSchema>;
+
+export const stockCountLineInputSchema = z.object({
+  itemId: idSchema,
+  countedQuantity: z
+    .number({ error: STOCK_COUNT_NEGATIVE_MESSAGE })
+    .int(STOCK_COUNT_NEGATIVE_MESSAGE)
+    .nonnegative(STOCK_COUNT_NEGATIVE_MESSAGE)
+    .max(DELIVERY_QUANTITY_MAX, STOCK_COUNT_QUANTITY_MAX_MESSAGE),
+});
+export type StockCountLineInput = z.infer<typeof stockCountLineInputSchema>;
+
+export const submitStockCountSchema = z
+  .object({
+    campusId: idSchema,
+    note: z
+      .string()
+      .trim()
+      .max(
+        STOCK_COUNT_NOTE_MAX,
+        `Use ${STOCK_COUNT_NOTE_MAX} characters or fewer.`
+      )
+      .nullish()
+      .transform((value) =>
+        value === undefined || value === '' ? null : value
+      ),
+    lines: z
+      .array(stockCountLineInputSchema)
+      .min(1, STOCK_COUNT_REQUIRED_MESSAGE)
+      .max(DELIVERY_LINES_MAX, STOCK_COUNT_LINES_MAX_MESSAGE),
+  })
+  .superRefine((body, context) => {
+    const ids = body.lines.map((line) => line.itemId);
+    if (new Set(ids).size !== ids.length) {
+      context.addIssue({
+        code: 'custom',
+        message: DELIVERY_DUPLICATE_ITEM_MESSAGE,
+        path: ['lines'],
+      });
+    }
+  });
+export type SubmitStockCountInput = z.input<typeof submitStockCountSchema>;
+export type SubmitStockCount = z.output<typeof submitStockCountSchema>;
+
+export const stockCountListQuerySchema = z.object(pagedQueryShape);
+export type StockCountListQueryInput = z.input<
+  typeof stockCountListQuerySchema
+>;
+export type StockCountListQuery = z.output<typeof stockCountListQuerySchema>;
+
+export const stockCountLineSchema = z.object({
+  itemId: idSchema,
+  displayName: z.string(),
+  expectedQuantity: countSchema,
+  countedQuantity: countSchema,
+  difference: minorSchema,
+  valueMinor: minorSchema.nonnegative(),
+});
+export type StockCountLine = z.infer<typeof stockCountLineSchema>;
+
+export const stockCountSchema = z.object({
+  id: idSchema,
+  number: z.string(),
+  campusId: idSchema,
+  campusName: z.string(),
+  status: stockCountStatusSchema,
+  note: z.string().nullable(),
+  createdAt: z.iso.datetime({ offset: true }),
+  countedBy: memberRefSchema,
+  decidedBy: memberRefSchema.nullable(),
+  rejectionReason: z.string().nullable(),
+  netValueMinor: minorSchema,
+  differences: z.string(),
+  lines: z.array(stockCountLineSchema),
+});
+export type StockCount = z.infer<typeof stockCountSchema>;
+
+export const stockCountListSchema = z.object({
+  items: z.array(stockCountSchema),
+  total: countSchema,
+});
+export type StockCountList = z.infer<typeof stockCountListSchema>;

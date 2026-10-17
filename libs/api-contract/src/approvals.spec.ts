@@ -58,6 +58,8 @@ describe('approval copy', () => {
     expect(APPROVAL_KIND_LABELS.payment_void).toBe('Cancel a payment');
     expect(APPROVAL_KIND_LABELS.credit_note).toBe('Reduce a fee');
     expect(APPROVAL_KIND_LABELS.write_off).toBe('Cancel a balance');
+    expect(APPROVAL_KIND_LABELS.store_write_off).toBe('Store write-off');
+    expect(APPROVAL_RULE_BY_KIND.store_write_off).toBe('writeOff');
     expect(new Set(Object.values(APPROVAL_RULE_BY_KIND)).size).toBe(5);
   });
 
@@ -117,7 +119,7 @@ describe('approvalSummarySchema', () => {
   it('previews at most five items', () => {
     const summary = {
       waitingForMe: 6,
-      byNav: { approvals: 6, payments: 6 },
+      byNav: { approvals: 6, payments: 6, store: 0 },
       currency: 'NGN',
       preview: [item, item, item, item, item],
     };

@@ -2,6 +2,16 @@ import { contract } from './contract';
 import type { MoneyAccountKind } from './finance';
 import {
   BOOK_LEVEL_REQUIRED_MESSAGE,
+  STOCK_COUNT_LINES_MAX_MESSAGE,
+  STOCK_COUNT_NEGATIVE_MESSAGE,
+  STOCK_COUNT_NOTE_MAX,
+  STOCK_COUNT_QUANTITY_MAX_MESSAGE,
+  STOCK_COUNT_REQUIRED_MESSAGE,
+  STOCK_MOVED_MESSAGE,
+  stockCountRetiredItemMessage,
+  stockCountWaitingMessage,
+  stockCountSchema,
+  submitStockCountSchema,
   BOOK_NO_SIZE_MESSAGE,
   DELIVERY_LINES_MAX,
   DELIVERY_LINES_MAX_MESSAGE,
@@ -625,5 +635,139 @@ describe('isSellable and booksForLevel', () => {
     const shirt = { ...item, kind: 'uniform' as const, classLevel: null };
     expect(booksForLevel([item, elsewhere, shirt], 'jss1')).toEqual([item]);
     expect(booksForLevel([item], null)).toEqual([]);
+  });
+});
+
+describe('submitStockCountSchema', () => {
+  const body = { campusId: id, lines: [{ itemId: id, countedQuantity: 3 }] };
+
+  it('accepts a count and trims the note to null when blank', () => {
+    expect(submitStockCountSchema.parse(body)).toEqual({
+      ...body,
+      note: null,
+    });
+    expect(
+      submitStockCountSchema.parse({ ...body, note: '  Shelf count  ' }).note
+    ).toBe('Shelf count');
+    expect(
+      submitStockCountSchema.parse({ ...body, note: '  ' }).note
+    ).toBeNull();
+  });
+
+  it('accepts a counted quantity of zero', () => {
+    const lines = [{ itemId: id, countedQuantity: 0 }];
+    expect(submitStockCountSchema.safeParse({ ...body, lines }).success).toBe(
+      true
+    );
+  });
+
+  it('refuses a negative, fractional, missing or oversized count', () => {
+    for (const countedQuantity of [-1, 1.5, undefined]) {
+      const result = submitStockCountSchema.safeParse({
+        ...body,
+        lines: [{ itemId: id, countedQuantity }],
+      });
+      expect(messages(result)).toEqual([STOCK_COUNT_NEGATIVE_MESSAGE]);
+    }
+    const tooMany = submitStockCountSchema.safeParse({
+      ...body,
+      lines: [{ itemId: id, countedQuantity: DELIVERY_QUANTITY_MAX + 1 }],
+    });
+    expect(messages(tooMany)).toEqual([STOCK_COUNT_QUANTITY_MAX_MESSAGE]);
+  });
+
+  it('needs at least one line and caps the line count', () => {
+    expect(
+      messages(submitStockCountSchema.safeParse({ ...body, lines: [] }))
+    ).toEqual([STOCK_COUNT_REQUIRED_MESSAGE]);
+    const lines = Array.from(
+      { length: DELIVERY_LINES_MAX + 1 },
+      (_, index) => ({
+        itemId: `${index}`,
+        countedQuantity: 1,
+      })
+    );
+    expect(
+      messages(submitStockCountSchema.safeParse({ ...body, lines }))
+    ).toContain(STOCK_COUNT_LINES_MAX_MESSAGE);
+  });
+
+  it('refuses an item counted twice', () => {
+    const lines = [
+      { itemId: id, countedQuantity: 1 },
+      { itemId: id, countedQuantity: 2 },
+    ];
+    expect(
+      messages(submitStockCountSchema.safeParse({ ...body, lines }))
+    ).toEqual([DELIVERY_DUPLICATE_ITEM_MESSAGE]);
+  });
+
+  it('caps the note', () => {
+    const note = 'x'.repeat(STOCK_COUNT_NOTE_MAX + 1);
+    expect(submitStockCountSchema.safeParse({ ...body, note }).success).toBe(
+      false
+    );
+  });
+});
+
+describe('stock count copy', () => {
+  it('uses the PRD words', () => {
+    expect(stockCountWaitingMessage('CNT-2026-0001')).toBe(
+      'CNT-2026-0001 for this campus is still waiting for approval. Approve or decline it first.'
+    );
+    expect(STOCK_MOVED_MESSAGE).toBe(
+      'Stock has moved since this count. Count again.'
+    );
+    expect(stockCountRetiredItemMessage('School tie')).toBe(
+      'School tie is retired and can’t be counted.'
+    );
+  });
+});
+
+describe('stockCountSchema', () => {
+  it('parses a count with a signed net value and no decider', () => {
+    const count = {
+      id,
+      number: 'CNT-2026-0001',
+      campusId: id,
+      campusName: 'Lekki',
+      status: 'submitted',
+      note: null,
+      createdAt: '2026-10-17T08:00:00.000Z',
+      countedBy: { id, name: 'Chika' },
+      decidedBy: null,
+      rejectionReason: null,
+      netValueMinor: -325_000,
+      differences: 'School shirt, Size 14: 3 extra',
+      lines: [
+        {
+          itemId: id,
+          displayName: 'School shirt, Size 14',
+          expectedQuantity: 2,
+          countedQuantity: 5,
+          difference: 3,
+          valueMinor: 325_000,
+        },
+      ],
+    };
+    expect(stockCountSchema.parse(count)).toEqual(count);
+  });
+});
+
+describe('contract.stockCounts', () => {
+  it('serves the counts under /store/counts', () => {
+    expect(
+      Object.entries(contract.stockCounts).map(([name, route]) => [
+        name,
+        route.method,
+        route.path,
+      ])
+    ).toEqual([
+      ['list', 'GET', '/store/counts'],
+      ['get', 'GET', '/store/counts/:id'],
+      ['submit', 'POST', '/store/counts'],
+      ['approve', 'POST', '/store/counts/:id/approve'],
+      ['decline', 'POST', '/store/counts/:id/decline'],
+    ]);
   });
 });

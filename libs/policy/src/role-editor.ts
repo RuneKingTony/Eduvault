@@ -246,6 +246,7 @@ export const ACTION_WORDS: Record<Action, string> = {
   record: 'record',
   receive: 'receive stock',
   issue: 'sell to students',
+  count: 'count stock',
   void: 'cancel',
   approve: 'approve',
 };

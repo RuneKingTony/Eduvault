@@ -283,7 +283,7 @@ The service wraps Better Auth's `createOrgRole`, `updateOrgRole`, `deleteOrgRole
 12. **Isolation.** Given another school created role `fees-approver`, when this school's owner reads `/roles/fees-approver` and none exists here, then 404; this school's roles never list it.
 13. **`/me/permissions`.** Given Grace (teacher + principal), then the response has `roles: ["member","teacher","principal"]`, `campusScope: "all"`, `classScope: "all"`, and `permissions.leave` is `["approve"]`.
 14. **Protected roles.** Given the owner, when she deletes the Student role, then 409 "Admissions use this role." even when nobody holds it.
-15. **Backfill.** Given a school created before M3.6 whose Principal role is unedited, when the app next starts (the boot-time starter-role sync, [D-295](../technical-reference.md#decision-log); no migration), then Principal holds `leave:approve`; given one whose Principal was edited, then it is unchanged.
+15. **Backfill.** Given a school created before M3.6 whose Principal role is unedited, when the app next starts (the boot-time starter-role sync, [D-303](../technical-reference.md#decision-log); no migration), then Principal holds `leave:approve`; given one whose Principal was edited, then it is unchanged.
 16. **Role cap.** Given a school with 50 roles, when the owner creates another, then 400 `TOO_MANY_ROLES`.
 
 ## Tests

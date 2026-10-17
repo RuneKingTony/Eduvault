@@ -147,16 +147,25 @@ describe('statements', () => {
 
   it('has the store resource with no sensitive action', () => {
     expect(ALL_PERMISSIONS).toEqual(
-      expect.arrayContaining(['store:read', 'store:receive', 'store:issue'])
+      expect.arrayContaining([
+        'store:read',
+        'store:receive',
+        'store:issue',
+        'store:count',
+      ])
     );
     expect(SENSITIVE.filter((item) => item.startsWith('store:'))).toEqual([]);
     expect(permLabel('store:receive')).toBe('Store: receive');
     expect(permLabel('store:issue')).toBe('Store: issue');
+    expect(permLabel('store:count')).toBe('Store: count');
     expect(PERM_HELP['store:issue']).toBe(
       'Records student purchases at the store, on the campuses they see.'
     );
     expect(PERM_HELP['store:read']).toBeDefined();
     expect(PERM_HELP['store:receive']).toBeDefined();
+    expect(PERM_HELP['store:count']).toBe(
+      'Counts store stock and submits the differences for approval, on the campuses they see.'
+    );
   });
 
   it('has the subject resource with no sensitive action', () => {

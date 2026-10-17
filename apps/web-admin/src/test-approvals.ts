@@ -16,6 +16,7 @@ const id = (n: number) =>
 export const VOID_ID = id(701);
 export const ADJUSTMENT_ID = id(702);
 export const DISCOUNT_ID = id(703);
+export const COUNT_APPROVAL_ID = id(704);
 export const BOLA = id(711);
 const HALIMA = id(712);
 
@@ -94,7 +95,11 @@ export const approvalSummary = (
   return {
     currency: 'NGN',
     waitingForMe: preview.length,
-    byNav: { approvals: preview.length, payments: preview.length },
+    byNav: {
+      approvals: preview.length,
+      payments: preview.length,
+      store: 0,
+    },
     preview,
     ...over,
   };
@@ -177,3 +182,17 @@ export const discountList = (
   items: StudentDiscount[] = [discountRow()],
   over: Partial<StudentDiscountList> = {}
 ): StudentDiscountList => ({ ...listOf(items), ...over });
+
+export const storeWriteOffApproval = (
+  over: Partial<ApprovalItem> = {}
+): ApprovalItem =>
+  approvalItem({
+    kind: 'store_write_off',
+    id: COUNT_APPROVAL_ID,
+    label: 'Store write-off',
+    details:
+      'Lekki stock count: School shirt, Size 14: 2 missing; School tie: 1 missing',
+    amountMinor: 820_000,
+    campusId: id(901),
+    ...over,
+  });

@@ -135,6 +135,10 @@ export function ApprovalsBell() {
       void router.navigate({ to: '/approvals', search: { tab } });
       return;
     }
+    if (tab === 'counts') {
+      void router.navigate({ to: '/finance/store', search: { tab } });
+      return;
+    }
     void router.navigate({
       to: '/finance/adjustments',
       search: searchFor('/finance/adjustments', { tab }),

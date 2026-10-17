@@ -574,6 +574,46 @@ async function checkStore(db: Database, check: Check) {
   }
 }
 
+const NO_COUNT = {
+  number: 'missing',
+  status: 'missing',
+  campus: 'missing',
+  counted_by: 'missing',
+  note: 'missing',
+  shortages: 'missing',
+};
+
+async function checkStockCounts(db: Database, check: Check) {
+  const { rows } = await sql<typeof NO_COUNT>`
+    SELECT sc.number, sc.status, t.name AS campus, u.name AS counted_by, sc.note,
+      (SELECT string_agg(i.name || coalesce(', ' || i.variant, '') || ' ' ||
+          (l.expected_quantity - l.counted_quantity), '; '
+          ORDER BY i.name, i.variant)
+        FROM stock_count_line l
+        JOIN item i ON i.id = l.item_id AND i.organization_id = l.organization_id
+        WHERE l.stock_count_id = sc.id AND l.organization_id = sc.organization_id) AS shortages
+    FROM stock_count sc
+    JOIN store s ON s.id = sc.store_id AND s.organization_id = sc.organization_id
+    JOIN team t ON t.id = s.campus_id
+    LEFT JOIN "user" u ON u.id = sc.created_by`.execute(db);
+  check('stock counts', rows.length, 1);
+  const count = rows[0] ?? NO_COUNT;
+  check('stock count number', count.number.slice(-4), '0001');
+  check('stock count status', count.status, 'submitted');
+  check('stock count campus', count.campus, 'Lekki');
+  check('stock count counted by', count.counted_by, 'Chika Eze');
+  check(
+    'stock count note',
+    count.note,
+    'Shelf count after mid-term stock check'
+  );
+  check(
+    'stock count shortages',
+    count.shortages,
+    'School shirt, Size 14 2; School tie 1'
+  );
+}
+
 async function checkStoreSales(db: Database, check: Check) {
   const { rows } = await sql<{
     number: string;
@@ -746,6 +786,7 @@ export async function runSeedCheck(
   await checkFinance(app, check);
   await checkStore(db, check);
   await checkStoreSales(db, check);
+  await checkStockCounts(db, check);
 
   for (const [key, expected] of Object.entries(visibleStudents)) {
     const ctx = await orgContextFor(app, emailOf(key));

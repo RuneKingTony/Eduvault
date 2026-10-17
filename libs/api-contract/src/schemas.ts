@@ -19,6 +19,10 @@ import {
 import { z } from 'zod';
 
 export const idSchema = z.uuid();
+export const memberRefSchema = z.object({
+  id: idSchema.nullable(),
+  name: z.string(),
+});
 export const currencySchema = z.string().length(3).toUpperCase();
 const timestamp = z.string();
 

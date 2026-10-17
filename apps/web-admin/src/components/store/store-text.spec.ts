@@ -1,4 +1,11 @@
 import {
+  COUNT_APPLIED_MESSAGE,
+  COUNT_MATCHED_MESSAGE,
+  COUNT_STATUS_LABELS,
+  countSubmittedMessage,
+  countedItemsText,
+  countWaitingMessage,
+  differenceText,
   saleRecordedMessage,
   termSoldNote,
   deliveryRecordedMessage,
@@ -110,5 +117,39 @@ describe('sale copy', () => {
   it('counts the students served', () => {
     expect(termSoldNote(1)).toBe('1 student served');
     expect(termSoldNote(4)).toBe('4 students served');
+  });
+});
+
+describe('stock count text', () => {
+  it('names the four statuses', () => {
+    expect(COUNT_STATUS_LABELS).toEqual({
+      matched: 'Matched',
+      submitted: 'Waiting',
+      approved: 'Approved',
+      rejected: 'Declined',
+    });
+  });
+
+  it('says what happened to a submitted count', () => {
+    expect(countSubmittedMessage({ status: 'matched', netValueMinor: 0 })).toBe(
+      COUNT_MATCHED_MESSAGE
+    );
+    expect(
+      countSubmittedMessage({ status: 'approved', netValueMinor: 100 })
+    ).toBe(COUNT_APPLIED_MESSAGE);
+    expect(
+      countSubmittedMessage({ status: 'submitted', netValueMinor: 1_166_700 })
+    ).toBe('Count submitted. ₦11,667 of differences wait for approval.');
+    expect(countWaitingMessage(-325_000)).toBe(
+      'Count submitted. ₦3,250 of differences wait for approval.'
+    );
+  });
+
+  it('counts the items and signs a difference', () => {
+    expect(countedItemsText(1)).toBe('1 item counted');
+    expect(countedItemsText(12)).toBe('12 items counted');
+    expect(differenceText(3)).toBe('+3');
+    expect(differenceText(-2)).toBe('−2');
+    expect(differenceText(0)).toBe('matches');
   });
 });

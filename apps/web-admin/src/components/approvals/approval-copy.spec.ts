@@ -42,6 +42,12 @@ describe('approval copy', () => {
     expect(APPROVAL_KIND_UI.discount.approveEffect).toBe(
       'Applies the discount to the student from the next round of charges.'
     );
+    expect(APPROVAL_KIND_UI.store_write_off.approveEffect).toBe(
+      'Brings store stock in line with the count and records the missing items as a loss at their average cost.'
+    );
+    expect(APPROVAL_KIND_UI.store_write_off.declineEffect).toBe(
+      'Stock stays as it is.'
+    );
   });
 
   it('toasts each kind’s outcome with the right follow-up', () => {
@@ -59,6 +65,10 @@ describe('approval copy', () => {
       message: 'Discount approved.',
       action: null,
     });
+    expect(APPROVAL_KIND_UI.store_write_off.approvedToast).toEqual({
+      message: 'Approved. Stock now matches the count.',
+      action: { label: 'Store', to: '/finance/store' },
+    });
     expect(DECLINED_TOAST).toBe(
       'Declined. The request is kept with your reason.'
     );
@@ -66,7 +76,7 @@ describe('approval copy', () => {
 });
 
 describe('where each kind is decided and listed', () => {
-  it('names the API resource and the Discounts and refunds tab of every kind', () => {
+  it('names the API resource and the tab of every kind, the store write-off on Stock counts', () => {
     expect(
       APPROVAL_KINDS.map((kind) => [
         kind,
@@ -80,6 +90,7 @@ describe('where each kind is decided and listed', () => {
       ['refund', 'adjustments', 'corrections'],
       ['discount', 'studentDiscounts', 'discounts'],
       ['leave', 'leave', 'leave'],
+      ['store_write_off', 'stockCounts', 'counts'],
     ]);
   });
 });

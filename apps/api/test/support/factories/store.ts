@@ -2,6 +2,7 @@ import type {
   Item,
   RecordedDelivery,
   RecordedSale,
+  StockCount,
 } from '@eduvault/api-contract';
 import type { Pool } from 'pg';
 import type { Fixtures, TestUser } from '../base-test';
@@ -229,4 +230,53 @@ export async function saleTables(
     (typeof SALE_TABLES)[number],
     number
   >;
+}
+
+interface CountInput {
+  campusId: string;
+  lines: { itemId: string; countedQuantity: number }[];
+  note?: string;
+}
+
+export const countBody = (input: CountInput) => ({
+  campusId: input.campusId,
+  ...(input.note === undefined ? {} : { note: input.note }),
+  lines: input.lines,
+});
+
+export async function submitCount(
+  api: Api,
+  actor: TestUser,
+  input: CountInput
+): Promise<StockCount> {
+  const res = await api(actor)
+    .post('/store/counts')
+    .send(countBody(input))
+    .expect(201);
+  return res.body as StockCount;
+}
+
+export async function approveCount(
+  api: Api,
+  actor: TestUser,
+  id: string
+): Promise<StockCount> {
+  const res = await api(actor).post(`/store/counts/${id}/approve`).expect(200);
+  return res.body as StockCount;
+}
+
+export async function declineCount(
+  api: Api,
+  actor: TestUser,
+  count: string | { id: string; reason: string }
+): Promise<StockCount> {
+  const { id, reason } =
+    typeof count === 'string'
+      ? { id: count, reason: 'Recount the shelf first' }
+      : count;
+  const res = await api(actor)
+    .post(`/store/counts/${id}/decline`)
+    .send({ reason })
+    .expect(200);
+  return res.body as StockCount;
 }

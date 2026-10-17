@@ -1,7 +1,12 @@
 import { z } from 'zod';
 import type { Permission } from '@eduvault/policy';
 import { ADJUSTMENT_KIND_LABELS } from './adjustment-kinds';
-import { currencySchema, idSchema, type ApprovalRules } from './schemas';
+import {
+  currencySchema,
+  idSchema,
+  memberRefSchema,
+  type ApprovalRules,
+} from './schemas';
 
 export const APPROVAL_STATUSES = ['submitted', 'approved', 'rejected'] as const;
 export const approvalStatusSchema = z.enum(APPROVAL_STATUSES);
@@ -14,6 +19,7 @@ export const APPROVAL_KINDS = [
   'refund',
   'discount',
   'leave',
+  'store_write_off',
 ] as const;
 export const approvalKindSchema = z.enum(APPROVAL_KINDS);
 export type ApprovalKind = z.infer<typeof approvalKindSchema>;
@@ -23,6 +29,7 @@ export const APPROVAL_KIND_LABELS = {
   ...ADJUSTMENT_KIND_LABELS,
   discount: 'Discount',
   leave: 'Leave',
+  store_write_off: 'Store write-off',
 } as const satisfies Record<ApprovalKind, string>;
 
 export type MoneyApprovalKind = Exclude<ApprovalKind, 'leave'>;
@@ -42,6 +49,7 @@ export const APPROVAL_KIND_PERMISSION = {
   refund: 'adjustment:approve',
   discount: 'adjustment:approve',
   leave: 'leave:approve',
+  store_write_off: 'adjustment:approve',
 } as const satisfies Record<ApprovalKind, Permission>;
 
 export const APPROVAL_PAGE_SIZE = 10;
@@ -77,7 +85,7 @@ export const approvalItemSchema = z.object({
   details: z.string(),
   amountMinor: z.number().int().nullable(),
   amountText: z.string().nullable(),
-  createdBy: z.object({ id: idSchema.nullable(), name: z.string() }),
+  createdBy: memberRefSchema,
   createdAt: z.iso.datetime({ offset: true }),
   campusId: idSchema.nullable(),
   decide: approvalDecideSchema,
@@ -108,6 +116,7 @@ export const approvalSummarySchema = z.object({
   byNav: z.object({
     approvals: z.number().int().nonnegative(),
     payments: z.number().int().nonnegative(),
+    store: z.number().int().nonnegative(),
   }),
   currency: currencySchema,
   preview: z.array(approvalItemSchema).max(APPROVAL_PREVIEW_SIZE),
@@ -128,6 +137,7 @@ export const APPROVAL_RULE_BY_KIND = {
   credit_note: 'creditNote',
   discount: 'discount',
   payment_void: 'paymentVoid',
+  store_write_off: 'writeOff',
 } as const satisfies Record<MoneyApprovalKind, keyof ApprovalRules>;
 
 export const APPROVAL_RULES_ON_MESSAGE =

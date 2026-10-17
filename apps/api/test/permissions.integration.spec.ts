@@ -371,7 +371,7 @@ test.describe('/me/permissions', () => {
       adjustment: ['read', 'create'],
       moneyAccount: ['read'],
       ledger: ['read'],
-      store: ['read', 'receive', 'issue'],
+      store: ['read', 'receive', 'issue', 'count'],
     });
   });
 

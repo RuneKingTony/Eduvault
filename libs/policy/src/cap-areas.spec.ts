@@ -258,7 +258,7 @@ describe('capSummary', () => {
       'Discounts and refunds: ask for refunds, fee reductions, cancelled balances and discounts',
       'Approves money requests',
       'Bank and POS accounts: add and change bank and POS accounts',
-      'Store: add items, record deliveries and sell to students',
+      'Store: add items, record deliveries, sell to students and count stock',
       'Money categories: change the accountant’s categories',
       'Own records: can see',
       'Sees fees',
@@ -304,7 +304,7 @@ describe('capSummary', () => {
       'Asks to cancel payments',
       'Discounts and refunds: ask for refunds, fee reductions, cancelled balances and discounts',
       'Bank and POS accounts: can see',
-      'Store: add items, record deliveries and sell to students',
+      'Store: add items, record deliveries, sell to students and count stock',
       'Money categories: can see',
     ]);
   });
@@ -569,24 +569,34 @@ describe('the Store area', () => {
     expect(store.group).toBe('Money');
     expect(store.label).toBe('Store');
     expect(store.see).toEqual(['store:read']);
-    expect(store.change).toEqual(['store:receive', 'store:issue']);
+    expect(store.change).toEqual([
+      'store:receive',
+      'store:issue',
+      'store:count',
+    ]);
     expect(store.changeDesc).toBe(
-      'Add items, record deliveries and sell to students'
+      'Add items, record deliveries, sell to students and count stock'
     );
     expect(store.extras).toEqual([]);
     expect(store.important).toBe(false);
   });
 
-  it('is see for store:read, change with receive and issue, and custom for a lone receive or issue', () => {
+  it('is see for store:read, change with receive, issue and count, and custom for a lone receive, issue or count', () => {
     expect(capLevel(toPermissionMap(['store:read']), store)).toBe('see');
     expect(
       capLevel(
-        toPermissionMap(['store:read', 'store:receive', 'store:issue']),
+        toPermissionMap([
+          'store:read',
+          'store:receive',
+          'store:issue',
+          'store:count',
+        ]),
         store
       )
     ).toBe('change');
     expect(capLevel(toPermissionMap(['store:receive']), store)).toBe('custom');
     expect(capLevel(toPermissionMap(['store:issue']), store)).toBe('custom');
+    expect(capLevel(toPermissionMap(['store:count']), store)).toBe('custom');
   });
 });
 

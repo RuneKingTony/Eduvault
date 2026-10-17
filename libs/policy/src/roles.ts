@@ -102,6 +102,7 @@ export const STARTER_ROLES: readonly StarterRole[] = [
       'store:read',
       'store:receive',
       'store:issue',
+      'store:count',
     ],
   },
   {
