@@ -52,6 +52,19 @@ describe('FeesTabs', () => {
     );
   });
 
+  it('keeps the fee type and add sheet out of the school and other fees links', async () => {
+    renderFees(<FeesTabs term={TERM_2} />, feesApi());
+    await waitFor(() => {
+      expect(screen.getByRole('link', { name: 'Other fees' })).toBeVisible();
+    });
+    for (const name of ['School fees', 'Other fees']) {
+      const href =
+        screen.getByRole('link', { name }).getAttribute('href') ?? '';
+      const params = new URLSearchParams(href.split('?')[1]);
+      expect([...params.keys()]).toEqual(['term']);
+    }
+  });
+
   it('hides every tab from a teacher and from a member with no roles', async () => {
     renderFees(
       <FeesTabs term={undefined} />,

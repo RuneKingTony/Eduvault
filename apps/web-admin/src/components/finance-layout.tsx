@@ -1,8 +1,7 @@
 import type { ReactNode } from 'react';
 import { Link } from '@tanstack/react-router';
 import { useCan } from '@eduvault/auth-client';
-import { NO_ADJUSTMENT_SEARCH } from '../adjustments-search';
-import { NO_PAYMENT_FILTERS } from '../payments-search';
+import { searchFor } from '../route-search-defaults';
 
 const TAB =
   'rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground';
@@ -50,7 +49,7 @@ export function PaymentsLayout({ children }: { children: ReactNode }) {
         <nav aria-label="Payments" className="flex gap-1">
           <Link
             to="/finance/payments"
-            search={NO_PAYMENT_FILTERS}
+            search={searchFor('/finance/payments')}
             className={TAB}
             activeProps={ACTIVE}
           >
@@ -58,7 +57,7 @@ export function PaymentsLayout({ children }: { children: ReactNode }) {
           </Link>
           <Link
             to="/finance/adjustments"
-            search={NO_ADJUSTMENT_SEARCH}
+            search={searchFor('/finance/adjustments')}
             className={TAB}
             activeProps={ACTIVE}
           >

@@ -13,15 +13,6 @@ export interface AdjustmentsSearch {
   amount?: number;
 }
 
-export const NO_ADJUSTMENT_SEARCH = {
-  tab: undefined,
-  page: undefined,
-  new: undefined,
-  kind: undefined,
-  student: undefined,
-  amount: undefined,
-} as const satisfies AdjustmentsSearch;
-
 const amountOf = (value: unknown): number | undefined => {
   const amount = Number(textOf(value));
   return Number.isSafeInteger(amount) && amount > 0 ? amount : undefined;
