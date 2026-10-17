@@ -83,6 +83,7 @@ const person = (
   title: 'New member',
   roles,
   campusIds,
+  onLeave: false,
 });
 
 class FakeMembers extends MembersRepository {
@@ -606,6 +607,16 @@ describe('create', () => {
     );
     expect(error).toBeInstanceOf(NotFoundException);
     expect(admin.findAccount).not.toHaveBeenCalled();
+  });
+});
+
+describe('onLeave', () => {
+  it('carries the on-leave flag through the list and the detail', async () => {
+    const away = { ...person('t', ['member', 'teacher']), onLeave: true };
+    const { service } = setup([away, person('u', ['member', 'teacher'])]);
+    const list = await service.list(context(), { page: 1 });
+    expect(list.items.map((item) => item.onLeave)).toEqual([true, false]);
+    expect((await service.get(context(), 't')).onLeave).toBe(true);
   });
 });
 

@@ -36,6 +36,7 @@ import {
 import { useApi } from '../api';
 import { MemberAccessCard } from '../components/member-access-card';
 import { EditTitleDialog } from '../components/edit-title-dialog';
+import { MemberLeaveCard } from '../components/leave/member-leave-card';
 import { MemberCampusesCard } from '../components/member-campuses-card';
 import { RemoveMemberDialog } from '../components/remove-member-dialog';
 import { ResetPasswordDialog } from '../components/reset-password-dialog';
@@ -331,7 +332,10 @@ function MemberView({
             isSelf={isSelf}
           />
         </div>
-        <MemberAccessCard member={detail} campuses={campuses} />
+        <div className="flex flex-col gap-4">
+          <MemberAccessCard member={detail} campuses={campuses} />
+          <MemberLeaveCard userId={detail.userId} />
+        </div>
       </div>
     </section>
   );

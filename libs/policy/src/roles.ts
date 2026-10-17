@@ -108,7 +108,8 @@ export const STARTER_ROLES: readonly StarterRole[] = [
   {
     slug: 'principal',
     label: 'Principal',
-    description: 'Approves money corrections across the school.',
+    description:
+      'Approves money corrections and staff leave across the school.',
     permissions: [
       'team:read',
       'campus:readAll',
@@ -123,6 +124,7 @@ export const STARTER_ROLES: readonly StarterRole[] = [
       'payment:read',
       'adjustment:read',
       'adjustment:approve',
+      'leave:approve',
       'moneyAccount:read',
       'store:read',
     ],

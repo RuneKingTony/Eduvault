@@ -59,6 +59,7 @@ export const summary = (
   title: 'Head of maths',
   roles: ['member'],
   campusIds: [LEKKI.id],
+  onLeave: false,
   ...overrides,
 });
 

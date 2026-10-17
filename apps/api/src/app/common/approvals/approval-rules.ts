@@ -1,8 +1,8 @@
 import type { Kysely, Selectable } from 'kysely';
 import {
   APPROVAL_RULE_BY_KIND,
-  type ApprovalKind,
   type ApprovalRules,
+  type MoneyApprovalKind,
 } from '@eduvault/api-contract';
 import type { DB, SchoolSetting } from '../../../db/db-types';
 
@@ -31,14 +31,16 @@ export const approvalRulesOf = (row: RuleColumns): ApprovalRules => ({
   paymentVoid: row.approve_payment_void,
 });
 
-export const isRuleOn = (rules: ApprovalRules, kind: ApprovalKind): boolean =>
-  rules[APPROVAL_RULE_BY_KIND[kind]];
+export const isRuleOn = (
+  rules: ApprovalRules,
+  kind: MoneyApprovalKind
+): boolean => rules[APPROVAL_RULE_BY_KIND[kind]];
 
 /** Read once when a request is made: a switch changed later never touches a request already waiting. */
 export async function isApprovalOn(
   db: Kysely<DB>,
   organizationId: string,
-  kind: ApprovalKind
+  kind: MoneyApprovalKind
 ): Promise<boolean> {
   const row = await db
     .selectFrom('school_setting')

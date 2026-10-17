@@ -1,4 +1,4 @@
-import { fireEvent, screen } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import { actingAccess, renderWithApi, starterAccess } from '../test-utils';
 import { CATALOGUE, IKEJA, LEKKI, summary } from '../test-members';
 import { MembersPage } from './members-page';
@@ -63,6 +63,17 @@ describe('MembersPage', () => {
     expect(screen.getByText('No roles')).toBeInTheDocument();
     expect(screen.getByText('Lekki, Ikeja')).toBeInTheDocument();
     expect(screen.getByText('Showing 1 to 3 of 3')).toBeInTheDocument();
+  });
+
+  it('marks a member on leave today with an On leave badge', async () => {
+    setup({}, undefined, [
+      summary({ id: 'm1', name: 'Funmi Adeyemi' }),
+      summary({ id: 'm2', name: 'Emeka Obi', onLeave: true }),
+    ]);
+    const away = (await screen.findByText('Emeka Obi')).closest('tr');
+    expect(within(away as HTMLElement).getByText('On leave')).toBeVisible();
+    const present = screen.getByText('Funmi Adeyemi').closest('tr');
+    expect(within(present as HTMLElement).queryByText('On leave')).toBeNull();
   });
 
   it('passes search, role and page through to the list request', async () => {

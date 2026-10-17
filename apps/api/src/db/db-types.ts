@@ -524,6 +524,26 @@ export interface Session {
   userId: string;
 }
 
+export interface StaffLeave {
+  approved_at: Timestamp | null;
+  approved_by: string | null;
+  cancelled_at: Timestamp | null;
+  cover: string | null;
+  created_at: Generated<Timestamp>;
+  created_by: string;
+  ends_on: Timestamp;
+  id: Generated<string>;
+  organization_id: string;
+  reason: string;
+  rejected_at: Timestamp | null;
+  rejected_by: string | null;
+  rejection_reason: string | null;
+  starts_on: Timestamp;
+  status: Generated<string>;
+  type: string;
+  updated_at: Generated<Timestamp>;
+}
+
 export interface StockCount {
   approved_at: Timestamp | null;
   approved_by: string | null;
@@ -827,6 +847,7 @@ export interface DB {
   school_holiday: SchoolHoliday;
   school_setting: SchoolSetting;
   session: Session;
+  staff_leave: StaffLeave;
   stock_count: StockCount;
   stock_count_line: StockCountLine;
   stock_delivery: StockDelivery;

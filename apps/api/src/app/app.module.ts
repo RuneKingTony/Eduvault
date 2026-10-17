@@ -12,6 +12,7 @@ import { DatabaseModule } from './common/db/database.module';
 import { FilesModule } from './common/files';
 import { AdjustmentModule } from './modules/adjustment/adjustment.module';
 import { AnnouncementModule } from './modules/announcement/announcement.module';
+import { LeaveModule } from './modules/leave/leave.module';
 import { ApprovalsModule } from './modules/approvals/approvals.module';
 import { PaymentModule } from './modules/payment/payment.module';
 import { PortalModule } from './modules/portal/portal.module';
@@ -69,6 +70,7 @@ import { SubjectModule } from './modules/subject/subject.module';
     PaymentModule,
     StoreModule,
     AdjustmentModule,
+    LeaveModule,
     ApprovalsModule,
     StudentAccountModule,
   ],

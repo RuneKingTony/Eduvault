@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { Permission } from '@eduvault/policy';
 import { ADJUSTMENT_KIND_LABELS } from './adjustment-kinds';
 import {
   currencySchema,
@@ -17,6 +18,7 @@ export const APPROVAL_KINDS = [
   'write_off',
   'refund',
   'discount',
+  'leave',
   'store_write_off',
 ] as const;
 export const approvalKindSchema = z.enum(APPROVAL_KINDS);
@@ -26,8 +28,29 @@ export const APPROVAL_KIND_LABELS = {
   payment_void: 'Cancel a payment',
   ...ADJUSTMENT_KIND_LABELS,
   discount: 'Discount',
+  leave: 'Leave',
   store_write_off: 'Store write-off',
 } as const satisfies Record<ApprovalKind, string>;
+
+export type MoneyApprovalKind = Exclude<ApprovalKind, 'leave'>;
+
+export const APPROVAL_PILLARS = ['money', 'leave'] as const;
+export const approvalPillarSchema = z.enum(APPROVAL_PILLARS);
+export type ApprovalPillar = z.infer<typeof approvalPillarSchema>;
+
+export const isMoneyApproval = (
+  kind: ApprovalKind
+): kind is MoneyApprovalKind => kind !== 'leave';
+
+export const APPROVAL_KIND_PERMISSION = {
+  payment_void: 'adjustment:approve',
+  credit_note: 'adjustment:approve',
+  write_off: 'adjustment:approve',
+  refund: 'adjustment:approve',
+  discount: 'adjustment:approve',
+  leave: 'leave:approve',
+  store_write_off: 'adjustment:approve',
+} as const satisfies Record<ApprovalKind, Permission>;
 
 export const APPROVAL_PAGE_SIZE = 10;
 export const APPROVAL_PREVIEW_SIZE = 5;
@@ -52,7 +75,7 @@ export const declineSchema = z.object({
 });
 export type DeclineInput = z.input<typeof declineSchema>;
 
-export const approvalDecideSchema = z.enum(['yes', 'own']);
+export const approvalDecideSchema = z.enum(['yes', 'own', 'other']);
 export type ApprovalDecide = z.infer<typeof approvalDecideSchema>;
 
 export const approvalItemSchema = z.object({
@@ -71,6 +94,8 @@ export type ApprovalItem = z.infer<typeof approvalItemSchema>;
 
 export const approvalListQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
+  includeOthers: z.union([z.boolean(), z.stringbool()]).default(false),
+  pillar: approvalPillarSchema.optional(),
 });
 export type ApprovalListQuery = z.output<typeof approvalListQuerySchema>;
 
@@ -78,6 +103,11 @@ export const approvalListSchema = z.object({
   currency: currencySchema,
   items: z.array(approvalItemSchema),
   total: z.number().int().nonnegative(),
+  othersCount: z.number().int().nonnegative(),
+  pillars: z.object({
+    money: z.number().int().nonnegative(),
+    leave: z.number().int().nonnegative(),
+  }),
 });
 export type ApprovalList = z.infer<typeof approvalListSchema>;
 
@@ -108,7 +138,7 @@ export const APPROVAL_RULE_BY_KIND = {
   discount: 'discount',
   payment_void: 'paymentVoid',
   store_write_off: 'writeOff',
-} as const satisfies Record<ApprovalKind, keyof ApprovalRules>;
+} as const satisfies Record<MoneyApprovalKind, keyof ApprovalRules>;
 
 export const APPROVAL_RULES_ON_MESSAGE =
   'These requests now wait for a boss to approve.';

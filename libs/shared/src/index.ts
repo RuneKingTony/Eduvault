@@ -2,6 +2,7 @@ export * from './calendar';
 export * from './count-of';
 export * from './date';
 export * from './days-off';
+export * from './leave';
 export * from './initials';
 export * from './naira';
 export * from './slug';

@@ -12,6 +12,7 @@ import {
   type FeeGroup,
   type InvoiceKind,
   type InvoiceStatus,
+  type ApprovalPillar,
   type ItemKind,
   type PaymentStatus,
   type RouteQuery,
@@ -817,11 +818,43 @@ const ADJUSTMENTS_KEY = ['adjustments'] as const;
 
 export const APPROVALS_REFRESH_MS = 60_000;
 
-export const approvalsQueryOptions = (api: Api, page: number) =>
+interface ApprovalsView {
+  includeOthers: boolean;
+  pillar: ApprovalPillar | undefined;
+}
+
+const PLAIN_VIEW: ApprovalsView = { includeOthers: false, pillar: undefined };
+
+export const approvalsQueryOptions = (
+  api: Api,
+  page: number,
+  { includeOthers, pillar }: ApprovalsView = PLAIN_VIEW
+) =>
   queryOptions({
-    queryKey: [...APPROVALS_KEY, 'list', page],
-    queryFn: () => api.approvals.list({ query: { page } }),
+    queryKey: [...APPROVALS_KEY, 'list', { page, includeOthers, pillar }],
+    queryFn: () =>
+      api.approvals.list({
+        query: {
+          page,
+          includeOthers,
+          ...(pillar === undefined ? {} : { pillar }),
+        },
+      }),
     placeholderData: keepPreviousData,
+  });
+
+const LEAVE_KEY = ['leave'] as const;
+
+export const myLeaveQueryOptions = (api: Api) =>
+  queryOptions({
+    queryKey: [...LEAVE_KEY, 'mine'],
+    queryFn: () => api.leave.me({}),
+  });
+
+export const memberLeaveQueryOptions = (api: Api, userId: string) =>
+  queryOptions({
+    queryKey: [...LEAVE_KEY, 'member', userId],
+    queryFn: () => api.leave.list({ query: { status: 'all', userId } }),
   });
 
 export const approvalsSummaryQueryOptions = (api: Api) =>
@@ -1055,9 +1088,20 @@ export const invalidateApprovals = (queryClient: QueryClient): Promise<void> =>
   invalidateAll(queryClient, [
     ...MONEY_VIEW_KEYS,
     FEES_KEY,
+    LEAVE_KEY,
+    MEMBERS_KEY,
     STORE_KEY,
     [...DASHBOARD_KEY, 'tasks'],
     [...DASHBOARD_KEY, 'store'],
+    ACTIVITY_KEY,
+  ]);
+
+export const invalidateLeave = (queryClient: QueryClient): Promise<void> =>
+  invalidateAll(queryClient, [
+    LEAVE_KEY,
+    APPROVALS_KEY,
+    [...DASHBOARD_KEY, 'tasks'],
+    ACTIVITY_KEY,
   ]);
 
 export const invalidatePayments = (queryClient: QueryClient): Promise<void> =>

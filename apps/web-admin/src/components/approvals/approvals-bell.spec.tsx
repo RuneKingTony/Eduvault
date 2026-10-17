@@ -4,9 +4,11 @@ import { ApprovalsPage } from '../../pages/approvals-page';
 import {
   approvalList,
   approvalSummary,
+  leaveApproval,
   storeWriteOffApproval,
   voidApproval,
 } from '../../test-approvals';
+import { myLeave } from '../../test-leave';
 import { renderPayments } from '../../test-payments';
 import { starterAccess } from '../../test-utils';
 import {
@@ -35,11 +37,14 @@ function setup(
     paymentVoids: {
       approve: vi.fn().mockResolvedValue({ id: 'x', status: 'approved' }),
     },
+    leave: { me: vi.fn().mockResolvedValue(myLeave()) },
   };
   const { router } = renderPayments(
     <>
       <ApprovalsBell />
-      {options.withQueue === true ? <ApprovalsPage /> : null}
+      {options.withQueue === true ? (
+        <ApprovalsPage search={{}} onSearchChange={vi.fn()} />
+      ) : null}
     </>,
     api,
     { access: options.access ?? starterAccess('principal'), path: '/approvals' }
@@ -83,6 +88,38 @@ describe('ApprovalsBell', () => {
       expect(router.state.location.pathname).toBe('/finance/adjustments');
     });
     expect(router.state.location.search).toMatchObject({ tab: 'voids' });
+  });
+
+  it('opens the Leave tab of Approvals for a leave request', async () => {
+    const { router } = setup({
+      summary: approvalSummary({
+        waitingForMe: 1,
+        byNav: { approvals: 1, payments: 0, store: 0 },
+        preview: [leaveApproval()],
+      }),
+    });
+    fireEvent.click(await screen.findByRole('button', { name: 'Approvals' }));
+    expect(await screen.findByText('2 days')).toBeVisible();
+    fireEvent.click(await screen.findByText('Leave'));
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/approvals');
+    });
+    expect(router.state.location.search).toMatchObject({ tab: 'leave' });
+  });
+
+  it('counts a leave-only approver’s waiting leave', async () => {
+    const { api } = setup({
+      access: starterAccess('principal'),
+      summary: approvalSummary({
+        waitingForMe: 1,
+        byNav: { approvals: 1, payments: 0, store: 0 },
+        preview: [leaveApproval()],
+      }),
+    });
+    const bell = await screen.findByRole('button', { name: 'Approvals' });
+    expect(await within(bell).findByText('1')).toBeVisible();
+    expect(api.approvals.summary).toHaveBeenCalled();
   });
 
   it('opens the Stock counts tab for a store write-off', async () => {

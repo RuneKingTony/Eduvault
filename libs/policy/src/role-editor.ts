@@ -216,6 +216,7 @@ export const RESOURCE_PILLARS: Record<Resource, Pillar> = {
   session: 'Foundation',
   class: 'Foundation',
   announcement: 'Foundation',
+  leave: 'People and access',
   feeLine: 'Finance',
   invoice: 'Finance',
   payment: 'Finance',

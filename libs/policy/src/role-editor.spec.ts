@@ -400,6 +400,7 @@ describe('Advanced grid vocabulary', () => {
     expect(RESOURCE_PILLARS.feeLine).toBe('Finance');
     expect(RESOURCE_PILLARS.invoice).toBe('Finance');
     expect(RESOURCE_PILLARS.adjustment).toBe('Finance');
+    expect(RESOURCE_PILLARS.leave).toBe('People and access');
   });
 
   it('words the bill action', () => {

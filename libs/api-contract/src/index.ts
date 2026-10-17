@@ -11,6 +11,7 @@ export * from './dashboard';
 export * from './finance';
 export * from './guardians';
 export * from './invoices';
+export * from './leave';
 export * from './payments';
 export * from './portal';
 export * from './store';

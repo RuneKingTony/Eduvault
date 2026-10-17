@@ -1,8 +1,13 @@
 import { toPermissionMap, type Permission } from '@eduvault/policy';
 import { activityAccess } from './activity-access';
 
-const access = (...permissions: Permission[]) =>
-  activityAccess(toPermissionMap(permissions));
+const access = (...permissions: Permission[]) => {
+  const { pillars, foundationSubjects } = activityAccess(
+    toPermissionMap(permissions),
+    'viewer'
+  );
+  return { pillars, foundationSubjects };
+};
 
 describe('activityAccess', () => {
   it('shows platform rows only to a member with no permission', () => {
@@ -57,5 +62,24 @@ describe('activityAccess', () => {
     expect(access('guardian:read', 'class:read').foundationSubjects).toEqual(
       []
     );
+  });
+});
+
+describe('activityAccess for leave events', () => {
+  it('names the viewer and whether they approve leave', () => {
+    expect(activityAccess(toPermissionMap([]), 'ayo')).toMatchObject({
+      viewerId: 'ayo',
+      leaveApprover: false,
+    });
+    expect(
+      activityAccess(toPermissionMap(['leave:approve']), 'grace')
+    ).toMatchObject({ viewerId: 'grace', leaveApprover: true });
+  });
+
+  it('opens no foundation subject and no pillar for leave:approve alone', () => {
+    expect(access('leave:approve')).toEqual({
+      pillars: ['platform'],
+      foundationSubjects: [],
+    });
   });
 });

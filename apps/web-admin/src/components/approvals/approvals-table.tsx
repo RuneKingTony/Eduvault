@@ -1,4 +1,4 @@
-import { CheckIcon, WalletIcon, XIcon } from 'lucide-react';
+import { CheckIcon, XIcon } from 'lucide-react';
 import {
   SELF_APPROVAL_MESSAGE,
   type ApprovalItem,
@@ -17,27 +17,50 @@ import {
   TooltipTrigger,
 } from '@eduvault/ui';
 import { PersonAvatar } from '../person-avatar';
-import { amountOf } from './approval-copy';
+import { APPROVAL_KIND_UI, amountOf, otherTip, ownTip } from './approval-copy';
 
 interface ActionsProps {
   item: ApprovalItem;
-  canDecide: boolean;
+  canAct: boolean;
   onApprove: (item: ApprovalItem) => void;
   onDecline: (item: ApprovalItem) => void;
 }
 
-function Actions({ item, canDecide, onApprove, onDecline }: ActionsProps) {
+function Cell({
+  label,
+  variant,
+  tip,
+}: {
+  label: string;
+  variant: 'warning' | 'outline';
+  tip: string;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Badge variant={variant}>{label}</Badge>
+      </TooltipTrigger>
+      <TooltipContent>{tip}</TooltipContent>
+    </Tooltip>
+  );
+}
+
+function Actions({ item, canAct, onApprove, onDecline }: ActionsProps) {
   if (item.decide === 'own') {
     return (
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Badge variant="warning">Your own</Badge>
-        </TooltipTrigger>
-        <TooltipContent>{SELF_APPROVAL_MESSAGE}</TooltipContent>
-      </Tooltip>
+      <Cell
+        label="Your own"
+        variant="warning"
+        tip={ownTip(item.kind, SELF_APPROVAL_MESSAGE)}
+      />
     );
   }
-  if (!canDecide) {
+  if (item.decide === 'other') {
+    return (
+      <Cell label="Someone else" variant="outline" tip={otherTip(item.kind)} />
+    );
+  }
+  if (!canAct) {
     return null;
   }
   return (
@@ -74,11 +97,12 @@ function QueueRow({
   currency,
   ...actions
 }: ActionsProps & { currency: string }) {
+  const Icon = APPROVAL_KIND_UI[item.kind].icon;
   return (
     <TableRow>
       <TableCell>
         <span className="flex items-center gap-2 font-semibold">
-          <WalletIcon className="size-4 text-muted-foreground" />
+          <Icon className="size-4 text-muted-foreground" />
           {item.label}
         </span>
       </TableCell>

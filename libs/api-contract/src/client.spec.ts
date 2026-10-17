@@ -125,6 +125,7 @@ describe('createApiClient', () => {
         title: 'New member',
         roles: ['member', 'teacher'],
         campusIds: [campusId],
+        onLeave: false,
         permissions: { student: ['read'] },
         campusScope: [campusId],
         classScope: 'all',

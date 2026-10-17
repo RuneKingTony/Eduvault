@@ -13,6 +13,7 @@ import {
   splitRoles,
   PORTAL_SAFE_ROLES,
 } from '@eduvault/policy';
+import { Clock } from '../../common/clock';
 import { campusIdsByUser } from '../../common/db/campus-ids-by-user';
 import { escapeLike } from '../../common/db/escape-like';
 import { inCampusScope } from '../../common/db/in-campus-scope';
@@ -33,7 +34,10 @@ interface Row {
   role: string;
 }
 
-const toMemberSummary = (row: Row, campusIds: string[]): MemberRecord => ({
+const toMemberSummary = (
+  row: Row,
+  extras: { campusIds: string[]; onLeave: boolean }
+): MemberRecord => ({
   id: row.id,
   userId: row.userId,
   name: row.name,
@@ -41,7 +45,7 @@ const toMemberSummary = (row: Row, campusIds: string[]): MemberRecord => ({
   username: null,
   title: row.title ?? DEFAULT_MEMBER_TITLE,
   roles: splitRoles(row.role),
-  campusIds,
+  ...extras,
 });
 
 interface RoleRow {
@@ -77,8 +81,30 @@ const MEMBER_COLUMNS = [
 
 @Injectable()
 export class KyselyMembersRepository extends MembersRepository {
-  constructor(@Inject(KYSELY_TOKEN) private readonly db: Database) {
+  constructor(
+    @Inject(KYSELY_TOKEN) private readonly db: Database,
+    private readonly clock: Clock
+  ) {
     super();
+  }
+
+  private async onLeaveToday(
+    organizationId: string,
+    userIds: readonly string[]
+  ): Promise<Set<string>> {
+    if (userIds.length === 0) {
+      return new Set();
+    }
+    const today = this.clock.today();
+    const rows = await this.db
+      .selectFrom('staff_leave')
+      .select('created_by')
+      .where('organization_id', '=', organizationId)
+      .where('created_by', 'in', [...userIds])
+      .where('status', '=', 'approved')
+      .where(sql<boolean>`${today}::date BETWEEN starts_on AND ends_on`)
+      .execute();
+    return new Set(rows.map((row) => row.created_by));
   }
 
   private filtered({ organizationId, scope, q, role }: MemberListQuery) {
@@ -141,13 +167,16 @@ export class KyselyMembersRepository extends MembersRepository {
     organizationId: string,
     rows: Row[]
   ): Promise<MemberRecord[]> {
-    const campuses = await campusIdsByUser(
-      this.db,
-      organizationId,
-      rows.map((row) => row.userId)
-    );
+    const userIds = rows.map((row) => row.userId);
+    const [campuses, onLeave] = await Promise.all([
+      campusIdsByUser(this.db, organizationId, userIds),
+      this.onLeaveToday(organizationId, userIds),
+    ]);
     return rows.map((row) =>
-      toMemberSummary(row, campuses.get(row.userId) ?? [])
+      toMemberSummary(row, {
+        campusIds: campuses.get(row.userId) ?? [],
+        onLeave: onLeave.has(row.userId),
+      })
     );
   }
 

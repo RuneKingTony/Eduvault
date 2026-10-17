@@ -2,15 +2,19 @@ import { contract } from './contract';
 import {
   ALREADY_DECIDED_MESSAGE,
   APPROVAL_KIND_LABELS,
+  APPROVAL_KIND_PERMISSION,
   APPROVAL_KINDS,
   APPROVAL_RULE_BY_KIND,
   DECLINE_REASON_MESSAGE,
   SELF_APPROVAL_MESSAGE,
   approvalItemSchema,
+  approvalDecideSchema,
   approvalListQuerySchema,
+  approvalListSchema,
   approvalStatusSchema,
   approvalSummarySchema,
   declineSchema,
+  isMoneyApproval,
 } from './approvals';
 import { apiErrorCodeSchema, errorSchema } from './schemas';
 
@@ -58,6 +62,19 @@ describe('approval copy', () => {
     expect(APPROVAL_RULE_BY_KIND.store_write_off).toBe('writeOff');
     expect(new Set(Object.values(APPROVAL_RULE_BY_KIND)).size).toBe(5);
   });
+
+  it('labels leave and gives it no approval switch', () => {
+    expect(APPROVAL_KIND_LABELS.leave).toBe('Leave');
+    expect(Object.keys(APPROVAL_RULE_BY_KIND)).not.toContain('leave');
+    expect(isMoneyApproval('leave')).toBe(false);
+    expect(isMoneyApproval('refund')).toBe(true);
+  });
+
+  it('names the permission that decides each kind', () => {
+    expect(Object.keys(APPROVAL_KIND_PERMISSION)).toEqual([...APPROVAL_KINDS]);
+    expect(APPROVAL_KIND_PERMISSION.leave).toBe('leave:approve');
+    expect(APPROVAL_KIND_PERMISSION.discount).toBe('adjustment:approve');
+  });
 });
 
 describe('approvalStatusSchema', () => {
@@ -85,8 +102,13 @@ describe('declineSchema', () => {
 });
 
 describe('approvalItemSchema', () => {
-  it('parses an item and refuses a decide value outside yes and own', () => {
+  it('parses an item and refuses a decide value outside yes, own and other', () => {
     expect(approvalItemSchema.parse(item)).toEqual(item);
+    expect(approvalDecideSchema.options).toEqual(['yes', 'own', 'other']);
+    expect(
+      approvalItemSchema.parse({ ...item, kind: 'leave', decide: 'other' })
+        .decide
+    ).toBe('other');
     expect(
       approvalItemSchema.safeParse({ ...item, decide: 'no_permission' }).success
     ).toBe(false);
@@ -112,11 +134,41 @@ describe('approvalSummarySchema', () => {
 });
 
 describe('approvalListQuerySchema', () => {
-  it('defaults to page 1 and refuses page 0', () => {
-    expect(approvalListQuerySchema.parse({})).toEqual({ page: 1 });
+  it('defaults to page 1 without others and refuses page 0', () => {
+    expect(approvalListQuerySchema.parse({})).toEqual({
+      page: 1,
+      includeOthers: false,
+    });
+    expect(approvalListQuerySchema.parse({ includeOthers: 'true' })).toEqual({
+      page: 1,
+      includeOthers: true,
+    });
+    expect(approvalListQuerySchema.parse({ pillar: 'leave' }).pillar).toBe(
+      'leave'
+    );
+    expect(approvalListQuerySchema.safeParse({ pillar: 'store' }).success).toBe(
+      false
+    );
     expect(approvalListQuerySchema.safeParse({ page: '0' }).success).toBe(
       false
     );
+  });
+});
+
+describe('approvalListSchema', () => {
+  it('carries the count of requests others approve', () => {
+    const list = {
+      currency: 'NGN',
+      items: [item],
+      total: 1,
+      othersCount: 2,
+      pillars: { money: 1, leave: 0 },
+    };
+    expect(approvalListSchema.parse(list)).toEqual(list);
+    expect(
+      approvalListSchema.safeParse({ currency: 'NGN', items: [], total: 0 })
+        .success
+    ).toBe(false);
   });
 });
 

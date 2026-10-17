@@ -237,6 +237,7 @@ describe('capSummary', () => {
       'Campuses: add and rename campuses',
       'Sees every campus',
       'Staff: add and remove staff, and give them roles',
+      'Approves staff leave',
       'Roles: create roles and change what they allow',
       'School settings: change the school profile and rules',
       'Hands over the school',
@@ -312,6 +313,7 @@ describe('capSummary', () => {
     expect(summaryFor('principal')).toEqual([
       'Campuses: can see',
       'Sees every campus',
+      'Approves staff leave',
       'Classes: can see',
       'Sees every class',
       'Subjects: can see',
@@ -621,5 +623,29 @@ describe('the Portal area', () => {
       expect(summaryFor(slug)).toEqual(['Own records: can see', 'Sees fees']);
     }
     expect(summaryFor('teacher')).not.toContain('Own records: can see');
+  });
+});
+
+describe('the Staff area leave extra', () => {
+  const staff = CAP_AREAS.find((a) => a.id === 'staff');
+
+  it('offers approving leave as an important extra and leaves the levels alone', () => {
+    expect(staff?.extras).toEqual([
+      {
+        label: 'Approves staff leave',
+        description:
+          'Approves or declines leave requests from other people, never their own.',
+        permissions: ['leave:approve'],
+        important: true,
+      },
+    ]);
+    expect(staff?.see).toEqual(['member:read']);
+    expect(staff?.change).not.toContain('leave:approve');
+  });
+
+  it('is none for a lone leave:approve, with the extra listed', () => {
+    const lone = toPermissionMap(['leave:approve']);
+    expect(capLevel(lone, staff!)).toBe('none');
+    expect(capSummary(lone)).toEqual(['Approves staff leave']);
   });
 });

@@ -56,7 +56,10 @@ test.describe('dev seed', () => {
                 (SELECT count(*) FROM payment) AS payment,
                 (SELECT count(*) FROM payment_void WHERE status = 'submitted') AS waiting_void,
                 (SELECT count(*) FROM adjustment WHERE status = 'submitted') AS waiting_adjustment,
-                (SELECT count(*) FROM adjustment WHERE status = 'rejected') AS declined_adjustment`
+                (SELECT count(*) FROM adjustment WHERE status = 'rejected') AS declined_adjustment,
+                (SELECT count(*) FROM staff_leave WHERE status = 'submitted') AS waiting_leave,
+                (SELECT count(*) FROM staff_leave WHERE status = 'approved') AS approved_leave,
+                (SELECT count(*) FROM staff_leave WHERE status = 'rejected') AS declined_leave`
       );
       return rows[0];
     };
@@ -89,7 +92,7 @@ test.describe('dev seed', () => {
       enrollment_placement: '68',
       guardian: '6',
       guardian_student: '8',
-      activity_event: '43',
+      activity_event: '49',
       announcement: '8',
       published_announcement: '4',
       pinned_announcement: '1',
@@ -111,6 +114,9 @@ test.describe('dev seed', () => {
       waiting_void: '1',
       waiting_adjustment: '1',
       declined_adjustment: '2',
+      waiting_leave: '2',
+      approved_leave: '1',
+      declined_leave: '1',
     });
 
     const scopeOf = async (key: string) => {

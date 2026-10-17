@@ -51,6 +51,8 @@ describe('ActivityService', () => {
         access: {
           pillars: ['platform', 'access', 'foundation'],
           foundationSubjects: ['student'],
+          viewerId: 'caller',
+          leaveApprover: false,
         },
         page: 3,
       },
@@ -63,6 +65,17 @@ describe('ActivityService', () => {
     expect(repository.calls[0]?.access).toEqual({
       pillars: ['platform'],
       foundationSubjects: [],
+      viewerId: 'caller',
+      leaveApprover: false,
+    });
+  });
+
+  it('tells the repository when the caller approves leave', async () => {
+    const { repository, service } = setup();
+    await service.list(ctxFor(['leave:approve']), 1);
+    expect(repository.calls[0]?.access).toMatchObject({
+      viewerId: 'caller',
+      leaveApprover: true,
     });
   });
 });
