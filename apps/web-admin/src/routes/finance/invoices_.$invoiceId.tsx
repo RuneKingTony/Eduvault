@@ -1,8 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { requireGate } from '../../access';
-import { NO_INVOICE_FILTERS } from '../../invoices-search';
 import { InvoicePage } from '../../pages/invoice-page';
 import { invoiceQueryOptions } from '../../queries';
+import { searchFor } from '../../route-search-defaults';
 
 export const Route = createFileRoute('/finance/invoices_/$invoiceId')({
   beforeLoad: ({ context }) => {
@@ -26,7 +26,7 @@ function InvoiceRoute() {
       onBack={() => {
         void navigate({
           to: '/finance/invoices',
-          search: NO_INVOICE_FILTERS,
+          search: searchFor('/finance/invoices'),
         });
       }}
     />

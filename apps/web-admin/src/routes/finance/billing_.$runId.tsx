@@ -3,6 +3,7 @@ import { requireGate } from '../../access';
 import { parseRunSearch } from '../../billing-search';
 import { BillingRunPage } from '../../pages/billing-run-page';
 import { billingRunQueryOptions } from '../../queries';
+import { searchFor } from '../../route-search-defaults';
 
 export const Route = createFileRoute('/finance/billing_/$runId')({
   validateSearch: parseRunSearch,
@@ -35,7 +36,7 @@ function BillingRunRoute() {
       onBack={() => {
         void navigate({
           to: '/finance/billing',
-          search: { page: undefined, prepare: undefined },
+          search: searchFor('/finance/billing'),
         });
       }}
     />

@@ -2,7 +2,7 @@ import { Link } from '@tanstack/react-router';
 import { useCanAny } from '@eduvault/auth-client';
 import { FINANCE_READ_GATE, type Gate } from '@eduvault/policy';
 import { NO_ACCOUNT_FILTERS } from '../../accounts-search';
-import { NO_INVOICE_FILTERS } from '../../invoices-search';
+import { searchFor } from '../../route-search-defaults';
 
 const TAB =
   'rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground';
@@ -78,23 +78,11 @@ function Tab({ tab, term }: { tab: FeeTab; term: string | undefined }) {
       </Link>
     );
   }
-  if (tab.to === '/finance/billing') {
+  if (tab.to === '/finance/billing' || tab.to === '/finance/invoices') {
     return (
       <Link
         to={tab.to}
-        search={{ page: undefined, prepare: undefined }}
-        className={TAB}
-        activeProps={ACTIVE}
-      >
-        {tab.label}
-      </Link>
-    );
-  }
-  if (tab.to === '/finance/invoices') {
-    return (
-      <Link
-        to={tab.to}
-        search={NO_INVOICE_FILTERS}
+        search={searchFor(tab.to)}
         className={TAB}
         activeProps={ACTIVE}
       >

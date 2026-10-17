@@ -16,8 +16,8 @@ import {
   toast,
 } from '@eduvault/ui';
 import { useApi } from '../../api';
-import { NO_INVOICE_FILTERS } from '../../invoices-search';
 import { invalidateBilling } from '../../queries';
+import { searchFor } from '../../route-search-defaults';
 import { chargesCount, sentToast } from './billing-text';
 
 function useSend(onClose: () => void) {
@@ -35,7 +35,7 @@ function useSend(onClose: () => void) {
           onClick: () => {
             void navigate({
               to: '/finance/invoices',
-              search: NO_INVOICE_FILTERS,
+              search: searchFor('/finance/invoices'),
             });
           },
         },
