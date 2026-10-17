@@ -180,13 +180,13 @@ const chargedSql = (termId: string) =>
       and i.status <> 'cancelled'
   )`;
 
-const roundFilterSql = (term: TermInfo, filter: RoundFilter) => {
+const roundFilterSql = (filter: RoundFilter) => {
   switch (filter.scope) {
     case 'school': {
       return sql`true`;
     }
     case 'campus': {
-      return sql`${termCampusSql(term.id)} = ${filter.campusId}`;
+      return sql`coalesce(p.term_campus_id, p.latest_campus_id, s.campus_id) = ${filter.campusId}`;
     }
     case 'level': {
       return sql`en.class_level_id = ${filter.classLevelId}`;
@@ -357,18 +357,23 @@ export class KyselyBillingRepository extends BillingRepository {
           en.id as enrollment_id,
           en.class_level_id,
           en.is_new_student,
-          ${termPlacementCampusSql(term.id)} as term_campus_id,
-          ${latestPlacementCampusSql()} as latest_campus_id,
+          p.term_campus_id,
+          p.latest_campus_id,
           ${chargedSql(term.id)} as charged
         from student s
         join student_enrollment en
           on en.student_id = s.id
           and en.organization_id = s.organization_id
+        cross join lateral (
+          select
+            ${termPlacementCampusSql(term.id)} as term_campus_id,
+            ${latestPlacementCampusSql()} as latest_campus_id
+        ) p
         where s.organization_id = ${scope.organizationId}
           and en.session_id = ${term.sessionId}
           and ${inScope(currentCampusSql('s'), scope.campusScope)}
           and ${includedSql(options.today)}
-          and ${roundFilterSql(term, options.filter)}
+          and ${roundFilterSql(options.filter)}
       )
       select
         (count(*) filter (where charged))::int as skipped,
