@@ -63,8 +63,8 @@ export const balanceSummarySchema = z.object({
   totalOwedMinor: minorSchema.nonnegative(),
   studentsOwing: countSchema,
   studentsInScope: countSchema,
-  receivedThisTermMinor: minorSchema.nonnegative(),
-  paymentsThisTerm: countSchema,
+  receivedThisTermMinor: minorSchema.nonnegative().optional(),
+  paymentsThisTerm: countSchema.optional(),
   scopeNote: z.string(),
 });
 export type BalanceSummary = z.infer<typeof balanceSummarySchema>;

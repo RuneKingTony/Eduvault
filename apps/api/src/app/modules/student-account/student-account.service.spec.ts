@@ -1,26 +1,26 @@
 import { NotFoundException } from '@nestjs/common';
-import type { StatementFamily } from '@eduvault/api-contract';
+import { toPermissionMap, type Permission } from '@eduvault/policy';
 import type { OrgContext } from '../../common/auth';
 import { Clock } from '../../common/clock';
+import { FakeStudentAccountRepository } from './fake-student-account.repository';
 import type { MovementRecord } from './statement-assembly';
-import {
-  StudentAccountRepository,
-  type BalanceCounts,
-  type BalancePageRecord,
-  type GuardianChildren,
-  type StudentHeader,
-} from './student-account.repository';
+import type { StudentHeader } from './student-account.repository';
 import { StudentAccountService } from './student-account.service';
 
-const ctxOf = (campusScope: OrgContext['campusScope']) =>
+const ctxOf = (
+  campusScope: OrgContext['campusScope'],
+  permissions: Permission[] = ['invoice:read', 'payment:read']
+) =>
   ({
     organizationId: 'school-a',
     user: { id: 'chika', email: 'c@eduvault.test', name: 'Chika' },
+    permissions: toPermissionMap(permissions),
     campusScope,
   }) as OrgContext;
 
 const everyone = ctxOf('all');
 const lekkiOnly = ctxOf(['lekki']);
+const invoiceOnly = ctxOf('all', ['invoice:read']);
 
 const header = (id: string): StudentHeader => ({
   id,
@@ -46,59 +46,8 @@ const movement = (
   ...overrides,
 });
 
-class FakeAccounts extends StudentAccountRepository {
-  headers = new Map<string, StudentHeader>();
-  history = new Map<string, MovementRecord[]>();
-  guardian: GuardianChildren | undefined;
-  familyOf: StatementFamily = null;
-  page: BalancePageRecord = { items: [], total: 0 };
-  counts: BalanceCounts = {
-    totalOwedMinor: 0,
-    studentsOwing: 0,
-    studentsInScope: 0,
-  };
-  received = { minor: 0, count: 0 };
-  names: string[] = [];
-
-  currency() {
-    return Promise.resolve('NGN');
-  }
-
-  balancePage() {
-    return Promise.resolve(this.page);
-  }
-
-  balanceCounts() {
-    return Promise.resolve(this.counts);
-  }
-
-  receivedThisTerm() {
-    return Promise.resolve(this.received);
-  }
-
-  campusNames() {
-    return Promise.resolve(this.names);
-  }
-
-  studentHeader(_scope: unknown, studentId: string) {
-    return Promise.resolve(this.headers.get(studentId));
-  }
-
-  movements(_organizationId: string, studentId: string) {
-    return Promise.resolve(this.history.get(studentId) ?? []);
-  }
-
-  family() {
-    return Promise.resolve(this.familyOf);
-  }
-
-  guardianChildren() {
-    return Promise.resolve(this.guardian);
-  }
-}
-
 const setup = () => {
-  const accounts = new FakeAccounts();
+  const accounts = new FakeStudentAccountRepository();
   const clock = new Clock({ NODE_ENV: 'test' });
   clock.set('2026-10-07');
   return { accounts, service: new StudentAccountService(accounts, clock) };
@@ -167,6 +116,17 @@ describe('StudentAccountService.balances', () => {
     });
   });
 
+  it('leaves the received tile out, and does not read it, without payment:read', async () => {
+    const { accounts, service } = setup();
+    accounts.received = { minor: 50_000_000, count: 7 };
+
+    const { summary } = await service.balances(invoiceOnly, query);
+
+    expect(summary).not.toHaveProperty('receivedThisTermMinor');
+    expect(summary).not.toHaveProperty('paymentsThisTerm');
+    expect(accounts.receivedReads).toBe(0);
+  });
+
   it('names the campuses of a campus-scoped caller', async () => {
     const { accounts, service } = setup();
     accounts.names = ['Lekki'];
@@ -174,6 +134,94 @@ describe('StudentAccountService.balances', () => {
     const { summary } = await service.balances(lekkiOnly, query);
 
     expect(summary.scopeNote).toBe('Lekki campus');
+  });
+});
+
+const seedOwing = (accounts: FakeStudentAccountRepository) => {
+  accounts.counts = {
+    totalOwedMinor: 8_000_000,
+    studentsOwing: 2,
+    studentsInScope: 30,
+  };
+  accounts.received = { minor: 50_000_000, count: 7 };
+};
+
+describe('StudentAccountService.dashboardFinance', () => {
+  it('gives owed and received to a payment reader', async () => {
+    const { accounts, service } = setup();
+    seedOwing(accounts);
+
+    expect(await service.dashboardFinance(everyone)).toEqual({
+      currency: 'NGN',
+      owedMinor: 8_000_000,
+      owingStudents: 2,
+      receivedMinor: 50_000_000,
+      paymentCount: 7,
+    });
+  });
+
+  it('leaves the received fields out without payment:read', async () => {
+    const { accounts, service } = setup();
+    seedOwing(accounts);
+
+    const finance = await service.dashboardFinance(invoiceOnly);
+
+    expect(finance).toEqual({
+      currency: 'NGN',
+      owedMinor: 8_000_000,
+      owingStudents: 2,
+    });
+    expect(finance).not.toHaveProperty('receivedMinor');
+    expect(finance).not.toHaveProperty('paymentCount');
+    expect(accounts.receivedReads).toBe(0);
+  });
+
+  it('keeps the owed figures for a payment-only reader', async () => {
+    const { accounts, service } = setup();
+    seedOwing(accounts);
+
+    expect(
+      await service.dashboardFinance(ctxOf('all', ['payment:read']))
+    ).toMatchObject({ owedMinor: 8_000_000, receivedMinor: 50_000_000 });
+  });
+
+  it('answers null, and counts nothing, with no current term', async () => {
+    const { accounts, service } = setup();
+    accounts.currentTerm = false;
+
+    expect(await service.dashboardFinance(everyone)).toBeNull();
+    expect(accounts.scopes).toEqual([]);
+  });
+
+  it('counts through the caller’s campus scope', async () => {
+    const { accounts, service } = setup();
+
+    await service.dashboardFinance(lekkiOnly);
+
+    expect(accounts.scopes).toHaveLength(2);
+    expect(accounts.scopes.map(({ campusScope }) => campusScope)).toEqual([
+      ['lekki'],
+      ['lekki'],
+    ]);
+    expect(accounts.scopes[0]).toMatchObject({ organizationId: 'school-a' });
+  });
+});
+
+describe('StudentAccountService.owedByLife', () => {
+  it('passes the buckets through with the currency', async () => {
+    const { accounts, service } = setup();
+    accounts.owed = {
+      active: 900,
+      newIntakes: 300,
+      inactive: 50,
+      left: 40,
+      graduated: 10,
+    };
+
+    expect(await service.owedByLife(everyone)).toEqual({
+      currency: 'NGN',
+      owed: accounts.owed,
+    });
   });
 });
 

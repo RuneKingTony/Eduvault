@@ -10,6 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from '@eduvault/ui';
+import { NO_STATEMENT_FILTERS } from '../../accounts-search';
 import { PersonAvatar } from '../person-avatar';
 import { BalanceBadge } from './balance-badge';
 import { lifeSuffix } from './statement-text';
@@ -19,7 +20,7 @@ function StudentCell({ row }: { row: BalanceRow }) {
     <Link
       to="/finance/accounts/$studentId"
       params={{ studentId: row.studentId }}
-      search={{ view: undefined, page: undefined }}
+      search={NO_STATEMENT_FILTERS}
       className="flex items-center gap-2"
     >
       <PersonAvatar name={row.name} />

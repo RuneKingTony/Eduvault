@@ -55,7 +55,7 @@ Sort: date descending, then number descending. Rows open the charge. Paged 10.
 ### Charge detail
 
 - Route `/finance/invoices/$invoiceId`. Gate `invoice:read`.
-- Header: breadcrumb **Charges › `<number>`** (or **Prepared** for a draft); title the charge number, or **Prepared charge** for a draft; status badge; description `<kind label> · <student name, linked to their statement> · <class arm for the charge's term>`; info tip "A charge that has been sent never changes. A mistake is fixed with an approved fee reduction."; action **Student statement** (wallet icon) to the student's statement (M3.4).
+- Header: breadcrumb **Charges › `<number>`** (or **Prepared** for a draft); title the charge number, or **Prepared charge** for a draft; status badge; description `<kind label> · <student name, linked to their statement> · <class arm for the charge's term>`; info tip "A charge that has been sent never changes. A mistake is fixed with an approved fee reduction."; action **Student statement** (wallet icon) to the student's statement (`/finance/accounts/$studentId`, shipped with M3.4).
 - Two columns.
 - Main column:
   1. **Lines** card (receipt icon, flush): table **Description**, **Amount**; discount lines (negative) shown muted with a negative row style; footer **Total**.
@@ -193,7 +193,6 @@ No write endpoints here: charges are written by [51](51-charge-students.md#api) 
 
 - M3.1 ledger core (accounts, journal, balances, `document_sequence`, posting service).
 - M3.2 fee lines ([50-fees](50-fees.md)); [51-charge-students](51-charge-students.md) in the same slice creates term charges.
-- M3.4 for the **Student statement** action and statement links (until then, hide the action).
 - `student_discount` (see [51 Dependencies](51-charge-students.md#dependencies)).
 - M4.4 creates store charges and the `ISS-` link; until then the Store purchase filter shows 0.
 - M2.4 guardians (`pays_fees`) and placements.

@@ -2,6 +2,7 @@ import type {
   BalanceListQuery,
   StatementFamily,
   StudentLife,
+  OwedByLife,
 } from '@eduvault/api-contract';
 import type { CampusScope } from '../../common/campus-scope';
 import type { KindMovement } from '../../common/ledger';
@@ -58,6 +59,10 @@ export abstract class StudentAccountRepository {
   ): Promise<BalancePageRecord>;
 
   abstract balanceCounts(scope: AccountScope): Promise<BalanceCounts>;
+
+  abstract owedByLife(scope: AccountScope): Promise<OwedByLife>;
+
+  abstract hasCurrentTerm(organizationId: string): Promise<boolean>;
 
   abstract receivedThisTerm(
     scope: AccountScope

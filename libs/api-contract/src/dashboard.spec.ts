@@ -1,5 +1,7 @@
 import {
   activityQuerySchema,
+  dashboardFinanceSchema,
+  dashboardRollSchema,
   dashboardTaskSchema,
   myClassSchema,
 } from './dashboard';
@@ -77,5 +79,78 @@ describe('activityQuerySchema', () => {
     expect(activityQuerySchema.parse({})).toEqual({ page: 1 });
     expect(activityQuerySchema.parse({ page: '2' })).toEqual({ page: 2 });
     expect(activityQuerySchema.safeParse({ page: '0' }).success).toBe(false);
+  });
+});
+
+describe('dashboardFinanceSchema', () => {
+  it('parses an owed-only payload with the received fields omitted', () => {
+    const finance = { currency: 'NGN', owedMinor: 250_000, owingStudents: 3 };
+    expect(dashboardFinanceSchema.parse(finance)).toEqual(finance);
+  });
+
+  it('parses the received fields when present', () => {
+    const finance = {
+      currency: 'NGN',
+      receivedMinor: 90_000,
+      paymentCount: 2,
+      owedMinor: 0,
+      owingStudents: 0,
+    };
+    expect(dashboardFinanceSchema.parse(finance)).toEqual(finance);
+  });
+
+  it('refuses a negative owed total', () => {
+    expect(
+      dashboardFinanceSchema.safeParse({
+        currency: 'NGN',
+        owedMinor: -1,
+        owingStudents: 0,
+      }).success
+    ).toBe(false);
+  });
+
+  it('refuses a negative received total', () => {
+    expect(
+      dashboardFinanceSchema.safeParse({
+        currency: 'NGN',
+        receivedMinor: -1,
+        paymentCount: 0,
+        owedMinor: 0,
+        owingStudents: 0,
+      }).success
+    ).toBe(false);
+  });
+});
+
+describe('dashboardRollSchema', () => {
+  const counts = {
+    active: 10,
+    newIntakes: 2,
+    inactive: 1,
+    dueLeft: 0,
+    left: 3,
+    leftThisTerm: 1,
+    graduated: 4,
+    campusNames: null,
+  };
+
+  it('parses the roll without the owed fields', () => {
+    expect(dashboardRollSchema.parse(counts)).toEqual(counts);
+  });
+
+  it('parses the roll with the owed fields', () => {
+    const roll = {
+      ...counts,
+      currency: 'NGN',
+      owedMinor: {
+        active: 500_000,
+        newIntakes: 100_000,
+        inactive: 0,
+        left: 40_000,
+        graduated: 0,
+      },
+      formerOwedMinor: 40_000,
+    };
+    expect(dashboardRollSchema.parse(roll)).toEqual(roll);
   });
 });

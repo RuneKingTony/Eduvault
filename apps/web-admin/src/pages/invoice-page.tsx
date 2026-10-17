@@ -14,13 +14,9 @@ import {
   ErrorMessage,
   NotFoundState,
   PageSkeleton,
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
 } from '@eduvault/ui';
 import { useApi } from '../api';
-import { KIND_LABELS } from '../components/billing/billing-text';
-import { StatusBadge } from '../components/billing/status-badge';
+import { InvoiceHeader } from '../components/invoices/invoice-header';
 import { InvoiceJournalCard } from '../components/invoices/invoice-journal-card';
 import { InvoiceLinesCard } from '../components/invoices/invoice-lines-card';
 import {
@@ -63,41 +59,6 @@ function InvoiceNotFound({ onBack }: { onBack: () => void }) {
         </Button>
       </NotFoundState>
     </section>
-  );
-}
-
-function InvoiceHeader({ invoice }: { invoice: Invoice }) {
-  return (
-    <header className="flex flex-col gap-1">
-      <h1 className="flex items-center gap-2">
-        {invoice.number ?? 'Prepared charge'}
-        <StatusBadge status={invoice.status} />
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              type="button"
-              aria-label="About this charge"
-              className="text-muted-foreground"
-            >
-              <InfoIcon className="size-4" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>
-            A charge that has been sent never changes. A mistake is fixed with
-            an approved fee reduction.
-          </TooltipContent>
-        </Tooltip>
-      </h1>
-      <p className="text-sm text-muted-foreground">
-        {[
-          KIND_LABELS[invoice.kind],
-          invoice.student.name,
-          invoice.student.armName,
-        ]
-          .filter((part): part is string => part !== null)
-          .join(' · ')}
-      </p>
-    </header>
   );
 }
 

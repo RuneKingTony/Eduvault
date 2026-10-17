@@ -1,4 +1,9 @@
-import { canAny, type Gate, type PermissionMap } from '@eduvault/policy';
+import {
+  FINANCE_READ_GATE,
+  canAny,
+  type Gate,
+  type PermissionMap,
+} from '@eduvault/policy';
 import { routeMatchLength } from '@eduvault/shared';
 import type { NavIconName } from '@eduvault/ui';
 import { isDev } from './env';
@@ -32,7 +37,7 @@ const SETTINGS_ITEM_ID = 'settings';
 const FEES_ITEM_ID = 'fees';
 
 const FEES_ENTRIES: readonly (readonly [route: string, gate: Gate])[] = [
-  ['/finance/accounts', ['invoice:read', 'payment:read']],
+  ['/finance/accounts', FINANCE_READ_GATE],
   ['/finance/school-fees', ['feeLine:read']],
   ['/finance/billing', ['invoice:bill', 'invoice:read']],
   ['/finance/invoices', ['invoice:read']],

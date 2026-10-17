@@ -34,8 +34,13 @@ export function AccountTiles({
   currency: string;
   onOwing: () => void;
 }) {
+  const { receivedThisTermMinor: received, paymentsThisTerm: payments } =
+    summary;
+  const showReceived = received !== undefined && payments !== undefined;
   return (
-    <div className="grid gap-3 sm:grid-cols-3">
+    <div
+      className={`grid gap-3 ${showReceived ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}
+    >
       <button type="button" className={TILE} onClick={onOwing}>
         <Card className="h-full">
           <CardContent>
@@ -58,17 +63,23 @@ export function AccountTiles({
           </CardContent>
         </Card>
       </button>
-      <Link to="/finance/payments" search={NO_PAYMENT_FILTERS} className={TILE}>
-        <Card className="h-full">
-          <CardContent>
-            <Tile
-              label="Received this term"
-              value={money(summary.receivedThisTermMinor, currency)}
-              note={countOf(summary.paymentsThisTerm, 'payment', 'payments')}
-            />
-          </CardContent>
-        </Card>
-      </Link>
+      {showReceived ? (
+        <Link
+          to="/finance/payments"
+          search={NO_PAYMENT_FILTERS}
+          className={TILE}
+        >
+          <Card className="h-full">
+            <CardContent>
+              <Tile
+                label="Received this term"
+                value={money(received, currency)}
+                note={countOf(payments, 'payment', 'payments')}
+              />
+            </CardContent>
+          </Card>
+        </Link>
+      ) : null}
     </div>
   );
 }
