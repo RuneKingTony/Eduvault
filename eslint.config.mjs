@@ -266,7 +266,7 @@ export default [
       ],
     },
     rules: {
-      'import-x/no-cycle': 'error',
+      'import-x/no-cycle': ['error', { ignoreExternal: true }],
       'import-x/no-duplicates': ['error', { 'prefer-inline': true }],
       'import-x/no-self-import': 'error',
     },
