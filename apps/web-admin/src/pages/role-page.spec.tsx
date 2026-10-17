@@ -1,4 +1,5 @@
 import {
+  configure,
   fireEvent,
   render,
   screen,
@@ -30,6 +31,7 @@ vi.mock('@eduvault/ui', async (importOriginal) => ({
 
 // The Advanced grid renders a button per permission, so role queries are slow under parallel load.
 vi.setConfig({ testTimeout: 20_000 });
+configure({ asyncUtilTimeout: 10_000 });
 
 const accessOf = (...permissions: Permission[]) =>
   fakeAccess({ roles: ['custom'], permissions: toPermissionMap(permissions) });
