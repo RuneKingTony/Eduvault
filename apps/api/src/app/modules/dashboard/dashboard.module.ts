@@ -12,6 +12,7 @@ import { ActivityService } from './activity.service';
 import { DashboardChargesService } from './dashboard-charges.service';
 import { DashboardFinanceController } from './dashboard-finance.controller';
 import { DashboardRollService } from './dashboard-roll.service';
+import { DashboardStoreController } from './dashboard-store.controller';
 import { DashboardStoreTasksService } from './dashboard-store-tasks.service';
 import { DashboardMoneyService } from './dashboard-money.service';
 import {
@@ -38,6 +39,7 @@ import { KyselyDashboardRepository } from './kysely-dashboard.repository';
   controllers: [
     DashboardController,
     DashboardFinanceController,
+    DashboardStoreController,
     ActivityController,
   ],
   providers: [
