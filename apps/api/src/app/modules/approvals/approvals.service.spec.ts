@@ -179,12 +179,31 @@ describe('ApprovalsService.summary', () => {
 
     expect(await service.summary(org('grace'))).toMatchObject({
       waitingForMe: 3,
-      byNav: { approvals: 3, payments: 3 },
+      byNav: { approvals: 3, payments: 3, store: 0 },
     });
     const summary = await withOwn.summary(org('grace'));
     expect(summary.waitingForMe).toBe(3);
-    expect(summary.byNav).toEqual({ approvals: 3, payments: 3 });
+    expect(summary.byNav).toEqual({ approvals: 3, payments: 3, store: 0 });
     expect(summary.preview.map((item) => item.id)).not.toContain('mine');
+  });
+
+  it('counts a store write-off on Store and the money kinds on Payments', async () => {
+    const writeOff = waiting({
+      kind: 'store_write_off',
+      id: 'count-1',
+      details: 'Lekki stock count: School tie: 1 missing',
+      amountMinor: 116_667,
+    });
+    const own = waiting({
+      kind: 'store_write_off',
+      id: 'count-own',
+      createdById: 'grace',
+    });
+    const summary = await serviceOver(
+      provider(voidItem, writeOff, own)
+    ).summary(org('grace'));
+    expect(summary.waitingForMe).toBe(2);
+    expect(summary.byNav).toEqual({ approvals: 2, payments: 1, store: 1 });
   });
 
   it('previews the first five, oldest first', async () => {
@@ -212,7 +231,7 @@ describe('ApprovalsService.summary', () => {
     expect(summary).toEqual({
       currency: 'NGN',
       waitingForMe: 0,
-      byNav: { approvals: 0, payments: 0 },
+      byNav: { approvals: 0, payments: 0, store: 0 },
       preview: [],
     });
   });

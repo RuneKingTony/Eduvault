@@ -2,16 +2,19 @@ import type { ApprovalItem, ApprovalKind } from '@eduvault/api-contract';
 import { money } from '@eduvault/shared';
 import type { AdjustmentsTab } from '../../adjustments-search';
 
-type ToastDestination = '/finance/accounts' | '/finance/payments';
+type ToastDestination =
+  '/finance/accounts' | '/finance/payments' | '/finance/store';
 
 interface ApprovedToast {
   message: string;
   action: { label: string; to: ToastDestination } | null;
 }
 
+type KindTab = AdjustmentsTab | 'counts';
+
 interface KindUi {
-  resource: 'paymentVoids' | 'adjustments' | 'studentDiscounts';
-  tab: AdjustmentsTab;
+  resource: 'paymentVoids' | 'adjustments' | 'studentDiscounts' | 'stockCounts';
+  tab: KindTab;
   approveEffect: string;
   declineEffect: string;
   approvedToast: ApprovedToast;
@@ -69,6 +72,17 @@ export const APPROVAL_KIND_UI: Record<ApprovalKind, KindUi> = {
     declineEffect:
       'The discount is not applied and later charges stay as they are.',
     approvedToast: { message: 'Discount approved.', action: null },
+  },
+  store_write_off: {
+    resource: 'stockCounts',
+    tab: 'counts',
+    approveEffect:
+      'Brings store stock in line with the count and records the missing items as a loss at their average cost.',
+    declineEffect: 'Stock stays as it is.',
+    approvedToast: {
+      message: 'Approved. Stock now matches the count.',
+      action: { label: 'Store', to: '/finance/store' },
+    },
   },
 };
 

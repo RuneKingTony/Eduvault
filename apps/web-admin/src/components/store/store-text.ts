@@ -3,6 +3,8 @@ import type {
   Item,
   ItemKind,
   Sale,
+  StockCount,
+  StockCountStatus,
   StockState,
 } from '@eduvault/api-contract';
 import { countOf, naira } from '@eduvault/shared';
@@ -117,3 +119,43 @@ export const COSTS_HIDDEN_NOTE = 'Hidden · turn on Show costs';
 
 export const termSoldNote = (students: number): string =>
   `${countOf(students, 'student', 'students')} served`;
+
+export const COUNT_STATUS_LABELS: Record<StockCountStatus, string> = {
+  matched: 'Matched',
+  submitted: 'Waiting',
+  approved: 'Approved',
+  rejected: 'Declined',
+};
+
+export const COUNT_MATCHED_MESSAGE = 'Every item matches. Nothing to approve.';
+export const COUNT_APPLIED_MESSAGE = 'Count recorded and stock adjusted.';
+
+export const countWaitingMessage = (netMinor: number): string =>
+  `Count submitted. ${naira(Math.abs(netMinor))} of differences wait for approval.`;
+
+export const countSubmittedMessage = (
+  count: Pick<StockCount, 'status' | 'netValueMinor'>
+): string => {
+  switch (count.status) {
+    case 'matched': {
+      return COUNT_MATCHED_MESSAGE;
+    }
+    case 'approved': {
+      return COUNT_APPLIED_MESSAGE;
+    }
+    case 'submitted':
+    case 'rejected': {
+      return countWaitingMessage(count.netValueMinor);
+    }
+  }
+};
+
+export const countedItemsText = (count: number): string =>
+  `${countOf(count, 'item', 'items')} counted`;
+
+export const differenceText = (difference: number): string => {
+  if (difference === 0) {
+    return 'matches';
+  }
+  return difference > 0 ? `+${difference}` : `−${Math.abs(difference)}`;
+};

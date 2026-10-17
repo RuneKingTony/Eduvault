@@ -7,7 +7,9 @@ import {
   approvalItem,
   approvalList,
   discountApproval,
+  storeWriteOffApproval,
   voidApproval,
+  COUNT_APPROVAL_ID,
 } from '../test-approvals';
 import { APPROVAL_KIND_UI } from '../components/approvals/approval-copy';
 import { renderPayments } from '../test-payments';
@@ -53,6 +55,10 @@ function setup(
       decline: vi.fn().mockResolvedValue(done),
     },
     studentDiscounts: {
+      approve: vi.fn().mockResolvedValue(done),
+      decline: vi.fn().mockResolvedValue(done),
+    },
+    stockCounts: {
       approve: vi.fn().mockResolvedValue(done),
       decline: vi.fn().mockResolvedValue(done),
     },
@@ -177,6 +183,61 @@ describe('ApprovalsPage', () => {
         action: expect.objectContaining({ label: 'Who owes' }),
       })
     );
+  });
+
+  it('lists a store write-off and approves it through the stock counts route, toasting with a Store action', async () => {
+    const api = setup({ list: approvalList([storeWriteOffApproval()]) });
+
+    const row = (await screen.findByText('Store write-off')).closest('tr');
+    expect(
+      within(row as HTMLElement).getByText(
+        'Lekki stock count: School shirt, Size 14: 2 missing; School tie: 1 missing'
+      )
+    ).toBeVisible();
+    expect(within(row as HTMLElement).getByText('₦8,200')).toBeVisible();
+    fireEvent.click(await screen.findByRole('button', { name: /^Approve/ }));
+    const dialog = await screen.findByRole('dialog');
+    expect(
+      within(dialog).getByText('Store write-off · asked by Chika Eze')
+    ).toBeVisible();
+    expect(
+      within(dialog).getByText(
+        'Brings store stock in line with the count and records the missing items as a loss at their average cost.'
+      )
+    ).toBeVisible();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Approve' }));
+
+    await waitFor(() => {
+      expect(api.stockCounts.approve).toHaveBeenCalledWith({
+        params: { id: COUNT_APPROVAL_ID },
+      });
+    });
+    await waitFor(() => {
+      expect(toast.success).toHaveBeenCalledWith(
+        'Approved. Stock now matches the count.',
+        expect.objectContaining({
+          action: expect.objectContaining({ label: 'Store' }),
+        })
+      );
+    });
+  });
+
+  it('declines a store write-off with a reason through the stock counts route', async () => {
+    const api = setup({ list: approvalList([storeWriteOffApproval()]) });
+    fireEvent.click(await screen.findByRole('button', { name: /^Decline/ }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/Stock stays as it is\./)).toBeVisible();
+    fireEvent.change(within(dialog).getByLabelText('Reason'), {
+      target: { value: 'Recount first' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Decline' }));
+
+    await waitFor(() => {
+      expect(api.stockCounts.decline).toHaveBeenCalledWith({
+        params: { id: COUNT_APPROVAL_ID },
+        body: { reason: 'Recount first' },
+      });
+    });
   });
 
   it('shows the refusal in the dialog when someone else decided first', async () => {

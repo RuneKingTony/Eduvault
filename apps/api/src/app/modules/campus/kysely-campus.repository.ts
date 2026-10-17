@@ -228,7 +228,7 @@ export class KyselyCampusRepository extends CampusRepository {
   }
 
   private async hasStock(organizationId: string, id: string): Promise<boolean> {
-    const [delivery, movement] = await Promise.all([
+    const [delivery, movement, count] = await Promise.all([
       this.db
         .selectFrom('stock_delivery')
         .innerJoin('store', 'store.id', 'stock_delivery.store_id')
@@ -245,8 +245,18 @@ export class KyselyCampusRepository extends CampusRepository {
         .where('stock_movement.organization_id', '=', organizationId)
         .limit(1)
         .executeTakeFirst(),
+      this.db
+        .selectFrom('stock_count')
+        .innerJoin('store', 'store.id', 'stock_count.store_id')
+        .select('stock_count.id')
+        .where('store.campus_id', '=', id)
+        .where('stock_count.organization_id', '=', organizationId)
+        .limit(1)
+        .executeTakeFirst(),
     ]);
-    return delivery !== undefined || movement !== undefined;
+    return (
+      delivery !== undefined || movement !== undefined || count !== undefined
+    );
   }
 
   private async hasCharges(

@@ -1,7 +1,8 @@
 import { sql, type Kysely, type RawBuilder } from 'kysely';
 import type { DB } from '../../../db/db-types';
 
-type DecidableTable = 'adjustment' | 'payment_void' | 'student_discount';
+type DecidableTable =
+  'adjustment' | 'payment_void' | 'stock_count' | 'student_discount';
 
 interface DecisionTarget {
   table: DecidableTable;

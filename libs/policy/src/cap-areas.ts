@@ -244,8 +244,9 @@ export const CAP_AREAS: readonly CapArea[] = [
     label: 'Store',
     important: false,
     see: ['store:read'],
-    change: ['store:receive', 'store:issue'],
-    changeDesc: 'Add items, record deliveries and sell to students',
+    change: ['store:receive', 'store:issue', 'store:count'],
+    changeDesc:
+      'Add items, record deliveries, sell to students and count stock',
     extras: [],
   },
   {

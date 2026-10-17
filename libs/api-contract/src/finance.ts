@@ -11,6 +11,7 @@ export const OPENING_BALANCE_SYSTEM_KEY = 'opening_balance_equity';
 export const FEES_RECEIVABLE_SYSTEM_KEY = 'fees_receivable';
 export const DISCOUNTS_GIVEN_SYSTEM_KEY = 'discounts_given';
 export const STORE_STOCK_SYSTEM_KEY = 'store_stock';
+export const STORE_LOSSES_SYSTEM_KEY = 'store_losses';
 export const BAD_DEBT_SYSTEM_KEY = 'bad_debt';
 export const STORE_SALES_SYSTEM_KEY = 'store_sales';
 export const STORE_COST_SYSTEM_KEY = 'store_cost';

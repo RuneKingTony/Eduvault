@@ -20,7 +20,7 @@ function setup(
   slug: string,
   summary = approvalSummary({
     waitingForMe: 3,
-    byNav: { approvals: 3, payments: 3 },
+    byNav: { approvals: 3, payments: 3, store: 0 },
   })
 ) {
   const access = starterAccess(slug);
@@ -60,12 +60,27 @@ describe('SidebarNav counts', () => {
     expect(countOn('Dashboard').queryByText('3')).toBeNull();
   });
 
+  it('shows a store write-off on Store and the money kinds on Payments', async () => {
+    setup(
+      'principal',
+      approvalSummary({
+        waitingForMe: 3,
+        byNav: { approvals: 3, payments: 2, store: 1 },
+      })
+    );
+
+    expect(await screen.findByLabelText('1 waiting for you')).toBeVisible();
+    expect(countOn('Store').getByText('1')).toBeVisible();
+    expect(countOn('Payments').getByText('2')).toBeVisible();
+    expect(countOn('Approvals').getByText('3')).toBeVisible();
+  });
+
   it('shows no count when nothing waits', async () => {
     const api = setup(
       'principal',
       approvalSummary({
         waitingForMe: 0,
-        byNav: { approvals: 0, payments: 0 },
+        byNav: { approvals: 0, payments: 0, store: 0 },
         preview: [],
       })
     );

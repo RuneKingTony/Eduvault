@@ -13,6 +13,8 @@ import {
   LEVEL_ID,
   SHIRT_ID,
   SALE_ID,
+  stockCount,
+  stockCountList,
   deliveryList,
   itemList,
   moneyAccountList,
@@ -89,20 +91,26 @@ function setup(
       saleOptions: vi.fn().mockResolvedValue(saleOptions()),
       recordSale: vi.fn().mockResolvedValue(recordedSale()),
     },
+    stockCounts: {
+      list: vi.fn().mockResolvedValue(stockCountList()),
+      submit: vi.fn().mockResolvedValue(stockCount()),
+    },
     files: { upload: vi.fn() },
   };
   const onSearchChange = vi.fn();
   const onStatement = vi.fn();
+  const onApprovals = vi.fn();
   renderWithApi(
     <StorePage
       search={options.search ?? {}}
       onSearchChange={onSearchChange}
       onStatement={onStatement}
+      onApprovals={onApprovals}
     />,
     api,
     options.access ?? ownerAccess()
   );
-  return { api, onSearchChange, onStatement };
+  return { api, onSearchChange, onStatement, onApprovals };
 }
 
 const rowOf = (text: string) =>
@@ -388,6 +396,55 @@ describe('StorePage', () => {
     expect(onSearchChange).toHaveBeenLastCalledWith({ deliver: 1 });
   });
 
+  it('puts Start a stock count in the overflow menu for the owner', async () => {
+    const { onSearchChange } = setup();
+    fireEvent.keyDown(
+      await screen.findByRole('button', { name: 'More actions' }),
+      { key: 'Enter' }
+    );
+
+    fireEvent.click(
+      await screen.findByRole('menuitem', { name: 'Start a stock count' })
+    );
+
+    expect(onSearchChange).toHaveBeenLastCalledWith({ count: 1 });
+  });
+
+  it('gives a bursar who can only count the overflow menu with just the count, keeping the purchase button', async () => {
+    setup({
+      access: fakeAccess({
+        roles: ['custom'],
+        permissions: toPermissionMap([
+          'store:read',
+          'store:issue',
+          'store:count',
+        ]),
+        campusScope: 'all',
+      }),
+    });
+    expect(
+      await screen.findByRole('button', { name: 'Record student purchase' })
+    ).toBeVisible();
+    fireEvent.keyDown(
+      await screen.findByRole('button', { name: 'More actions' }),
+      { key: 'Enter' }
+    );
+
+    expect(
+      await screen.findByRole('menuitem', { name: 'Start a stock count' })
+    ).toBeVisible();
+    expect(
+      screen.queryByRole('menuitem', { name: 'Record a delivery' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('opens the stock count sheet from the address', async () => {
+    setup({ search: { count: 1 } });
+    expect(
+      await screen.findByRole('heading', { name: 'Stock count' })
+    ).toBeVisible();
+  });
+
   it('gives a bursar who can only sell the purchase button and no overflow menu', async () => {
     setup({
       access: fakeAccess({
@@ -464,6 +521,32 @@ describe('StorePage', () => {
       expect(screen.getByRole('tab', { name: 'Items sold 1' })).toBeVisible();
       expect(screen.getByRole('tab', { name: 'Deliveries 2' })).toBeVisible();
       expect(screen.getByText('Paid · RCT-2026-00012')).toBeVisible();
+    });
+
+    it('counts the Stock counts tab and lists the count with its status and Approvals link', async () => {
+      const { onApprovals } = setup({ search: { tab: 'counts' } });
+
+      expect(await screen.findByText('CNT-2026-0001')).toBeVisible();
+      expect(screen.getByRole('tab', { name: 'Stock counts 1' })).toBeVisible();
+      expect(rowOf('CNT-2026-0001').getByText('Waiting')).toBeVisible();
+      fireEvent.click(screen.getByRole('button', { name: 'Approvals' }));
+      expect(onApprovals).toHaveBeenCalledOnce();
+    });
+
+    it('switches to the Stock counts tab without carrying filters over', async () => {
+      const { onSearchChange } = setup({
+        search: { campus: LEKKI.id, low: 1 },
+      });
+
+      fireEvent.mouseDown(
+        await screen.findByRole('tab', { name: /Stock counts/ })
+      );
+      fireEvent.click(screen.getByRole('tab', { name: /Stock counts/ }));
+
+      expect(onSearchChange).toHaveBeenCalledWith({
+        campus: LEKKI.id,
+        tab: 'counts',
+      });
     });
 
     it('opens a sale by putting its id in the address', async () => {

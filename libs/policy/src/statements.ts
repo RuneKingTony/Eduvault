@@ -15,7 +15,7 @@ export const statements = {
   announcement: ['create', 'read', 'update'],
   ledger: ['read', 'manageAccounts'],
   moneyAccount: ['create', 'read', 'update'],
-  store: ['read', 'receive', 'issue'],
+  store: ['read', 'receive', 'issue', 'count'],
   subject: ['create', 'read', 'update'],
   member: ['create', 'read', 'update', 'delete'],
   ac: ['create', 'read', 'update', 'delete'],
@@ -123,6 +123,8 @@ export const PERM_HELP: Partial<Record<Permission, string>> = {
     'Adds items, edits prices and records deliveries and opening stock, on the campuses they see.',
   'store:issue':
     'Records student purchases at the store, on the campuses they see.',
+  'store:count':
+    'Counts store stock and submits the differences for approval, on the campuses they see.',
 };
 
 const RESOURCE_LABELS: Record<Resource, string> = {

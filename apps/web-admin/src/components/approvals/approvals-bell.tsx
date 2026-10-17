@@ -129,9 +129,14 @@ export function ApprovalsBell() {
   const count = summary?.waitingForMe ?? 0;
   const openItem = (item: ApprovalItem) => {
     setOpen(false);
+    const { tab } = APPROVAL_KIND_UI[item.kind];
+    if (tab === 'counts') {
+      void router.navigate({ to: '/finance/store', search: { tab } });
+      return;
+    }
     void router.navigate({
       to: '/finance/adjustments',
-      search: { ...NO_ADJUSTMENT_SEARCH, tab: APPROVAL_KIND_UI[item.kind].tab },
+      search: { ...NO_ADJUSTMENT_SEARCH, tab },
     });
   };
   const openQueue = () => {
