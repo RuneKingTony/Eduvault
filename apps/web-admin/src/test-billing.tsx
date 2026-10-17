@@ -23,6 +23,7 @@ import type {
 } from '@eduvault/api-contract';
 import { PermissionsProvider } from '@eduvault/auth-client';
 import { TooltipProvider } from '@eduvault/ui';
+import { parseStatementSearch } from './accounts-search';
 import { ApiProvider, type Api } from './api';
 import { parseBillingSearch, parseRunSearch } from './billing-search';
 import { parseFeesSearch } from './fees-search';
@@ -298,6 +299,7 @@ export function renderBilling(
     ),
   });
   const routes = [
+    ['/finance/accounts/$studentId', parseStatementSearch],
     ['/finance/billing', parseBillingSearch],
     ['/finance/billing/$runId', parseRunSearch],
     ['/finance/invoices', parseInvoicesSearch],

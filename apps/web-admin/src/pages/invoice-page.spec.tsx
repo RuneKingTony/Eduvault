@@ -22,9 +22,9 @@ describe('InvoicePage', () => {
     expect(
       await screen.findByRole('heading', { name: /CHG-2026-00001/ })
     ).toBeVisible();
-    expect(
-      screen.getByText('Term fees · Ada Okeke · JSS 2 Gold')
-    ).toBeVisible();
+    expect(screen.getByText(/^Term fees ·/)).toHaveTextContent(
+      'Term fees · Ada Okeke · JSS 2 Gold'
+    );
     const discount = screen
       .getByText('Sibling discount (3 children) (5% of tuition)')
       .closest('tr');
@@ -33,6 +33,18 @@ describe('InvoicePage', () => {
     expect(screen.getByText('Total').closest('tr')).toHaveTextContent(
       '₦171,000'
     );
+  });
+
+  it('links the student name and the Student statement action to the same statement', async () => {
+    const sent = invoice();
+    setup(billingApi({ invoice: sent }));
+    const href = `/finance/accounts/${sent.student.id}`;
+    expect(
+      await screen.findByRole('link', { name: 'Ada Okeke' })
+    ).toHaveAttribute('href', href);
+    expect(
+      screen.getByRole('link', { name: 'Student statement' })
+    ).toHaveAttribute('href', href);
   });
 
   it('shows what was owed before, what is due and the balance today', async () => {
@@ -110,14 +122,6 @@ describe('InvoicePage', () => {
       screen.queryByRole('button', { name: /For your accountant/ })
     ).not.toBeInTheDocument();
     expect(screen.getAllByText('—').length).toBeGreaterThan(0);
-  });
-
-  it('has no Student statement action until the statement exists', async () => {
-    setup();
-    await screen.findByText('Due at issue');
-    expect(
-      screen.queryByRole('link', { name: /Student statement/ })
-    ).not.toBeInTheDocument();
   });
 
   it('shows the not found state for a charge out of scope', async () => {

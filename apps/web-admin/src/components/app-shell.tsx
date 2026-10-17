@@ -14,7 +14,7 @@ import {
 } from '@tanstack/react-router';
 import type { MePermissions } from '@eduvault/api-contract';
 import { PermissionsProvider } from '@eduvault/auth-client';
-import { canAny, type Gate } from '@eduvault/policy';
+import { FINANCE_READ_GATE, canAny, type Gate } from '@eduvault/policy';
 import {
   Sheet,
   SheetContent,
@@ -155,7 +155,7 @@ function commandActions(
     ...(allowed('/finance/payments', ['payment:record'])
       ? [RECORD_PAYMENT_ACTION]
       : []),
-    ...(allowed('/finance/accounts', ['invoice:read', 'payment:read'])
+    ...(allowed('/finance/accounts', FINANCE_READ_GATE)
       ? [WHO_OWES_ACTION]
       : []),
     ...(allowed('/roles/new', ['ac:create']) ? [CREATE_ROLE_ACTION] : []),

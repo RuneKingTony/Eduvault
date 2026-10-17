@@ -54,6 +54,22 @@ describe('WhoOwesPage', () => {
     ).toHaveAttribute('href', expect.stringContaining('/finance/payments'));
   });
 
+  it('leaves the Received tile out when the API omits the received figures', async () => {
+    setup({
+      list: balanceList([balanceRow()], {
+        summary: {
+          totalOwedMinor: 18_000_000,
+          studentsOwing: 1,
+          studentsInScope: 12,
+          scopeNote: 'Lekki campus',
+        },
+      }),
+    });
+
+    expect(await screen.findByText('Total owed')).toBeVisible();
+    expect(screen.queryByText('Received this term')).not.toBeInTheDocument();
+  });
+
   it('sets the filter back to Owing from the first two tiles', async () => {
     const { onSearchChange } = setup({ search: { filter: 'all', page: 3 } });
     fireEvent.click(await screen.findByRole('button', { name: /Total owed/ }));

@@ -6,6 +6,7 @@ import {
   journalKindSchema,
   type BalanceListQuery,
   type StatementFamily,
+  type OwedByLife,
 } from '@eduvault/api-contract';
 import { escapeLike } from '../../common/db/escape-like';
 import { KYSELY_TOKEN, type Database } from '../../common/db/tokens';
@@ -93,6 +94,8 @@ interface KindRow {
   debit: string;
   credit: string;
 }
+
+const minorOf = (value: string | undefined): number => Number(value ?? 0);
 
 const toKind = (row: KindRow): KindMovement => ({
   kind: journalKindSchema.parse(row.kind),
@@ -270,13 +273,48 @@ export class KyselyStudentAccountRepository extends StudentAccountRepository {
     };
   }
 
+  async owedByLife(scope: AccountScope): Promise<OwedByLife> {
+    const { rows } = await sql<Record<keyof OwedByLife, string>>`
+      WITH ${visibleWith(scope)}, ${balancesCte(scope.organizationId)},
+      owed AS (
+        SELECT v.life, COALESCE(v.new_in_session, FALSE) AS new_intake, b.balance
+        FROM visible v
+        JOIN bal b ON b.student_id = v.id
+        WHERE b.balance > 0
+      )
+      SELECT
+        COALESCE(sum(balance) FILTER (WHERE life = 'active'), 0)::text AS active,
+        COALESCE(sum(balance) FILTER (WHERE life = 'active' AND new_intake), 0)::text AS "newIntakes",
+        COALESCE(sum(balance) FILTER (WHERE life = 'inactive'), 0)::text AS inactive,
+        COALESCE(sum(balance) FILTER (WHERE life = 'left'), 0)::text AS "left",
+        COALESCE(sum(balance) FILTER (WHERE life = 'graduated'), 0)::text AS graduated
+      FROM owed`.execute(this.db);
+    const row = rows[0];
+    return {
+      active: minorOf(row?.active),
+      newIntakes: minorOf(row?.newIntakes),
+      inactive: minorOf(row?.inactive),
+      left: minorOf(row?.left),
+      graduated: minorOf(row?.graduated),
+    };
+  }
+
+  async hasCurrentTerm(organizationId: string): Promise<boolean> {
+    const { rows } = await sql<{ present: boolean }>`
+      SELECT EXISTS (
+        SELECT 1 FROM term
+        WHERE organization_id = ${organizationId} AND is_current
+      ) AS present`.execute(this.db);
+    return rows[0]?.present ?? false;
+  }
+
   async receivedThisTerm(
     scope: AccountScope
   ): Promise<{ minor: number; count: number }> {
     const { organizationId } = scope;
     const { rows } = await sql<{ received: string; payments: number }>`
       WITH cur AS (
-        SELECT t.id, t.starts_on FROM term t
+        SELECT t.id, t.starts_on, t.ends_on FROM term t
         WHERE t.organization_id = ${organizationId} AND t.is_current
         LIMIT 1
       ),
@@ -298,6 +336,7 @@ export class KyselyStudentAccountRepository extends StudentAccountRepository {
       WHERE p.organization_id = ${organizationId}
         AND p.status <> 'voided'
         AND p.paid_on >= (SELECT day FROM since)
+        AND p.paid_on <= (SELECT ends_on FROM cur)
         AND ${inScope(currentCampusSql('st'), scope.campusScope)}`.execute(
       this.db
     );

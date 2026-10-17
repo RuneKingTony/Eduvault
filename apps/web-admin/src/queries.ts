@@ -688,6 +688,12 @@ export const dashboardChargedQueryOptions = (api: Api) =>
     queryFn: () => api.dashboard.charged({}),
   });
 
+export const dashboardFinanceQueryOptions = (api: Api) =>
+  queryOptions({
+    queryKey: [...DASHBOARD_KEY, 'finance'],
+    queryFn: () => api.dashboard.finance({}),
+  });
+
 export async function invalidateBilling(
   queryClient: QueryClient
 ): Promise<void> {
@@ -697,6 +703,8 @@ export async function invalidateBilling(
     queryClient.invalidateQueries({ queryKey: [...FEES_KEY, 'preview'] }),
     queryClient.invalidateQueries({ queryKey: [...DASHBOARD_KEY, 'tasks'] }),
     queryClient.invalidateQueries({ queryKey: [...DASHBOARD_KEY, 'charged'] }),
+    queryClient.invalidateQueries({ queryKey: [...DASHBOARD_KEY, 'finance'] }),
+    queryClient.invalidateQueries({ queryKey: [...DASHBOARD_KEY, 'roll'] }),
     queryClient.invalidateQueries({ queryKey: LEDGER_KEY }),
     queryClient.invalidateQueries({ queryKey: MONEY_ACCOUNTS_KEY }),
   ]);
@@ -785,6 +793,8 @@ export async function invalidatePayments(
     queryClient.invalidateQueries({ queryKey: STATEMENTS_KEY }),
     queryClient.invalidateQueries({ queryKey: INVOICES_KEY }),
     queryClient.invalidateQueries({ queryKey: [...DASHBOARD_KEY, 'money'] }),
+    queryClient.invalidateQueries({ queryKey: [...DASHBOARD_KEY, 'finance'] }),
+    queryClient.invalidateQueries({ queryKey: [...DASHBOARD_KEY, 'roll'] }),
     queryClient.invalidateQueries({ queryKey: LEDGER_KEY }),
     queryClient.invalidateQueries({ queryKey: MONEY_ACCOUNTS_KEY }),
   ]);

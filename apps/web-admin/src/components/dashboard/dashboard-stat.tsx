@@ -1,15 +1,28 @@
 import type { ReactNode } from 'react';
+import type { UseQueryResult } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import { Card, CardContent } from '@eduvault/ui';
+import { Card, CardContent, ErrorMessage } from '@eduvault/ui';
+import { NO_ACCOUNT_FILTERS } from '../../accounts-search';
 import { NO_INVOICE_FILTERS } from '../../invoices-search';
+import { NO_PAYMENT_FILTERS } from '../../payments-search';
 import { CardSkeleton } from './card-states';
 
-const searchFor = (to: string) =>
-  to === '/finance/invoices'
-    ? {
-        search: NO_INVOICE_FILTERS,
-      }
-    : {};
+type StatTarget =
+  | '/students'
+  | '/classes'
+  | '/finance/invoices'
+  | '/finance/payments'
+  | '/finance/accounts';
+
+function searchFor(to: StatTarget) {
+  if (to === '/finance/invoices') {
+    return { search: NO_INVOICE_FILTERS };
+  }
+  if (to === '/finance/payments') {
+    return { search: NO_PAYMENT_FILTERS };
+  }
+  return to === '/finance/accounts' ? { search: NO_ACCOUNT_FILTERS } : {};
+}
 
 export function StatCard({
   label,
@@ -21,7 +34,7 @@ export function StatCard({
   label: string;
   value: string | number;
   sub: string;
-  to?: '/students' | '/classes' | '/finance/invoices';
+  to?: StatTarget;
   children?: ReactNode;
 }) {
   const body = (
@@ -50,3 +63,19 @@ export function StatCard({
 }
 
 export const StatSkeleton = () => <CardSkeleton rows={1} />;
+
+export function NullableStat<T>({
+  query,
+  children,
+}: {
+  query: UseQueryResult<T | null>;
+  children: (data: T) => ReactNode;
+}) {
+  if (query.isPending) {
+    return <StatSkeleton />;
+  }
+  if (query.data === undefined) {
+    return <ErrorMessage error={query.error} />;
+  }
+  return <>{query.data === null ? null : children(query.data)}</>;
+}

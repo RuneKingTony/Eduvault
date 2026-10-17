@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useCan, usePermissions } from '@eduvault/auth-client';
-import { MEMBER_ROLE } from '@eduvault/policy';
+import { useCan, useCanAny, usePermissions } from '@eduvault/auth-client';
+import { FINANCE_READ_GATE, MEMBER_ROLE } from '@eduvault/policy';
 import { lagosDateOf } from '@eduvault/shared';
 import {
   Button,
@@ -20,6 +20,8 @@ import { DashboardHeader } from '../components/dashboard/dashboard-header';
 import { selectDashboardView } from '../components/dashboard/dashboard-view';
 import { MyClassesCard } from '../components/dashboard/my-classes-card';
 import { ChargedStat } from '../components/dashboard/charged-stat';
+import { OwedStat } from '../components/dashboard/owed-stat';
+import { ReceivedStat } from '../components/dashboard/received-stat';
 import { RollCard, StudentsStat } from '../components/dashboard/roll-card';
 import { SchoolAccountCard } from '../components/dashboard/school-account-card';
 import {
@@ -88,13 +90,17 @@ function TermSlot({ today }: { today: string }) {
 function StaffStats() {
   const canReadStudents = useCan('student', 'read');
   const canReadCharges = useCan('invoice', 'read');
-  if (!canReadStudents && !canReadCharges) {
+  const canReadPayments = useCan('payment', 'read');
+  const canReadOwed = useCanAny(FINANCE_READ_GATE);
+  if (!canReadStudents && !canReadOwed) {
     return null;
   }
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       {canReadStudents ? <StudentsStat /> : null}
       {canReadCharges ? <ChargedStat /> : null}
+      {canReadPayments ? <ReceivedStat /> : null}
+      {canReadOwed ? <OwedStat /> : null}
     </div>
   );
 }
