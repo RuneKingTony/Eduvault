@@ -24,13 +24,13 @@ import { useApi, type Api } from '../../api';
 import { invalidateApprovals } from '../../queries';
 import { APPROVAL_KIND_UI, DECLINED_TOAST, amountOf } from './approval-copy';
 
-export function approveRequest(api: Api, item: ApprovalItem): Promise<unknown> {
+function approveRequest(api: Api, item: ApprovalItem): Promise<unknown> {
   return api[APPROVAL_KIND_UI[item.kind].resource].approve({
     params: { id: item.id },
   });
 }
 
-export function declineRequest(
+function declineRequest(
   api: Api,
   item: ApprovalItem,
   reason: string

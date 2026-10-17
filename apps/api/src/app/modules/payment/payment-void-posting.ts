@@ -1,6 +1,6 @@
 import type { LedgerLine } from '../../common/ledger';
 
-export const VOID_MEMO_MAX = 500;
+const VOID_MEMO_MAX = 500;
 
 export const voidReference = (paymentReference: string): string =>
   `VOID-${paymentReference}`;

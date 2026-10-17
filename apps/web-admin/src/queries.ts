@@ -852,7 +852,7 @@ export const discountsQueryOptions = (api: Api, page: number) =>
     placeholderData: keepPreviousData,
   });
 
-export const REQUEST_STUDENT_CHOICES = 20;
+const REQUEST_STUDENT_CHOICES = 20;
 
 export const discountTermsQueryOptions = (api: Api) =>
   queryOptions({

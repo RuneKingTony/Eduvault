@@ -21,7 +21,7 @@ import {
 import type { RequestErrors, RequestState } from './request-model';
 import { StudentPicker } from './student-picker';
 
-export interface RequestFieldsProps {
+interface RequestFieldsProps {
   state: RequestState;
   errors: RequestErrors;
   patch: (change: Partial<RequestState>) => void;

@@ -17,7 +17,7 @@ export const VOID_ID = id(701);
 export const ADJUSTMENT_ID = id(702);
 export const DISCOUNT_ID = id(703);
 export const BOLA = id(711);
-export const HALIMA = id(712);
+const HALIMA = id(712);
 
 export const approvalItem = (
   over: Partial<ApprovalItem> = {}
@@ -113,9 +113,7 @@ export const adjustmentList = (
   over: Partial<AdjustmentList> = {}
 ): AdjustmentList => ({ ...listOf(items), ...over });
 
-export const voidRow = (
-  over: Partial<PaymentVoidItem> = {}
-): PaymentVoidItem => ({
+const voidRow = (over: Partial<PaymentVoidItem> = {}): PaymentVoidItem => ({
   id: VOID_ID,
   status: 'submitted',
   reason: 'Keyed the wrong child',

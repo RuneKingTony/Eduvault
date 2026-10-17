@@ -7,7 +7,7 @@ import {
 } from '@eduvault/api-contract';
 import type { StudentFacts } from './adjustment.repository';
 
-export interface CapProblem {
+interface CapProblem {
   message: string;
   creditMinor?: number;
 }

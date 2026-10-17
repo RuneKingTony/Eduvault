@@ -5,7 +5,7 @@ import {
   SELF_APPROVAL_MESSAGE,
 } from '@eduvault/api-contract';
 
-export interface Decision {
+interface Decision {
   actorId: string;
   createdBy: string | null;
 }

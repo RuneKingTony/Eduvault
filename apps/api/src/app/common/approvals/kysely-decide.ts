@@ -9,7 +9,7 @@ interface DecisionTarget {
   id: string;
 }
 
-export async function approveWaiting(
+async function approveWaiting(
   db: Kysely<DB>,
   target: DecisionTarget,
   approval: { userId: string; journalEntryId?: string }
@@ -26,7 +26,7 @@ export async function approveWaiting(
   return (result.numAffectedRows ?? 0n) > 0n;
 }
 
-export async function rejectWaiting(
+async function rejectWaiting(
   db: Kysely<DB>,
   target: DecisionTarget,
   rejection: { userId: string; reason: string }

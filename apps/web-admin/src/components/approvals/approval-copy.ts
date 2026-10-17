@@ -2,7 +2,7 @@ import type { ApprovalItem, ApprovalKind } from '@eduvault/api-contract';
 import { money } from '@eduvault/shared';
 import type { AdjustmentsTab } from '../../adjustments-search';
 
-export type ToastDestination = '/finance/accounts' | '/finance/payments';
+type ToastDestination = '/finance/accounts' | '/finance/payments';
 
 interface ApprovedToast {
   message: string;
