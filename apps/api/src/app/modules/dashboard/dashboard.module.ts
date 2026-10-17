@@ -9,6 +9,10 @@ import { ActivityRepository } from './activity.repository';
 import { ActivityService } from './activity.service';
 import { DashboardChargesService } from './dashboard-charges.service';
 import { DashboardMoneyService } from './dashboard-money.service';
+import {
+  DASHBOARD_TASK_SOURCES,
+  type DashboardTaskSource,
+} from './dashboard-task-source';
 import { DashboardController } from './dashboard.controller';
 import { DashboardRepository } from './dashboard.repository';
 import { DashboardService } from './dashboard.service';
@@ -30,6 +34,11 @@ import { KyselyDashboardRepository } from './kysely-dashboard.repository';
     DashboardMoneyService,
     DashboardChargesService,
     DashboardTasksService,
+    {
+      provide: DASHBOARD_TASK_SOURCES,
+      useFactory: (...sources: DashboardTaskSource[]) => sources,
+      inject: [DashboardService, DashboardChargesService],
+    },
     ActivityService,
     { provide: DashboardRepository, useClass: KyselyDashboardRepository },
     { provide: ActivityRepository, useClass: KyselyActivityRepository },

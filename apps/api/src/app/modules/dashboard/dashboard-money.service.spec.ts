@@ -1,5 +1,8 @@
 import type { MoneyAccount, MoneyAccountList } from '@eduvault/api-contract';
 import type { OrgContext } from '../../common/auth';
+import type { BillingPlanService } from '../billing/billing-plan.service';
+import type { TermInfo } from '../billing/billing.repository';
+import type { InvoiceService } from '../invoice/invoice.service';
 import type { MoneyAccountService } from '../money-account/money-account.service';
 import { DashboardMoneyService } from './dashboard-money.service';
 
@@ -18,9 +21,30 @@ const account = (overrides: Partial<MoneyAccount>): MoneyAccount => ({
   ...overrides,
 });
 
-const serviceFor = (list: MoneyAccountList) => {
+const term: TermInfo = {
+  id: 'term-2',
+  name: 'Second term',
+  schoolYearName: '2026/2027',
+  sessionId: 's1',
+  isCurrent: true,
+  position: { sessionStartsOn: '2026-09-07', sequence: 2 },
+};
+
+const serviceFor = (list: MoneyAccountList, over: { term?: TermInfo } = {}) => {
   const accounts = { list: vi.fn().mockResolvedValue(list) };
-  return new DashboardMoneyService(accounts as unknown as MoneyAccountService);
+  const plans = {
+    currentTerm: vi.fn().mockResolvedValue('term' in over ? over.term : term),
+  };
+  const invoices = {
+    chargedIn: vi
+      .fn()
+      .mockResolvedValue({ currency: 'NGN', count: 3, totalMinor: 54_000_000 }),
+  };
+  return new DashboardMoneyService(
+    accounts as unknown as MoneyAccountService,
+    plans as unknown as BillingPlanService,
+    invoices as unknown as InvoiceService
+  );
 };
 
 const ctx = { organizationId: 'school-a' } as OrgContext;
@@ -98,5 +122,29 @@ describe('DashboardMoneyService.summary', () => {
       accounts: [],
       hiddenSchoolWide: 0,
     });
+  });
+});
+
+describe('DashboardMoneyService.charged', () => {
+  const noAccounts: MoneyAccountList = {
+    currency: 'NGN',
+    items: [],
+    hiddenSchoolWideCount: 0,
+  };
+
+  it('sums the sent term charges of the current term', async () => {
+    const service = serviceFor(noAccounts);
+    expect(await service.charged(ctx)).toEqual({
+      currency: 'NGN',
+      termId: 'term-2',
+      termName: 'Second term, 2026/2027',
+      chargedMinor: 54_000_000,
+      chargeCount: 3,
+    });
+  });
+
+  it('is null with no current term', async () => {
+    const service = serviceFor(noAccounts, { term: undefined });
+    expect(await service.charged(ctx)).toBeNull();
   });
 });

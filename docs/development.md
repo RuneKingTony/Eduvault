@@ -8,8 +8,11 @@ Node 24 (`.nvmrc`), pnpm 10 (`packageManager`), Docker. `pnpm install` also inst
 
 ```sh
 pnpm validate:quick      # lint + typecheck + unit tests, affected projects only
+pnpm validate:one api    # the same three targets for named projects (space-separated)
 nx run api:test-integration   # when API, policy, contract or migrations changed
 ```
+
+`validate:quick` diffs against `origin/main` (`defaultBase` in `nx.json`), so run `git fetch` first, and runs two tasks at a time (`--parallel=2`) to bound memory. A change to `libs/api-contract`, `libs/policy` or `libs/shared`, or to `tsconfig.base.json`, the root ESLint config or `pnpm-lock.yaml`, widens the affected set; use `validate:one` for a small change you know is local. Preview the set with `pnpm nx show projects --affected`.
 
 Never run an unscoped test command across the monorepo. `pnpm validate` runs everything; it is for a final check, not the inner loop.
 

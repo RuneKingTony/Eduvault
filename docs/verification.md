@@ -1,6 +1,6 @@
 # Verification
 
-Every gate, what it catches, and how to fix it. `pnpm validate` runs them in this order and exits non-zero on the first failure; `pnpm validate:quick` runs lint, typecheck and unit tests on affected projects.
+Every gate, what it catches, and how to fix it. `pnpm validate` runs them in this order and exits non-zero on the first failure; `pnpm validate:quick` runs lint, typecheck and unit tests on projects affected against `origin/main`, and `pnpm validate:one <project>` runs the same three targets for the named projects.
 
 | #   | Gate        | Command                       | Catches                                                                                                                     | Fix                                                                            |
 | --- | ----------- | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |

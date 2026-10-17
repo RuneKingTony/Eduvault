@@ -1,11 +1,17 @@
 import { Injectable } from '@nestjs/common';
-import type { DashboardMoney } from '@eduvault/api-contract';
+import type { DashboardCharged, DashboardMoney } from '@eduvault/api-contract';
 import type { OrgContext } from '../../common/auth';
+import { BillingPlanService } from '../billing/billing-plan.service';
+import { InvoiceService } from '../invoice/invoice.service';
 import { MoneyAccountService } from '../money-account/money-account.service';
 
 @Injectable()
 export class DashboardMoneyService {
-  constructor(private readonly accounts: MoneyAccountService) {}
+  constructor(
+    private readonly accounts: MoneyAccountService,
+    private readonly plans: BillingPlanService,
+    private readonly invoices: InvoiceService
+  ) {}
 
   /** Reads through the money-account list so the visibility rule lives in one place. */
   async summary(ctx: OrgContext): Promise<DashboardMoney> {
@@ -27,6 +33,21 @@ export class DashboardMoneyService {
         balanceMinor: account.balanceMinor,
       })),
       hiddenSchoolWide: hiddenSchoolWideCount,
+    };
+  }
+
+  async charged(ctx: OrgContext): Promise<DashboardCharged | null> {
+    const term = await this.plans.currentTerm(ctx);
+    if (term === undefined) {
+      return null;
+    }
+    const totals = await this.invoices.chargedIn(ctx, term.id);
+    return {
+      currency: totals.currency,
+      termId: term.id,
+      termName: `${term.name}, ${term.schoolYearName}`,
+      chargedMinor: totals.totalMinor,
+      chargeCount: totals.count,
     };
   }
 }

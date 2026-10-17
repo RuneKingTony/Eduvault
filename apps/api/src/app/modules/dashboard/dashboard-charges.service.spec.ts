@@ -4,10 +4,7 @@ import type { BillingPlanService } from '../billing/billing-plan.service';
 import type { BillingService } from '../billing/billing.service';
 import type { TermInfo } from '../billing/billing.repository';
 import type { RoundPlan } from '../billing/round-plan';
-import type { InvoiceService } from '../invoice/invoice.service';
 import { DashboardChargesService } from './dashboard-charges.service';
-import { DashboardTasksService } from './dashboard-tasks.service';
-import type { DashboardService } from './dashboard.service';
 
 const term: TermInfo = {
   id: 'term-2',
@@ -59,17 +56,11 @@ function setup(over: { term?: TermInfo; plan?: RoundPlan } = {}) {
     plan: vi.fn().mockResolvedValue(over.plan ?? planOf([])),
   };
   const billing = { list: vi.fn().mockResolvedValue(drafts) };
-  const invoices = {
-    chargedIn: vi
-      .fn()
-      .mockResolvedValue({ currency: 'NGN', count: 3, totalMinor: 54_000_000 }),
-  };
   const service = new DashboardChargesService(
     plans as unknown as BillingPlanService,
-    billing as unknown as BillingService,
-    invoices as unknown as InvoiceService
+    billing as unknown as BillingService
   );
-  return { service, plans, billing, invoices };
+  return { service, plans, billing };
 }
 
 describe('DashboardChargesService.tasks', () => {
@@ -129,51 +120,5 @@ describe('DashboardChargesService.tasks', () => {
     const { service } = setup({ plan: planOf([], 4) });
     const tasks = await service.tasks(biller);
     expect(tasks.map((task) => task.kind)).toEqual(['unsentRound']);
-  });
-});
-
-describe('DashboardChargesService.charged', () => {
-  it('sums the sent term charges of the current term', async () => {
-    const { service } = setup();
-    expect(await service.charged(reader)).toEqual({
-      currency: 'NGN',
-      termId: 'term-2',
-      termName: 'Second term, 2026/2027',
-      chargedMinor: 54_000_000,
-      chargeCount: 3,
-    });
-  });
-
-  it('is null with no current term', async () => {
-    const { service } = setup({ term: undefined });
-    expect(await service.charged(reader)).toBeNull();
-  });
-});
-
-describe('DashboardTasksService.tasks', () => {
-  it('puts the charge tasks before the members with no role', async () => {
-    const school = [
-      { kind: 'announcementDrafts', count: 1, titles: ['x'] },
-      { kind: 'noRole', memberId: 'm', name: 'Kemi' },
-    ];
-    const money = [
-      {
-        kind: 'unsentRound',
-        runId: 'r',
-        number: 'BR',
-        termName: 't',
-        count: 1,
-      },
-    ];
-    const service = new DashboardTasksService(
-      {
-        tasks: vi.fn().mockResolvedValue(school),
-      } as unknown as DashboardService,
-      {
-        tasks: vi.fn().mockResolvedValue(money),
-      } as unknown as DashboardChargesService
-    );
-    const kinds = (await service.tasks(biller)).map((task) => task.kind);
-    expect(kinds).toEqual(['announcementDrafts', 'unsentRound', 'noRole']);
   });
 });

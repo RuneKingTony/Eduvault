@@ -10,6 +10,7 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     include: ['src/**/*.spec.ts'],
+    maxWorkers: 4,
     passWithNoTests: false,
   },
 });

@@ -1,11 +1,10 @@
+import { textOf } from '@eduvault/shared';
+
 export interface FeesSearch {
   term?: string;
   type?: string;
   add?: 1;
 }
-
-const textOf = (value: unknown): string | undefined =>
-  typeof value === 'string' && value.trim() !== '' ? value.trim() : undefined;
 
 export function parseFeesSearch(search: Record<string, unknown>): FeesSearch {
   return {

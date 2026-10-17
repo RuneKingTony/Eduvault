@@ -19,6 +19,7 @@ Before implementing a roadmap slice, read `docs/technical-reference.md` (shared 
 | Need                   | Command                                                                  |
 | ---------------------- | ------------------------------------------------------------------------ |
 | Fast loop (affected)   | `pnpm validate:quick`                                                    |
+| Fast loop (named)      | `pnpm validate:one <project> [<project>...]`                             |
 | Everything             | `pnpm validate` (needs Docker)                                           |
 | One project            | `nx run <project>:<lint\|typecheck\|test\|build>`                        |
 | API integration tests  | `nx run api:test-integration` (real Postgres via Testcontainers)         |
