@@ -101,6 +101,7 @@ export const STARTER_ROLES: readonly StarterRole[] = [
       'ledger:read',
       'store:read',
       'store:receive',
+      'store:issue',
     ],
   },
   {

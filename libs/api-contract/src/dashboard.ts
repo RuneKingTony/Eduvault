@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { moneyAccountKindSchema } from './finance';
 import { currencySchema, idSchema } from './schemas';
+import { storeTermFiguresSchema } from './store';
 
 export const DASHBOARD_SAMPLE_SIZE = 5;
 export const DASHBOARD_LOW_STOCK_NAMES = 3;
@@ -168,5 +169,6 @@ export type DashboardFinance = z.infer<typeof dashboardFinanceSchema>;
 
 export const dashboardStoreSchema = z.object({
   stockValueMinor: z.number().int(),
+  ...storeTermFiguresSchema.shape,
 });
 export type DashboardStore = z.infer<typeof dashboardStoreSchema>;

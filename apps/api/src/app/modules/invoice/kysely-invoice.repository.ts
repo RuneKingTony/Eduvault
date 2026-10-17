@@ -87,6 +87,8 @@ interface DetailRow {
   issued_by_name: string | null;
   entry_sequence: string | null;
   entry_reference: string | null;
+  sale_id: string | null;
+  sale_number: string | null;
 }
 
 interface LineRow {
@@ -292,7 +294,8 @@ export class KyselyInvoiceRepository extends InvoiceRepository {
         i.campus_id, camp.name AS campus_name,
         i.billing_run_id, br.number AS run_number,
         i.created_at, i.issued_at, issuer.name AS issued_by_name,
-        je.sequence::text AS entry_sequence, je.reference AS entry_reference
+        je.sequence::text AS entry_sequence, je.reference AS entry_reference,
+        ss.id AS sale_id, ss.number AS sale_number
       FROM invoice i
       JOIN student st ON st.id = i.student_id AND st.organization_id = i.organization_id
       JOIN term t ON t.id = i.term_id AND t.organization_id = i.organization_id
@@ -305,6 +308,7 @@ export class KyselyInvoiceRepository extends InvoiceRepository {
       LEFT JOIN billing_run br ON br.id = i.billing_run_id AND br.organization_id = i.organization_id
       LEFT JOIN "user" issuer ON issuer.id = i.issued_by
       LEFT JOIN journal_entry je ON je.id = i.journal_entry_id AND je.organization_id = i.organization_id
+      LEFT JOIN store_sale ss ON ss.invoice_id = i.id AND ss.organization_id = i.organization_id
       WHERE i.id = ${id}
         AND i.organization_id = ${scope.organizationId}
         AND ${inScope(currentCampusSql('st'), scope.campusScope)}`.execute(
@@ -352,6 +356,10 @@ export class KyselyInvoiceRepository extends InvoiceRepository {
       issuedBy: row.issued_by_name,
       chargedTo: extra.chargedTo,
       journal: extra.journal,
+      source:
+        row.sale_id === null || row.sale_number === null
+          ? null
+          : { kind: 'store_sale', id: row.sale_id, number: row.sale_number },
       entrySequence:
         row.entry_sequence === null ? null : Number(row.entry_sequence),
     };

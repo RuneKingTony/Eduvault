@@ -10,12 +10,15 @@ import {
   type PortalMe,
   type PortalStatement,
   type PortalStatementQuery,
+  type PortalPriceList,
+  type PortalPurchases,
   type PortalStudent,
 } from '@eduvault/api-contract';
 import { holds } from '@eduvault/policy';
 import type { OrgContext } from '../../common/auth';
 import { AnnouncementService } from '../announcement/announcement.service';
 import { orderTeachers } from '../class/class-view';
+import { StoreReadService } from '../store/store-read.service';
 import { StudentAccountService } from '../student-account/student-account.service';
 import {
   firstNameOf,
@@ -40,7 +43,8 @@ export class PortalService {
   constructor(
     private readonly portal: PortalRepository,
     private readonly announcements: AnnouncementService,
-    private readonly accounts: StudentAccountService
+    private readonly accounts: StudentAccountService,
+    private readonly store: StoreReadService
   ) {}
 
   async me(ctx: OrgContext): Promise<PortalMe> {
@@ -117,6 +121,22 @@ export class PortalService {
       campusId: record.campusId,
       ...query,
     });
+  }
+
+  async purchasesFor(
+    ctx: OrgContext,
+    studentId: string
+  ): Promise<PortalPurchases> {
+    await this.require(ctx, studentId);
+    return this.store.purchasesOf(ctx, studentId);
+  }
+
+  async priceListFor(
+    ctx: OrgContext,
+    studentId: string
+  ): Promise<PortalPriceList> {
+    await this.require(ctx, studentId);
+    return this.store.priceListFor(ctx, studentId);
   }
 
   private async require(

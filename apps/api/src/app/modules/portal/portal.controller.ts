@@ -77,4 +77,22 @@ export class PortalController {
   ): Promise<RouteOutput<typeof routes.familyStatement>> {
     return this.portal.familyStatement(org);
   }
+
+  @Get('students/:studentId/purchases')
+  @OrganizationAuth('invoice', 'readOwn')
+  purchases(
+    @Org() org: OrgContext,
+    @Param(zod(routes.purchases.params)) params: { studentId: string }
+  ): Promise<RouteOutput<typeof routes.purchases>> {
+    return this.portal.purchasesFor(org, params.studentId);
+  }
+
+  @Get('students/:studentId/price-list')
+  @OrganizationAuth('invoice', 'readOwn')
+  priceList(
+    @Org() org: OrgContext,
+    @Param(zod(routes.priceList.params)) params: { studentId: string }
+  ): Promise<RouteOutput<typeof routes.priceList>> {
+    return this.portal.priceListFor(org, params.studentId);
+  }
 }

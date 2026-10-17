@@ -32,7 +32,7 @@ import type { OrgContext } from '../../common/auth';
 import { Clock } from '../../common/clock';
 import { documentYear } from '../../common/documents';
 import { MoneyAccountService } from '../money-account/money-account.service';
-import { paymentRequestHash } from './payment-request-hash';
+import { paymentRequestHash } from '../../common/payments';
 import {
   PaymentRepository,
   type ExistingPayment,

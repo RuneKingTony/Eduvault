@@ -932,6 +932,10 @@ interface StoreDeliveryFilters {
   page?: number;
 }
 
+interface StoreSaleFilters extends StoreDeliveryFilters {
+  studentId?: string;
+}
+
 export const storeSummaryQueryOptions = (api: Api, campusId?: string) =>
   queryOptions({
     queryKey: [...STORE_KEY, 'summary', { campusId }],
@@ -998,6 +1002,29 @@ export const storeDeliveriesQueryOptions = (
     placeholderData: keepPreviousData,
   });
 
+export const storeSalesQueryOptions = (
+  api: Api,
+  { campusId, studentId, page = 1 }: StoreSaleFilters = {}
+) =>
+  queryOptions({
+    queryKey: [...STORE_KEY, 'sales', { campusId, studentId, page }],
+    queryFn: () => api.store.sales({ query: { campusId, studentId, page } }),
+    placeholderData: keepPreviousData,
+  });
+
+export const storeSaleQueryOptions = (api: Api, id: string) =>
+  queryOptions({
+    queryKey: [...STORE_KEY, 'sale', id],
+    queryFn: () => api.store.sale({ params: { id } }),
+  });
+
+export const storeSaleOptionsQueryOptions = (api: Api) =>
+  queryOptions({
+    queryKey: [...STORE_KEY, 'sale-options'],
+    queryFn: () => api.store.saleOptions({}),
+    gcTime: 0,
+  });
+
 export const dashboardStoreQueryOptions = (api: Api) =>
   queryOptions({
     queryKey: [...DASHBOARD_KEY, 'store'],
@@ -1023,3 +1050,10 @@ export const invalidateApprovals = (queryClient: QueryClient): Promise<void> =>
 
 export const invalidatePayments = (queryClient: QueryClient): Promise<void> =>
   invalidateAll(queryClient, MONEY_VIEW_KEYS);
+
+export async function invalidateSale(queryClient: QueryClient): Promise<void> {
+  await Promise.all([
+    invalidateStore(queryClient),
+    invalidatePayments(queryClient),
+  ]);
+}

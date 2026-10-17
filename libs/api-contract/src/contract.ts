@@ -157,6 +157,8 @@ import {
   portalMeSchema,
   portalStatementQuerySchema,
   portalStatementSchema,
+  portalPriceListSchema,
+  portalPurchasesSchema,
   portalStudentParamsSchema,
   portalStudentSchema,
 } from './portal';
@@ -179,7 +181,13 @@ import {
   itemListSchema,
   itemSchema,
   recordDeliverySchema,
+  recordSaleSchema,
   recordedDeliverySchema,
+  recordedSaleSchema,
+  saleListQuerySchema,
+  saleListSchema,
+  saleOptionsSchema,
+  saleSchema,
   storeSummaryQuerySchema,
   storeSummarySchema,
   updateItemSchema,
@@ -1153,6 +1161,29 @@ export const contract = defineContract({
       body: recordDeliverySchema,
       response: recordedDeliverySchema,
     }),
+    sales: defineRoute({
+      method: 'GET',
+      path: '/store/sales',
+      query: saleListQuerySchema,
+      response: saleListSchema,
+    }),
+    saleOptions: defineRoute({
+      method: 'GET',
+      path: '/store/sales/options',
+      response: saleOptionsSchema,
+    }),
+    sale: defineRoute({
+      method: 'GET',
+      path: '/store/sales/:id',
+      params: idParamsSchema,
+      response: saleSchema,
+    }),
+    recordSale: defineRoute({
+      method: 'POST',
+      path: '/store/sales',
+      body: recordSaleSchema,
+      response: recordedSaleSchema,
+    }),
   },
   studentAccounts: {
     balances: defineRoute({
@@ -1217,6 +1248,18 @@ export const contract = defineContract({
       method: 'GET',
       path: '/portal/family-statement',
       response: portalFamilyStatementSchema,
+    }),
+    purchases: defineRoute({
+      method: 'GET',
+      path: '/portal/students/:studentId/purchases',
+      params: portalStudentParamsSchema,
+      response: portalPurchasesSchema,
+    }),
+    priceList: defineRoute({
+      method: 'GET',
+      path: '/portal/students/:studentId/price-list',
+      params: portalStudentParamsSchema,
+      response: portalPriceListSchema,
     }),
   },
   announcements: {

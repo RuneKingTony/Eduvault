@@ -1,4 +1,6 @@
 import {
+  saleRecordedMessage,
+  termSoldNote,
   deliveryRecordedMessage,
   newDeliveryReference,
   scopeNote,
@@ -91,5 +93,22 @@ describe('newDeliveryReference', () => {
     expect(newDeliveryReference('2026-10-07')).not.toBe(
       newDeliveryReference('2026-10-07')
     );
+  });
+});
+
+describe('sale copy', () => {
+  it('confirms the sale with its total and receipt', () => {
+    expect(
+      saleRecordedMessage({
+        number: 'ISS-2026-0001',
+        totalMinor: 1_350_000,
+        receiptNumber: 'RCT-2026-00012',
+      })
+    ).toBe('ISS-2026-0001: ₦13,500 paid, receipt RCT-2026-00012.');
+  });
+
+  it('counts the students served', () => {
+    expect(termSoldNote(1)).toBe('1 student served');
+    expect(termSoldNote(4)).toBe('4 students served');
   });
 });

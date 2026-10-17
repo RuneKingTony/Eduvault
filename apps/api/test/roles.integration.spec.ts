@@ -769,6 +769,7 @@ test.describe('roles', () => {
           'ledger:read',
           'store:read',
           'store:receive',
+          'store:issue',
         ],
         { campuses: [lekki] }
       );
@@ -808,6 +809,7 @@ test.describe('roles', () => {
         'ledger:read',
         'store:read',
         'store:receive',
+        'store:issue',
       ]);
       const res = await api(deleter).delete('/roles/bursar').expect(409);
       expect(res.body.message).toBe(

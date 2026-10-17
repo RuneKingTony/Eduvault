@@ -19,6 +19,7 @@ export interface MovementRecord extends KindMovement {
   effectiveOn: string;
   reference: string;
   memo: string | null;
+  storeSale: boolean;
   invoice: { id: string; termLabel: string; descriptions: string } | null;
   payment: {
     id: string;
@@ -147,10 +148,12 @@ export function statementRowsOf(
 export function unpaidOf(
   movementsOldestFirst: readonly MovementRecord[]
 ): StatementUnpaid[] {
-  const nets = movementsOldestFirst.map((movement) => ({
-    ...movement,
-    netMinor: movement.debitMinor - movement.creditMinor,
-  }));
+  const nets = movementsOldestFirst
+    .filter((movement) => !movement.storeSale)
+    .map((movement) => ({
+      ...movement,
+      netMinor: movement.debitMinor - movement.creditMinor,
+    }));
   return unpaidCharges(nets).map((charge) => ({
     reference: charge.kind === 'opening' ? OPENING : charge.reference,
     outstandingMinor: charge.outstandingMinor,

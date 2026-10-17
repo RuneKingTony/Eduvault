@@ -5,7 +5,7 @@ import {
   announcementSummarySchema,
 } from './announcements';
 import { FINANCE_PAGE_SIZE, FINANCE_PAGE_SIZE_MAX } from './finance';
-import { currencySchema, idSchema } from './schemas';
+import { currencySchema, idSchema, paymentMethodSchema } from './schemas';
 import {
   statementRowStatusSchema,
   statementTotalsSchema,
@@ -170,3 +170,53 @@ export const portalFamilyStatementSchema = z.object({
   ),
 });
 export type PortalFamilyStatement = z.infer<typeof portalFamilyStatementSchema>;
+
+export const portalPurchaseLineSchema = z.object({
+  itemName: z.string(),
+  quantity: z.number().int().positive(),
+  unitPriceMinor: z.number().int().positive(),
+  amountMinor: z.number().int().positive(),
+});
+export type PortalPurchaseLine = z.infer<typeof portalPurchaseLineSchema>;
+
+export const portalPurchaseSchema = z.object({
+  id: idSchema,
+  date: z.iso.date(),
+  campusName: z.string(),
+  receiptNumber: z.string(),
+  method: paymentMethodSchema,
+  totalMinor: z.number().int().positive(),
+  lines: z.array(portalPurchaseLineSchema),
+});
+export type PortalPurchase = z.infer<typeof portalPurchaseSchema>;
+
+export const portalPurchasesSchema = z.object({
+  termName: z.string().nullable(),
+  spentThisTermMinor: z.number().int().nonnegative(),
+  termPurchaseCount: z.number().int().nonnegative(),
+  itemsBought: z.number().int().nonnegative(),
+  sales: z.array(portalPurchaseSchema),
+});
+export type PortalPurchases = z.infer<typeof portalPurchasesSchema>;
+
+export const portalPriceListSchema = z.object({
+  levelName: z.string().nullable(),
+  books: z.array(
+    z.object({
+      name: z.string(),
+      priceMinor: z.number().int().positive(),
+      inStock: z.boolean(),
+    })
+  ),
+  uniforms: z.array(
+    z.object({
+      name: z.string(),
+      sizes: z.array(z.string()),
+      minPriceMinor: z.number().int().positive(),
+      maxPriceMinor: z.number().int().positive(),
+      inStock: z.boolean(),
+    })
+  ),
+  paymentMethods: z.array(paymentMethodSchema),
+});
+export type PortalPriceList = z.infer<typeof portalPriceListSchema>;

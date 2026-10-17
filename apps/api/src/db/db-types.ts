@@ -574,6 +574,32 @@ export interface Store {
   updated_at: Generated<Timestamp>;
 }
 
+export interface StoreSale {
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  invoice_id: string;
+  number: string;
+  organization_id: string;
+  payment_id: string;
+  reference: string;
+  request_hash: string;
+  sold_by: string | null;
+  sold_on: Timestamp;
+  store_id: string;
+  student_id: string;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface StoreSaleLine {
+  cost_minor: Int8;
+  id: Generated<string>;
+  item_id: string;
+  organization_id: string;
+  quantity: number;
+  store_sale_id: string;
+  unit_price_minor: Int8;
+}
+
 export interface Student {
   admission_number: string;
   admitted_on: Timestamp;
@@ -776,6 +802,8 @@ export interface DB {
   stock_delivery_line: StockDeliveryLine;
   stock_movement: StockMovement;
   store: Store;
+  store_sale: StoreSale;
+  store_sale_line: StoreSaleLine;
   student: Student;
   student_discount: StudentDiscount;
   student_enrollment: StudentEnrollment;

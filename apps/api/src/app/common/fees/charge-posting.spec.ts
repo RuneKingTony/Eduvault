@@ -1,4 +1,4 @@
-import { assertBalancedLines } from '../../common/ledger';
+import { assertBalancedLines } from '../ledger';
 import { chargePostingLines } from './charge-posting';
 
 const base = {

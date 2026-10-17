@@ -58,7 +58,7 @@ export const FILE_KIND_RULES: Record<FileKind, FileKindRule> = {
   payment_proof: {
     maxBytes: PAYMENT_PROOF.maxBytes,
     types: PAYMENT_PROOF.types,
-    write: ['payment:record'],
+    write: ['payment:record', 'store:issue'],
     read: 'payment:read',
     campusScoped: true,
     locked: PAYMENT_PROOF_LOCKED_MESSAGE,

@@ -17,6 +17,7 @@ import {
 } from '../../common/ledger';
 import {
   currentCampusSql,
+  payingGuardian,
   inScope,
   studentClassNameSql,
   visibleStudentsCte,
@@ -142,6 +143,7 @@ interface MovementRow {
   receipt_number: string | null;
   payer_name: string | null;
   method: string | null;
+  store_sale: boolean;
 }
 
 function toMovement(row: MovementRow): MovementRecord {
@@ -154,6 +156,7 @@ function toMovement(row: MovementRow): MovementRecord {
     memo: row.memo,
     debitMinor: Number(row.debit),
     creditMinor: Number(row.credit),
+    storeSale: row.store_sale,
     invoice:
       row.invoice_id === null
         ? null
@@ -244,6 +247,12 @@ export class KyselyStudentAccountRepository extends StudentAccountRepository {
       WHERE jl.organization_id = ${organizationId}
         AND jl.ledger_account_id = ${receivableAccountIdSql(organizationId)}
         AND jl.student_id IN (${sql.join(studentIds)})
+        AND je.kind <> 'store'
+        AND NOT EXISTS (
+          SELECT 1 FROM payment sp
+          JOIN store_sale ss ON ss.payment_id = sp.id AND ss.organization_id = sp.organization_id
+          WHERE sp.journal_entry_id = je.id AND sp.organization_id = je.organization_id
+        )
       GROUP BY jl.student_id, je.kind`.execute(this.db);
     for (const row of rows) {
       const list = grouped.get(row.student_id) ?? [];
@@ -325,6 +334,7 @@ export class KyselyStudentAccountRepository extends StudentAccountRepository {
           JOIN journal_entry je ON je.id = i.journal_entry_id AND je.organization_id = i.organization_id
           WHERE i.organization_id = ${organizationId}
             AND i.term_id = cur.id AND i.status = 'issued'
+            AND i.kind <> 'store'
         ), cur.starts_on)) AS day
         FROM cur
       )
@@ -335,6 +345,10 @@ export class KyselyStudentAccountRepository extends StudentAccountRepository {
       JOIN student st ON st.id = pa.student_id AND st.organization_id = pa.organization_id
       WHERE p.organization_id = ${organizationId}
         AND p.status <> 'voided'
+        AND NOT EXISTS (
+          SELECT 1 FROM store_sale ss
+          WHERE ss.payment_id = p.id AND ss.organization_id = p.organization_id
+        )
         AND p.paid_on >= (SELECT day FROM since)
         AND p.paid_on <= (SELECT ends_on FROM cur)
         AND ${inScope(currentCampusSql('st'), scope.campusScope)}`.execute(
@@ -408,7 +422,12 @@ export class KyselyStudentAccountRepository extends StudentAccountRepository {
           FROM invoice_line il
           WHERE il.invoice_id = inv.id AND il.organization_id = inv.organization_id
         ) AS invoice_lines,
-        pay.id AS payment_id, pay.receipt_number, pay.payer_name, pay.method
+        pay.id AS payment_id, pay.receipt_number, pay.payer_name, pay.method,
+        EXISTS (
+          SELECT 1 FROM store_sale ss
+          WHERE ss.organization_id = je.organization_id
+            AND (ss.invoice_id = inv.id OR ss.payment_id = pay.id)
+        ) AS store_sale
       FROM journal_line jl
       JOIN journal_entry je ON je.id = jl.entry_id AND je.organization_id = jl.organization_id
       LEFT JOIN invoice inv
@@ -429,28 +448,17 @@ export class KyselyStudentAccountRepository extends StudentAccountRepository {
     scope: AccountScope,
     studentId: string
   ): Promise<StatementFamily> {
-    const payer = await this.db
-      .selectFrom('guardian_student as gs')
-      .innerJoin('guardian as g', (join) =>
-        join
-          .onRef('g.id', '=', 'gs.guardian_id')
-          .onRef('g.organization_id', '=', 'gs.organization_id')
-      )
-      .select(['g.id', 'g.full_name'])
-      .where('gs.organization_id', '=', scope.organizationId)
-      .where('gs.student_id', '=', studentId)
-      .where('gs.pays_fees', '=', true)
-      .orderBy('gs.created_at')
-      .orderBy('gs.id')
-      .limit(1)
-      .executeTakeFirst();
+    const payer = await payingGuardian(this.db, {
+      organizationId: scope.organizationId,
+      studentId,
+    });
     if (payer === undefined) {
       return null;
     }
     const children = await this.childIds(scope, payer.id);
     return {
       guardianId: payer.id,
-      guardianName: payer.full_name,
+      guardianName: payer.fullName,
       childCount: children.length,
     };
   }

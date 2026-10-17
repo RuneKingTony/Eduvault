@@ -29,6 +29,8 @@ import {
   portalFamilyStatement,
   portalMe,
   portalStatement,
+  portalPriceList,
+  portalPurchases,
   portalStudent,
 } from './test-utils';
 
@@ -74,6 +76,8 @@ function fakeApi(
       announcementList: vi.fn().mockResolvedValue(portalAnnouncementList()),
       statement: vi.fn().mockResolvedValue(portalStatement()),
       familyStatement: vi.fn().mockResolvedValue(portalFamilyStatement()),
+      purchases: vi.fn().mockResolvedValue(portalPurchases()),
+      priceList: vi.fn().mockResolvedValue(portalPriceList()),
     },
     calendar: {
       current: vi.fn().mockResolvedValue(calendarCurrent()),
@@ -171,6 +175,60 @@ describe('the portal routes', () => {
       expect(router.state.location.pathname).toBe('/');
     });
     expect(router.state.location.search).toEqual({ child: 'tobi' });
+  });
+
+  it('opens Purchases for the chosen child, last in the nav, carrying the child', async () => {
+    const api = fakeApi(
+      access(['guardian'], ['student:readOwn', 'invoice:readOwn'])
+    );
+    const router = renderAt('/?child=tobi', api);
+    await screen.findByRole('heading', { name: 'Ada Okeke' });
+    const links = screen
+      .getAllByRole('link')
+      .map((link) => link.textContent)
+      .filter((text) => ['My children', 'Home', 'Purchases'].includes(text));
+    expect(links.at(-1)).toBe('Purchases');
+
+    screen.getAllByRole('link', { name: 'Purchases' })[0]?.click();
+
+    expect(
+      await screen.findByRole('heading', { name: 'Purchases' })
+    ).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe('/purchases');
+    expect(router.state.location.search).toEqual({ child: 'tobi' });
+    expect(api.portal.purchases).toHaveBeenCalledWith({
+      params: { studentId: 'tobi' },
+    });
+    expect(api.portal.priceList).toHaveBeenCalledWith({
+      params: { studentId: 'tobi' },
+    });
+  });
+
+  it('falls back to the first child on Purchases for an id that is not linked', async () => {
+    const api = fakeApi(
+      access(['guardian'], ['student:readOwn', 'invoice:readOwn'])
+    );
+    renderAt('/purchases?child=another-family', api);
+    await screen.findByRole('heading', { name: 'Purchases' });
+    expect(api.portal.purchases).toHaveBeenCalledWith({
+      params: { studentId: 'ada' },
+    });
+    expect(api.portal.purchases).not.toHaveBeenCalledWith({
+      params: { studentId: 'another-family' },
+    });
+  });
+
+  it('sends a family without invoice:readOwn from Purchases to Home and keeps it out of the nav', async () => {
+    const api = fakeApi(access(['guardian'], ['student:readOwn']));
+    const router = renderAt('/purchases?child=ada', api);
+    expect(
+      await screen.findByRole('heading', { name: 'Ada Okeke' })
+    ).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe('/');
+    expect(
+      screen.queryByRole('link', { name: 'Purchases' })
+    ).not.toBeInTheDocument();
+    expect(api.portal.purchases).not.toHaveBeenCalled();
   });
 
   it('sends a student on /children to Home', async () => {

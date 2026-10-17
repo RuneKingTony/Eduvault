@@ -1,4 +1,4 @@
-import type { LedgerLine } from '../../common/ledger';
+import type { LedgerLine } from '../ledger';
 
 interface PostingInput {
   moneyLedgerAccountId: string;

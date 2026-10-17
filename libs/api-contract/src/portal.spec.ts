@@ -7,6 +7,8 @@ import {
   portalChildSchema,
   portalFamilyStatementSchema,
   portalMeSchema,
+  portalPriceListSchema,
+  portalPurchasesSchema,
   portalStatementQuerySchema,
   portalStatementSchema,
   portalStudentParamsSchema,
@@ -144,6 +146,8 @@ describe('the portal routes', () => {
       'children',
       'familyStatement',
       'me',
+      'priceList',
+      'purchases',
       'statement',
       'student',
     ]);
@@ -278,5 +282,77 @@ describe('the portal family statement', () => {
     expect(contract.portal.statement.path).toBe(
       '/portal/students/:studentId/statement'
     );
+  });
+});
+
+describe('portalPurchasesSchema', () => {
+  const purchases = {
+    termName: 'First term',
+    spentThisTermMinor: 650_000,
+    termPurchaseCount: 1,
+    itemsBought: 2,
+    sales: [
+      {
+        id,
+        date: '2026-09-08',
+        campusName: 'Lekki',
+        receiptNumber: 'RCT-2026-0001',
+        method: 'pos',
+        totalMinor: 650_000,
+        lines: [
+          {
+            itemName: 'Mathematics',
+            quantity: 2,
+            unitPriceMinor: 325_000,
+            amountMinor: 650_000,
+          },
+        ],
+      },
+    ],
+  };
+
+  it('parses the sales with their frozen line prices', () => {
+    expect(portalPurchasesSchema.parse(purchases)).toEqual(purchases);
+  });
+
+  it('takes no sales and no current term', () => {
+    expect(
+      portalPurchasesSchema.safeParse({
+        termName: null,
+        spentThisTermMinor: 0,
+        termPurchaseCount: 0,
+        itemsBought: 0,
+        sales: [],
+      }).success
+    ).toBe(true);
+  });
+
+  it('refuses a method the school never offered', () => {
+    expect(
+      portalPurchasesSchema.safeParse({
+        ...purchases,
+        sales: [{ ...purchases.sales[0], method: 'cheque' }],
+      }).success
+    ).toBe(false);
+  });
+});
+
+describe('portalPriceListSchema', () => {
+  it('lists books, uniform sizes with a price range and the ways to pay', () => {
+    const list = {
+      levelName: 'JSS 2',
+      books: [{ name: 'Mathematics', priceMinor: 325_000, inStock: false }],
+      uniforms: [
+        {
+          name: 'School shirt',
+          sizes: ['Size 10', 'Size 12'],
+          minPriceMinor: 350_000,
+          maxPriceMinor: 450_000,
+          inStock: true,
+        },
+      ],
+      paymentMethods: ['cash', 'pos'],
+    };
+    expect(portalPriceListSchema.parse(list)).toEqual(list);
   });
 });

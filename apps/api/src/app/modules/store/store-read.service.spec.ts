@@ -1,24 +1,45 @@
 import { NotFoundException } from '@nestjs/common';
-import { deliveryListQuerySchema } from '@eduvault/api-contract';
+import {
+  deliveryListQuerySchema,
+  saleListQuerySchema,
+} from '@eduvault/api-contract';
+import { toPermissionMap, type Permission } from '@eduvault/policy';
 import type { OrgContext } from '../../common/auth';
 import {
   FakeStoreRepository,
   storeItem,
   storeRef,
 } from './fake-store.repository';
+import { Clock } from '../../common/clock';
+import {
+  FakeSaleRepository,
+  noTermFigures,
+  saleAccount,
+} from './fake-sale.repository';
 import { StoreReadService } from './store-read.service';
 
-const ctx = (campusScope: 'all' | string[] = 'all') =>
+const ctx = (
+  campusScope: 'all' | string[] = 'all',
+  permissions: Permission[] = ['store:issue', 'payment:read']
+) =>
   ({
     organizationId: 'school-a',
     user: { id: 'chika', email: 'chika@eduvault.test', name: 'Chika' },
+    permissions: toPermissionMap(permissions),
     campusScope,
   }) as unknown as OrgContext;
 
 function setup() {
   const repository = new FakeStoreRepository();
   repository.stores = [storeRef('lekki', 'Lekki'), storeRef('ikeja', 'Ikeja')];
-  return { repository, service: new StoreReadService(repository) };
+  const sales = new FakeSaleRepository();
+  const clock = new Clock();
+  clock.set('2026-10-07');
+  return {
+    repository,
+    sales,
+    service: new StoreReadService(repository, sales, clock),
+  };
 }
 
 const names = ['Tie', 'Pinafore', 'Trousers', 'Sportswear set', 'School shirt'];
@@ -99,14 +120,17 @@ describe('StoreReadService.summary', () => {
     expect(await service.summary(ctx())).toEqual({
       stockValueMinor: 4_200_000,
       lowCount: 1,
+      ...noTermFigures,
     });
     expect(await service.summary(ctx(['lekki']))).toEqual({
       stockValueMinor: 3_500_000,
       lowCount: 0,
+      ...noTermFigures,
     });
     expect(await service.summary(ctx(), 'ikeja')).toEqual({
       stockValueMinor: 700_000,
       lowCount: 1,
+      ...noTermFigures,
     });
   });
 
@@ -138,10 +162,127 @@ describe('StoreReadService.summary', () => {
 
     expect(await service.dashboardStore(ctx())).toEqual({
       stockValueMinor: 4_200_000,
+      ...noTermFigures,
     });
     expect(await service.dashboardStore(ctx(['ikeja']))).toEqual({
       stockValueMinor: 700_000,
+      ...noTermFigures,
     });
+  });
+
+  it('adds this term’s sales to the summary and the dashboard card', async () => {
+    const { sales, service } = setup();
+    sales.figures = {
+      termSalesMinor: 1_350_000,
+      termCostMinor: 1_000_000,
+      termSalesCount: 2,
+      termItemsSold: 5,
+      termStudentsServed: 2,
+    };
+
+    expect(await service.summary(ctx())).toMatchObject(sales.figures);
+    expect(await service.dashboardStore(ctx())).toMatchObject(sales.figures);
+  });
+});
+
+describe('StoreReadService sales', () => {
+  it('lists ten to a page after checking the campus filter', async () => {
+    const { sales, service } = setup();
+    await service.saleList(ctx(), saleListQuerySchema.parse({ page: '2' }));
+    expect(sales.listed).toEqual([{ page: 2, pageSize: 10 }]);
+    await expect(
+      service.saleList(
+        ctx(['lekki']),
+        saleListQuerySchema.parse({
+          campusId: '6f1d2a7c-3b0e-4e53-9c55-0d6a3f5f2b10',
+        })
+      )
+    ).rejects.toThrow(new NotFoundException('Campus not found'));
+  });
+
+  it('answers 404 for a sale outside scope', async () => {
+    const { service } = setup();
+    await expect(service.sale(ctx(), 'nope')).rejects.toThrow(
+      new NotFoundException('Sale not found')
+    );
+  });
+
+  it('offers the sheet only open accounts that are not gateways', async () => {
+    const { sales, service } = setup();
+    sales.accountRows = [
+      saleAccount({ id: 'cash', kind: 'cash' }),
+      saleAccount({ id: 'old', kind: 'pos', retired: true }),
+      saleAccount({ id: 'gate', kind: 'gateway' }),
+    ];
+    sales.methods = { cash: true, transfer: false, pos: true };
+
+    const options = await service.saleOptions(ctx());
+
+    expect(options.accounts).toEqual([
+      { id: 'cash', name: 'Lekki cash box', kind: 'cash', campusId: 'lekki' },
+    ]);
+    expect(options.methods).toEqual({ cash: true, transfer: false, pos: true });
+  });
+
+  it('asks for fee balances only from a caller who can read payments', async () => {
+    const { sales, service } = setup();
+    await service.saleOptions(ctx('all', ['store:issue']));
+    expect(sales.optionRequests.at(-1)).toMatchObject({ withBalance: false });
+    await service.saleOptions(ctx());
+    expect(sales.optionRequests.at(-1)).toMatchObject({ withBalance: true });
+  });
+});
+
+describe('StoreReadService portal reads', () => {
+  it('builds the price list from the child’s campus store', async () => {
+    const { repository, sales, service } = setup();
+    const maths = storeItem({
+      kind: 'book',
+      name: 'Mathematics',
+      variant: null,
+      classLevel: { id: 'jss2', name: 'JSS 2' },
+    });
+    const tie = storeItem({ name: 'Tie', variant: null });
+    repository.items = [maths, tie];
+    repository.totals = [
+      { storeId: 'store-lekki', itemId: maths.id, onHand: 0, valueMinor: 0 },
+      { storeId: 'store-lekki', itemId: tie.id, onHand: 3, valueMinor: 30 },
+      { storeId: 'store-ikeja', itemId: maths.id, onHand: 9, valueMinor: 90 },
+    ];
+    sales.placement = {
+      levelId: 'jss2',
+      levelName: 'JSS 2',
+      campusId: 'lekki',
+    };
+    sales.methods = { cash: true, transfer: false, pos: true };
+
+    expect(await service.priceListFor(ctx(), 'ada')).toEqual({
+      levelName: 'JSS 2',
+      books: [{ name: 'Mathematics', priceMinor: 450_000, inStock: false }],
+      uniforms: [
+        {
+          name: 'Tie',
+          sizes: [],
+          minPriceMinor: 450_000,
+          maxPriceMinor: 450_000,
+          inStock: true,
+        },
+      ],
+      paymentMethods: ['cash', 'pos'],
+    });
+  });
+
+  it('answers 404 for a student with no placement', async () => {
+    const { service } = setup();
+    await expect(service.priceListFor(ctx(), 'ghost')).rejects.toThrow(
+      NotFoundException
+    );
+  });
+
+  it('hands the purchases through', async () => {
+    const { sales, service } = setup();
+    sales.purchases = { ...sales.purchases, itemsBought: 3 };
+    expect((await service.purchasesOf(ctx(), 'ada')).itemsBought).toBe(3);
   });
 });
 

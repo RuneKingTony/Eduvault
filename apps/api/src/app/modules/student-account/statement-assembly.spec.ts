@@ -19,6 +19,7 @@ const base: MovementRecord = {
   memo: null,
   debitMinor: 0,
   creditMinor: 0,
+  storeSale: false,
   invoice: null,
   payment: null,
 };
@@ -251,6 +252,32 @@ describe('unpaidOf', () => {
     };
     expect(unpaidOf([opening])).toEqual([
       { reference: 'Opening balance', outstandingMinor: 4_000_000, link: null },
+    ]);
+  });
+
+  it('leaves a store sale and its payment out, so older debt keeps its full amount', () => {
+    const sale: MovementRecord = {
+      ...base,
+      entryId: 'entry-3',
+      reference: 'CHG-2026-00002',
+      kind: 'store',
+      storeSale: true,
+      debitMinor: 900_000,
+    };
+    const salePayment: MovementRecord = {
+      ...receipt,
+      entryId: 'entry-4',
+      storeSale: true,
+      creditMinor: 900_000,
+    };
+    expect(
+      unpaidOf([{ ...charge, creditMinor: 0 }, sale, salePayment])
+    ).toEqual([
+      {
+        reference: 'CHG-2026-00001',
+        outstandingMinor: 22_000_000,
+        link: { type: 'invoice', id: 'invoice-1' },
+      },
     ]);
   });
 

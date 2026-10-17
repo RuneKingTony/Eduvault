@@ -1,6 +1,7 @@
 import { Link } from '@tanstack/react-router';
 import { InfoIcon } from 'lucide-react';
 import type { Invoice } from '@eduvault/api-contract';
+import { useCan } from '@eduvault/auth-client';
 import { fmtTimestamp, money } from '@eduvault/shared';
 import {
   Card,
@@ -86,6 +87,29 @@ export function AmountDueCard({ invoice }: { invoice: Invoice }) {
   );
 }
 
+function SourceRow({ invoice }: { invoice: Invoice }) {
+  const canOpen = useCan('store', 'read');
+  const { source } = invoice;
+  if (source === null) {
+    return null;
+  }
+  return (
+    <Row label="Source">
+      {canOpen ? (
+        <Link
+          to="/finance/store"
+          search={{ tab: 'sold', sale: source.id }}
+          className="font-mono underline-offset-4 hover:underline"
+        >
+          {source.number}
+        </Link>
+      ) : (
+        <span className="font-mono">{source.number}</span>
+      )}
+    </Row>
+  );
+}
+
 export function InvoiceDetailsCard({ invoice }: { invoice: Invoice }) {
   const { billingRun } = invoice;
   return (
@@ -117,6 +141,7 @@ export function InvoiceDetailsCard({ invoice }: { invoice: Invoice }) {
               </Link>
             )}
           </Row>
+          <SourceRow invoice={invoice} />
           <Row label="Issued">{issuedText(invoice)}</Row>
           <Row label="Charged to">
             {invoice.chargedTo === null

@@ -25,6 +25,7 @@ import {
 import type { DayOff } from '@eduvault/shared';
 import { MyAccessProvider } from './components/my-access';
 import { currentCalendar } from './test-calendar';
+import { NO_SALES } from './test-store';
 import { ownerAccess, renderWithApi } from './test-utils';
 
 const authClient = {
@@ -114,7 +115,7 @@ const financeOf = (overrides: { finance?: DashboardFinance | null }) =>
   overrides.finance === undefined ? finance() : overrides.finance;
 
 const storeOf = (overrides: { store?: DashboardStore }): DashboardStore =>
-  overrides.store ?? { stockValueMinor: 0 };
+  overrides.store ?? { stockValueMinor: 0, ...NO_SALES };
 
 export function dashboardApi(
   overrides: {

@@ -1,10 +1,11 @@
 import { randomUUID } from 'node:crypto';
-import { sql, type Kysely } from 'kysely';
+import type { Kysely } from 'kysely';
 import {
   OPENING_BALANCE_SYSTEM_KEY,
   STORE_STOCK_SYSTEM_KEY,
 } from '@eduvault/api-contract';
 import type { DB } from '../../../db/db-types';
+import { advisoryLock } from '../../common/db/advisory-lock';
 import { uniqueViolation } from '../../common/db/unique-violation';
 import {
   allocateDocumentNumber,
@@ -57,9 +58,6 @@ export async function hasOpeningStock(
     .executeTakeFirst();
   return row !== undefined;
 }
-
-const lock = (trx: Kysely<DB>, key: string) =>
-  sql`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))`.execute(trx);
 
 async function numberFor(trx: Kysely<DB>, input: NewDelivery): Promise<string> {
   if (input.isOpening) {
@@ -192,9 +190,12 @@ async function recordIn(
   input: NewDelivery
 ): Promise<DeliveryOutcome> {
   const { organizationId, reference } = input;
-  await lock(trx, `delivery:${organizationId}:${reference}`);
+  await advisoryLock(trx, `delivery:${organizationId}:${reference}`);
   if (input.isOpening) {
-    await lock(trx, `delivery-opening:${organizationId}:${input.store.id}`);
+    await advisoryLock(
+      trx,
+      `delivery-opening:${organizationId}:${input.store.id}`
+    );
   }
   const existing = await findDeliveryByReference(
     trx,

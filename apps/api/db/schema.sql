@@ -338,6 +338,25 @@ END;
 $$;
 
 --
+-- Name: payment_store_sale_stays_posted(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.payment_store_sale_stays_posted() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  IF NEW.status IS DISTINCT FROM OLD.status AND NEW.status <> 'posted' AND EXISTS (
+    SELECT 1 FROM store_sale
+    WHERE payment_id = OLD.id AND organization_id = OLD.organization_id
+  ) THEN
+    RAISE EXCEPTION 'This payment is for a store sale. It can’t be cancelled on its own.'
+      USING ERRCODE = 'check_violation', CONSTRAINT = 'payment_store_sale_stays_posted';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+--
 -- Name: school_is_gone(text); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -429,6 +448,25 @@ CREATE FUNCTION public.store_record_append_only() RETURNS trigger
 BEGIN
   RAISE EXCEPTION '% is append-only', TG_TABLE_NAME
     USING ERRCODE = 'check_violation', CONSTRAINT = 'store_record_append_only';
+END;
+$$;
+
+--
+-- Name: store_sale_not_empty(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.store_sale_not_empty() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM store_sale_line
+    WHERE store_sale_id = NEW.id AND organization_id = NEW.organization_id
+  ) THEN
+    RAISE EXCEPTION 'store sale % has no lines', NEW.id
+      USING ERRCODE = 'check_violation', CONSTRAINT = 'store_sale_not_empty';
+  END IF;
+  RETURN NULL;
 END;
 $$;
 
@@ -1287,6 +1325,45 @@ CREATE TABLE public.store (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT store_name_check CHECK (((char_length(btrim(name)) >= 1) AND (char_length(btrim(name)) <= 160)))
+);
+
+--
+-- Name: store_sale; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.store_sale (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id text NOT NULL,
+    number text NOT NULL,
+    reference text NOT NULL,
+    request_hash text NOT NULL,
+    store_id uuid NOT NULL,
+    student_id uuid NOT NULL,
+    invoice_id uuid NOT NULL,
+    payment_id uuid NOT NULL,
+    sold_by text,
+    sold_on date NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT store_sale_number_check CHECK ((char_length(btrim(number)) > 0)),
+    CONSTRAINT store_sale_reference_check CHECK (((char_length(btrim(reference)) >= 1) AND (char_length(btrim(reference)) <= 80)))
+);
+
+--
+-- Name: store_sale_line; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.store_sale_line (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id text NOT NULL,
+    store_sale_id uuid NOT NULL,
+    item_id uuid NOT NULL,
+    quantity integer NOT NULL,
+    unit_price_minor bigint NOT NULL,
+    cost_minor bigint NOT NULL,
+    CONSTRAINT store_sale_line_cost_minor_check CHECK ((cost_minor >= 0)),
+    CONSTRAINT store_sale_line_quantity_check CHECK ((quantity > 0)),
+    CONSTRAINT store_sale_line_unit_price_minor_check CHECK ((unit_price_minor > 0))
 );
 
 --
@@ -2201,6 +2278,69 @@ ALTER TABLE ONLY public.store
     ADD CONSTRAINT store_pkey PRIMARY KEY (id);
 
 --
+-- Name: store_sale store_sale_id_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.store_sale
+    ADD CONSTRAINT store_sale_id_organization_id_key UNIQUE (id, organization_id);
+
+--
+-- Name: store_sale_line store_sale_line_id_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.store_sale_line
+    ADD CONSTRAINT store_sale_line_id_organization_id_key UNIQUE (id, organization_id);
+
+--
+-- Name: store_sale_line store_sale_line_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.store_sale_line
+    ADD CONSTRAINT store_sale_line_pkey PRIMARY KEY (id);
+
+--
+-- Name: store_sale_line store_sale_line_store_sale_id_item_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.store_sale_line
+    ADD CONSTRAINT store_sale_line_store_sale_id_item_id_key UNIQUE (store_sale_id, item_id);
+
+--
+-- Name: store_sale store_sale_organization_id_invoice_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.store_sale
+    ADD CONSTRAINT store_sale_organization_id_invoice_id_key UNIQUE (organization_id, invoice_id);
+
+--
+-- Name: store_sale store_sale_organization_id_number_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.store_sale
+    ADD CONSTRAINT store_sale_organization_id_number_key UNIQUE (organization_id, number);
+
+--
+-- Name: store_sale store_sale_organization_id_payment_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.store_sale
+    ADD CONSTRAINT store_sale_organization_id_payment_id_key UNIQUE (organization_id, payment_id);
+
+--
+-- Name: store_sale store_sale_organization_id_reference_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.store_sale
+    ADD CONSTRAINT store_sale_organization_id_reference_key UNIQUE (organization_id, reference);
+
+--
+-- Name: store_sale store_sale_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.store_sale
+    ADD CONSTRAINT store_sale_pkey PRIMARY KEY (id);
+
+--
 -- Name: student_discount student_discount_id_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2836,6 +2976,24 @@ CREATE UNIQUE INDEX stock_delivery_opening_key ON public.stock_delivery USING bt
 CREATE INDEX stock_movement_stock_idx ON public.stock_movement USING btree (organization_id, store_id, item_id);
 
 --
+-- Name: store_sale_line_item_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX store_sale_line_item_idx ON public.store_sale_line USING btree (organization_id, item_id);
+
+--
+-- Name: store_sale_store_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX store_sale_store_idx ON public.store_sale USING btree (organization_id, store_id, sold_on);
+
+--
+-- Name: store_sale_student_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX store_sale_student_idx ON public.store_sale USING btree (organization_id, student_id);
+
+--
 -- Name: student_discount_ledger_account_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3034,6 +3192,12 @@ CREATE TRIGGER payment_allocation_immutable BEFORE DELETE OR UPDATE ON public.pa
 CREATE TRIGGER payment_immutable BEFORE DELETE OR UPDATE ON public.payment FOR EACH ROW EXECUTE FUNCTION public.payment_immutable();
 
 --
+-- Name: payment payment_store_sale_stays_posted; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER payment_store_sale_stays_posted BEFORE UPDATE ON public.payment FOR EACH ROW EXECUTE FUNCTION public.payment_store_sale_stays_posted();
+
+--
 -- Name: payment_void payment_void_immutable; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -3062,6 +3226,24 @@ CREATE CONSTRAINT TRIGGER stock_delivery_not_empty AFTER INSERT ON public.stock_
 --
 
 CREATE TRIGGER stock_movement_append_only BEFORE DELETE OR UPDATE ON public.stock_movement FOR EACH ROW EXECUTE FUNCTION public.stock_movement_append_only();
+
+--
+-- Name: store_sale store_sale_append_only; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER store_sale_append_only BEFORE DELETE OR UPDATE ON public.store_sale FOR EACH ROW EXECUTE FUNCTION public.store_record_append_only();
+
+--
+-- Name: store_sale_line store_sale_line_append_only; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER store_sale_line_append_only BEFORE DELETE OR UPDATE ON public.store_sale_line FOR EACH ROW EXECUTE FUNCTION public.store_record_append_only();
+
+--
+-- Name: store_sale store_sale_not_empty; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE CONSTRAINT TRIGGER store_sale_not_empty AFTER INSERT ON public.store_sale DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.store_sale_not_empty();
 
 --
 -- Name: academic_session academic_session_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -4016,6 +4198,69 @@ ALTER TABLE ONLY public.store
     ADD CONSTRAINT store_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE CASCADE;
 
 --
+-- Name: store_sale store_sale_invoice_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.store_sale
+    ADD CONSTRAINT store_sale_invoice_id_organization_id_fkey FOREIGN KEY (invoice_id, organization_id) REFERENCES public.invoice(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: store_sale_line store_sale_line_item_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.store_sale_line
+    ADD CONSTRAINT store_sale_line_item_id_organization_id_fkey FOREIGN KEY (item_id, organization_id) REFERENCES public.item(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: store_sale_line store_sale_line_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.store_sale_line
+    ADD CONSTRAINT store_sale_line_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE RESTRICT;
+
+--
+-- Name: store_sale_line store_sale_line_store_sale_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.store_sale_line
+    ADD CONSTRAINT store_sale_line_store_sale_id_organization_id_fkey FOREIGN KEY (store_sale_id, organization_id) REFERENCES public.store_sale(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: store_sale store_sale_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.store_sale
+    ADD CONSTRAINT store_sale_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE RESTRICT;
+
+--
+-- Name: store_sale store_sale_payment_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.store_sale
+    ADD CONSTRAINT store_sale_payment_id_organization_id_fkey FOREIGN KEY (payment_id, organization_id) REFERENCES public.payment(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: store_sale store_sale_sold_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.store_sale
+    ADD CONSTRAINT store_sale_sold_by_fkey FOREIGN KEY (sold_by) REFERENCES public."user"(id) ON DELETE SET NULL;
+
+--
+-- Name: store_sale store_sale_store_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.store_sale
+    ADD CONSTRAINT store_sale_store_id_organization_id_fkey FOREIGN KEY (store_id, organization_id) REFERENCES public.store(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: store_sale store_sale_student_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.store_sale
+    ADD CONSTRAINT store_sale_student_id_organization_id_fkey FOREIGN KEY (student_id, organization_id) REFERENCES public.student(id, organization_id) ON DELETE RESTRICT;
+
+--
 -- Name: student student_archived_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -4345,4 +4590,5 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20261017090000'),
     ('20261017090100'),
     ('20261017090200'),
+    ('20261017090300'),
     ('20261017100000');

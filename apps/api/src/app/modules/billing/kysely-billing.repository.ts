@@ -18,6 +18,7 @@ import {
   formatDocumentNumber,
 } from '../../common/documents';
 import {
+  chargePostingLines,
   discountFacts,
   invoiceTotalSql,
   type ChargeableFeeLine,
@@ -47,7 +48,6 @@ import {
   type RunPage,
   type TermInfo,
 } from './billing.repository';
-import { chargePostingLines } from './charge-posting';
 import type { RoundCandidate } from './round-plan';
 import { sendOrder } from './send-order';
 

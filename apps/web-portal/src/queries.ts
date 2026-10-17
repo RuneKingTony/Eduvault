@@ -82,6 +82,18 @@ export const portalFamilyStatementQueryOptions = (api: Api) =>
     queryFn: () => api.portal.familyStatement({}),
   });
 
+export const portalPurchasesQueryOptions = (api: Api, studentId: string) =>
+  queryOptions({
+    queryKey: [...PORTAL_KEY, 'purchases', studentId],
+    queryFn: () => api.portal.purchases({ params: { studentId } }),
+  });
+
+export const portalPriceListQueryOptions = (api: Api, studentId: string) =>
+  queryOptions({
+    queryKey: [...PORTAL_KEY, 'price-list', studentId],
+    queryFn: () => api.portal.priceList({ params: { studentId } }),
+  });
+
 export const calendarCurrentQueryOptions = (api: Api) =>
   queryOptions({
     queryKey: [...CALENDAR_KEY, 'current'],

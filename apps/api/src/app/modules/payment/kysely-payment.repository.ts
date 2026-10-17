@@ -1,83 +1,42 @@
-import { randomUUID } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
-import { sql, type Kysely } from 'kysely';
-import {
-  FEES_RECEIVABLE_SYSTEM_KEY,
-  type Payment,
-  type PaymentListQuery,
-  type PaymentMethods,
-  type RecordingChild,
-  type RecordingPayer,
+import { sql } from 'kysely';
+import type {
+  Payment,
+  PaymentListQuery,
+  PaymentMethods,
+  RecordingChild,
+  RecordingPayer,
 } from '@eduvault/api-contract';
-import type { DB } from '../../../db/db-types';
 import { inCampusScope } from '../../common/db/in-campus-scope';
 import { KYSELY_TOKEN, type Database } from '../../common/db/tokens';
 import { uniqueViolation } from '../../common/db/unique-violation';
 import { readPaymentMethods } from '../../common/school-setting/payment-methods';
 import {
-  allocateDocumentNumber,
-  formatDocumentNumber,
-} from '../../common/documents';
-import {
   LedgerPoster,
   receivableBalanceSql,
   schoolCurrency,
-  systemAccountId,
 } from '../../common/ledger';
-import { currentCampusSql, inScope } from '../../common/students';
-import { findPayment, listPayments } from './kysely-payment-read.repository';
-import { paymentPostingLines } from './payment-posting';
 import {
-  PaymentRepository,
+  findPaymentByColumn,
+  paymentProofState,
+  writePayment,
   type ExistingPayment,
   type InsertOutcome,
   type NewPayment,
+  type ProofState,
+} from '../../common/payments';
+import { currentCampusSql, inScope } from '../../common/students';
+import { findPayment, listPayments } from './kysely-payment-read.repository';
+import {
+  PaymentRepository,
   type PaymentPage,
   type PaymentScope,
-  type ProofCheck,
   type RecordingAccount,
   type RecordingPeople,
 } from './payment.repository';
 
 const PROVIDER_REFERENCE_KEY = 'payment_provider_reference_key';
 const PROOF_FILE_KEY = 'payment_proof_file_key';
-
-async function findByColumn(
-  db: Kysely<DB>,
-  lookup: {
-    organizationId: string;
-    column: 'reference' | 'provider_reference';
-    value: string;
-  }
-): Promise<ExistingPayment | undefined> {
-  const { organizationId, column, value } = lookup;
-  const row = await db
-    .selectFrom('payment')
-    .select(['id', 'receipt_number', 'request_hash'])
-    .where('organization_id', '=', organizationId)
-    .where(column, '=', value)
-    .executeTakeFirst();
-  return (
-    row && {
-      id: row.id,
-      receiptNumber: row.receipt_number,
-      requestHash: row.request_hash,
-    }
-  );
-}
-
-async function campusesOf(
-  trx: Kysely<DB>,
-  organizationId: string,
-  studentIds: readonly string[]
-): Promise<Map<string, string>> {
-  const { rows } = await sql<{ id: string; campus_id: string }>`
-    SELECT st.id, ${currentCampusSql('st')} AS campus_id
-    FROM student st
-    WHERE st.organization_id = ${organizationId}
-      AND st.id IN (${sql.join(studentIds)})`.execute(trx);
-  return new Map(rows.map((row) => [row.id, row.campus_id]));
-}
 
 interface PersonRow {
   student_id: string;
@@ -122,7 +81,7 @@ export class KyselyPaymentRepository extends PaymentRepository {
     organizationId: string,
     reference: string
   ): Promise<ExistingPayment | undefined> {
-    return findByColumn(this.db, {
+    return findPaymentByColumn(this.db, {
       organizationId,
       column: 'reference',
       value: reference,
@@ -133,7 +92,7 @@ export class KyselyPaymentRepository extends PaymentRepository {
     organizationId: string,
     providerReference: string
   ): Promise<ExistingPayment | undefined> {
-    return findByColumn(this.db, {
+    return findPaymentByColumn(this.db, {
       organizationId,
       column: 'provider_reference',
       value: providerReference,
@@ -211,36 +170,19 @@ export class KyselyPaymentRepository extends PaymentRepository {
     return rows.map((row) => row.id);
   }
 
-  async proof(
+  proof(
     organizationId: string,
     userId: string,
     fileId: string
-  ): Promise<ProofCheck> {
-    const file = await this.db
-      .selectFrom('file_object')
-      .select('id')
-      .where('organization_id', '=', organizationId)
-      .where('uploaded_by', '=', userId)
-      .where('id', '=', fileId)
-      .where('kind', '=', 'payment_proof')
-      .executeTakeFirst();
-    if (file === undefined) {
-      return 'missing';
-    }
-    const attached = await this.db
-      .selectFrom('payment')
-      .select('id')
-      .where('organization_id', '=', organizationId)
-      .where('proof_file_id', '=', fileId)
-      .executeTakeFirst();
-    return attached === undefined ? 'free' : 'taken';
+  ): Promise<ProofState> {
+    return paymentProofState(this.db, { organizationId, userId, fileId });
   }
 
   async insert(input: NewPayment): Promise<InsertOutcome> {
     try {
       return await this.db
         .transaction()
-        .execute((trx) => this.insertIn(trx, input));
+        .execute((trx) => writePayment(trx, this.poster, input));
     } catch (error) {
       return this.afterRace(error);
     }
@@ -255,119 +197,6 @@ export class KyselyPaymentRepository extends PaymentRepository {
       return { status: 'proof_taken' };
     }
     throw error;
-  }
-
-  private async insertIn(
-    trx: Kysely<DB>,
-    input: NewPayment
-  ): Promise<InsertOutcome> {
-    const lockKey = `payment:${input.organizationId}:${input.reference}`;
-    await sql`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`.execute(
-      trx
-    );
-    const existing = await findByColumn(trx, {
-      organizationId: input.organizationId,
-      column: 'reference',
-      value: input.reference,
-    });
-    if (existing !== undefined) {
-      return existing.requestHash === input.requestHash
-        ? { status: 'replayed', id: existing.id }
-        : { status: 'reference_used' };
-    }
-    const journalClash = await trx
-      .selectFrom('journal_entry')
-      .select('id')
-      .where('organization_id', '=', input.organizationId)
-      .where('reference', '=', input.reference)
-      .executeTakeFirst();
-    if (journalClash !== undefined) {
-      return { status: 'reference_used' };
-    }
-    return this.create(trx, input);
-  }
-
-  private async create(
-    trx: Kysely<DB>,
-    input: NewPayment
-  ): Promise<InsertOutcome> {
-    const { organizationId } = input;
-    const value = await allocateDocumentNumber(trx, {
-      organizationId,
-      kind: 'payment',
-      year: input.year,
-    });
-    const receiptNumber = formatDocumentNumber('payment', input.year, value);
-    const paymentId = randomUUID();
-    const entryId = await this.postEntry(trx, input, {
-      receiptNumber,
-      paymentId,
-    });
-    await trx
-      .insertInto('payment')
-      .values({
-        id: paymentId,
-        organization_id: organizationId,
-        reference: input.reference,
-        receipt_number: receiptNumber,
-        payer_guardian_id: input.payerGuardianId,
-        payer_name: input.payerName,
-        money_account_id: input.moneyAccountId,
-        method: input.method,
-        provider_reference: input.providerReference,
-        proof_file_id: input.proofFileId,
-        amount_minor: input.amountMinor,
-        paid_on: input.paidOn,
-        request_hash: input.requestHash,
-        journal_entry_id: entryId,
-        created_by: input.userId,
-      })
-      .execute();
-    await trx
-      .insertInto('payment_allocation')
-      .values(
-        input.allocations.map((row) => ({
-          payment_id: paymentId,
-          organization_id: organizationId,
-          student_id: row.studentId,
-          amount_minor: row.amountMinor,
-        }))
-      )
-      .execute();
-    return { status: 'recorded', id: paymentId };
-  }
-
-  private async postEntry(
-    trx: Kysely<DB>,
-    input: NewPayment,
-    issued: { receiptNumber: string; paymentId: string }
-  ): Promise<string> {
-    const { organizationId } = input;
-    const [campusOf, receivableId] = await Promise.all([
-      campusesOf(
-        trx,
-        organizationId,
-        input.allocations.map((row) => row.studentId)
-      ),
-      systemAccountId(trx, organizationId, FEES_RECEIVABLE_SYSTEM_KEY),
-    ]);
-    const { entry } = await this.poster.post(trx, {
-      organizationId,
-      reference: input.reference,
-      kind: 'payment',
-      effectiveOn: input.paidOn,
-      memo: `Receipt ${issued.receiptNumber} · ${input.payerName}`,
-      postedBy: input.userId,
-      sourceId: issued.paymentId,
-      lines: paymentPostingLines({
-        moneyLedgerAccountId: input.ledgerAccountId,
-        moneyCampusId: input.accountCampusId,
-        receivableId,
-        allocations: input.allocations,
-        campusOf,
-      }),
-    });
-    return entry.id;
   }
 
   async recordingPeople(scope: PaymentScope): Promise<RecordingPeople> {

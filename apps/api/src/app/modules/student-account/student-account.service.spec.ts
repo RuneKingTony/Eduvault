@@ -45,6 +45,7 @@ const movement = (
   memo: null,
   debitMinor: 0,
   creditMinor: 0,
+  storeSale: false,
   invoice: null,
   payment: null,
   ...overrides,

@@ -11,6 +11,7 @@ import {
   person,
   renderInRouter,
 } from '../test-dashboard';
+import { termFigures } from '../test-store';
 import { fakeAccess, ownerAccess, starterAccess } from '../test-utils';
 import { DashboardPage } from './dashboard-page';
 
@@ -490,7 +491,9 @@ describe('DashboardPage Received and Still owed', () => {
 
 describe('DashboardPage Store card', () => {
   it('shows the Store card to a holder of store:read and nothing else asks for it', async () => {
-    const api = dashboardApi({ store: { stockValueMinor: 5_000_000 } });
+    const api = dashboardApi({
+      store: { stockValueMinor: 5_000_000, ...termFigures() },
+    });
     render(ownerAccess(), api);
     expect(await screen.findByText('Stock value')).toBeInTheDocument();
     expect(api.dashboard.store).toHaveBeenCalledTimes(1);

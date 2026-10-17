@@ -1,20 +1,31 @@
 import { fireEvent, screen, within } from '@testing-library/react';
 import { ApiError } from '@eduvault/api-contract';
+import { toPermissionMap } from '@eduvault/policy';
 import {
   INVOICE_ID,
   billingApi,
   invoice,
   renderBilling,
 } from '../test-billing';
+import { SALE_ID } from '../test-store';
+import { fakeAccess } from '../test-utils';
 import { InvoicePage } from './invoice-page';
 
-function setup(api = billingApi()) {
+function setup(api = billingApi(), access?: ReturnType<typeof fakeAccess>) {
   const onBack = vi.fn();
   renderBilling(<InvoicePage invoiceId={INVOICE_ID} onBack={onBack} />, api, {
     path: `/finance/invoices/${INVOICE_ID}`,
+    ...(access === undefined ? {} : { access }),
   });
   return { api, onBack };
 }
+
+const storeCharge = () =>
+  invoice({
+    kind: 'store',
+    billingRun: null,
+    source: { kind: 'store_sale', id: SALE_ID, number: 'ISS-2026-0001' },
+  });
 
 describe('InvoicePage', () => {
   it('shows a sent charge: header, lines with the discount muted, and the total', async () => {
@@ -69,6 +80,43 @@ describe('InvoicePage', () => {
     expect(cardView.getByRole('link', { name: 'BR-2026-0001' })).toBeVisible();
     expect(cardView.getByText(/ by Chika Eze/)).toBeVisible();
     expect(cardView.getByText('Ngozi Okeke (mother)')).toBeVisible();
+  });
+
+  it('links a store charge to its sale in the Items sold tab', async () => {
+    setup(billingApi({ invoice: storeCharge() }));
+    const card = (await screen.findByText('Details')).closest(
+      '[data-slot="card"]'
+    );
+
+    const link = within(card as HTMLElement).getByRole('link', {
+      name: 'ISS-2026-0001',
+    });
+    expect(link).toHaveAttribute(
+      'href',
+      expect.stringContaining(`/finance/store?tab=sold&sale=${SALE_ID}`)
+    );
+  });
+
+  it('names the sale without a link for someone who cannot open the store', async () => {
+    setup(
+      billingApi({ invoice: storeCharge() }),
+      fakeAccess({
+        roles: ['custom'],
+        permissions: toPermissionMap(['invoice:read']),
+        campusScope: 'all',
+      })
+    );
+
+    expect(await screen.findByText('ISS-2026-0001')).toBeVisible();
+    expect(
+      screen.queryByRole('link', { name: 'ISS-2026-0001' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows no Source for a term charge', async () => {
+    setup();
+    await screen.findByText('Details');
+    expect(screen.queryByText('Source')).not.toBeInTheDocument();
   });
 
   it('opens the accountant’s card to a balanced journal', async () => {

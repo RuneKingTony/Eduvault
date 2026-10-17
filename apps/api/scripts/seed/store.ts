@@ -1,14 +1,19 @@
 import type { INestApplicationContext } from '@nestjs/common';
+import { sql } from 'kysely';
 import {
   OPENING_STOCK_SUPPLIER,
   itemDisplayName,
+  storeSaleReference,
+  type PaymentMethod,
   type RecordDelivery,
 } from '@eduvault/api-contract';
 import type { OrgContext } from '../../src/app/common/auth';
 import { Clock } from '../../src/app/common/clock';
 import { KYSELY_TOKEN, type Database } from '../../src/app/common/db/tokens';
+import { FilesService } from '../../src/app/common/files/files.service';
 import { DeliveryService } from '../../src/app/modules/store/delivery.service';
 import { ItemService } from '../../src/app/modules/store/item.service';
+import { SaleService } from '../../src/app/modules/store/sale.service';
 import { shiftDate } from './date-shift';
 
 type SeedCampus = 'Lekki' | 'Ikeja';
@@ -155,7 +160,80 @@ const SEED_DELIVERY_LINES: readonly {
   { displayName: 'School trousers, Size 12', quantity: 10 },
 ];
 
-export const SEED_STORE_ENTRIES = 3;
+interface SeedSale {
+  on: string;
+  student: string;
+  method: PaymentMethod;
+  lines: readonly { item: string; quantity: number }[];
+}
+
+/** In date order, so receipt numbers climb with the dates. */
+const SEED_SALES: readonly SeedSale[] = [
+  {
+    on: '2026-09-22',
+    student: 'Peace Akpan',
+    method: 'pos',
+    lines: [
+      { item: 'School shirt, Size 12', quantity: 2 },
+      { item: 'Mathematics (JSS2)', quantity: 1 },
+    ],
+  },
+  {
+    on: '2026-09-23',
+    student: 'Ada Okeke',
+    method: 'cash',
+    lines: [
+      { item: 'School shirt, Size 12', quantity: 1 },
+      { item: 'School tie', quantity: 1 },
+      { item: 'English Language (JSS2)', quantity: 1 },
+    ],
+  },
+  {
+    on: '2026-09-28',
+    student: 'Tobi Adewale',
+    method: 'transfer',
+    lines: [{ item: 'School trousers, Size 12', quantity: 2 }],
+  },
+  {
+    on: '2026-09-30',
+    student: 'Femi Lawal',
+    method: 'cash',
+    lines: [{ item: 'School shirt, Size 12', quantity: 2 }],
+  },
+  {
+    on: '2026-10-01',
+    student: 'Amara Nwachukwu',
+    method: 'cash',
+    lines: [
+      { item: 'Mathematics (JSS1)', quantity: 1 },
+      { item: 'English Language (JSS1)', quantity: 1 },
+      { item: 'Basic Science (JSS1)', quantity: 1 },
+    ],
+  },
+  {
+    on: '2026-10-05',
+    student: 'Zainab Bello',
+    method: 'pos',
+    lines: [
+      { item: 'Pinafore, Size 14', quantity: 1 },
+      { item: 'Sportswear set, Medium', quantity: 1 },
+    ],
+  },
+  {
+    on: '2026-10-06',
+    student: 'Kayode Martins',
+    method: 'transfer',
+    lines: [
+      { item: 'Mathematics (JSS2)', quantity: 1 },
+      { item: 'School tie', quantity: 2 },
+    ],
+  },
+];
+
+const PROOF_METHODS = new Set<PaymentMethod>(['pos', 'transfer']);
+
+export const SEED_SALE_COUNT = SEED_SALES.length;
+export const SEED_STORE_ENTRIES = 3 + SEED_SALE_COUNT * 3;
 
 interface StoreSeed {
   owner: OrgContext;
@@ -266,6 +344,66 @@ async function moneyAccountId(
   return row.id;
 }
 
+async function studentIdOf(
+  db: Database,
+  organizationId: string,
+  name: string
+): Promise<string> {
+  const row = await db
+    .selectFrom('student')
+    .select('id')
+    .where('organization_id', '=', organizationId)
+    .where(sql<string>`first_name || ' ' || last_name`, '=', name)
+    .executeTakeFirstOrThrow();
+  return row.id;
+}
+
+async function seedSales(
+  app: INestApplicationContext,
+  seed: Pick<StoreSeed, 'owner' | 'offsetDays'>,
+  stocked: readonly Stocked[]
+) {
+  const clock = app.get(Clock, { strict: false });
+  const sales = app.get(SaleService, { strict: false });
+  const files = app.get(FilesService, { strict: false });
+  const db = app.get<Database>(KYSELY_TOKEN, { strict: false });
+  const { owner } = seed;
+  for (const [index, sale] of SEED_SALES.entries()) {
+    const day = shiftDate(sale.on, seed.offsetDays);
+    clock.set(day);
+    const proof = PROOF_METHODS.has(sale.method)
+      ? await files.upload(owner, {
+          kind: 'payment_proof',
+          file: {
+            originalname: `${sale.method}-slip-${index + 1}.pdf`,
+            buffer: Buffer.from(
+              `%PDF-1.7\n% ${sale.method} slip ${index + 1} for ${sale.student}\n`
+            ),
+          },
+        })
+      : undefined;
+    await sales.record(owner, {
+      reference: storeSaleReference(
+        day,
+        `5eed${String(index + 1).padStart(4, '0')}`
+      ),
+      studentId: await studentIdOf(db, owner.organizationId, sale.student),
+      method: sale.method,
+      proofFileId: proof?.id,
+      moneyAccountId: undefined,
+      lines: sale.lines.map((line) => {
+        const item = stocked.find(
+          (candidate) => candidate.displayName === line.item
+        );
+        if (item === undefined) {
+          throw new Error(`Seed has no item ${line.item}`);
+        }
+        return { itemId: item.id, quantity: line.quantity };
+      }),
+    });
+  }
+}
+
 export async function seedStore(
   app: INestApplicationContext,
   { owner, campusIds, school, today, offsetDays }: StoreSeed
@@ -313,6 +451,7 @@ export async function seedStore(
         };
       }),
     });
+    await seedSales(app, { owner, offsetDays }, stocked);
   } finally {
     clock.set(null);
   }

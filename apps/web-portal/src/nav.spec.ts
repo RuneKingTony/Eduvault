@@ -47,6 +47,19 @@ describe('portal nav', () => {
     });
   });
 
+  it('puts Purchases last on the store icon behind invoice:readOwn', () => {
+    expect(PORTAL_NAV.at(-1)).toMatchObject({
+      id: 'purchases',
+      route: '/purchases',
+      icon: 'store',
+      permission: 'invoice:readOwn',
+    });
+    expect(
+      idsFor('guardian', readOwnFees, new Set(['/', '/purchases']))
+    ).toEqual(['home', 'purchases']);
+    expect(idsFor('guardian', readOwn, new Set(['/purchases']))).toEqual([]);
+  });
+
   it('shows nothing without student:readOwn', () => {
     expect(idsFor('guardian', {})).toEqual([]);
     expect(idsFor('student', toPermissionMap(['student:read']))).toEqual([]);

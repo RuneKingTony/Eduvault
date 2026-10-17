@@ -25,7 +25,7 @@ import {
   SEED_OPENING_BALANCES,
 } from './finance';
 import { shiftDate } from './date-shift';
-import { SEED_STORE_ENTRIES } from './store';
+import { SEED_SALE_COUNT, SEED_STORE_ENTRIES } from './store';
 import {
   CURRENT_SUBJECT_TEACHERS,
   RETIRED_SUBJECT,
@@ -574,6 +574,36 @@ async function checkStore(db: Database, check: Check) {
   }
 }
 
+async function checkStoreSales(db: Database, check: Check) {
+  const { rows } = await sql<{
+    number: string;
+    charged: string;
+    paid: string;
+    cost: string;
+    moved: string;
+  }>`
+    SELECT ss.number,
+      (SELECT sum(il.amount_minor) FROM invoice_line il
+        WHERE il.invoice_id = ss.invoice_id AND il.organization_id = ss.organization_id)::text AS charged,
+      p.amount_minor::text AS paid,
+      (SELECT sum(l.cost_minor) FROM store_sale_line l
+        WHERE l.store_sale_id = ss.id AND l.organization_id = ss.organization_id)::text AS cost,
+      (SELECT -sum(m.value_minor) FROM stock_movement m
+        WHERE m.source_id = ss.id AND m.organization_id = ss.organization_id)::text AS moved
+    FROM store_sale ss
+    JOIN payment p ON p.id = ss.payment_id AND p.organization_id = ss.organization_id
+    ORDER BY ss.number`.execute(db);
+  check('store sales', rows.length, SEED_SALE_COUNT);
+  for (const row of rows) {
+    check(`charge of ${row.number} equals its payment`, row.charged, row.paid);
+    check(
+      `cost of ${row.number} equals its stock movements`,
+      row.cost,
+      row.moved
+    );
+  }
+}
+
 type OwnerContext = Awaited<ReturnType<typeof orgContextFor>>;
 
 async function checkRound(
@@ -627,7 +657,8 @@ async function checkCharges(
     page: 1,
     pageSize: 50,
   });
-  check('sent charges', list.summary.sentCount, list.total);
+  check('sent charges', list.summary.sentCount, list.total + list.counts.store);
+  check('store charges', list.counts.store, SEED_SALE_COUNT);
   check('prepared charges', list.summary.draftCount, 0);
   const ada = list.items.find((item) => item.admissionNumber === 'GF-0123');
   const adaCharge = await invoices.get(funmi, ada?.id ?? '');
@@ -644,7 +675,7 @@ async function checkCharges(
   );
   return {
     sentCount: list.total,
-    chargedMinor: list.summary.sentTotalMinor,
+    chargedMinor: list.items.reduce((sum, item) => sum + item.totalMinor, 0),
     feesMinor: amounts
       .filter((amount) => amount > 0)
       .reduce((sum, amount) => sum + amount, 0),
@@ -714,6 +745,7 @@ export async function runSeedCheck(
   await checkAnnouncements(app, check);
   await checkFinance(app, check);
   await checkStore(db, check);
+  await checkStoreSales(db, check);
 
   for (const [key, expected] of Object.entries(visibleStudents)) {
     const ctx = await orgContextFor(app, emailOf(key));

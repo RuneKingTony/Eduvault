@@ -2,7 +2,7 @@ import { ITEM_KINDS, type ItemKind } from '@eduvault/api-contract';
 import { oneOf, pageOf, textOf } from '@eduvault/shared';
 
 export interface StoreSearch {
-  tab?: 'deliveries';
+  tab?: 'deliveries' | 'sold';
   campus?: string;
   q?: string;
   kind?: ItemKind;
@@ -11,14 +11,18 @@ export interface StoreSearch {
   page?: number;
   deliver?: 1;
   add?: 1;
+  sell?: 1;
+  sale?: string;
 }
 
 const flagOf = (value: unknown): 1 | undefined =>
   textOf(value) === '1' ? 1 : undefined;
 
+const TABS = ['deliveries', 'sold'] as const;
+
 export function parseStoreSearch(search: Record<string, unknown>): StoreSearch {
   return {
-    tab: search['tab'] === 'deliveries' ? 'deliveries' : undefined,
+    tab: oneOf(TABS, search['tab']),
     campus: textOf(search['campus']),
     q: textOf(search['q']),
     kind: oneOf(ITEM_KINDS, search['kind']),
@@ -27,5 +31,7 @@ export function parseStoreSearch(search: Record<string, unknown>): StoreSearch {
     page: pageOf(search['page']),
     deliver: flagOf(search['deliver']),
     add: flagOf(search['add']),
+    sell: flagOf(search['sell']),
+    sale: textOf(search['sale']),
   };
 }

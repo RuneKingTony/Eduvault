@@ -12,13 +12,19 @@ import {
   BANK_ACCOUNT_ID,
   LEVEL_ID,
   SHIRT_ID,
+  SALE_ID,
   deliveryList,
   itemList,
   moneyAccountList,
   openingDelivery,
   recordedDelivery,
+  recordedSale,
+  sale,
+  saleList,
+  saleOptions,
   shirt,
   storeSummary,
+  termFigures,
   textbook,
   tie,
 } from '../test-store';
@@ -51,6 +57,7 @@ function setup(
     search?: Search;
     campuses?: (typeof LEKKI)[];
     items?: (args: { query: { page?: number } }) => Promise<ItemList>;
+    summary?: ReturnType<typeof storeSummary>;
   } = {}
 ) {
   const campuses = options.campuses ?? [LEKKI, IKEJA];
@@ -61,7 +68,7 @@ function setup(
     },
     moneyAccounts: { list: vi.fn().mockResolvedValue(moneyAccountList()) },
     store: {
-      summary: vi.fn().mockResolvedValue(storeSummary()),
+      summary: vi.fn().mockResolvedValue(options.summary ?? storeSummary()),
       items: vi.fn(
         options.items ??
           (() =>
@@ -77,15 +84,25 @@ function setup(
       createItem: vi.fn(),
       updateItem: vi.fn(),
       recordDelivery: vi.fn().mockResolvedValue(recordedDelivery()),
+      sales: vi.fn().mockResolvedValue(saleList([sale()])),
+      sale: vi.fn().mockResolvedValue(sale()),
+      saleOptions: vi.fn().mockResolvedValue(saleOptions()),
+      recordSale: vi.fn().mockResolvedValue(recordedSale()),
     },
+    files: { upload: vi.fn() },
   };
   const onSearchChange = vi.fn();
+  const onStatement = vi.fn();
   renderWithApi(
-    <StorePage search={options.search ?? {}} onSearchChange={onSearchChange} />,
+    <StorePage
+      search={options.search ?? {}}
+      onSearchChange={onSearchChange}
+      onStatement={onStatement}
+    />,
     api,
     options.access ?? ownerAccess()
   );
-  return { api, onSearchChange };
+  return { api, onSearchChange, onStatement };
 }
 
 const rowOf = (text: string) =>
@@ -319,7 +336,7 @@ describe('StorePage', () => {
   it('shows the write controls to the owner', async () => {
     setup();
     expect(
-      await screen.findByRole('button', { name: 'Record a delivery' })
+      await screen.findByRole('button', { name: 'Record student purchase' })
     ).toBeVisible();
     expect(screen.getByRole('button', { name: 'More actions' })).toBeVisible();
     expect(
@@ -338,7 +355,7 @@ describe('StorePage', () => {
 
     expect(await screen.findByText('School shirt')).toBeVisible();
     expect(
-      screen.queryByRole('button', { name: 'Record a delivery' })
+      screen.queryByRole('button', { name: 'Record student purchase' })
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'More actions' })
@@ -349,5 +366,133 @@ describe('StorePage', () => {
     expect(
       screen.queryByRole('button', { name: /^Retire / })
     ).not.toBeInTheDocument();
+  });
+
+  it('puts the delivery and the new item in the overflow menu', async () => {
+    const { onSearchChange } = setup();
+    fireEvent.keyDown(
+      await screen.findByRole('button', { name: 'More actions' }),
+      { key: 'Enter' }
+    );
+
+    fireEvent.click(
+      await screen.findByRole('menuitem', { name: 'Add an item' })
+    );
+    expect(onSearchChange).toHaveBeenLastCalledWith({ add: 1 });
+    fireEvent.keyDown(screen.getByRole('button', { name: 'More actions' }), {
+      key: 'Enter',
+    });
+    fireEvent.click(
+      await screen.findByRole('menuitem', { name: 'Record a delivery' })
+    );
+    expect(onSearchChange).toHaveBeenLastCalledWith({ deliver: 1 });
+  });
+
+  it('gives a bursar who can only sell the purchase button and no overflow menu', async () => {
+    setup({
+      access: fakeAccess({
+        roles: ['custom'],
+        permissions: toPermissionMap(['store:read', 'store:issue']),
+        campusScope: 'all',
+      }),
+    });
+
+    expect(
+      await screen.findByRole('button', { name: 'Record student purchase' })
+    ).toBeVisible();
+    expect(
+      screen.queryByRole('button', { name: 'More actions' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('opens the purchase sheet from the button and from the address', async () => {
+    const { onSearchChange } = setup();
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Record student purchase' })
+    );
+    expect(onSearchChange).toHaveBeenCalledWith({ sell: 1 });
+
+    setup({ search: { sell: 1 } });
+    expect(
+      await screen.findByRole('heading', { name: 'Record student purchase' })
+    ).toBeVisible();
+  });
+
+  describe('the term tiles and the Items sold tab', () => {
+    it('shows sold, profit and items sold for the term, with profit masked until Show costs is on', async () => {
+      setup();
+
+      expect(await screen.findByText('₦27,000')).toBeVisible();
+      expect(screen.getByText('3 students served')).toBeVisible();
+      expect(screen.getByText('9')).toBeVisible();
+      expect(screen.getByText('This term · paid at the store')).toBeVisible();
+      expect(screen.getByText('Hidden · turn on Show costs')).toBeVisible();
+      expect(screen.queryByText('₦7,000')).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('switch', { name: 'Show costs' }));
+
+      expect(await screen.findByText('₦7,000')).toBeVisible();
+      expect(screen.getByText('Sales minus cost')).toBeVisible();
+    });
+
+    it('counts one student served as singular', async () => {
+      setup({ summary: storeSummary(termFigures({ termStudentsServed: 1 })) });
+      expect(await screen.findByText('1 student served')).toBeVisible();
+    });
+
+    it('sends the Sold this term and Items sold tiles to the Items sold tab', async () => {
+      const { onSearchChange } = setup();
+
+      fireEvent.click(
+        await screen.findByRole('button', { name: /Sold this term/ })
+      );
+      expect(onSearchChange).toHaveBeenLastCalledWith({
+        campus: undefined,
+        tab: 'sold',
+      });
+      fireEvent.click(screen.getByRole('button', { name: /Items sold/ }));
+      expect(onSearchChange).toHaveBeenLastCalledWith({
+        campus: undefined,
+        tab: 'sold',
+      });
+    });
+
+    it('counts each tab and lists the sales on Items sold', async () => {
+      setup({ search: { tab: 'sold' } });
+
+      expect(await screen.findByText('ISS-2026-0001')).toBeVisible();
+      expect(screen.getByRole('tab', { name: 'Items sold 1' })).toBeVisible();
+      expect(screen.getByRole('tab', { name: 'Deliveries 2' })).toBeVisible();
+      expect(screen.getByText('Paid · RCT-2026-00012')).toBeVisible();
+    });
+
+    it('opens a sale by putting its id in the address', async () => {
+      const { onSearchChange } = setup({ search: { tab: 'sold' } });
+
+      fireEvent.click(
+        await screen.findByRole('button', { name: 'ISS-2026-0001' })
+      );
+
+      expect(onSearchChange).toHaveBeenCalledWith({
+        tab: 'sold',
+        sale: SALE_ID,
+      });
+    });
+
+    it('switches tabs without carrying filters over', async () => {
+      const { onSearchChange } = setup({
+        search: { campus: LEKKI.id, low: 1 },
+      });
+
+      fireEvent.mouseDown(
+        await screen.findByRole('tab', { name: /Items sold/ })
+      );
+      fireEvent.click(screen.getByRole('tab', { name: /Items sold/ }));
+
+      expect(onSearchChange).toHaveBeenCalledWith({
+        campus: LEKKI.id,
+        tab: 'sold',
+      });
+    });
   });
 });

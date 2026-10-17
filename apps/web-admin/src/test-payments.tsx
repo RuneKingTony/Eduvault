@@ -21,6 +21,7 @@ import type {
 } from '@eduvault/api-contract';
 import { PermissionsProvider } from '@eduvault/auth-client';
 import { TooltipProvider } from '@eduvault/ui';
+import { parseStoreSearch } from './store-search';
 import { parseAccountsSearch, parseStatementSearch } from './accounts-search';
 import { parseAdjustmentsSearch } from './adjustments-search';
 import { ApiProvider, type Api } from './api';
@@ -302,6 +303,7 @@ export function renderPayments(
     ['/finance/invoices', parseInvoicesSearch],
     ['/finance/invoices/$invoiceId', undefined],
     ['/finance/school-fees', parseFeesSearch],
+    ['/finance/store', parseStoreSearch],
     ['/finance/other-fees', parseFeesSearch],
   ] as const;
   const router = createRouter({

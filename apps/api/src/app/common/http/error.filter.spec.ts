@@ -119,6 +119,19 @@ describe('ErrorFilter', () => {
     });
   });
 
+  it('words the store payment guard with the sale copy', () => {
+    expect(
+      run({ code: '23514', constraint: 'payment_store_sale_stays_posted' })
+    ).toEqual({
+      status: 409,
+      body: {
+        code: 'Conflict',
+        message:
+          'This payment is for a store sale. It can’t be cancelled on its own.',
+      },
+    });
+  });
+
   it('maps any other check violation to Conflict', () => {
     expect(
       run({ code: '23514', constraint: 'fee_amount_nonnegative' })

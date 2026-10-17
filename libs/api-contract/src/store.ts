@@ -1,6 +1,17 @@
 import { z } from 'zod';
-import { FINANCE_PAGE_SIZE, FINANCE_PAGE_SIZE_MAX } from './finance';
-import { idSchema } from './schemas';
+import {
+  FINANCE_PAGE_SIZE,
+  FINANCE_PAGE_SIZE_MAX,
+  moneyAccountKindSchema,
+  type MoneyAccountKind,
+} from './finance';
+import {
+  idSchema,
+  paymentMethodSchema,
+  paymentMethodsSchema,
+  paymentMethodWord,
+  type PaymentMethod,
+} from './schemas';
 
 export const ITEM_KINDS = ['uniform', 'book'] as const;
 export const STOCK_STATES = ['in', 'low', 'out'] as const;
@@ -56,6 +67,107 @@ export const deliveryReferenceUsedMessage = (
   reference: string,
   number: string
 ): string => `Reference ${reference} is already used by ${number}.`;
+
+export const STORE_SALE_REQUIRED_MESSAGE =
+  'Choose a student and at least one item.';
+export const STORE_SALE_QUANTITY_MAX_MESSAGE = `Sell ${DELIVERY_QUANTITY_MAX.toLocaleString('en-NG')} or fewer of an item at a time.`;
+export const STORE_SALE_LINES_MAX_MESSAGE = `List ${DELIVERY_LINES_MAX} items or fewer in one purchase.`;
+export const STORE_SALE_POS_PROOF_MESSAGE =
+  'Upload the POS slip before recording.';
+export const STORE_SALE_TRANSFER_PROOF_MESSAGE =
+  'Upload the transfer receipt before recording.';
+export const STORE_SALE_NOT_ACTIVE_MESSAGE =
+  'Only active students can receive items.';
+export const STORE_SALE_NO_TERM_MESSAGE =
+  'There is no current term. Set one before recording a purchase.';
+export const STORE_SALE_REFERENCE_TAKEN_MESSAGE =
+  'That reference is already used by another record.';
+export const STORE_SALE_ZERO_PRICE_MESSAGE =
+  'An item with no selling price can’t be sold.';
+export const STORE_PAYMENT_VOID_MESSAGE =
+  'This payment is for a store sale. It can’t be cancelled on its own.';
+export const STORE_SALE_NOT_FOUND_MESSAGE = 'Sale not found';
+export const STORE_SALE_ACCOUNT_CHOICE_MESSAGE =
+  'Choose the money account that takes this payment.';
+export const storeSaleReferenceUsedMessage = (
+  reference: string,
+  number: string
+): string => `Reference ${reference} is already used by ${number}.`;
+export const storeSaleStockShortMessage = (
+  onHand: number,
+  itemName: string,
+  campusName: string
+): string => `Only ${onHand} of ${itemName} left at ${campusName}.`;
+export const storeSaleNoAccountMessage = (
+  method: PaymentMethod,
+  campusName: string
+): string =>
+  `No money account takes ${paymentMethodWord(method)} payments on ${campusName} campus.`;
+export const storeSaleReplayedMessage = (
+  reference: string,
+  receiptNumber: string
+): string =>
+  `Reference ${reference} was already recorded as ${receiptNumber}. Nothing was posted twice.`;
+
+const SALE_REFERENCE_SUFFIX_LENGTH = 8;
+
+export const storeSaleReference = (date: string, uuid: string): string =>
+  `STORE-${date.replaceAll('-', '')}-${uuid
+    .replaceAll('-', '')
+    .slice(0, SALE_REFERENCE_SUFFIX_LENGTH)
+    .toUpperCase()}`;
+
+const SALE_ACCOUNT_KINDS = {
+  pos: ['pos'],
+  transfer: ['bank'],
+  cash: ['cash', 'bank'],
+} as const satisfies Record<PaymentMethod, readonly MoneyAccountKind[]>;
+
+export const saleAccountKinds = (
+  method: PaymentMethod
+): readonly MoneyAccountKind[] => SALE_ACCOUNT_KINDS[method];
+
+export const SALE_METHOD_ORDER: readonly PaymentMethod[] = [
+  'cash',
+  'pos',
+  'transfer',
+];
+
+export function fittingSaleAccounts<
+  T extends {
+    kind: MoneyAccountKind;
+    campusId: string | null;
+    retired?: boolean;
+  },
+>(method: PaymentMethod, campusId: string, accounts: readonly T[]): T[] {
+  const kinds = saleAccountKinds(method);
+  return accounts
+    .filter(
+      (account) =>
+        account.retired !== true &&
+        kinds.includes(account.kind) &&
+        (account.campusId === null || account.campusId === campusId)
+    )
+    .toSorted((a, b) => kinds.indexOf(a.kind) - kinds.indexOf(b.kind));
+}
+
+export const isSellable = (item: {
+  retiredAt: string | null;
+  sellPriceMinor: number;
+}): boolean => item.retiredAt === null && item.sellPriceMinor > 0;
+
+export const booksForLevel = <
+  T extends { kind: ItemKind; classLevel: { id: string } | null },
+>(
+  items: readonly T[],
+  levelId: string | null
+): T[] =>
+  items.filter(
+    (item) =>
+      item.kind === 'book' &&
+      levelId !== null &&
+      item.classLevel?.id === levelId
+  );
 
 export const itemKindSchema = z.enum(ITEM_KINDS);
 export type ItemKind = z.infer<typeof itemKindSchema>;
@@ -327,8 +439,138 @@ export const storeSummaryQuerySchema = z.object({
 });
 export type StoreSummaryQuery = z.infer<typeof storeSummaryQuerySchema>;
 
+export const storeTermFiguresSchema = z.object({
+  termSalesMinor: minorSchema,
+  termCostMinor: minorSchema,
+  termSalesCount: countSchema,
+  termItemsSold: countSchema,
+  termStudentsServed: countSchema,
+});
+export type StoreTermFigures = z.infer<typeof storeTermFiguresSchema>;
+
 export const storeSummarySchema = z.object({
   stockValueMinor: minorSchema,
   lowCount: countSchema,
+  ...storeTermFiguresSchema.shape,
 });
 export type StoreSummary = z.infer<typeof storeSummarySchema>;
+
+export const saleLineInputSchema = z.object({
+  itemId: idSchema,
+  quantity: z
+    .number({ error: STORE_SALE_REQUIRED_MESSAGE })
+    .int(STORE_SALE_REQUIRED_MESSAGE)
+    .positive(STORE_SALE_REQUIRED_MESSAGE)
+    .max(DELIVERY_QUANTITY_MAX, STORE_SALE_QUANTITY_MAX_MESSAGE),
+});
+export type SaleLineInput = z.infer<typeof saleLineInputSchema>;
+
+export const recordSaleSchema = z
+  .object({
+    reference: requiredText(
+      DELIVERY_REFERENCE_MAX,
+      DELIVERY_REFERENCE_REQUIRED_MESSAGE
+    ),
+    studentId: idSchema,
+    method: paymentMethodSchema,
+    moneyAccountId: idSchema.optional(),
+    proofFileId: idSchema.optional(),
+    lines: z
+      .array(saleLineInputSchema)
+      .min(1, STORE_SALE_REQUIRED_MESSAGE)
+      .max(DELIVERY_LINES_MAX, STORE_SALE_LINES_MAX_MESSAGE),
+  })
+  .superRefine((body, context) => {
+    const ids = body.lines.map((line) => line.itemId);
+    if (new Set(ids).size !== ids.length) {
+      context.addIssue({
+        code: 'custom',
+        message: DELIVERY_DUPLICATE_ITEM_MESSAGE,
+        path: ['lines'],
+      });
+    }
+  });
+export type RecordSaleInput = z.input<typeof recordSaleSchema>;
+export type RecordSale = z.output<typeof recordSaleSchema>;
+
+export const saleListQuerySchema = z.object({
+  campusId: idSchema.optional(),
+  studentId: idSchema.optional(),
+  page: z.coerce.number().int().min(1).default(1),
+});
+export type SaleListQueryInput = z.input<typeof saleListQuerySchema>;
+export type SaleListQuery = z.output<typeof saleListQuerySchema>;
+
+export const saleLineSchema = z.object({
+  itemId: idSchema,
+  displayName: z.string(),
+  quantity: z.number().int().positive(),
+  unitPriceMinor: minorSchema.positive(),
+  amountMinor: minorSchema.positive(),
+  costMinor: minorSchema.nonnegative(),
+  unitCostMinor: minorSchema.nonnegative(),
+});
+export type SaleLine = z.infer<typeof saleLineSchema>;
+
+export const saleSchema = z.object({
+  id: idSchema,
+  number: z.string(),
+  reference: z.string(),
+  soldOn: z.iso.date(),
+  student: z.object({
+    id: idSchema,
+    name: z.string(),
+    admissionNumber: z.string(),
+    className: z.string().nullable(),
+  }),
+  campusId: idSchema,
+  campusName: z.string(),
+  soldBy: z.string().nullable(),
+  lines: z.array(saleLineSchema),
+  totalMinor: minorSchema.positive(),
+  costMinor: minorSchema.nonnegative(),
+  chargeId: idSchema,
+  chargeNumber: z.string(),
+  paymentId: idSchema,
+  receiptNumber: z.string(),
+  method: paymentMethodSchema,
+  proof: z.object({ fileId: idSchema, fileName: z.string() }).nullable(),
+});
+export type Sale = z.infer<typeof saleSchema>;
+
+export const recordedSaleSchema = saleSchema.extend({
+  replayed: z.boolean(),
+});
+export type RecordedSale = z.infer<typeof recordedSaleSchema>;
+
+export const saleListSchema = z.object({
+  items: z.array(saleSchema),
+  total: countSchema,
+});
+export type SaleList = z.infer<typeof saleListSchema>;
+
+export const saleOptionsSchema = z.object({
+  students: z.array(
+    z.object({
+      id: idSchema,
+      name: z.string(),
+      admissionNumber: z.string(),
+      className: z.string().nullable(),
+      levelId: idSchema.nullable(),
+      levelName: z.string().nullable(),
+      campusId: idSchema,
+      campusName: z.string(),
+      balanceMinor: minorSchema.optional(),
+    })
+  ),
+  methods: paymentMethodsSchema,
+  accounts: z.array(
+    z.object({
+      id: idSchema,
+      name: z.string(),
+      kind: moneyAccountKindSchema,
+      campusId: idSchema.nullable(),
+    })
+  ),
+});
+export type SaleOptions = z.infer<typeof saleOptionsSchema>;
