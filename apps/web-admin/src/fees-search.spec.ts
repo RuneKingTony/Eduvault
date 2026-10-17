@@ -13,6 +13,11 @@ describe('parseFeesSearch', () => {
   it('drops blanks and anything else', () => {
     expect(parseFeesSearch({ term: ' ', type: 4, add: 2 })).toEqual({
       term: undefined,
+      type: '4',
+      add: undefined,
+    });
+    expect(parseFeesSearch({ term: {}, type: ' ' })).toEqual({
+      term: undefined,
       type: undefined,
       add: undefined,
     });
