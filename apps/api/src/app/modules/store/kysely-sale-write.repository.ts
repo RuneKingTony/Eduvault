@@ -7,6 +7,14 @@ import {
   STORE_STOCK_SYSTEM_KEY,
 } from '@eduvault/api-contract';
 import type { DB } from '../../../db/db-types';
+import {
+  financeActor,
+  storeSaleRecordedActivity,
+  type ActivityRecorder,
+  type ActivityWriter,
+  type FinanceActor,
+  type StoreSaleFacts,
+} from '../../common/activity';
 import { advisoryLock } from '../../common/db/advisory-lock';
 import { uniqueViolation } from '../../common/db/unique-violation';
 import {
@@ -14,6 +22,7 @@ import {
   formatDocumentNumber,
 } from '../../common/documents';
 import {
+  schoolCurrency,
   systemAccountId,
   type LedgerPoster,
   type PostInput,
@@ -37,6 +46,16 @@ class SaleAbort extends Error {
     super(outcome.status);
     this.name = 'SaleAbort';
   }
+}
+
+interface SaleWriters {
+  poster: LedgerPoster;
+  activity: ActivityWriter;
+}
+
+interface SaleTxWriters {
+  poster: LedgerPoster;
+  activity: ActivityRecorder;
 }
 
 interface SaleRun {
@@ -201,11 +220,16 @@ async function postCost(
   }
 }
 
+interface TakenPayment {
+  id: string;
+  receiptNumber: string;
+}
+
 async function takePayment(
   trx: Kysely<DB>,
   poster: LedgerPoster,
   run: SaleRun
-): Promise<string> {
+): Promise<TakenPayment> {
   const { input } = run;
   const { student, account } = input;
   const allocations = [{ studentId: student.id, amountMinor: run.totalMinor }];
@@ -243,7 +267,7 @@ async function takePayment(
   if (outcome.status !== 'recorded') {
     throw new SaleAbort({ status: 'posting_clash' });
   }
-  return outcome.id;
+  return { id: outcome.id, receiptNumber: outcome.receiptNumber };
 }
 
 async function insertRows(
@@ -300,6 +324,33 @@ async function insertRows(
     .execute();
 }
 
+async function saleActor(
+  trx: Kysely<DB>,
+  input: NewSale
+): Promise<FinanceActor> {
+  const { organizationId, userId, userName } = input;
+  return financeActor(
+    { organizationId, userId, name: userName },
+    await schoolCurrency(trx, organizationId)
+  );
+}
+
+function saleFacts(run: SaleRun, payment: TakenPayment): StoreSaleFacts {
+  const { input } = run;
+  return {
+    id: run.saleId,
+    number: run.saleNumber,
+    paymentId: payment.id,
+    receiptNumber: payment.receiptNumber,
+    studentId: input.student.id,
+    studentName: input.student.name,
+    campusId: input.store.campusId,
+    campusName: input.store.campusName,
+    itemCount: run.lines.reduce((sum, line) => sum + line.quantity, 0),
+    totalMinor: run.totalMinor,
+  };
+}
+
 async function numbersFor(
   trx: Kysely<DB>,
   input: NewSale
@@ -345,7 +396,7 @@ async function stillSellable(
 
 async function recordIn(
   trx: Kysely<DB>,
-  poster: LedgerPoster,
+  { poster, activity }: SaleTxWriters,
   input: NewSale
 ): Promise<SaleOutcome> {
   const { organizationId, reference } = input;
@@ -384,19 +435,32 @@ async function recordIn(
   };
   await issueCharge(trx, poster, run);
   await postCost(trx, poster, run);
-  await insertRows(trx, run, await takePayment(trx, poster, run));
+  const payment = await takePayment(trx, poster, run);
+  await insertRows(trx, run, payment.id);
+  await activity.recordMany(
+    storeSaleRecordedActivity(
+      await saleActor(trx, input),
+      saleFacts(run, payment)
+    )
+  );
   return { status: 'recorded', id: run.saleId };
 }
 
 export async function insertSale(
   db: Kysely<DB>,
-  poster: LedgerPoster,
+  writers: SaleWriters,
   input: NewSale
 ): Promise<SaleOutcome> {
   try {
     return await db
       .transaction()
-      .execute((trx) => recordIn(trx, poster, input));
+      .execute((trx) =>
+        recordIn(
+          trx,
+          { poster: writers.poster, activity: writers.activity.within(trx) },
+          input
+        )
+      );
   } catch (error) {
     if (error instanceof SaleAbort) {
       return error.outcome;

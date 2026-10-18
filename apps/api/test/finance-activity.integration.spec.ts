@@ -11,46 +11,37 @@ import {
   switchApproval,
 } from './support/factories/approvals';
 import { chargeFixture, prepare, sendRun } from './support/factories/billing';
-import { financeTexts, ledgerAccountId } from './support/factories/finance';
+import {
+  createMoneyAccount,
+  financeActivityRows,
+  type FinanceActivityRow,
+  financeTexts,
+  ledgerAccountId,
+} from './support/factories/finance';
 import {
   bankAccount,
   cashBody,
   owes,
   recordCash,
 } from './support/factories/payments';
+import { createItem, receive, sell } from './support/factories/store';
 import { schoolsTest as test } from './support/two-schools';
 
-interface FinanceRow {
-  kind: string;
-  campus_id: string | null;
-  text: string;
-}
+const SCHEDULE_KINDS: string[] = Object.values(FEE_SCHEDULE_KINDS);
 
-const SCHEDULE_KINDS = Object.values(FEE_SCHEDULE_KINDS);
+const financeRows = async (pool: Pool, organizationId: string) =>
+  (await financeActivityRows(pool, organizationId)).filter(
+    (row) => !SCHEDULE_KINDS.includes(row.kind)
+  );
 
-const queryRows = async (
-  pool: Pool,
-  organizationId: string,
-  kindTest: 'kind = ANY($2)' | 'kind <> ALL($2)'
-): Promise<FinanceRow[]> =>
-  (
-    await pool.query<FinanceRow>(
-      `SELECT kind, campus_id, text FROM activity_event
-       WHERE organization_id = $1 AND pillar = 'finance' AND ${kindTest}
-       ORDER BY kind, campus_id`,
-      [organizationId, SCHEDULE_KINDS]
-    )
-  ).rows;
-
-const financeRows = (pool: Pool, organizationId: string) =>
-  queryRows(pool, organizationId, 'kind <> ALL($2)');
-
-const feeScheduleRows = (pool: Pool, organizationId: string) =>
-  queryRows(pool, organizationId, 'kind = ANY($2)');
+const feeScheduleRows = async (pool: Pool, organizationId: string) =>
+  (await financeActivityRows(pool, organizationId)).filter((row) =>
+    SCHEDULE_KINDS.includes(row.kind)
+  );
 
 const compare = (a: string, b: string) => a.localeCompare(b);
 
-const kindsAndCampuses = (rows: FinanceRow[]) =>
+const kindsAndCampuses = (rows: FinanceActivityRow[]) =>
   rows.map((row) => [row.kind, row.campus_id]);
 
 const OWED = 18_000_000;
@@ -555,6 +546,69 @@ test.describe('finance activity', () => {
     expect(lekkiSees.join(' ')).not.toContain(ikejaReceipt.receiptNumber);
     expect(await financeTexts(api, noPermission)).toEqual([]);
     expect(await financeTexts(api, ownerB)).toHaveLength(1);
+  });
+
+  test('a store sale’s row reaches a finance reader on that campus only, and no other campus, school or member', async ({
+    api,
+    app,
+    clock,
+    withPermissions,
+    schools: {
+      owner,
+      ownerB,
+      orgA,
+      lekki,
+      ikeja,
+      lekkiOnly,
+      noPermission,
+      studentLekki,
+    },
+  }) => {
+    clock.set('2026-10-07');
+    const cash = await createMoneyAccount(app, owner, {
+      name: 'Lekki cash box',
+      kind: 'cash',
+      campusId: lekki.id,
+    });
+    const shirt = await createItem(api, owner);
+    await receive(api, owner, {
+      campusId: lekki.id,
+      accountId: cash.id,
+      lines: [{ itemId: shirt.id, quantity: 5, unitCostMinor: 350_000 }],
+    });
+    const sale = await sell(api, owner, {
+      studentId: studentLekki.id,
+      lines: [{ itemId: shirt.id, quantity: 2 }],
+    });
+    const campuses = [lekki, ikeja];
+    const invoiceOnly = await withPermissions(orgA, ['invoice:read'], {
+      campuses: [lekki],
+    });
+    const paymentOnly = await withPermissions(orgA, ['payment:read'], {
+      campuses: [lekki],
+    });
+    const ikejaReader = await withPermissions(orgA, ['payment:read'], {
+      campuses: [ikeja],
+    });
+    const storeOnly = await withPermissions(
+      orgA,
+      ['store:read', 'store:issue'],
+      { campuses }
+    );
+
+    const sold = async (actor: typeof owner) =>
+      (await financeTexts(api, actor)).filter((text) =>
+        text.includes(`sale ${sale.number}`)
+      );
+
+    expect(await sold(owner)).toHaveLength(1);
+    expect(await sold(lekkiOnly)).toHaveLength(1);
+    expect(await sold(invoiceOnly)).toHaveLength(1);
+    expect(await sold(paymentOnly)).toHaveLength(1);
+    expect(await financeTexts(api, ikejaReader)).toEqual([]);
+    expect(await financeTexts(api, storeOnly)).toEqual([]);
+    expect(await financeTexts(api, noPermission)).toEqual([]);
+    expect(await financeTexts(api, ownerB)).toEqual([]);
   });
 
   test('either finance read opens every finance row, and no other permission does', async ({

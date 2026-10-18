@@ -6,6 +6,7 @@ import {
   type Sale,
   type StoreTermFigures,
 } from '@eduvault/api-contract';
+import { ActivityWriter } from '../../common/activity';
 import { inCampusScope } from '../../common/db/in-campus-scope';
 import { KYSELY_TOKEN, type Database } from '../../common/db/tokens';
 import { LedgerPoster } from '../../common/ledger';
@@ -42,7 +43,8 @@ import type { StoreScope } from './store.repository';
 export class KyselySaleRepository extends SaleRepository {
   constructor(
     @Inject(KYSELY_TOKEN) private readonly db: Database,
-    private readonly poster: LedgerPoster
+    private readonly poster: LedgerPoster,
+    private readonly activity: ActivityWriter
   ) {
     super();
   }
@@ -131,7 +133,11 @@ export class KyselySaleRepository extends SaleRepository {
   }
 
   insert(input: NewSale): Promise<SaleOutcome> {
-    return insertSale(this.db, this.poster, input);
+    return insertSale(
+      this.db,
+      { poster: this.poster, activity: this.activity },
+      input
+    );
   }
 
   termFigures(scope: StoreScope, campusId?: string): Promise<StoreTermFigures> {

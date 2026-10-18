@@ -76,6 +76,7 @@ export class SaleService {
     const outcome = await this.sales.insert({
       organizationId: ctx.organizationId,
       userId: ctx.user.id,
+      userName: ctx.user.name,
       year: documentYear(this.clock),
       today: this.clock.today(),
       reference: input.reference,

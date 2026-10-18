@@ -69,6 +69,29 @@ export async function importOpening(
   });
 }
 
+export interface FinanceActivityRow {
+  kind: string;
+  campus_id: string | null;
+  subject_type: string;
+  subject_id: string;
+  text: string;
+  data: Record<string, unknown>;
+}
+
+export async function financeActivityRows(
+  pool: Pool,
+  organizationId: string
+): Promise<FinanceActivityRow[]> {
+  const { rows } = await pool.query<FinanceActivityRow>(
+    `SELECT kind, campus_id, subject_type, subject_id, text, data
+     FROM activity_event
+     WHERE organization_id = $1 AND pillar = 'finance'
+     ORDER BY kind, campus_id`,
+    [organizationId]
+  );
+  return rows;
+}
+
 export async function financeTexts(
   api: Fixtures['api'],
   actor: TestUser
