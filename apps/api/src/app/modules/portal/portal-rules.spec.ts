@@ -81,6 +81,10 @@ const own: OwnStatement = {
       link: { type: 'invoice', id: 'invoice-1' },
     },
   ],
+  term: null,
+  broughtForward: null,
+  closingMinor: null,
+  termOptions: [],
 };
 
 describe('toPortalStatement', () => {
@@ -105,6 +109,37 @@ describe('toPortalStatement', () => {
         amountMinor: 4_000_000,
       },
     ]);
+  });
+
+  it('passes the chosen term, brought forward, closing and options through', () => {
+    const term = {
+      id: 'term-1',
+      label: 'First term, 2026/2027',
+      fromOn: '2026-09-01',
+      toOn: null,
+    };
+    const filtered = {
+      ...own,
+      term,
+      broughtForward: { amountMinor: 1500 },
+      closingMinor: 6_000_000,
+      termOptions: [{ id: 'term-1', label: term.label }],
+    };
+    expect(toPortalStatement(record, filtered)).toMatchObject({
+      term,
+      broughtForward: { amountMinor: 1500 },
+      closingMinor: 6_000_000,
+      termOptions: [{ id: 'term-1', label: term.label }],
+    });
+  });
+
+  it('leaves the term fields null for the whole history', () => {
+    expect(toPortalStatement(record, own)).toMatchObject({
+      term: null,
+      broughtForward: null,
+      closingMinor: null,
+      termOptions: [],
+    });
   });
 
   it('keeps the charge number and amount of an unpaid charge and drops its link', () => {

@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { sql, type RawBuilder } from 'kysely';
 import {
+  feeTermLabel,
   paymentMethodSchema,
   studentLifeSchema,
   journalKindSchema,
@@ -13,6 +14,7 @@ import { KYSELY_TOKEN, type Database } from '../../common/db/tokens';
 import {
   currentTermWindowCte,
   termPaymentPredicate,
+  termSinceDaySql,
 } from '../../common/payments';
 import {
   receivableAccountIdSql,
@@ -36,6 +38,7 @@ import {
   type BalanceRowRecord,
   type GuardianChildren,
   type StudentHeader,
+  type TermStart,
 } from './student-account.repository';
 
 const visibleWith = (scope: AccountScope, studentId?: string) =>
@@ -425,6 +428,29 @@ export class KyselyStudentAccountRepository extends StudentAccountRepository {
       GROUP BY je.id, inv.id, t.id, sy.id, pay.id
       ORDER BY je.effective_on, je.sequence`.execute(this.db);
     return rows.map((row) => toMovement(row));
+  }
+
+  async termWindows(organizationId: string): Promise<TermStart[]> {
+    const { rows } = await sql<{
+      id: string;
+      name: string;
+      school_year_name: string;
+      since_day: string;
+    }>`
+      SELECT t.id, t.name, sy.name AS school_year_name,
+        to_char(${termSinceDaySql(organizationId)}, 'YYYY-MM-DD') AS since_day
+      FROM term t
+      JOIN academic_session sy ON sy.id = t.session_id AND sy.organization_id = t.organization_id
+      WHERE t.organization_id = ${organizationId}
+      ORDER BY t.starts_on, t.id`.execute(this.db);
+    return rows.map((row) => ({
+      id: row.id,
+      label: feeTermLabel({
+        name: row.name,
+        schoolYearName: row.school_year_name,
+      }),
+      sinceDay: row.since_day,
+    }));
   }
 
   async family(

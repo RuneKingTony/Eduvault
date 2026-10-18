@@ -263,6 +263,10 @@ export const statement = (
     },
   ],
   family: { guardianId: NGOZI, guardianName: 'Ngozi Okeke', childCount: 3 },
+  term: null,
+  broughtForward: null,
+  closingMinor: null,
+  termOptions: [],
   ...over,
 });
 

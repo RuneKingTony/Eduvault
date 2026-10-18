@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import { contract } from './contract';
 import {
   ROW_STATUS_LABELS,
@@ -6,6 +7,7 @@ import {
   guardianStatementParamsSchema,
   isOwingStatus,
   statementQuerySchema,
+  statementTermFields,
 } from './student-accounts';
 
 describe('balanceListQuerySchema', () => {
@@ -45,6 +47,64 @@ describe('statementQuerySchema', () => {
 
   it('refuses a page below 1', () => {
     expect(statementQuerySchema.safeParse({ page: '0' }).success).toBe(false);
+  });
+
+  it('takes an optional term id and refuses anything that is not an id', () => {
+    const id = '0198a4b2-3c5d-7e6f-8a9b-0c1d2e3f4a5b';
+    expect(statementQuerySchema.parse({ termId: id }).termId).toBe(id);
+    expect(statementQuerySchema.parse({}).termId).toBeUndefined();
+    expect(statementQuerySchema.safeParse({ termId: 'nope' }).success).toBe(
+      false
+    );
+  });
+});
+
+describe('statementTermFields', () => {
+  const schema = z.object(statementTermFields);
+  const whole = {
+    term: null,
+    broughtForward: null,
+    closingMinor: null,
+    termOptions: [],
+  };
+
+  it('accepts the whole-history nulls', () => {
+    expect(schema.safeParse(whole).success).toBe(true);
+  });
+
+  it('accepts a filled term, a signed brought forward and a closing figure', () => {
+    const id = '0198a4b2-3c5d-7e6f-8a9b-0c1d2e3f4a5b';
+    const filled = {
+      term: {
+        id,
+        label: 'First term, 2026/2027',
+        fromOn: '2026-09-01',
+        toOn: null,
+      },
+      broughtForward: { amountMinor: -500 },
+      closingMinor: 1200,
+      termOptions: [{ id, label: 'First term, 2026/2027' }],
+    };
+    expect(schema.safeParse(filled).success).toBe(true);
+    expect(
+      schema.safeParse({
+        ...filled,
+        term: { ...filled.term, toOn: '2026-12-18' },
+      }).success
+    ).toBe(true);
+  });
+
+  it('refuses a fractional amount and a term without a label', () => {
+    expect(
+      schema.safeParse({ ...whole, broughtForward: { amountMinor: 1.5 } })
+        .success
+    ).toBe(false);
+    expect(
+      schema.safeParse({
+        ...whole,
+        term: { id: 'nope', fromOn: '2026-09-01', toOn: null },
+      }).success
+    ).toBe(false);
   });
 });
 

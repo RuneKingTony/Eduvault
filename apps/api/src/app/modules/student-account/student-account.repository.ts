@@ -50,6 +50,12 @@ export interface GuardianChildren {
   studentIds: string[];
 }
 
+export interface TermStart {
+  id: string;
+  label: string;
+  sinceDay: string;
+}
+
 export abstract class StudentAccountRepository {
   abstract currency(organizationId: string): Promise<string>;
 
@@ -79,6 +85,8 @@ export abstract class StudentAccountRepository {
     organizationId: string,
     studentId: string
   ): Promise<MovementRecord[]>;
+
+  abstract termWindows(organizationId: string): Promise<TermStart[]>;
 
   abstract family(
     scope: AccountScope,

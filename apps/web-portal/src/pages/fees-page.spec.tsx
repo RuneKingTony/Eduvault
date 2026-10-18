@@ -35,7 +35,16 @@ const withBalance = (balanceMinor: number) =>
   });
 
 const renderFees = (api: ReturnType<typeof apiWith>, childId = 'ada') =>
-  renderWithApi(<FeesPage me={guardian} childId={childId} />, api, HELD);
+  renderWithApi(
+    <FeesPage
+      me={guardian}
+      childId={childId}
+      term={undefined}
+      onTerm={vi.fn()}
+    />,
+    api,
+    HELD
+  );
 
 describe('FeesPage', () => {
   it('names the child and the term under the Fees heading', async () => {
@@ -159,7 +168,12 @@ describe('FeesPage', () => {
           >
             Switch to Tobi
           </button>
-          <FeesPage me={guardian} childId={childId} />
+          <FeesPage
+            me={guardian}
+            childId={childId}
+            term={undefined}
+            onTerm={vi.fn()}
+          />
         </>
       );
     }
@@ -184,7 +198,12 @@ describe('FeesPage', () => {
 
   it('says so when no children are linked', () => {
     renderWithApi(
-      <FeesPage me={portalMe({ children: [] })} childId={undefined} />,
+      <FeesPage
+        me={portalMe({ children: [] })}
+        childId={undefined}
+        term={undefined}
+        onTerm={vi.fn()}
+      />,
       apiWith(),
       HELD
     );
@@ -193,7 +212,12 @@ describe('FeesPage', () => {
 
   it('shows the error when the statement cannot be loaded', async () => {
     renderWithApi(
-      <FeesPage me={guardian} childId="ada" />,
+      <FeesPage
+        me={guardian}
+        childId="ada"
+        term={undefined}
+        onTerm={vi.fn()}
+      />,
       {
         portal: {
           statement: vi.fn().mockRejectedValue(new Error('The school is away')),
@@ -205,5 +229,96 @@ describe('FeesPage', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'The school is away'
     );
+  });
+});
+
+describe('FeesPage term filter', () => {
+  const OPTIONS = [
+    { id: 'term-2', label: 'Second term, 2026/2027' },
+    { id: 'term-1', label: 'First term, 2026/2027' },
+  ];
+  const filtered = (toOn: string | null) =>
+    portalStatement({
+      termOptions: OPTIONS,
+      term: {
+        id: 'term-1',
+        label: 'First term, 2026/2027',
+        fromOn: '2026-09-07',
+        toOn,
+      },
+      broughtForward: { amountMinor: 1_500_000 },
+      closingMinor: 6_000_000,
+    });
+
+  it('offers Whole history and the terms from the response', async () => {
+    renderWithApi(
+      <FeesPage
+        me={guardian}
+        childId="ada"
+        term={undefined}
+        onTerm={vi.fn()}
+      />,
+      apiWith(portalStatement({ termOptions: OPTIONS })),
+      HELD
+    );
+
+    const select = await screen.findByRole('combobox', { name: 'Term' });
+
+    expect(
+      [...select.querySelectorAll('option')].map((option) => option.textContent)
+    ).toEqual([
+      'Whole history',
+      'Second term, 2026/2027',
+      'First term, 2026/2027',
+    ]);
+    expect(select).toHaveValue('');
+    expect(screen.queryByText('Brought forward')).not.toBeInTheDocument();
+  });
+
+  it('asks for the chosen term and shows Brought forward first with the term-end footer', async () => {
+    const api = apiWith(filtered('2026-12-18'));
+    renderWithApi(
+      <FeesPage me={guardian} childId="ada" term="term-1" onTerm={vi.fn()} />,
+      api,
+      HELD
+    );
+
+    const row = (await screen.findByText('Brought forward')).closest('tr');
+
+    expect(row).toBe(screen.getAllByRole('row')[1]);
+    expect(within(row as HTMLElement).getByText('₦15,000')).toBeInTheDocument();
+    expect(screen.getByText('Owing at end of term')).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Term' })).toHaveValue(
+      'term-1'
+    );
+    expect(api.portal.statement).toHaveBeenCalledWith({
+      params: { studentId: 'ada' },
+      query: { termId: 'term-1' },
+    });
+  });
+
+  it('keeps the usual footer for the latest term', async () => {
+    renderWithApi(
+      <FeesPage me={guardian} childId="ada" term="term-1" onTerm={vi.fn()} />,
+      apiWith(filtered(null)),
+      HELD
+    );
+
+    expect(await screen.findByText('Owing now')).toBeInTheDocument();
+  });
+
+  it('reports the picked term and the whole history', async () => {
+    const onTerm = vi.fn();
+    renderWithApi(
+      <FeesPage me={guardian} childId="ada" term="term-1" onTerm={onTerm} />,
+      apiWith(filtered(null)),
+      HELD
+    );
+    const select = await screen.findByRole('combobox', { name: 'Term' });
+
+    fireEvent.change(select, { target: { value: 'term-2' } });
+    expect(onTerm).toHaveBeenLastCalledWith('term-2');
+    fireEvent.change(select, { target: { value: '' } });
+    expect(onTerm).toHaveBeenLastCalledWith(undefined);
   });
 });

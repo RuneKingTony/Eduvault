@@ -51,6 +51,10 @@ export function toPortalStatement(
       number: reference,
       outstandingMinor,
     })),
+    term: own.term,
+    broughtForward: own.broughtForward,
+    closingMinor: own.closingMinor,
+    termOptions: own.termOptions,
   };
 }
 

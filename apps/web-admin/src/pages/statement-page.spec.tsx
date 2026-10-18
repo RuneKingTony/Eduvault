@@ -290,3 +290,128 @@ describe('StatementPage (family)', () => {
     ).not.toBeInTheDocument();
   });
 });
+
+describe('StatementPage term filter', () => {
+  const TERM_ID = '00000000-0000-4000-8000-0000000c0001';
+  const OPTIONS = [
+    {
+      id: '00000000-0000-4000-8000-0000000c0002',
+      label: 'Second term, 2026/2027',
+    },
+    { id: TERM_ID, label: 'First term, 2026/2027' },
+  ];
+  const filtered = (toOn: string | null) =>
+    statement({
+      termOptions: OPTIONS,
+      term: {
+        id: TERM_ID,
+        label: 'First term, 2026/2027',
+        fromOn: '2026-09-07',
+        toOn,
+      },
+      broughtForward: { amountMinor: 1_500_000 },
+      closingMinor: 18_000_000,
+    });
+
+  it('offers Whole history and each term from the response, with the whole history picked', async () => {
+    setup({ statement: statement({ termOptions: OPTIONS }) });
+
+    const select = await screen.findByRole('combobox', { name: 'Term' });
+
+    expect(
+      [...select.querySelectorAll('option')].map((option) => option.textContent)
+    ).toEqual([
+      'Whole history',
+      'Second term, 2026/2027',
+      'First term, 2026/2027',
+    ]);
+    expect(select).toHaveValue('');
+    expect(screen.queryByText('Brought forward')).not.toBeInTheDocument();
+  });
+
+  it('asks the API for the term in the search and shows the picked term', async () => {
+    const { api } = setup({
+      statement: filtered(null),
+      search: { term: TERM_ID },
+    });
+
+    expect(await screen.findByRole('combobox', { name: 'Term' })).toHaveValue(
+      TERM_ID
+    );
+    expect(api.studentAccounts.statement).toHaveBeenCalledWith({
+      params: { studentId: ADA },
+      query: { page: undefined, termId: TERM_ID },
+    });
+  });
+
+  it('puts the Brought forward row, with its tip and amount, first on page 1', async () => {
+    setup({ statement: filtered(null), search: { term: TERM_ID } });
+
+    const row = (await screen.findByText('Brought forward')).closest('tr');
+
+    expect(row).toBe(screen.getAllByRole('row')[1]);
+    expect(
+      within(row as HTMLElement).getByText(
+        'What the family already owed before this term.'
+      )
+    ).toBeVisible();
+    expect(within(row as HTMLElement).getByText('₦15,000')).toBeVisible();
+  });
+
+  it('reads Owing at end of term in the footer of a term that has ended', async () => {
+    setup({ statement: filtered('2026-12-18'), search: { term: TERM_ID } });
+
+    expect(await screen.findByText('Owing at end of term')).toBeVisible();
+    expect(screen.getAllByText('₦180,000').length).toBeGreaterThan(0);
+  });
+
+  it('keeps the usual Owing now footer for the latest term', async () => {
+    setup({ statement: filtered(null), search: { term: TERM_ID } });
+
+    expect(await screen.findByText('Owing now')).toBeVisible();
+    expect(screen.queryByText('Owing at end of term')).not.toBeInTheDocument();
+  });
+
+  it('goes back to the whole history from the select, dropping the page', async () => {
+    const { onSearchChange } = setup({
+      statement: filtered(null),
+      search: { term: TERM_ID, page: 3 },
+    });
+
+    fireEvent.change(await screen.findByRole('combobox', { name: 'Term' }), {
+      target: { value: '' },
+    });
+
+    expect(onSearchChange).toHaveBeenCalledWith({
+      term: undefined,
+      page: undefined,
+    });
+  });
+
+  it('picks a term from the select, dropping the page', async () => {
+    const { onSearchChange } = setup({
+      statement: statement({ termOptions: OPTIONS }),
+      search: { page: 2 },
+    });
+
+    fireEvent.change(await screen.findByRole('combobox', { name: 'Term' }), {
+      target: { value: TERM_ID },
+    });
+
+    expect(onSearchChange).toHaveBeenCalledWith({
+      term: TERM_ID,
+      page: undefined,
+    });
+  });
+
+  it('has no Term select in the family view', async () => {
+    setup({
+      statement: statement({ termOptions: OPTIONS }),
+      search: { view: 'family' },
+    });
+    await screen.findByText('Family total');
+    expect(
+      screen.queryByRole('combobox', { name: 'Term' })
+    ).not.toBeInTheDocument();
+  });
+});

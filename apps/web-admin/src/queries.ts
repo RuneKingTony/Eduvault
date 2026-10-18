@@ -803,12 +803,21 @@ export const balancesQueryOptions = (
 export const statementQueryOptions = (
   api: Api,
   studentId: string,
-  page?: number
+  { page, termId }: { page?: number; termId?: string } = {}
 ) =>
   queryOptions({
-    queryKey: [...STATEMENTS_KEY, 'student', studentId, page ?? 'last'],
+    queryKey: [
+      ...STATEMENTS_KEY,
+      'student',
+      studentId,
+      termId ?? 'all',
+      page ?? 'last',
+    ],
     queryFn: () =>
-      api.studentAccounts.statement({ params: { studentId }, query: { page } }),
+      api.studentAccounts.statement({
+        params: { studentId },
+        query: { page, termId },
+      }),
     placeholderData: keepPreviousData,
   });
 

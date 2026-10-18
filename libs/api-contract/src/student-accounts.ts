@@ -90,6 +90,7 @@ export type BalanceList = z.infer<typeof balanceListSchema>;
 
 export const statementQuerySchema = z.object({
   page: z.coerce.number().int().min(1).optional(),
+  termId: idSchema.optional(),
   pageSize: z.coerce
     .number()
     .int()
@@ -144,6 +145,29 @@ export const statementFamilySchema = z
   .nullable();
 export type StatementFamily = z.infer<typeof statementFamilySchema>;
 
+const statementTermSchema = z.object({
+  id: idSchema,
+  label: z.string(),
+  fromOn: z.iso.date(),
+  toOn: z.iso.date().nullable(),
+});
+
+const statementBroughtForwardSchema = z
+  .object({ amountMinor: minorSchema })
+  .nullable();
+
+const statementTermOptionSchema = z.object({
+  id: idSchema,
+  label: z.string(),
+});
+
+export const statementTermFields = {
+  term: statementTermSchema.nullable(),
+  broughtForward: statementBroughtForwardSchema,
+  closingMinor: minorSchema.nullable(),
+  termOptions: z.array(statementTermOptionSchema),
+};
+
 export const studentStatementSchema = z.object({
   currency: currencySchema,
   student: z.object({
@@ -161,6 +185,7 @@ export const studentStatementSchema = z.object({
   pageSize: z.number().int().min(1),
   unpaid: z.array(statementUnpaidSchema),
   family: statementFamilySchema,
+  ...statementTermFields,
 });
 export type StudentStatement = z.infer<typeof studentStatementSchema>;
 

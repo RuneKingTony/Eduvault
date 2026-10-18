@@ -69,7 +69,7 @@ function useAddHoliday(target: TermInYear | undefined, added: () => void) {
   });
 }
 
-function TermSelect({
+function HolidayTerm({
   options,
   termId,
   onChange,
@@ -153,7 +153,7 @@ function AddHolidayForm({
           Days open = weekdays in the term minus holidays.
         </DialogDescription>
       </DialogHeader>
-      <TermSelect options={options} termId={termId} onChange={setTermId} />
+      <HolidayTerm options={options} termId={termId} onChange={setTermId} />
       <TextField
         key={termId}
         label="Date"

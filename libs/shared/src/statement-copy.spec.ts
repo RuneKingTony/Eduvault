@@ -1,4 +1,7 @@
+import { fmtDate } from './date';
 import {
+  BROUGHT_FORWARD_LABEL,
+  BROUGHT_FORWARD_TIP,
   balanceBadgeVariant,
   balanceTile,
   balanceTone,
@@ -12,6 +15,7 @@ import {
   statementCallout,
   statementTiles,
   studentDetail,
+  termStatementView,
 } from './statement-copy';
 
 describe('balanceTile', () => {
@@ -209,5 +213,119 @@ describe('balanceBadgeVariant', () => {
     expect(balanceBadgeVariant(6_000_000)).toBe('destructive');
     expect(balanceBadgeVariant(-500_000)).toBe('secondary');
     expect(balanceBadgeVariant(0)).toBe('success');
+  });
+});
+
+describe('the term filter copy', () => {
+  it('names the brought forward row', () => {
+    expect(BROUGHT_FORWARD_LABEL).toBe('Brought forward');
+    expect(BROUGHT_FORWARD_TIP).toBe(
+      'What the family already owed before this term.'
+    );
+  });
+});
+
+const WHOLE = {
+  term: null,
+  broughtForward: null,
+  closingMinor: null,
+  totals: { balanceMinor: 2_000_000 },
+};
+
+const ended = { fromOn: '2026-09-01', toOn: '2026-12-18' };
+const open = { fromOn: '2027-01-05', toOn: null };
+
+const footerOf = (closingMinor: number) =>
+  termStatementView(
+    {
+      ...WHOLE,
+      term: ended,
+      broughtForward: { amountMinor: 0 },
+      closingMinor,
+    },
+    'NGN'
+  ).footer;
+
+describe('termStatementView', () => {
+  it('has no brought forward row and the usual footer without a term', () => {
+    expect(termStatementView(WHOLE, 'NGN')).toEqual({
+      footer: { label: 'Owing now', value: '₦20,000' },
+    });
+  });
+
+  it('shows what was owed before the term, dated the first day, in the owe tone', () => {
+    const view = termStatementView(
+      {
+        ...WHOLE,
+        term: ended,
+        broughtForward: { amountMinor: 1_500_000 },
+        closingMinor: 2_000_000,
+      },
+      'NGN'
+    );
+    expect(view.broughtForward).toEqual({
+      date: fmtDate('2026-09-01'),
+      label: 'Brought forward',
+      tip: 'What the family already owed before this term.',
+      amount: '₦15,000',
+      tone: 'owe',
+    });
+  });
+
+  it('marks a credit and keeps it out of the owe tone', () => {
+    const view = termStatementView(
+      {
+        ...WHOLE,
+        term: ended,
+        broughtForward: { amountMinor: -500_000 },
+        closingMinor: 0,
+      },
+      'NGN'
+    );
+    expect(view.broughtForward).toMatchObject({
+      amount: '₦5,000 credit',
+      tone: 'paid',
+    });
+  });
+
+  it('shows ₦0 when nothing came across', () => {
+    const view = termStatementView(
+      {
+        ...WHOLE,
+        term: ended,
+        broughtForward: { amountMinor: 0 },
+        closingMinor: 0,
+      },
+      'NGN'
+    );
+    expect(view.broughtForward).toMatchObject({ amount: '₦0', tone: 'paid' });
+  });
+
+  it('reads at end of term in the footer of a term that has ended', () => {
+    expect(footerOf(2_000_000)).toEqual({
+      label: 'Owing at end of term',
+      value: '₦20,000',
+    });
+    expect(footerOf(-500_000)).toEqual({
+      label: 'Extra paid at end of term',
+      value: '₦5,000',
+    });
+    expect(footerOf(0)).toEqual({
+      label: 'Nothing owing at end of term',
+      value: '₦0',
+    });
+  });
+
+  it('keeps the usual footer, on the closing figure, for the latest term', () => {
+    const view = termStatementView(
+      {
+        ...WHOLE,
+        term: open,
+        broughtForward: { amountMinor: 1_000_000 },
+        closingMinor: 2_000_000,
+      },
+      'NGN'
+    );
+    expect(view.footer).toEqual({ label: 'Owing now', value: '₦20,000' });
   });
 });

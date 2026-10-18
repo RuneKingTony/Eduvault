@@ -33,11 +33,20 @@ export interface StatementCardRow {
   amount: string;
 }
 
+interface StatementCardBroughtForward {
+  date: string;
+  label: string;
+  tip: string;
+  amount: string;
+  tone: StatementTone;
+}
+
 export interface StatementCardProps {
   heading: { avatar: ReactNode; name: string; detail: string };
   tiles: readonly StatementCardTile[];
   callout?: { text: string; action?: ReactNode };
   rows: readonly StatementCardRow[];
+  broughtForward?: StatementCardBroughtForward;
   footer: StatementCardTile;
   unpaid: readonly { key: string; label: string }[];
   pager?: {
@@ -116,10 +125,34 @@ function EntryRow({ row }: { row: StatementCardRow }) {
   );
 }
 
+function BroughtForwardRow({ row }: { row: StatementCardBroughtForward }) {
+  return (
+    <TableRow>
+      <TableCell>{row.date}</TableCell>
+      <TableCell>
+        <span className="flex flex-col">
+          {row.label}
+          <span className="text-xs text-muted-foreground">{row.tip}</span>
+        </span>
+      </TableCell>
+      <TableCell />
+      <TableCell
+        className={cn(
+          'text-right tabular-nums',
+          row.tone === 'owe' ? 'text-destructive' : 'text-success'
+        )}
+      >
+        {row.amount}
+      </TableCell>
+    </TableRow>
+  );
+}
+
 function EntriesTable({
   rows,
+  broughtForward,
   footer,
-}: Pick<StatementCardProps, 'rows' | 'footer'>) {
+}: Pick<StatementCardProps, 'rows' | 'broughtForward' | 'footer'>) {
   return (
     <Table>
       <TableHeader>
@@ -131,6 +164,9 @@ function EntriesTable({
         </TableRow>
       </TableHeader>
       <TableBody>
+        {broughtForward === undefined ? null : (
+          <BroughtForwardRow row={broughtForward} />
+        )}
         {rows.map((row) => (
           <EntryRow key={row.key} row={row} />
         ))}
@@ -170,11 +206,14 @@ export function StatementCard({
   tiles,
   callout,
   rows,
+  broughtForward,
   footer,
   unpaid,
   pager,
   emptyText,
 }: StatementCardProps) {
+  const onFirstPage = pager === undefined || pager.page <= 1;
+  const brought = onFirstPage ? broughtForward : undefined;
   return (
     <Card>
       <CardHeader>
@@ -193,14 +232,14 @@ export function StatementCard({
           <MoneyTiles tiles={tiles} />
           {callout === undefined ? null : <Callout callout={callout} />}
         </div>
-        {rows.length === 0 ? (
+        {rows.length === 0 && brought === undefined ? (
           <Empty>
             <EmptyHeader>
               <EmptyTitle>{emptyText}</EmptyTitle>
             </EmptyHeader>
           </Empty>
         ) : (
-          <EntriesTable rows={rows} footer={footer} />
+          <EntriesTable rows={rows} broughtForward={brought} footer={footer} />
         )}
         {pager !== undefined && pager.total > pager.pageSize ? (
           <NumberedPager {...pager} />

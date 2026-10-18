@@ -6,12 +6,12 @@ import {
   type StudentStatement,
 } from '@eduvault/api-contract';
 import {
-  entriesFooter,
   fmtDate,
   money,
   statementCallout,
   statementTiles,
   studentDetail,
+  termStatementView,
 } from '@eduvault/shared';
 import { useCan } from '@eduvault/auth-client';
 import {
@@ -88,6 +88,7 @@ export function StatementCard({
   onPage: (page: number) => void;
 }) {
   const { student, totals, currency } = statement;
+  const { broughtForward, footer } = termStatementView(statement, currency);
   const canPayBack = useCan('adjustment', 'create');
   const base = statementCallout(totals.balanceMinor, currency, { canPayBack });
   const callout =
@@ -109,7 +110,8 @@ export function StatementCard({
       tiles={statementTiles(totals, currency)}
       {...(callout === undefined ? {} : { callout })}
       rows={rowsOf(statement)}
-      footer={entriesFooter(totals.balanceMinor, currency)}
+      {...(broughtForward === undefined ? {} : { broughtForward })}
+      footer={footer}
       unpaid={statement.unpaid.map((item) => ({
         key: item.reference,
         label: `${item.reference} · ${money(item.outstandingMinor, currency)}`,

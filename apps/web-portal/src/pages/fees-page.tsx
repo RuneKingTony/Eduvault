@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { PortalChild, PortalMe } from '@eduvault/api-contract';
 import { feesStat } from '@eduvault/shared';
-import { ErrorMessage, PageSkeleton } from '@eduvault/ui';
+import { ErrorMessage, PageSkeleton, TermSelect } from '@eduvault/ui';
 import { useApi } from '../api';
 import { NoChildren } from '../components/no-children';
 import { PortalStatementCard } from '../components/portal-statement-card';
@@ -13,10 +13,20 @@ import {
 } from '../queries';
 import { selectChild } from '../selected-child';
 
-function ChildFees({ child }: { child: PortalChild }) {
+function ChildFees({
+  child,
+  termId,
+  onTerm,
+}: {
+  child: PortalChild;
+  termId: string | undefined;
+  onTerm: (term: string | undefined) => void;
+}) {
   const api = useApi();
   const [page, setPage] = useState<number | undefined>(undefined);
-  const statement = useQuery(portalStatementQueryOptions(api, child.id, page));
+  const statement = useQuery(
+    portalStatementQueryOptions(api, child.id, { page, termId })
+  );
   const calendar = useQuery(calendarCurrentQueryOptions(api));
   if (statement.data === undefined) {
     return statement.isPending ? (
@@ -48,6 +58,14 @@ function ChildFees({ child }: { child: PortalChild }) {
         <StatTile label={stat.label} value={stat.value} sub={stat.sub} />
       </div>
       <h2>Statement</h2>
+      <TermSelect
+        terms={statement.data.termOptions}
+        value={termId}
+        onChange={(next) => {
+          setPage(undefined);
+          onTerm(next);
+        }}
+      />
       <PortalStatementCard statement={statement.data} onPage={setPage} />
     </section>
   );
@@ -56,13 +74,24 @@ function ChildFees({ child }: { child: PortalChild }) {
 export function FeesPage({
   me,
   childId,
+  term,
+  onTerm,
 }: {
   me: PortalMe;
   childId: string | undefined;
+  term: string | undefined;
+  onTerm: (term: string | undefined) => void;
 }) {
   const selected = selectChild(me.children, childId);
   if (selected === undefined) {
     return <NoChildren />;
   }
-  return <ChildFees key={selected.id} child={selected} />;
+  return (
+    <ChildFees
+      key={selected.id}
+      child={selected}
+      termId={term}
+      onTerm={onTerm}
+    />
+  );
 }

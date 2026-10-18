@@ -211,6 +211,10 @@ export const portalStatement = (
   page: 1,
   pageSize: 10,
   unpaid: [{ number: 'CHG-0001', outstandingMinor: 6_000_000 }],
+  term: null,
+  broughtForward: null,
+  closingMinor: null,
+  termOptions: [],
   ...overrides,
 });
 

@@ -3,8 +3,14 @@ import type {
   GuardianStatement,
   StudentStatement,
 } from '@eduvault/api-contract';
+import { addDays } from '@eduvault/shared';
 import { LedgerService } from '../src/app/modules/ledger/ledger.service';
-import { expect, type Fixtures } from './support/base-test';
+import { expect, type Fixtures, type TestUser } from './support/base-test';
+import {
+  approveVoid,
+  askAdjustment,
+  askVoid,
+} from './support/factories/approvals';
 import {
   TUITION_MINOR,
   addDiscount,
@@ -13,10 +19,15 @@ import {
   receivableBalance,
   sendRun,
 } from './support/factories/billing';
-import { ledgerAccountId, postEntry } from './support/factories/finance';
+import {
+  ledgerAccountId,
+  moneyFingerprint,
+  postEntry,
+} from './support/factories/finance';
 import { orgContextFor } from './support/factories/org-context';
 import { bankAccount, owes, recordCash } from './support/factories/payments';
 import { createStudent } from './support/factories/students';
+import { termOf } from './support/factories/terms';
 import { schoolsTest as test } from './support/two-schools';
 
 const OPENING = 4_000_000;
@@ -47,6 +58,63 @@ const balancesOf = async (
     .body as BalanceList;
 
 const names = (list: BalanceList) => list.items.map((row) => row.studentId);
+
+const OWING_STATUSES = new Set(['charged', 'cancelled', 'refunded']);
+
+const signedSum = (rows: StudentStatement['rows']) =>
+  rows.reduce(
+    (sum, row) =>
+      sum +
+      (OWING_STATUSES.has(row.status) ? row.amountMinor : -row.amountMinor),
+    0
+  );
+
+const termStatement = (
+  api: Fixtures['api'],
+  actor: { cookie: string },
+  { studentId, termId }: { studentId: string; termId: string }
+) =>
+  statementAt(
+    api,
+    actor,
+    `/finance/students/${studentId}/statement?pageSize=50&termId=${termId}`
+  );
+
+const YEAR = '2026/2027';
+
+const calendarTerms = async (api: Fixtures['api'], actor: TestUser) => {
+  const [first, second, third] = await Promise.all(
+    [1, 2, 3].map((sequence) => termOf(api, actor, { year: YEAR, sequence }))
+  );
+  if (first === undefined || second === undefined || third === undefined) {
+    throw new Error('the school year has three terms');
+  }
+  return { first, second, third };
+};
+
+async function expectReconciled(
+  api: Fixtures['api'],
+  actor: { cookie: string },
+  { studentId, termIds }: { studentId: string; termIds: readonly string[] }
+) {
+  const whole = await statementOf(api, actor, studentId);
+  const views = await Promise.all(
+    termIds.map((termId) => termStatement(api, actor, { studentId, termId }))
+  );
+  for (const [index, view] of views.entries()) {
+    const next = views[index + 1];
+    const brought = view.broughtForward?.amountMinor ?? Number.NaN;
+    expect(view.closingMinor).toBe(brought + signedSum(view.rows));
+    expect(view.totals).toEqual(whole.totals);
+    expect(view.unpaid).toEqual(whole.unpaid);
+    if (next === undefined) {
+      expect(view.closingMinor).toBe(whole.totals.balanceMinor);
+    } else {
+      expect(view.closingMinor).toBe(next.broughtForward?.amountMinor);
+    }
+  }
+  return { whole, views };
+}
 
 test.describe('balances and statements over the books', () => {
   test('the balance equals Total - Reduced - Paid and the ledger over charge, discount, payment and opening history', async ({
@@ -398,6 +466,179 @@ test.describe('balances and statements over the books', () => {
   });
 });
 
+test.describe('term filter', () => {
+  test('a payment cancelled after the term keeps Paid in its term and shows Payment cancelled in the later one', async ({
+    api,
+    app,
+    clock,
+    pool,
+    schools: { orgA, owner, lekkiOnly, studentLekki },
+  }) => {
+    clock.set('2026-10-07');
+    const fixture = await chargeFixture(app, api, owner);
+    const { first, second, third } = await calendarTerms(api, owner);
+    await owes(app, owner, {
+      studentId: studentLekki.id,
+      amountMinor: OPENING,
+    });
+    const { runId } = await prepare(api, owner, {
+      termId: fixture.firstTermId,
+      scope: 'school',
+    });
+    await sendRun(api, owner, runId ?? '');
+    const account = await bankAccount(app, owner);
+    const payment = await recordCash(api, owner, {
+      accountId: account.id,
+      paidOn: clock.today(),
+      allocations: [{ studentId: studentLekki.id, amountMinor: PAID }],
+    });
+    clock.set(addDays(second.startsOn, 3));
+    const { void: asked } = await askVoid(api, lekkiOnly, payment.id);
+    await approveVoid(api, owner, asked.id);
+    await askAdjustment(api, lekkiOnly, {
+      kind: 'credit_note',
+      studentId: studentLekki.id,
+      amountMinor: 1_000_000,
+      reason: 'Late enrolment',
+    });
+    const before = await moneyFingerprint(pool, orgA.id);
+
+    const { whole, views } = await expectReconciled(api, owner, {
+      studentId: studentLekki.id,
+      termIds: [first.id, second.id, third.id],
+    });
+    const [inFirst, inSecond] = views;
+
+    for (const table of Object.values(before)) {
+      expect(table).not.toMatch(/^0:/);
+    }
+    expect(await moneyFingerprint(pool, orgA.id)).toEqual(before);
+
+    expect(inFirst?.broughtForward).toEqual({ amountMinor: OPENING });
+    expect(inFirst?.rows.map((row) => row.status).toSorted(byText)).toEqual([
+      'charged',
+      'paid',
+    ]);
+    expect(inSecond?.rows.map((row) => row.status)).toEqual(['cancelled']);
+    expect(inSecond?.broughtForward?.amountMinor).toBe(
+      OPENING + TUITION_MINOR - PAID
+    );
+    expect(inSecond?.rows[0]?.effectiveOn).toBe(addDays(second.startsOn, 3));
+    expect(whole.rows.map((row) => row.status).toSorted(byText)).toEqual([
+      'cancelled',
+      'charged',
+      'charged',
+      'paid',
+    ]);
+  });
+
+  test('a second-term charge sent before the term starts opens the window early, so a payment on that day is in the second term and the day before is in the first', async ({
+    api,
+    app,
+    clock,
+    schools: { owner, studentLekki },
+  }) => {
+    clock.set('2026-10-07');
+    const fixture = await chargeFixture(app, api, owner);
+    const { first, second, third } = await calendarTerms(api, owner);
+    const account = await bankAccount(app, owner);
+    const early = addDays(second.startsOn, -10);
+    const firstRun = await prepare(api, owner, {
+      termId: fixture.firstTermId,
+      scope: 'school',
+    });
+    await sendRun(api, owner, firstRun.runId ?? '');
+    clock.set(early);
+    const secondRun = await prepare(api, owner, {
+      termId: fixture.secondTermId,
+      scope: 'school',
+    });
+    await sendRun(api, owner, secondRun.runId ?? '');
+    await recordCash(api, owner, {
+      accountId: account.id,
+      paidOn: addDays(early, -1),
+      allocations: [{ studentId: studentLekki.id, amountMinor: 1_000_000 }],
+    });
+    await recordCash(api, owner, {
+      accountId: account.id,
+      paidOn: early,
+      allocations: [{ studentId: studentLekki.id, amountMinor: 2_000_000 }],
+    });
+
+    const { views } = await expectReconciled(api, owner, {
+      studentId: studentLekki.id,
+      termIds: [first.id, second.id, third.id],
+    });
+    const [inFirst, inSecond] = views;
+
+    expect(inSecond?.term?.fromOn).toBe(early);
+    expect(inFirst?.term?.toOn).toBe(addDays(early, -1));
+    expect(
+      inFirst?.rows
+        .filter((row) => row.status === 'paid')
+        .map((row) => row.amountMinor)
+    ).toEqual([1_000_000]);
+    expect(
+      inSecond?.rows
+        .filter((row) => row.status === 'paid')
+        .map((row) => row.amountMinor)
+    ).toEqual([2_000_000]);
+    expect(
+      inSecond?.rows
+        .filter((row) => row.status === 'charged')
+        .map((row) => row.effectiveOn)
+    ).toEqual([early]);
+  });
+
+  test('a student with nothing before the term has ₦0 brought forward', async ({
+    api,
+    app,
+    clock,
+    schools: { owner, studentLekki },
+  }) => {
+    clock.set('2026-10-07');
+    const fixture = await chargeFixture(app, api, owner);
+    const { first, second, third } = await calendarTerms(api, owner);
+    const { runId } = await prepare(api, owner, {
+      termId: fixture.firstTermId,
+      scope: 'school',
+    });
+    await sendRun(api, owner, runId ?? '');
+
+    const { views } = await expectReconciled(api, owner, {
+      studentId: studentLekki.id,
+      termIds: [first.id, second.id, third.id],
+    });
+
+    expect(views[0]?.broughtForward).toEqual({ amountMinor: 0 });
+    expect(views[0]?.rows.map((row) => row.status)).toEqual(['charged']);
+    expect(views[0]?.closingMinor).toBe(TUITION_MINOR);
+    expect(views[1]?.rows).toEqual([]);
+    expect(views[1]?.broughtForward).toEqual({ amountMinor: TUITION_MINOR });
+  });
+
+  test('offers the terms that have opened, newest first, and nothing is picked without a term id', async ({
+    api,
+    app,
+    clock,
+    schools: { owner, studentLekki },
+  }) => {
+    clock.set('2026-10-07');
+    await chargeFixture(app, api, owner);
+    const { first } = await calendarTerms(api, owner);
+
+    const whole = await statementOf(api, owner, studentLekki.id);
+
+    expect(whole).toMatchObject({
+      term: null,
+      broughtForward: null,
+      closingMinor: null,
+    });
+    expect(whole.termOptions.map((option) => option.id)).toEqual([first.id]);
+    expect(whole.termOptions[0]?.label).toBe(`First term, ${YEAR}`);
+  });
+});
+
 test.describe('isolation', () => {
   test('a statement for a student in another campus or another school answers 404', async ({
     api,
@@ -415,6 +656,55 @@ test.describe('isolation', () => {
     await api(lekkiOnly)
       .get(`/finance/students/${studentLekki.id}/statement`)
       .expect(200);
+  });
+
+  test('another school’s term id answers 404 and another campus’s student answers 404 with a valid term', async ({
+    api,
+    app,
+    clock,
+    pool,
+    schools: { orgA, owner, ownerB, lekkiOnly, studentLekki, studentIkeja },
+  }) => {
+    clock.set('2026-10-07');
+    await chargeFixture(app, api, owner);
+    const { first } = await calendarTerms(api, owner);
+    const foreign = await termOf(api, ownerB, { year: YEAR, sequence: 1 });
+    await owes(app, owner, {
+      studentId: studentLekki.id,
+      amountMinor: OPENING,
+    });
+    const before = await moneyFingerprint(pool, orgA.id);
+
+    await api(owner)
+      .get(
+        `/finance/students/${studentLekki.id}/statement?termId=${foreign.id}`
+      )
+      .expect(404);
+    await api(lekkiOnly)
+      .get(
+        `/finance/students/${studentLekki.id}/statement?termId=${foreign.id}`
+      )
+      .expect(404);
+    await api(lekkiOnly)
+      .get(`/finance/students/${studentIkeja.id}/statement?termId=${first.id}`)
+      .expect(404);
+    await api(owner)
+      .get(
+        `/finance/students/${studentLekki.id}/statement?termId=${crypto.randomUUID()}`
+      )
+      .expect(404);
+    await api(owner)
+      .get(`/finance/students/${studentLekki.id}/statement?termId=nope`)
+      .expect(400);
+    await api(lekkiOnly)
+      .get(`/finance/students/${studentLekki.id}/statement?termId=${first.id}`)
+      .expect(200);
+    await termStatement(api, owner, {
+      studentId: studentLekki.id,
+      termId: first.id,
+    });
+
+    expect(await moneyFingerprint(pool, orgA.id)).toEqual(before);
   });
 
   test('a family view lists only in-scope children and answers 404 when none are in reach', async ({

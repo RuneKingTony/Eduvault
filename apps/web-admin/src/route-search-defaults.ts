@@ -35,7 +35,11 @@ export const SEARCH_DEFAULTS = {
     record: undefined,
   },
   '/finance/accounts': { filter: undefined, q: undefined, page: undefined },
-  '/finance/accounts/$studentId': { view: undefined, page: undefined },
+  '/finance/accounts/$studentId': {
+    view: undefined,
+    page: undefined,
+    term: undefined,
+  },
   '/finance/adjustments': {
     tab: undefined,
     page: undefined,

@@ -5,12 +5,12 @@ import {
 } from '@eduvault/api-contract';
 import { UserAvatar } from '@eduvault/auth-client';
 import {
-  entriesFooter,
   fmtDate,
   money,
   statementCallout,
   statementTiles,
   studentDetail,
+  termStatementView,
 } from '@eduvault/shared';
 import { StatementCard, type StatementCardRow } from '@eduvault/ui';
 
@@ -33,6 +33,7 @@ export function PortalStatementCard({
   onPage: (page: number) => void;
 }) {
   const { student, totals, currency } = statement;
+  const { broughtForward, footer } = termStatementView(statement, currency);
   const callout = statementCallout(totals.balanceMinor, currency, {
     canPayBack: false,
   });
@@ -46,7 +47,8 @@ export function PortalStatementCard({
       tiles={statementTiles(totals, currency)}
       {...(callout === undefined ? {} : { callout })}
       rows={rowsOf(statement)}
-      footer={entriesFooter(totals.balanceMinor, currency)}
+      {...(broughtForward === undefined ? {} : { broughtForward })}
+      footer={footer}
       unpaid={statement.unpaid.map((item, index) => ({
         key: `${item.number}-${index}`,
         label: `${item.number} · ${money(item.outstandingMinor, currency)}`,

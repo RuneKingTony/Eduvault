@@ -9,10 +9,15 @@ export const Route = createFileRoute('/finance/accounts_/$studentId')({
   beforeLoad: ({ context }) => {
     requireGate(context.access, '/finance/accounts');
   },
-  loader: async ({ context: { queryClient, api }, params: { studentId } }) => {
+  loaderDeps: ({ search }) => ({ termId: search.term }),
+  loader: async ({
+    context: { queryClient, api },
+    params: { studentId },
+    deps: { termId },
+  }) => {
     await queryClient
       .query({
-        ...statementQueryOptions(api, studentId),
+        ...statementQueryOptions(api, studentId, { termId }),
         staleTime: 'static',
       })
       .catch(() => undefined);

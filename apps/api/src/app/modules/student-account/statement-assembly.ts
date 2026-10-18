@@ -145,15 +145,19 @@ export function statementRowsOf(
   );
 }
 
+export const withNet = (
+  movement: MovementRecord
+): MovementRecord & { netMinor: number } => ({
+  ...movement,
+  netMinor: movement.debitMinor - movement.creditMinor,
+});
+
 export function unpaidOf(
   movementsOldestFirst: readonly MovementRecord[]
 ): StatementUnpaid[] {
   const nets = movementsOldestFirst
     .filter((movement) => !movement.storeSale)
-    .map((movement) => ({
-      ...movement,
-      netMinor: movement.debitMinor - movement.creditMinor,
-    }));
+    .map((movement) => withNet(movement));
   return unpaidCharges(nets).map((charge) => ({
     reference: charge.kind === 'opening' ? OPENING : charge.reference,
     outstandingMinor: charge.outstandingMinor,

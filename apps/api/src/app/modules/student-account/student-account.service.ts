@@ -3,6 +3,7 @@ import {
   FINANCE_PAGE_SIZE,
   GUARDIAN_ACCOUNT_NOT_FOUND_MESSAGE,
   STUDENT_ACCOUNT_NOT_FOUND_MESSAGE,
+  TERM_NOT_FOUND_MESSAGE,
   type BalanceList,
   type BalanceListQuery,
   type DashboardFinance,
@@ -14,7 +15,7 @@ import {
 import { can } from '@eduvault/policy';
 import type { OrgContext } from '../../common/auth';
 import { Clock } from '../../common/clock';
-import { familyTotals, statementTotals } from '../../common/ledger';
+import { familyTotals, statementTotals, termSlice } from '../../common/ledger';
 import {
   describeForFamily,
   describeMovement,
@@ -22,27 +23,77 @@ import {
   scopeNote,
   statementRowsOf,
   unpaidOf,
+  withNet,
   type Describer,
   type MovementRecord,
 } from './statement-assembly';
 import {
   StudentAccountRepository,
   type AccountScope,
+  type TermStart,
 } from './student-account.repository';
+import { termOptionsOf, termWindowsOf, type TermWindow } from './term-window';
 
 export type OwnStatement = Omit<StudentStatement, 'student' | 'family'>;
 
 interface StudentHistory {
   currency: string;
   movements: readonly MovementRecord[];
+  terms: readonly TermStart[];
+  today: string;
+}
+
+type TermFields = Pick<
+  OwnStatement,
+  'term' | 'broughtForward' | 'closingMinor'
+>;
+
+function windowOf(
+  windows: readonly TermWindow[],
+  termId: string | undefined
+): TermWindow | undefined {
+  const found = windows.find(({ id }) => id === termId);
+  if (termId !== undefined && found === undefined) {
+    throw new NotFoundException(TERM_NOT_FOUND_MESSAGE);
+  }
+  return found;
+}
+
+function shownIn(
+  movements: readonly MovementRecord[],
+  window: TermWindow | undefined
+): { shown: readonly MovementRecord[] } & TermFields {
+  if (window === undefined) {
+    return {
+      shown: movements,
+      term: null,
+      broughtForward: null,
+      closingMinor: null,
+    };
+  }
+  const { broughtForwardMinor, inTerm, closingMinor } = termSlice(
+    movements.map((movement) => withNet(movement)),
+    window
+  );
+  return {
+    shown: inTerm,
+    term: window,
+    broughtForward: { amountMinor: broughtForwardMinor },
+    closingMinor,
+  };
 }
 
 function ownStatementOf(
-  { currency, movements }: StudentHistory,
+  { currency, movements, terms, today }: StudentHistory,
   query: StatementQuery,
   describe: Describer
 ): OwnStatement {
-  const rows = statementRowsOf(movements, describe);
+  const windows = termWindowsOf(terms);
+  const { shown, ...termFields } = shownIn(
+    movements,
+    windowOf(windows, query.termId)
+  );
+  const rows = statementRowsOf(shown, describe);
   const { items, page } = pageOfRows(rows, query.page, query.pageSize);
   return {
     currency,
@@ -52,6 +103,8 @@ function ownStatementOf(
     page,
     pageSize: query.pageSize,
     unpaid: unpaidOf(movements),
+    termOptions: termOptionsOf(windows, today),
+    ...termFields,
   };
 }
 
@@ -251,10 +304,11 @@ export class StudentAccountService {
     organizationId: string,
     studentId: string
   ): Promise<StudentHistory> {
-    const [currency, movements] = await Promise.all([
+    const [currency, movements, terms] = await Promise.all([
       this.accounts.currency(organizationId),
       this.accounts.movements(organizationId, studentId),
+      this.accounts.termWindows(organizationId),
     ]);
-    return { currency, movements };
+    return { currency, movements, terms, today: this.clock.today() };
   }
 }

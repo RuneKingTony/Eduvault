@@ -34,6 +34,37 @@ export async function ledgerAccountId(
   return row.id;
 }
 
+const MONEY_TABLES = [
+  'payment',
+  'payment_allocation',
+  'payment_void',
+  'invoice',
+  'invoice_line',
+  'adjustment',
+  'journal_entry',
+  'journal_line',
+] as const;
+
+export async function moneyFingerprint(
+  pool: Pool,
+  organizationId: string
+): Promise<Record<(typeof MONEY_TABLES)[number], string>> {
+  const entries = await Promise.all(
+    MONEY_TABLES.map(async (table) => {
+      const { rows } = await pool.query<{ fingerprint: string }>(
+        `SELECT count(*)::text || ':' || coalesce(md5(string_agg(t::text, '|' ORDER BY t::text)), '') AS fingerprint
+           FROM ${table} t WHERE t.organization_id = $1`,
+        [organizationId]
+      );
+      return [table, rows[0]?.fingerprint ?? ''] as const;
+    })
+  );
+  return Object.fromEntries(entries) as Record<
+    (typeof MONEY_TABLES)[number],
+    string
+  >;
+}
+
 export async function createMoneyAccount(
   app: INestApplication,
   actor: { cookie: string },
