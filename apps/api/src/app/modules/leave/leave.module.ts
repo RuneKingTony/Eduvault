@@ -26,5 +26,6 @@ import { LeaveService } from './leave.service';
     { provide: LeaveRepository, useClass: KyselyLeaveRepository },
     registerApprovals(LeaveApprovalProvider),
   ],
+  exports: [LeaveService],
 })
 export class LeaveModule {}

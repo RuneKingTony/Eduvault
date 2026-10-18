@@ -3,6 +3,7 @@ import { EduvaultAuthModule } from '../../common/auth';
 import { ApprovalsModule } from '../approvals/approvals.module';
 import { BillingModule } from '../billing/billing.module';
 import { InvoiceModule } from '../invoice/invoice.module';
+import { LeaveModule } from '../leave/leave.module';
 import { MoneyAccountModule } from '../money-account/money-account.module';
 import { StoreModule } from '../store/store.module';
 import { StudentAccountModule } from '../student-account/student-account.module';
@@ -12,6 +13,7 @@ import { ActivityRepository } from './activity.repository';
 import { ActivityService } from './activity.service';
 import { DashboardApprovalsService } from './dashboard-approvals.service';
 import { DashboardChargesService } from './dashboard-charges.service';
+import { DashboardLeaveService } from './dashboard-leave.service';
 import { DashboardFinanceController } from './dashboard-finance.controller';
 import { DashboardRollService } from './dashboard-roll.service';
 import { DashboardStoreController } from './dashboard-store.controller';
@@ -38,6 +40,7 @@ import { KyselyDashboardRepository } from './kysely-dashboard.repository';
     StudentAccountModule,
     StoreModule,
     ApprovalsModule,
+    LeaveModule,
   ],
   controllers: [
     DashboardController,
@@ -51,6 +54,7 @@ import { KyselyDashboardRepository } from './kysely-dashboard.repository';
     DashboardChargesService,
     DashboardRollService,
     DashboardApprovalsService,
+    DashboardLeaveService,
     DashboardTasksService,
     DashboardStoreTasksService,
     {
@@ -61,6 +65,7 @@ import { KyselyDashboardRepository } from './kysely-dashboard.repository';
         DashboardChargesService,
         DashboardStoreTasksService,
         DashboardApprovalsService,
+        DashboardLeaveService,
       ],
     },
     ActivityService,

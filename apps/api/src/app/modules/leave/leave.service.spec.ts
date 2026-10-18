@@ -5,6 +5,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  LEAVE_CANCEL_NOT_APPROVED_MESSAGE,
+  LEAVE_CANCEL_STARTED_MESSAGE,
   LEAVE_NO_SCHOOL_DAY_MESSAGE,
   LEAVE_OVERLAP_MESSAGE,
   LEAVE_PAST_START_MESSAGE,
@@ -37,6 +39,7 @@ function setup(holidays: string[] = []) {
   const repository = new FakeLeaveRepository();
   repository.names.set('emeka', 'Emeka Obi');
   repository.names.set('grace', 'Grace Nwosu');
+  repository.names.set('funmi', 'Funmi Adeyemi');
   repository.campuses.set('emeka', [LEKKI]);
   repository.campuses.set('ayo', [IKEJA]);
   repository.campuses.set('grace', [LEKKI]);
@@ -61,6 +64,7 @@ function setup(holidays: string[] = []) {
   return {
     repository,
     calendar,
+    clock,
     service: new LeaveService(repository, calendar, clock),
   };
 }
@@ -387,6 +391,310 @@ describe('LeaveService.mine', () => {
       oldestWaitingSentOn: null,
       nextTimeOff: null,
     });
+  });
+});
+
+const approvedLeave = (
+  repository: FakeLeaveRepository,
+  over: Parameters<FakeLeaveRepository['seed']>[0]
+) => repository.seed({ status: 'approved', deciderId: 'grace', ...over });
+
+const atLagos = (instant: string) => {
+  const harness = setup();
+  harness.clock.set(null);
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date(instant));
+  const row = approvedLeave(harness.repository, {
+    createdBy: 'emeka',
+    startsOn: '2026-10-13',
+  });
+  return { ...harness, row };
+};
+
+describe('LeaveService.cancel', () => {
+  it('cancels approved leave that has not started, with who and why', async () => {
+    const { service, repository } = setup();
+    const row = approvedLeave(repository, {
+      createdBy: 'emeka',
+      startsOn: '2026-10-22',
+      endsOn: '2026-10-23',
+    });
+    const leave = await service.cancel(
+      ctxFor('funmi'),
+      row.id,
+      '  Cover is short  '
+    );
+    expect(leave).toMatchObject({
+      status: 'cancelled',
+      cancelledBy: 'funmi',
+      cancellerName: 'Funmi Adeyemi',
+      cancellationReason: 'Cover is short',
+      approvedBy: 'grace',
+    });
+    expect(repository.events.at(-1)).toMatchObject({
+      kind: 'leave.cancelled',
+      actorUserId: 'funmi',
+      subjectType: 'staff_leave',
+      subjectId: row.id,
+      campusId: null,
+      text: 'Emeka Obi’s annual leave (22 Oct 2026 – 23 Oct 2026) was cancelled.',
+    });
+  });
+
+  it('frees the days taken and the next time off', async () => {
+    const { service, repository } = setup();
+    const row = approvedLeave(repository, {
+      createdBy: 'emeka',
+      startsOn: '2026-10-22',
+      endsOn: '2026-10-23',
+    });
+    const before = await service.mine(ctxFor('emeka'));
+    expect(before.daysTakenThisYear).toBe(2);
+    expect(before.nextTimeOff?.id).toBe(row.id);
+    await service.cancel(ctxFor('funmi'), row.id, 'Cover is short');
+    const after = await service.mine(ctxFor('emeka'));
+    expect(after).toMatchObject({ daysTakenThisYear: 0, nextTimeOff: null });
+  });
+
+  it('answers 409 SelfApproval for the approver’s own leave', async () => {
+    const { service, repository } = setup();
+    const row = approvedLeave(repository, {
+      createdBy: 'grace',
+      startsOn: '2026-10-22',
+    });
+    await expect(
+      service.cancel(ctxFor('grace'), row.id, 'Changed my mind')
+    ).rejects.toMatchObject({ response: { code: 'SelfApproval' } });
+    expect(repository.rows[0]?.status).toBe('approved');
+  });
+
+  it.each([TODAY, '2026-10-09'])(
+    'answers 409 for leave that starts on %s',
+    async (startsOn) => {
+      const { service, repository } = setup();
+      const row = approvedLeave(repository, { createdBy: 'emeka', startsOn });
+      const error = await refusal(
+        service.cancel(ctxFor('funmi'), row.id, 'Too late')
+      );
+      expect(error).toBeInstanceOf(ConflictException);
+      expect((error as ConflictException).message).toBe(
+        LEAVE_CANCEL_STARTED_MESSAGE
+      );
+      expect(repository.rows[0]?.status).toBe('approved');
+    }
+  );
+
+  describe('at the Lagos midnight', () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('refuses leave starting on the Lagos day that began an hour ago', async () => {
+      const { service, repository, row } = atLagos('2026-10-12T23:30:00Z');
+      const error = await refusal(
+        service.cancel(ctxFor('funmi'), row.id, 'Too late')
+      );
+      expect(error).toBeInstanceOf(ConflictException);
+      expect((error as ConflictException).message).toBe(
+        LEAVE_CANCEL_STARTED_MESSAGE
+      );
+      expect(repository.rows[0]?.status).toBe('approved');
+    });
+
+    it('allows leave starting on the Lagos day that has not begun', async () => {
+      const { service, row } = atLagos('2026-10-12T22:30:00Z');
+      await expect(
+        service.cancel(ctxFor('funmi'), row.id, 'Cover is short')
+      ).resolves.toMatchObject({ status: 'cancelled' });
+    });
+  });
+
+  it.each([
+    ['waiting', { status: 'submitted' as const }],
+    ['declined', { status: 'rejected' as const }],
+    ['withdrawn', { status: 'cancelled' as const }],
+  ])('answers 409 for %s leave', async (_name, over) => {
+    const { service, repository } = setup();
+    const row = repository.seed({
+      createdBy: 'emeka',
+      startsOn: '2026-10-22',
+      ...over,
+    });
+    const error = await refusal(
+      service.cancel(ctxFor('funmi'), row.id, 'Cover is short')
+    );
+    expect(error).toBeInstanceOf(ConflictException);
+    expect((error as ConflictException).message).toBe(
+      LEAVE_CANCEL_NOT_APPROVED_MESSAGE
+    );
+  });
+
+  it('answers 409 the second time', async () => {
+    const { service, repository } = setup();
+    const row = approvedLeave(repository, {
+      createdBy: 'emeka',
+      startsOn: '2026-10-22',
+    });
+    await service.cancel(ctxFor('funmi'), row.id, 'Cover is short');
+    await expect(
+      service.cancel(ctxFor('funmi'), row.id, 'Again')
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('answers 404 outside the approver’s campus scope', async () => {
+    const { service, repository } = setup();
+    const row = approvedLeave(repository, {
+      createdBy: 'ayo',
+      startsOn: '2026-10-22',
+    });
+    await expect(
+      service.cancel(ctxFor('grace', [LEKKI]), row.id, 'Cover is short')
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(repository.rows[0]?.status).toBe('approved');
+  });
+
+  it('refuses a blank reason and leaves the leave approved', async () => {
+    const { service, repository } = setup();
+    const row = approvedLeave(repository, {
+      createdBy: 'emeka',
+      startsOn: '2026-10-22',
+    });
+    await expect(
+      service.cancel(ctxFor('funmi'), row.id, '   ')
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(repository.rows[0]?.status).toBe('approved');
+  });
+});
+
+const at = (time: string) =>
+  vi.setSystemTime(new Date(`2026-10-14T${time}:00.000Z`));
+
+describe('LeaveService.mine unseen decisions', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('lists approved, declined and cancelled decisions, newest first, but not a withdrawal', async () => {
+    const { service, repository } = setup();
+    const approved = repository.seed({
+      createdBy: 'emeka',
+      startsOn: '2026-10-22',
+    });
+    const declined = repository.seed({
+      createdBy: 'emeka',
+      startsOn: '2026-10-26',
+    });
+    const cancelled = approvedLeave(repository, {
+      createdBy: 'emeka',
+      startsOn: '2026-10-29',
+    });
+    const withdrawn = repository.seed({
+      createdBy: 'emeka',
+      startsOn: '2026-11-02',
+    });
+    at('10:00');
+    await service.approve(ctxFor('grace', [LEKKI]), approved.id);
+    at('10:01');
+    await service.decline(ctxFor('grace', [LEKKI]), declined.id, 'No cover');
+    at('10:02');
+    await service.cancel(ctxFor('funmi'), cancelled.id, 'Cover is short');
+    at('10:03');
+    await service.withdraw(ctxFor('emeka'), withdrawn.id);
+
+    const mine = await service.mine(ctxFor('emeka'));
+    expect(mine.unseenCount).toBe(3);
+    expect(mine.unseenDecisions.map((item) => item.status)).toEqual([
+      'cancelled',
+      'rejected',
+      'approved',
+    ]);
+  });
+
+  it('clears after markSeen and shows again after a later decision', async () => {
+    const { service, repository } = setup();
+    const first = repository.seed({
+      createdBy: 'emeka',
+      startsOn: '2026-10-22',
+    });
+    const second = repository.seed({
+      createdBy: 'emeka',
+      startsOn: '2026-10-26',
+    });
+    at('10:00');
+    await service.approve(ctxFor('grace', [LEKKI]), first.id);
+    at('10:01');
+    await service.markSeen(ctxFor('emeka'), {
+      through: new Date().toISOString(),
+    });
+    expect(await service.mine(ctxFor('emeka'))).toMatchObject({
+      unseenCount: 0,
+      unseenDecisions: [],
+    });
+
+    at('10:02');
+    await service.decline(ctxFor('grace', [LEKKI]), second.id, 'No cover');
+    const mine = await service.mine(ctxFor('emeka'));
+    expect(mine.unseenCount).toBe(1);
+    expect(mine.unseenDecisions[0]).toMatchObject({
+      id: second.id,
+      status: 'rejected',
+    });
+  });
+
+  it('clears only decisions up to the time shown, and never a time in the future', async () => {
+    const { service, repository } = setup();
+    const [first, second, third] = [22, 26, 29].map((day) =>
+      repository.seed({ createdBy: 'emeka', startsOn: `2026-10-${day}` })
+    );
+    at('10:00');
+    await service.approve(ctxFor('grace', [LEKKI]), first?.id ?? '');
+    at('10:05');
+    await service.approve(ctxFor('grace', [LEKKI]), second?.id ?? '');
+
+    await service.markSeen(ctxFor('emeka'), {
+      through: '2026-10-14T10:00:00.000Z',
+    });
+    expect((await service.mine(ctxFor('emeka'))).unseenDecisions).toMatchObject(
+      [{ id: second?.id }]
+    );
+
+    await service.markSeen(ctxFor('emeka'), {
+      through: '2026-10-15T00:00:00.000Z',
+    });
+    at('10:10');
+    await service.approve(ctxFor('grace', [LEKKI]), third?.id ?? '');
+    expect((await service.mine(ctxFor('emeka'))).unseenDecisions).toMatchObject(
+      [{ id: third?.id }]
+    );
+  });
+
+  it('shows at most five decisions but counts them all', async () => {
+    const { service, repository } = setup();
+    for (let index = 0; index < 6; index += 1) {
+      const row = repository.seed({
+        createdBy: 'emeka',
+        startsOn: `2026-11-0${index + 1}`,
+      });
+      at(`10:0${index}`);
+      await service.approve(ctxFor('grace', [LEKKI]), row.id);
+    }
+    const mine = await service.mine(ctxFor('emeka'));
+    expect(mine.unseenDecisions).toHaveLength(5);
+    expect(mine.unseenCount).toBe(6);
+  });
+
+  it('does not mark leave seen for a super admin acting in the school', async () => {
+    const { service } = setup();
+    const acting = { organizationId: 'school-a', writes: true, reason: 'x' };
+    await expect(
+      service.markSeen(ctxFor('root', 'all', acting), {
+        through: new Date().toISOString(),
+      })
+    ).rejects.toBeInstanceOf(ForbiddenException);
   });
 });
 

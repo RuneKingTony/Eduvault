@@ -7,6 +7,7 @@ import { countOf, leaveDaysText } from '@eduvault/shared';
 import { useApi } from '../../api';
 import { myLeaveQueryOptions } from '../../queries';
 import { QueryState } from '../money/query-state';
+import { LeaveDecisionsNotice } from './leave-decisions-notice';
 import { LeaveRequestList } from './leave-request-list';
 import { NoApproverCallout } from './no-approver-callout';
 import { RequestLeaveDialog } from './request-leave-dialog';
@@ -30,6 +31,7 @@ export function MyLeaveBody({
 }) {
   return (
     <div className="flex flex-col gap-3">
+      <LeaveDecisionsNotice leave={leave} />
       {leave.otherApproverExists ? null : <NoApproverCallout />}
       <LeaveRequestList items={leave.items} canWrite={canWrite} />
     </div>

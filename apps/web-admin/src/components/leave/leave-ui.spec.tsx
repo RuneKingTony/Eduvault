@@ -1,14 +1,18 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
-import { ApiError } from '@eduvault/api-contract';
+import { ApiError, type LeaveDto } from '@eduvault/api-contract';
+import { toPermissionMap } from '@eduvault/policy';
 import { toast } from '@eduvault/ui';
 import {
   approvedLeave,
+  cancelledLeave,
   declinedLeave,
   leaveDto,
   myLeave,
 } from '../../test-leave';
-import { ownerAccess, renderWithApi } from '../../test-utils';
+import { fakeAccess, ownerAccess, renderWithApi } from '../../test-utils';
+import { CancelLeaveDialog } from './cancel-leave-dialog';
 import { LeaveOnlyApprovalsPage } from './leave-only-approvals-page';
+import { MemberLeaveCard } from './member-leave-card';
 import { MyLeaveCard } from './my-leave-card';
 import { RequestLeaveDialog } from './request-leave-dialog';
 
@@ -35,9 +39,18 @@ function cardApi(mine = myLeave()) {
       me: vi.fn().mockResolvedValue(mine),
       withdraw: vi.fn().mockResolvedValue(leaveDto({ status: 'cancelled' })),
       create: vi.fn().mockResolvedValue(leaveDto()),
+      seen: vi.fn().mockResolvedValue({ seenAt: '2026-10-12T09:00:00.000Z' }),
+      cancel: vi.fn().mockResolvedValue(cancelledLeave()),
     },
   };
 }
+
+const LEAVE_INVALIDATIONS = [['leave'], ['approvals'], ['dashboard', 'tasks']];
+
+const invalidatedKeys = (spy: { mock: { calls: unknown[][] } }): unknown[] =>
+  spy.mock.calls.map(
+    ([filters]) => (filters as { queryKey: unknown }).queryKey
+  );
 
 const listed = myLeave({
   items: [
@@ -190,6 +203,281 @@ describe('LeaveOnlyApprovalsPage', () => {
     renderWithApi(<LeaveOnlyApprovalsPage canWrite={false} />, cardApi());
     await screen.findByText('Nothing waiting');
     expect(screen.queryByRole('button', { name: 'Request leave' })).toBeNull();
+  });
+});
+
+describe('Cancelled and Withdrawn leave', () => {
+  const WITHDRAWN_ID = '00000000-0000-4000-8000-000000000905';
+
+  it('reads Cancelled with who and why for a cancel by someone, and Withdrawn for the requester’s own', async () => {
+    const withdrawn = leaveDto({
+      id: WITHDRAWN_ID,
+      status: 'cancelled',
+      startsOn: '2026-09-01',
+      endsOn: '2026-09-01',
+      days: 1,
+    });
+    renderWithApi(
+      <MyLeaveCard canWrite />,
+      cardApi(myLeave({ items: [cancelledLeave(), withdrawn] }))
+    );
+
+    expect(await screen.findByText('Cancelled')).toBeVisible();
+    expect(screen.getByText('Withdrawn')).toBeVisible();
+    expect(
+      screen.getByText('Cancelled by Funmi Adeyemi: Cover is short')
+    ).toBeVisible();
+    expect(screen.queryByText(/Withdrawn by/)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Withdraw' })).toBeNull();
+  });
+});
+
+describe('LeaveDecisionsNotice', () => {
+  const unseen = myLeave({
+    items: [cancelledLeave(), approvedLeave(), declinedLeave()],
+    unseenCount: 3,
+    unseenDecisions: [cancelledLeave(), declinedLeave(), approvedLeave()],
+  });
+
+  it('shows one line per unseen decision and clears with Got it', async () => {
+    const api = cardApi(unseen);
+    const { queryClient } = renderWithApi(<MyLeaveCard canWrite />, api);
+    const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
+
+    expect(
+      await screen.findByText('New decisions on your leave')
+    ).toBeVisible();
+    expect(
+      screen.getAllByText('Cancelled by Funmi Adeyemi: Cover is short')
+    ).not.toHaveLength(0);
+    expect(
+      screen.getAllByText('Declined by Funmi Adeyemi: Exams that week')
+    ).not.toHaveLength(0);
+    expect(
+      screen.getByText(
+        'Approved by Funmi Adeyemi: Sick leave, 12 Oct 2026 – 13 Oct 2026'
+      )
+    ).toBeVisible();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Got it' }));
+
+    await waitFor(() => {
+      expect(api.leave.seen).toHaveBeenCalledExactlyOnceWith({
+        body: { through: '2026-10-12T09:00:00.000Z' },
+      });
+    });
+    await waitFor(() => {
+      expect(api.leave.me).toHaveBeenCalledTimes(2);
+    });
+    expect(invalidatedKeys(invalidate)).toEqual(
+      expect.arrayContaining(LEAVE_INVALIDATIONS)
+    );
+  });
+
+  it('shows why Got it failed in the notice, not as a toast', async () => {
+    const api = cardApi(unseen);
+    api.leave.seen.mockRejectedValue(
+      new ApiError(409, { code: 'Conflict', message: 'Try again in a moment.' })
+    );
+    renderWithApi(<MyLeaveCard canWrite />, api);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Got it' }));
+
+    expect(await screen.findByText('Try again in a moment.')).toBeVisible();
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(screen.getByText('New decisions on your leave')).toBeVisible();
+  });
+
+  it('says how many more there are beyond the five shown', async () => {
+    renderWithApi(
+      <MyLeaveCard canWrite />,
+      cardApi(myLeave({ unseenCount: 8, unseenDecisions: [approvedLeave()] }))
+    );
+    expect(await screen.findByText('and 7 more')).toBeVisible();
+  });
+
+  it('is absent when everything has been seen', async () => {
+    renderWithApi(<MyLeaveCard canWrite />, cardApi(listed));
+    await screen.findByText('Approved');
+    expect(screen.queryByText('New decisions on your leave')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Got it' })).toBeNull();
+  });
+});
+
+const ahead = (over: Parameters<typeof approvedLeave>[0] = {}) =>
+  approvedLeave({
+    isOwn: false,
+    startsOn: '2026-10-22',
+    endsOn: '2026-10-22',
+    days: 1,
+    ...over,
+  });
+
+const actingApprover = (writes: boolean) =>
+  fakeAccess({
+    roles: [],
+    permissions: toPermissionMap(['leave:approve']),
+    campusScope: 'all',
+    acting: { organizationId: 'org-1', writes },
+  });
+
+function memberApi(items: LeaveDto[] = [ahead()]) {
+  return {
+    ...cardApi(),
+    leave: { ...cardApi().leave, list: vi.fn().mockResolvedValue(items) },
+  };
+}
+
+describe('MemberLeaveCard Cancel leave', () => {
+  it('is offered on an approved row that has not started', async () => {
+    renderWithApi(<MemberLeaveCard userId="user-emeka" />, memberApi());
+    expect(
+      await screen.findByRole('button', { name: 'Cancel leave' })
+    ).toBeVisible();
+  });
+
+  it('is left off started, waiting, declined, withdrawn, already cancelled and own leave', async () => {
+    const items = [
+      ahead({ id: 'a', startsOn: TODAY, endsOn: TODAY }),
+      ahead({ id: 'b', startsOn: '2026-10-05', endsOn: '2026-10-05' }),
+      leaveDto({ id: 'c', isOwn: false, startsOn: '2026-10-22' }),
+      declinedLeave({ id: 'd', isOwn: false, startsOn: '2026-10-22' }),
+      leaveDto({
+        id: 'e',
+        isOwn: false,
+        status: 'cancelled',
+        startsOn: '2026-10-22',
+      }),
+      cancelledLeave({ id: 'f', isOwn: false, startsOn: '2026-10-22' }),
+      ahead({ id: 'g', isOwn: true }),
+    ];
+    renderWithApi(<MemberLeaveCard userId="user-emeka" />, memberApi(items));
+    expect(await screen.findAllByRole('listitem')).toHaveLength(items.length);
+    expect(screen.queryByRole('button', { name: 'Cancel leave' })).toBeNull();
+  });
+
+  it('is hidden while a super admin is acting read-only and shown once they have a reason', async () => {
+    const readOnly = renderWithApi(
+      <MemberLeaveCard userId="user-emeka" />,
+      memberApi(),
+      actingApprover(false)
+    );
+    await screen.findByText('Approved');
+    expect(screen.queryByRole('button', { name: 'Cancel leave' })).toBeNull();
+    readOnly.unmount();
+
+    renderWithApi(
+      <MemberLeaveCard userId="user-emeka" />,
+      memberApi(),
+      actingApprover(true)
+    );
+    expect(
+      await screen.findByRole('button', { name: 'Cancel leave' })
+    ).toBeVisible();
+  });
+
+  it('opens the dialog for that row', async () => {
+    renderWithApi(<MemberLeaveCard userId="user-emeka" />, memberApi());
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Cancel leave' })
+    );
+    expect(await screen.findByText('Cancel this leave?')).toBeVisible();
+    expect(
+      screen.getByText('Emeka Obi · Sick leave · 22 Oct 2026')
+    ).toBeVisible();
+  });
+});
+
+const submit = () => {
+  fireEvent.click(screen.getByRole('button', { name: 'Cancel leave' }));
+};
+
+describe('CancelLeaveDialog', () => {
+  const target = approvedLeave({
+    isOwn: false,
+    startsOn: '2026-10-22',
+    endsOn: '2026-10-23',
+    days: 2,
+  });
+
+  function openCancel(api = cardApi()) {
+    const onClose = vi.fn();
+    const { queryClient } = renderWithApi(
+      <CancelLeaveDialog leave={target} onClose={onClose} />,
+      api
+    );
+    return { api, onClose, queryClient };
+  }
+
+  it('names the leave and offers Keep leave and Cancel leave', () => {
+    const { onClose } = openCancel();
+    expect(screen.getByText('Cancel this leave?')).toBeVisible();
+    expect(
+      screen.getByText('Emeka Obi · Sick leave · 22 Oct 2026 – 23 Oct 2026')
+    ).toBeVisible();
+    expect(
+      screen.getByPlaceholderText('The staff member will see this')
+    ).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Keep leave' }));
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it('asks for a reason before cancelling', () => {
+    const { api } = openCancel();
+    submit();
+    expect(screen.getByText('Give a reason.')).toBeVisible();
+    fireEvent.change(screen.getByLabelText('Reason'), {
+      target: { value: '   ' },
+    });
+    submit();
+    expect(screen.getByText('Give a reason.')).toBeVisible();
+    expect(api.leave.cancel).not.toHaveBeenCalled();
+  });
+
+  it('cancels with the trimmed reason, closes and toasts', async () => {
+    const { api, onClose, queryClient } = openCancel();
+    const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
+    fireEvent.change(screen.getByLabelText('Reason'), {
+      target: { value: '  Cover is short  ' },
+    });
+    submit();
+
+    await waitFor(() => {
+      expect(api.leave.cancel).toHaveBeenCalledWith({
+        params: { id: target.id },
+        body: { reason: 'Cover is short' },
+      });
+    });
+    await waitFor(() => {
+      expect(toast.success).toHaveBeenCalledWith(
+        'Leave cancelled. Emeka Obi can see your reason.'
+      );
+    });
+    expect(onClose).toHaveBeenCalled();
+    expect(invalidatedKeys(invalidate)).toEqual(
+      expect.arrayContaining(LEAVE_INVALIDATIONS)
+    );
+  });
+
+  it('shows the server’s message when the leave can no longer be cancelled', async () => {
+    const api = cardApi();
+    api.leave.cancel.mockRejectedValue(
+      new ApiError(409, {
+        code: 'Conflict',
+        message: 'Leave that has started can’t be cancelled.',
+      })
+    );
+    const { onClose } = openCancel(api);
+    fireEvent.change(screen.getByLabelText('Reason'), {
+      target: { value: 'Too late' },
+    });
+    submit();
+
+    expect(
+      await screen.findByText('Leave that has started can’t be cancelled.')
+    ).toBeVisible();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(toast.success).not.toHaveBeenCalled();
   });
 });
 

@@ -1,5 +1,7 @@
 import {
   ALREADY_DECIDED_MESSAGE,
+  LEAVE_CANCEL_NOT_APPROVED_MESSAGE,
+  LEAVE_CANCEL_STARTED_MESSAGE,
   LEAVE_STAFF_ONLY_MESSAGE,
   LEAVE_TOO_LONG_MESSAGE,
   LEAVE_NO_SCHOOL_DAY_MESSAGE,
@@ -21,7 +23,13 @@ import {
   type Fixtures,
   type TestUser,
 } from './support/base-test';
-import { askLeave, approveLeave } from './support/factories/leave';
+import {
+  approvedLeave,
+  approveLeave,
+  askLeave,
+  cancelLeave,
+  markLeaveSeen,
+} from './support/factories/leave';
 import { termOf } from './support/factories/terms';
 import { family, guardianOf, signInAs, studentOf } from './support/portal';
 import { schoolsTest as test } from './support/two-schools';
@@ -523,6 +531,540 @@ test.describe('deciding leave', () => {
   });
 });
 
+test.describe('cancelling approved leave', () => {
+  test('an approver cancels leave that has not started, frees the days and the requester can ask again', async ({
+    api,
+    pool,
+    schools: { owner, lekkiOnly },
+  }) => {
+    const leave = await approvedLeave(
+      api,
+      { requester: lekkiOnly, approver: owner },
+      {
+        startsOn: '2026-10-22',
+      }
+    );
+    const before = await mineOf(api, lekkiOnly);
+    expect(before.daysTakenThisYear).toBe(1);
+    expect(before.nextTimeOff?.id).toBe(leave.id);
+
+    const res = await api(owner)
+      .post(`/leave/${leave.id}/cancel`)
+      .send({ reason: '  Cover is short  ' })
+      .expect(200);
+
+    expect(res.body).toMatchObject({
+      id: leave.id,
+      status: 'cancelled',
+      cancelledBy: owner.id,
+      cancellerName: 'Test User',
+      cancellationReason: 'Cover is short',
+      approvedBy: owner.id,
+    });
+    expect((res.body as LeaveDto).cancelledAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    const after = await mineOf(api, lekkiOnly);
+    expect(after).toMatchObject({ daysTakenThisYear: 0, nextTimeOff: null });
+    expect(after.items[0]).toMatchObject({
+      status: 'cancelled',
+      cancellationReason: 'Cover is short',
+    });
+    await askLeave(api, lekkiOnly, { startsOn: '2026-10-22' });
+
+    const { rows } = await pool.query<{ kind: string; text: string }>(
+      `SELECT kind, text FROM activity_event WHERE subject_id = $1 ORDER BY occurred_at DESC LIMIT 1`,
+      [leave.id]
+    );
+    expect(rows[0]?.kind).toBe('leave.cancelled');
+    expect(rows[0]?.text).toMatch(
+      /’s annual leave \(22 Oct 2026\) was cancelled\.$/
+    );
+  });
+
+  test('answers 409 once the first day has come', async ({
+    api,
+    clock,
+    schools: { owner, lekkiOnly },
+  }) => {
+    const leave = await approvedLeave(
+      api,
+      { requester: lekkiOnly, approver: owner },
+      {
+        startsOn: '2026-10-22',
+      }
+    );
+
+    for (const today of ['2026-10-22', '2026-10-25']) {
+      clock.set(today);
+      const res = await api(owner)
+        .post(`/leave/${leave.id}/cancel`)
+        .send({ reason: 'Too late' })
+        .expect(409);
+      expect(res.body.message).toBe(LEAVE_CANCEL_STARTED_MESSAGE);
+    }
+    expect((await mineOf(api, lekkiOnly)).items[0]?.status).toBe('approved');
+  });
+
+  test('answers 409 for waiting, declined, withdrawn and already cancelled leave', async ({
+    api,
+    schools: { owner, lekkiOnly },
+  }) => {
+    const waiting = await askLeave(api, lekkiOnly, { startsOn: '2026-10-22' });
+    const declined = await askLeave(api, lekkiOnly, { startsOn: '2026-10-29' });
+    await api(owner)
+      .post(`/leave/${declined.id}/decline`)
+      .send({ reason: 'Exams that week' })
+      .expect(200);
+    const withdrawn = await askLeave(api, lekkiOnly, {
+      startsOn: '2026-11-05',
+    });
+    await api(lekkiOnly).post(`/leave/${withdrawn.id}/withdraw`).expect(200);
+    const cancelled = await approvedLeave(
+      api,
+      { requester: lekkiOnly, approver: owner },
+      {
+        startsOn: '2026-11-12',
+      }
+    );
+    await cancelLeave(api, owner, cancelled.id);
+
+    for (const { id } of [waiting, declined, withdrawn, cancelled]) {
+      const res = await api(owner)
+        .post(`/leave/${id}/cancel`)
+        .send({ reason: 'Cover is short' })
+        .expect(409);
+      expect(res.body.message).toBe(LEAVE_CANCEL_NOT_APPROVED_MESSAGE);
+    }
+  });
+
+  test('asks for a reason of 1 to 500 characters', async ({
+    api,
+    schools: { owner, lekkiOnly },
+  }) => {
+    const leave = await approvedLeave(
+      api,
+      { requester: lekkiOnly, approver: owner },
+      {
+        startsOn: '2026-10-22',
+      }
+    );
+
+    for (const body of [{}, { reason: '   ' }, { reason: 'x'.repeat(501) }]) {
+      await api(owner).post(`/leave/${leave.id}/cancel`).send(body).expect(400);
+    }
+    expect((await mineOf(api, lekkiOnly)).items[0]?.status).toBe('approved');
+    await api(owner)
+      .post(`/leave/${leave.id}/cancel`)
+      .send({ reason: 'x'.repeat(500) })
+      .expect(200);
+  });
+
+  test('never lets an approver cancel their own leave, in the service or the database', async ({
+    api,
+    pool,
+    withPermissions,
+    schools: { owner, orgA, lekki },
+  }) => {
+    const grace = await withPermissions(orgA, ['leave:approve'], {
+      campuses: [lekki],
+    });
+    const mine = await approvedLeave(
+      api,
+      { requester: grace, approver: owner },
+      {
+        startsOn: '2026-10-22',
+      }
+    );
+
+    const res = await api(grace)
+      .post(`/leave/${mine.id}/cancel`)
+      .send({ reason: 'Changed my mind' })
+      .expect(409);
+    expect(res.body).toMatchObject({
+      code: 'SelfApproval',
+      message: SELF_APPROVAL_MESSAGE,
+    });
+    await expect(
+      pool.query(
+        `UPDATE staff_leave SET status = 'cancelled', cancelled_by = created_by, cancelled_at = now(),
+           cancellation_reason = 'No' WHERE id = $1`,
+        [mine.id]
+      )
+    ).rejects.toMatchObject({
+      code: '23514',
+      constraint: 'staff_leave_cancelled_not_self',
+    });
+    expect((await mineOf(api, grace)).items[0]?.status).toBe('approved');
+  });
+
+  test('needs leave:approve, and answers 404 outside the campus scope or in another school', async ({
+    api,
+    withPermissions,
+    schools: { owner, ownerB, orgA, lekki, ikeja, lekkiOnly, noPermission },
+  }) => {
+    const lekkiApprover = await withPermissions(orgA, ['leave:approve'], {
+      campuses: [lekki],
+    });
+    const inLekki = await approvedLeave(
+      api,
+      { requester: lekkiOnly, approver: owner },
+      {
+        startsOn: '2026-10-22',
+      }
+    );
+    const ikejaMember = await withPermissions(orgA, [], { campuses: [ikeja] });
+    const inIkeja = await approvedLeave(
+      api,
+      { requester: ikejaMember, approver: owner },
+      {
+        startsOn: '2026-10-22',
+      }
+    );
+    const body = { reason: 'Cover is short' };
+
+    await api(noPermission)
+      .post(`/leave/${inLekki.id}/cancel`)
+      .send(body)
+      .expect(403);
+    await api(lekkiOnly)
+      .post(`/leave/${inLekki.id}/cancel`)
+      .send(body)
+      .expect(403);
+    await api(lekkiApprover)
+      .post(`/leave/${inIkeja.id}/cancel`)
+      .send(body)
+      .expect(404);
+    await api(ownerB)
+      .post(`/leave/${inLekki.id}/cancel`)
+      .send(body)
+      .expect(404);
+    await api(owner)
+      .post('/leave/00000000-0000-4000-8000-000000000000/cancel')
+      .send(body)
+      .expect(404);
+
+    await cancelLeave(api, lekkiApprover, inLekki.id);
+  });
+
+  test('gives one winner when two approvers cancel at once', async ({
+    api,
+    withPermissions,
+    schools: { owner, orgA, lekki, lekkiOnly },
+  }) => {
+    const second = await withPermissions(orgA, ['leave:approve'], {
+      campuses: [lekki],
+    });
+    const leave = await approvedLeave(
+      api,
+      { requester: lekkiOnly, approver: owner },
+      {
+        startsOn: '2026-10-22',
+      }
+    );
+
+    const results = await Promise.all(
+      [owner, second].map((approver) =>
+        api(approver).post(`/leave/${leave.id}/cancel`).send({ reason: 'Race' })
+      )
+    );
+
+    expect(results.map((res) => res.status).toSorted((a, b) => a - b)).toEqual([
+      200, 409,
+    ]);
+  });
+
+  test('keeps the trigger shut on every other change to a decided row', async ({
+    api,
+    pool,
+    schools: { owner, lekkiOnly },
+  }) => {
+    const approved = await approvedLeave(
+      api,
+      { requester: lekkiOnly, approver: owner },
+      {
+        startsOn: '2026-10-22',
+      }
+    );
+    const cancelled = await approvedLeave(
+      api,
+      { requester: lekkiOnly, approver: owner },
+      {
+        startsOn: '2026-10-29',
+      }
+    );
+    await cancelLeave(api, owner, cancelled.id);
+    const frozen = { constraint: 'staff_leave_decided_frozen' };
+
+    for (const statement of [
+      `UPDATE staff_leave SET status = 'submitted' WHERE id = $1`,
+      `UPDATE staff_leave SET starts_on = '2026-10-23', ends_on = '2026-10-23' WHERE id = $1`,
+      `UPDATE staff_leave SET reason = 'Edited' WHERE id = $1`,
+      `UPDATE staff_leave SET status = 'cancelled', cancelled_by = approved_by, cancelled_at = now(),
+         cancellation_reason = 'Sneaky', reason = 'Edited' WHERE id = $1`,
+    ]) {
+      await expect(pool.query(statement, [approved.id])).rejects.toMatchObject(
+        frozen
+      );
+    }
+    await expect(
+      pool.query(`UPDATE staff_leave SET status = 'approved' WHERE id = $1`, [
+        cancelled.id,
+      ])
+    ).rejects.toMatchObject(frozen);
+    for (const { id } of [approved, cancelled]) {
+      await expect(
+        pool.query(`DELETE FROM staff_leave WHERE id = $1`, [id])
+      ).rejects.toMatchObject({ constraint: 'staff_leave_never_deleted' });
+    }
+  });
+});
+
+test.describe('unseen leave decisions', () => {
+  test('lists approved, declined and cancelled leave newest first, never a withdrawal, until Got it', async ({
+    api,
+    schools: { owner, lekkiOnly },
+  }) => {
+    const approved = await askLeave(api, lekkiOnly, { startsOn: '2026-10-22' });
+    const declined = await askLeave(api, lekkiOnly, { startsOn: '2026-10-29' });
+    const cancelled = await approvedLeave(
+      api,
+      { requester: lekkiOnly, approver: owner },
+      {
+        startsOn: '2026-11-05',
+      }
+    );
+    const withdrawn = await askLeave(api, lekkiOnly, {
+      startsOn: '2026-11-12',
+    });
+    expect((await mineOf(api, lekkiOnly)).unseenCount).toBe(1);
+
+    await approveLeave(api, owner, approved.id);
+    await api(owner)
+      .post(`/leave/${declined.id}/decline`)
+      .send({ reason: 'Exams that week' })
+      .expect(200);
+    await cancelLeave(api, owner, cancelled.id);
+    await api(lekkiOnly).post(`/leave/${withdrawn.id}/withdraw`).expect(200);
+
+    const mine = await mineOf(api, lekkiOnly);
+    expect(mine.unseenCount).toBe(3);
+    expect(mine.unseenDecisions.map(({ id, status }) => [id, status])).toEqual([
+      [cancelled.id, 'cancelled'],
+      [declined.id, 'rejected'],
+      [approved.id, 'approved'],
+    ]);
+    expect(mine.unseenDecisions[0]).toMatchObject({
+      cancellerName: 'Test User',
+      cancellationReason: 'Cover is short',
+    });
+
+    const seen = await markLeaveSeen(api, lekkiOnly).expect(200);
+    expect((seen.body as { seenAt: string }).seenAt).toMatch(/^\d{4}-/);
+    expect(await mineOf(api, lekkiOnly)).toMatchObject({
+      unseenCount: 0,
+      unseenDecisions: [],
+    });
+
+    const later = await askLeave(api, lekkiOnly, { startsOn: '2026-11-19' });
+    await approveLeave(api, owner, later.id);
+    const again = await mineOf(api, lekkiOnly);
+    expect(again.unseenCount).toBe(1);
+    expect(again.unseenDecisions[0]?.id).toBe(later.id);
+  });
+
+  test('a decision made at the very moment of the marker counts as seen', async ({
+    api,
+    pool,
+    schools: { owner, lekkiOnly },
+  }) => {
+    const leave = await approvedLeave(
+      api,
+      { requester: lekkiOnly, approver: owner },
+      { startsOn: '2026-10-22' }
+    );
+    const mark = (offsetMs: number) =>
+      pool.query(
+        `INSERT INTO staff_leave_seen (organization_id, user_id, seen_at)
+         SELECT organization_id, created_by,
+                approved_at + make_interval(secs => $2 / 1000.0)
+         FROM staff_leave WHERE id = $1
+         ON CONFLICT (organization_id, user_id)
+         DO UPDATE SET seen_at = EXCLUDED.seen_at`,
+        [leave.id, offsetMs]
+      );
+
+    await mark(-1);
+    expect((await mineOf(api, lekkiOnly)).unseenCount).toBe(1);
+    await mark(0);
+    expect((await mineOf(api, lekkiOnly)).unseenCount).toBe(0);
+  });
+
+  test('Got it only clears what was shown: a later decision and a future time do not hide anything', async ({
+    api,
+    schools: { owner, lekkiOnly },
+  }) => {
+    const first = await approvedLeave(
+      api,
+      { requester: lekkiOnly, approver: owner },
+      { startsOn: '2026-10-22' }
+    );
+    const shownAt = first.approvedAt ?? '';
+    const second = await approvedLeave(
+      api,
+      { requester: lekkiOnly, approver: owner },
+      { startsOn: '2026-10-29' }
+    );
+
+    await markLeaveSeen(api, lekkiOnly, shownAt).expect(200);
+    expect(await mineOf(api, lekkiOnly)).toMatchObject({
+      unseenCount: 1,
+      unseenDecisions: [{ id: second.id }],
+    });
+
+    const tomorrow = new Date(Date.now() + 86_400_000).toISOString();
+    await markLeaveSeen(api, lekkiOnly, tomorrow).expect(200);
+    const third = await approvedLeave(
+      api,
+      { requester: lekkiOnly, approver: owner },
+      { startsOn: '2026-11-05' }
+    );
+    expect(await mineOf(api, lekkiOnly)).toMatchObject({
+      unseenCount: 1,
+      unseenDecisions: [{ id: third.id }],
+    });
+
+    await markLeaveSeen(api, lekkiOnly, shownAt).expect(200);
+    expect((await mineOf(api, lekkiOnly)).unseenCount).toBe(1);
+  });
+
+  test('refuses a seen marker with no time', async ({
+    api,
+    schools: { lekkiOnly },
+  }) => {
+    await api(lekkiOnly).post('/me/leave/seen').send({}).expect(400);
+  });
+
+  test('shows at most five decisions and counts them all', async ({
+    api,
+    schools: { owner, lekkiOnly },
+  }) => {
+    for (const startsOn of [
+      '2026-10-22',
+      '2026-10-29',
+      '2026-11-05',
+      '2026-11-12',
+      '2026-11-19',
+      '2026-11-26',
+    ]) {
+      await approvedLeave(
+        api,
+        { requester: lekkiOnly, approver: owner },
+        { startsOn }
+      );
+    }
+    const mine = await mineOf(api, lekkiOnly);
+    expect(mine.unseenDecisions).toHaveLength(5);
+    expect(mine.unseenCount).toBe(6);
+  });
+
+  test('keeps each member’s marker apart', async ({
+    api,
+    schools: { owner, lekkiOnly, noPermission },
+  }) => {
+    await approvedLeave(
+      api,
+      { requester: lekkiOnly, approver: owner },
+      { startsOn: '2026-10-22' }
+    );
+    await approvedLeave(
+      api,
+      { requester: noPermission, approver: owner },
+      { startsOn: '2026-10-22' }
+    );
+    await markLeaveSeen(api, lekkiOnly).expect(200);
+
+    expect((await mineOf(api, lekkiOnly)).unseenCount).toBe(0);
+    expect((await mineOf(api, noPermission)).unseenCount).toBe(1);
+  });
+
+  test('keeps a member of two schools’ decisions and seen marker apart', async ({
+    api,
+    addMember,
+    createUser,
+    setActiveOrganization,
+    schools: { orgA, orgB, owner, ownerB, lekki, campusB },
+  }) => {
+    const traveller = await createUser();
+    await addMember(orgB, traveller, {
+      roles: ['bursar'],
+      campuses: [campusB],
+    });
+    await addMember(orgA, traveller, { roles: ['bursar'], campuses: [lekki] });
+
+    await setActiveOrganization(traveller, orgA.id);
+    const inA = await approvedLeave(
+      api,
+      { requester: traveller, approver: owner },
+      { startsOn: '2026-10-22' }
+    );
+    await setActiveOrganization(traveller, orgB.id);
+    const inB = await approvedLeave(
+      api,
+      { requester: traveller, approver: ownerB },
+      { startsOn: '2026-11-05' }
+    );
+
+    expect(await mineOf(api, traveller)).toMatchObject({
+      unseenCount: 1,
+      unseenDecisions: [{ id: inB.id }],
+    });
+    await setActiveOrganization(traveller, orgA.id);
+    expect(await mineOf(api, traveller)).toMatchObject({
+      unseenCount: 1,
+      unseenDecisions: [{ id: inA.id }],
+    });
+
+    await markLeaveSeen(api, traveller).expect(200);
+    expect(await mineOf(api, traveller)).toMatchObject({
+      unseenCount: 0,
+      unseenDecisions: [],
+    });
+    await setActiveOrganization(traveller, orgB.id);
+    expect(await mineOf(api, traveller)).toMatchObject({
+      unseenCount: 1,
+      unseenDecisions: [{ id: inB.id }],
+    });
+  });
+
+  test('is for staff: families get 403 and an acting super admin is refused', async ({
+    api,
+    app,
+    makeSuperAdmin,
+    createUser,
+    schools: { orgA, owner, lekki, ikeja },
+  }) => {
+    const { ada } = await family(app, { owner, lekki, ikeja });
+    for (const portal of [
+      await signInAs(api, studentOf(ada.logins)),
+      await signInAs(api, guardianOf(ada.logins)),
+    ]) {
+      await api(portal)
+        .post('/me/leave/seen')
+        .send({ through: new Date().toISOString() })
+        .expect(403);
+    }
+
+    const admin = await makeSuperAdmin(await createUser());
+    const refused = await markLeaveSeen(api, admin)
+      .set(acting(orgA.id, 'SUP-1 check leave'))
+      .expect(403);
+    expect(refused.body.message).toBe(LEAVE_STAFF_ONLY_MESSAGE);
+    await api()
+      .post('/me/leave/seen')
+      .send({ through: new Date().toISOString() })
+      .expect(401);
+  });
+});
+
 test.describe('who may approve', () => {
   test('the Principal starter role holds leave:approve after sync and an edited one is left alone', async ({
     api,
@@ -606,6 +1148,10 @@ test.describe('isolation', () => {
       .send({ reason: 'No' })
       .expect(404);
     await api(ownerB).post(`/leave/${leave.id}/withdraw`).expect(404);
+    await api(ownerB)
+      .post(`/leave/${leave.id}/cancel`)
+      .send({ reason: 'No' })
+      .expect(404);
     expect(await queueOf(api, owner, '?status=all')).toMatchObject([
       { id: leave.id, status: 'submitted' },
     ]);
@@ -651,9 +1197,39 @@ test.describe('isolation', () => {
     await api().post(`/leave/${leave.id}/withdraw`).expect(401);
     await api().post(`/leave/${leave.id}/approve`).expect(401);
     await api()
+      .post(`/leave/${leave.id}/cancel`)
+      .send({ reason: 'No' })
+      .expect(401);
+    await api()
       .post(`/leave/${leave.id}/decline`)
       .send({ reason: 'No' })
       .expect(401);
+  });
+
+  test('an acting super admin with a reason cancels approved leave like an approver', async ({
+    api,
+    makeSuperAdmin,
+    createUser,
+    schools: { orgA, owner, lekkiOnly },
+  }) => {
+    const leave = await approvedLeave(
+      api,
+      { requester: lekkiOnly, approver: owner },
+      { startsOn: '2026-10-22' }
+    );
+    const admin = await makeSuperAdmin(await createUser());
+
+    const res = await api(admin)
+      .post(`/leave/${leave.id}/cancel`)
+      .set(acting(orgA.id, 'SUP-1 check leave'))
+      .send({ reason: 'Cover is short' })
+      .expect(200);
+
+    expect(res.body).toMatchObject({
+      status: 'cancelled',
+      cancelledBy: admin.id,
+      cancellationReason: 'Cover is short',
+    });
   });
 
   test('case 12: an acting super admin cannot write leave, with or without a reason, and is audited', async ({
@@ -677,21 +1253,27 @@ test.describe('isolation', () => {
         .post(`/leave/${leave.id}/decline`)
         .set(headers)
         .send({ reason: 'No' });
+    const cancel = (headers: Record<string, string>) =>
+      api(admin)
+        .post(`/leave/${leave.id}/cancel`)
+        .set(headers)
+        .send({ reason: 'No' });
 
-    for (const write of [create, withdraw, approve, decline]) {
+    for (const write of [create, withdraw, approve, decline, cancel]) {
       const refused = await write(acting(orgA.id)).expect(403);
       expect(refused.body).toMatchObject({ code: 'ActingReadOnly' });
     }
     const rows = await waitForAuditRows(
       pool,
       { organizationId: orgA.id, kind: 'acting' },
-      4
+      5
     );
     expect(rows.map((row) => [row.method, row.path, row.status])).toEqual([
       ['POST', '/leave', 403],
       ['POST', `/leave/${leave.id}/withdraw`, 403],
       ['POST', `/leave/${leave.id}/approve`, 403],
       ['POST', `/leave/${leave.id}/decline`, 403],
+      ['POST', `/leave/${leave.id}/cancel`, 403],
     ]);
 
     for (const write of [create, withdraw]) {

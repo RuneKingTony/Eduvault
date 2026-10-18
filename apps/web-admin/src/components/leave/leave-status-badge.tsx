@@ -1,5 +1,9 @@
 import { CheckIcon, ClockIcon, type LucideIcon } from 'lucide-react';
-import { LEAVE_STATUS_LABELS, type LeaveStatus } from '@eduvault/shared';
+import {
+  leaveStatusLabel,
+  type LeaveOutcome,
+  type LeaveStatus,
+} from '@eduvault/shared';
 import { Badge } from '@eduvault/ui';
 
 type Variant = 'secondary' | 'success' | 'destructive' | 'outline';
@@ -16,12 +20,12 @@ const ICON: Partial<Record<LeaveStatus, LucideIcon>> = {
   approved: CheckIcon,
 };
 
-export function LeaveStatusBadge({ status }: { status: LeaveStatus }) {
-  const Icon = ICON[status];
+export function LeaveStatusBadge({ leave }: { leave: LeaveOutcome }) {
+  const Icon = ICON[leave.status];
   return (
-    <Badge variant={VARIANT[status]}>
+    <Badge variant={VARIANT[leave.status]}>
       {Icon === undefined ? null : <Icon />}
-      {LEAVE_STATUS_LABELS[status]}
+      {leaveStatusLabel(leave)}
     </Badge>
   );
 }

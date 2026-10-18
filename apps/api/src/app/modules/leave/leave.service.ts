@@ -6,6 +6,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  LEAVE_CANCEL_NOT_APPROVED_MESSAGE,
+  LEAVE_CANCEL_STARTED_MESSAGE,
   LEAVE_NOT_FOUND_MESSAGE,
   LEAVE_NO_SCHOOL_DAY_MESSAGE,
   LEAVE_OVERLAP_MESSAGE,
@@ -15,12 +17,15 @@ import {
   type CreateLeaveInput,
   type LeaveDto,
   type LeaveListQuery,
+  type LeaveSeen,
+  type MarkLeaveSeenInput,
   type MyLeave,
 } from '@eduvault/api-contract';
 import {
   daysTakenThisYear,
   lagosDateOf,
   fmtDateRange,
+  leaveCancelBlock,
   leaveTypeLower,
   nextTimeOff,
   schoolDays,
@@ -35,6 +40,7 @@ import {
   type LeaveScope,
   type LeaveTx,
   type LockedLeave,
+  type UnseenDecisions,
 } from './leave.repository';
 
 const HOLIDAY_CARD_SIZE = 20;
@@ -46,13 +52,26 @@ const scopeOf = (ctx: OrgContext): LeaveScope => ({
 
 const notFound = () => new NotFoundException(LEAVE_NOT_FOUND_MESSAGE);
 
-const toDto = (entry: LeaveEntry, holidays: readonly string[]): LeaveDto => ({
+const toDto = <Entry extends LeaveEntry>(
+  entry: Entry,
+  holidays: readonly string[]
+): Entry & { days: number } => ({
   ...entry,
   days: schoolDays(entry.startsOn, entry.endsOn, holidays),
 });
 
 const sentenceFor = (found: LockedLeave): string =>
   `${found.requesterName}’s ${leaveTypeLower(found.type)} (${fmtDateRange(found.startsOn, found.endsOn)})`;
+
+function assertCancellable(found: LockedLeave, today: string): void {
+  const block = leaveCancelBlock(found, today);
+  if (block === 'notApproved') {
+    throw new ConflictException(LEAVE_CANCEL_NOT_APPROVED_MESSAGE);
+  }
+  if (block === 'started') {
+    throw new ConflictException(LEAVE_CANCEL_STARTED_MESSAGE);
+  }
+}
 
 function assertNotActing(ctx: OrgContext): void {
   if (ctx.acting !== null) {
@@ -70,13 +89,14 @@ export class LeaveService {
 
   async mine(ctx: OrgContext): Promise<MyLeave> {
     const today = this.clock.today();
-    const [entries, holidays, current, otherApproverExists, daysOff] =
+    const [entries, holidays, current, otherApproverExists, daysOff, unseen] =
       await Promise.all([
         this.leave.mine(ctx.organizationId, ctx.user.id),
         this.calendar.holidayDates(ctx.organizationId),
         this.calendar.current(ctx),
         this.leave.otherApproverExists(ctx.organizationId, ctx.user.id),
         this.calendar.daysOff(ctx, HOLIDAY_CARD_SIZE),
+        this.leave.unseenDecisions(ctx.organizationId, ctx.user.id),
       ]);
     const items = entries.map((entry) => toDto(entry, holidays));
     const waiting = items.filter((item) => item.status === 'submitted');
@@ -95,7 +115,25 @@ export class LeaveService {
       otherApproverExists,
       schoolYearLabel: current.schoolYear?.name ?? null,
       holidays: daysOff,
+      unseenDecisions: unseen.items.map((entry) => toDto(entry, holidays)),
+      unseenCount: unseen.count,
     };
+  }
+
+  unseenDecisions(ctx: OrgContext): Promise<UnseenDecisions> {
+    return this.leave.unseenDecisions(ctx.organizationId, ctx.user.id);
+  }
+
+  async markSeen(
+    ctx: OrgContext,
+    input: MarkLeaveSeenInput
+  ): Promise<LeaveSeen> {
+    assertNotActing(ctx);
+    const at = new Date(
+      Math.min(new Date(input.through).getTime(), Date.now())
+    );
+    await this.leave.markSeen(ctx.organizationId, ctx.user.id, at);
+    return { seenAt: at.toISOString() };
   }
 
   async list(ctx: OrgContext, query: LeaveListQuery): Promise<LeaveDto[]> {
@@ -195,6 +233,33 @@ export class LeaveService {
         });
       }
       return applied;
+    });
+    return this.item(ctx, id);
+  }
+
+  async cancel(ctx: OrgContext, id: string, reason: string): Promise<LeaveDto> {
+    const cancelReason = assertDeclineReason(reason);
+    const today = this.clock.today();
+    await this.leave.withTx(scopeOf(ctx), ctx.user.id, async (tx) => {
+      const found = await tx.lockInScope(id);
+      if (found === undefined) {
+        throw notFound();
+      }
+      await decide(
+        { actorId: ctx.user.id, createdBy: found.createdBy },
+        async () => {
+          assertCancellable(found, today);
+          const applied = await tx.cancel(id, cancelReason);
+          if (applied) {
+            await this.recordDecision(tx, ctx, {
+              found,
+              kind: 'leave.cancelled',
+              text: `${sentenceFor(found)} was cancelled.`,
+            });
+          }
+          return applied;
+        }
+      );
     });
     return this.item(ctx, id);
   }

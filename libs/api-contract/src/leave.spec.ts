@@ -1,5 +1,7 @@
 import { contract } from './contract';
 import {
+  LEAVE_CANCEL_NOT_APPROVED_MESSAGE,
+  LEAVE_CANCEL_STARTED_MESSAGE,
   LEAVE_COVER_MAX,
   LEAVE_END_BEFORE_START_MESSAGE,
   LEAVE_FIRST_DAY_MESSAGE,
@@ -8,10 +10,12 @@ import {
   LEAVE_PAST_START_MESSAGE,
   LEAVE_REASON_MAX,
   LEAVE_REASON_MESSAGE,
+  cancelLeaveSchema,
   createLeaveSchema,
   leaveDtoSchema,
   leaveListQuerySchema,
   leaveTypeSchema,
+  markLeaveSeenSchema,
   myLeaveSchema,
 } from './leave';
 
@@ -45,6 +49,10 @@ const dto = {
   rejectedAt: null,
   deciderName: null,
   rejectionReason: null,
+  cancelledBy: null,
+  cancelledAt: null,
+  cancellerName: null,
+  cancellationReason: null,
   createdAt: '2026-10-10T08:00:00.000Z',
   isOwn: true,
 };
@@ -157,6 +165,8 @@ describe('leaveDtoSchema and myLeaveSchema', () => {
       nextTimeOff: null,
       otherApproverExists: true,
       schoolYearLabel: '2026/2027',
+      unseenDecisions: [{ ...dto, status: 'approved' }],
+      unseenCount: 1,
       holidays: [
         {
           kind: 'holiday',
@@ -168,6 +178,49 @@ describe('leaveDtoSchema and myLeaveSchema', () => {
       ],
     };
     expect(myLeaveSchema.parse(mine)).toEqual(mine);
+  });
+});
+
+describe('markLeaveSeenSchema', () => {
+  it('wants the time of the newest decision shown', () => {
+    expect(
+      markLeaveSeenSchema.safeParse({ through: '2026-10-12T09:00:00.000Z' })
+        .success
+    ).toBe(true);
+    expect(markLeaveSeenSchema.safeParse({}).success).toBe(false);
+    expect(
+      markLeaveSeenSchema.safeParse({ through: 'yesterday' }).success
+    ).toBe(false);
+  });
+});
+
+describe('cancelLeaveSchema', () => {
+  it('trims the reason', () => {
+    expect(cancelLeaveSchema.parse({ reason: '  Cover is short  ' })).toEqual({
+      reason: 'Cover is short',
+    });
+  });
+
+  it('refuses a blank, missing or over-long reason', () => {
+    expect(cancelLeaveSchema.safeParse({ reason: '   ' }).success).toBe(false);
+    expect(cancelLeaveSchema.safeParse({}).success).toBe(false);
+    expect(
+      cancelLeaveSchema.safeParse({ reason: 'x'.repeat(LEAVE_REASON_MAX) })
+        .success
+    ).toBe(true);
+    expect(
+      cancelLeaveSchema.safeParse({ reason: 'x'.repeat(LEAVE_REASON_MAX + 1) })
+        .success
+    ).toBe(false);
+  });
+
+  it('uses the PRD words', () => {
+    expect(LEAVE_CANCEL_STARTED_MESSAGE).toBe(
+      'Leave that has started can’t be cancelled.'
+    );
+    expect(LEAVE_CANCEL_NOT_APPROVED_MESSAGE).toBe(
+      'Only approved leave can be cancelled.'
+    );
   });
 });
 
@@ -184,7 +237,7 @@ describe('leaveListQuerySchema', () => {
 });
 
 describe('contract.leave', () => {
-  it('serves the six routes', () => {
+  it('serves the eight routes', () => {
     const paths = Object.values(contract.leave).map(
       (route) => `${route.method} ${route.path}`
     );
@@ -195,6 +248,8 @@ describe('contract.leave', () => {
       'GET /leave',
       'POST /leave/:id/approve',
       'POST /leave/:id/decline',
+      'POST /leave/:id/cancel',
+      'POST /me/leave/seen',
     ]);
   });
 });

@@ -20,9 +20,12 @@ import {
   declineSchema,
 } from './approvals';
 import {
+  cancelLeaveSchema,
   createLeaveSchema,
   leaveDtoSchema,
   leaveListQuerySchema,
+  leaveSeenSchema,
+  markLeaveSeenSchema,
   myLeaveSchema,
 } from './leave';
 import {
@@ -1179,6 +1182,19 @@ export const contract = defineContract({
       params: idParamsSchema,
       body: declineSchema,
       response: leaveDtoSchema,
+    }),
+    cancel: defineRoute({
+      method: 'POST',
+      path: '/leave/:id/cancel',
+      params: idParamsSchema,
+      body: cancelLeaveSchema,
+      response: leaveDtoSchema,
+    }),
+    seen: defineRoute({
+      method: 'POST',
+      path: '/me/leave/seen',
+      body: markLeaveSeenSchema,
+      response: leaveSeenSchema,
     }),
   },
   store: {
