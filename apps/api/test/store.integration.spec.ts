@@ -472,8 +472,20 @@ test.describe('receiving a delivery', () => {
     const detail = (
       await api(owner).get(`/store/deliveries/${atLekki.id}`).expect(200)
     ).body as DeliveryDetail;
-    expect(detail).toMatchObject({ id: atLekki.id, number: atLekki.number });
-    expect(detail.lines).toHaveLength(1);
+    expect(detail).toMatchObject({
+      id: atLekki.id,
+      number: atLekki.number,
+      receivedBy: 'Test User',
+    });
+    expect(detail.lines).toMatchObject([
+      {
+        itemId: size12.id,
+        itemName: 'School shirt',
+        displayName: 'School shirt, Size 12',
+        quantity: 3,
+        unitCostMinor: COST,
+      },
+    ]);
   });
 });
 

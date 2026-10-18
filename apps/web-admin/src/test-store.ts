@@ -1,6 +1,8 @@
 import type {
   Campus,
   Delivery,
+  DeliveryDetail,
+  DeliveryLine,
   DeliveryList,
   Item,
   ItemList,
@@ -29,8 +31,8 @@ export const SALE_ID = '00000000-0000-4000-8000-0000000f0601';
 export const ADA_ID = '00000000-0000-4000-8000-0000000f0701';
 export const TOBI_ID = '00000000-0000-4000-8000-0000000f0702';
 export const PROOF_ID = '00000000-0000-4000-8000-0000000f0603';
-const DELIVERY_ID = '00000000-0000-4000-8000-0000000f0401';
-const OPENING_ID = '00000000-0000-4000-8000-0000000f0402';
+export const DELIVERY_ID = '00000000-0000-4000-8000-0000000f0401';
+export const OPENING_ID = '00000000-0000-4000-8000-0000000f0402';
 
 const stockRow = (
   campus: Pick<Campus, 'id'>,
@@ -155,20 +157,47 @@ export const deliveryList = (
   suppliers: string[] = ['Adebayo Uniforms Ltd']
 ): DeliveryList => ({ items, total: items.length, suppliers });
 
+export const deliveryLine = (
+  over: Partial<DeliveryLine> = {}
+): DeliveryLine => ({
+  itemId: SHIRT_ID,
+  itemName: 'School shirt',
+  displayName: 'School shirt, Size 12',
+  retired: false,
+  quantity: 10,
+  unitCostMinor: 350_000,
+  totalMinor: 3_500_000,
+  ...over,
+});
+
+export const deliveryDetail = (
+  over: Partial<DeliveryDetail> = {}
+): DeliveryDetail => ({
+  ...delivery(),
+  lines: [deliveryLine()],
+  ...over,
+});
+
+export const openingDeliveryDetail = (): DeliveryDetail => ({
+  ...openingDelivery(),
+  itemCount: 2,
+  lines: [
+    deliveryLine({ quantity: 20, totalMinor: 7_000_000 }),
+    deliveryLine({
+      itemId: TIE_ID,
+      itemName: 'School tie',
+      displayName: 'School tie',
+      quantity: 25,
+      unitCostMinor: 120_000,
+      totalMinor: 3_000_000,
+    }),
+  ],
+});
+
 export const recordedDelivery = (
   over: Partial<RecordedDelivery> = {}
 ): RecordedDelivery => ({
-  ...delivery(),
-  lines: [
-    {
-      itemId: SHIRT_ID,
-      displayName: 'School shirt, Size 12',
-      retired: false,
-      quantity: 10,
-      unitCostMinor: 350_000,
-      totalMinor: 3_500_000,
-    },
-  ],
+  ...deliveryDetail(),
   replayed: false,
   ...over,
 });

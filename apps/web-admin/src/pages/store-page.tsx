@@ -28,6 +28,7 @@ import {
 import { useApi } from '../api';
 import { QueryState } from '../components/money/query-state';
 import { DeliveriesTable } from '../components/store/deliveries-table';
+import { DeliveryDetailSheet } from '../components/store/delivery-detail-sheet';
 import { DeliverySheet } from '../components/store/delivery-sheet';
 import { ItemDialog } from '../components/store/item-dialog';
 import { ItemsSoldTable } from '../components/store/items-sold-table';
@@ -259,7 +260,8 @@ function DeliveriesPanel({
   search,
   onSearchChange,
   showCosts,
-}: PageProps & { showCosts: boolean }) {
+  onOpen,
+}: PageProps & { showCosts: boolean; onOpen: (deliveryId: string) => void }) {
   const api = useApi();
   const campuses = useQuery(campusesQueryOptions(api)).data ?? [];
   const deliveries = useQuery(
@@ -280,6 +282,7 @@ function DeliveriesPanel({
           onPage={(next) => {
             onSearchChange({ ...search, page: next > 1 ? next : undefined });
           }}
+          onOpen={onOpen}
         />
       )}
     </QueryState>
@@ -471,6 +474,30 @@ function SaleSheets({ search, onSearchChange, onStatement }: StorePageProps) {
   );
 }
 
+function DeliverySheetHost({
+  search,
+  onSearchChange,
+  showCosts,
+}: PageProps & { showCosts: boolean }) {
+  const campuses = useQuery(campusesQueryOptions(useApi())).data ?? [];
+  return (
+    <DeliveryDetailSheet
+      deliveryId={search.delivery}
+      showCosts={showCosts}
+      onClose={() => {
+        onSearchChange({ ...search, delivery: undefined });
+      }}
+      onItem={(target) => {
+        onSearchChange({
+          campus: campuses.length > 1 ? target.campusId : search.campus,
+          q: target.itemName,
+          retired: target.retired ? 1 : undefined,
+        });
+      }}
+    />
+  );
+}
+
 function CountSheet({ search, onSearchChange, onApprovals }: StorePageProps) {
   const canCount = useCan('store', 'count');
   if (!canCount) {
@@ -510,9 +537,13 @@ export function StorePage(props: StorePageProps) {
         onOpenSale={(saleId) => {
           onSearchChange({ ...search, sale: saleId });
         }}
+        onOpenDelivery={(deliveryId) => {
+          onSearchChange({ ...search, delivery: deliveryId });
+        }}
         onApprovals={props.onApprovals}
       />
       <SaleSheets {...props} />
+      <DeliverySheetHost {...panel} />
       <CountSheet {...props} />
       {canReceive ? (
         <WriteDialogs
@@ -539,12 +570,14 @@ function TabPanel({
   onEdit,
   onRetire,
   onOpenSale,
+  onOpenDelivery,
   onApprovals,
 }: PageProps & {
   showCosts: boolean;
   onEdit: (item: Item) => void;
   onRetire: (item: Item) => void;
   onOpenSale: (saleId: string) => void;
+  onOpenDelivery: (deliveryId: string) => void;
   onApprovals: () => void;
 }) {
   if (search.tab === 'deliveries') {
@@ -553,6 +586,7 @@ function TabPanel({
         search={search}
         onSearchChange={onSearchChange}
         showCosts={showCosts}
+        onOpen={onOpenDelivery}
       />
     );
   }

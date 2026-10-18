@@ -27,7 +27,6 @@ import {
   SheetFooter,
   SheetHeader,
   SheetTitle,
-  Skeleton,
   Table,
   TableBody,
   TableCell,
@@ -69,6 +68,7 @@ import {
   type SaleState,
   type SaleStudent,
 } from './sale-model';
+import { SheetPending } from './sheet-pending';
 import { itemDetail, saleRecordedMessage, stockTone } from './store-text';
 
 interface SaleSheetProps {
@@ -665,11 +665,7 @@ function SheetBody({
     );
   }
   if (options.data === undefined || items.data === undefined) {
-    return (
-      <div role="status" aria-label="Loading" className="px-4">
-        <Skeleton className="h-48 w-full" />
-      </div>
-    );
+    return <SheetPending />;
   }
   return (
     <SaleForm

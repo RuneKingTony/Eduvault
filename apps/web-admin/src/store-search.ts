@@ -14,6 +14,7 @@ export interface StoreSearch {
   sell?: 1;
   count?: 1;
   sale?: string;
+  delivery?: string;
 }
 
 const flagOf = (value: unknown): 1 | undefined =>
@@ -35,5 +36,6 @@ export function parseStoreSearch(search: Record<string, unknown>): StoreSearch {
     sell: flagOf(search['sell']),
     count: flagOf(search['count']),
     sale: textOf(search['sale']),
+    delivery: textOf(search['delivery']),
   };
 }

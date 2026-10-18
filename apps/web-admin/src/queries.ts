@@ -1077,6 +1077,12 @@ export const storeSaleQueryOptions = (api: Api, id: string) =>
     queryFn: () => api.store.sale({ params: { id } }),
   });
 
+export const storeDeliveryQueryOptions = (api: Api, id: string) =>
+  queryOptions({
+    queryKey: [...STORE_KEY, 'delivery', id],
+    queryFn: () => api.store.delivery({ params: { id } }),
+  });
+
 export const storeSaleOptionsQueryOptions = (api: Api) =>
   queryOptions({
     queryKey: [...STORE_KEY, 'sale-options'],

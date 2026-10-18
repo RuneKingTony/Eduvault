@@ -18,6 +18,7 @@ import {
 } from '@eduvault/ui';
 import { FinancePager } from '../money/query-state';
 import { MaskedMoney } from './masked-money';
+import { RowButton } from './row-button';
 import { GO_LIVE_NOTE } from './store-text';
 
 type CampusRef = Pick<Campus, 'id' | 'name'>;
@@ -29,6 +30,7 @@ interface DeliveriesTableProps {
   showCosts: boolean;
   page: number;
   onPage: (page: number) => void;
+  onOpen: (deliveryId: string) => void;
 }
 
 function NoDeliveries() {
@@ -51,18 +53,37 @@ function DeliveryRow({
   delivery,
   campusName,
   showCosts,
+  onOpen,
 }: {
   delivery: Delivery;
   campusName: string | undefined;
   showCosts: boolean;
+  onOpen: (deliveryId: string) => void;
 }) {
+  const open = () => {
+    onOpen(delivery.id);
+  };
   return (
     <TableRow>
-      <TableCell className="font-mono text-xs">{delivery.number}</TableCell>
-      <TableCell>{fmtDate(delivery.receivedOn)}</TableCell>
-      <TableCell>{delivery.supplierName}</TableCell>
-      {campusName === undefined ? null : <TableCell>{campusName}</TableCell>}
-      <TableCell className="tabular-nums">{delivery.itemCount}</TableCell>
+      <TableCell className="font-mono text-xs">
+        <RowButton first onOpen={open}>
+          {delivery.number}
+        </RowButton>
+      </TableCell>
+      <TableCell>
+        <RowButton onOpen={open}>{fmtDate(delivery.receivedOn)}</RowButton>
+      </TableCell>
+      <TableCell>
+        <RowButton onOpen={open}>{delivery.supplierName}</RowButton>
+      </TableCell>
+      {campusName === undefined ? null : (
+        <TableCell>
+          <RowButton onOpen={open}>{campusName}</RowButton>
+        </TableCell>
+      )}
+      <TableCell className="tabular-nums">
+        <RowButton onOpen={open}>{delivery.itemCount}</RowButton>
+      </TableCell>
       <TableCell className="font-semibold tabular-nums">
         <MaskedMoney minor={delivery.totalMinor} show={showCosts} />
       </TableCell>
@@ -71,7 +92,9 @@ function DeliveryRow({
           delivery.moneyAccount === null ? 'text-muted-foreground' : ''
         }
       >
-        {delivery.moneyAccount?.name ?? GO_LIVE_NOTE}
+        <RowButton onOpen={open}>
+          {delivery.moneyAccount?.name ?? GO_LIVE_NOTE}
+        </RowButton>
       </TableCell>
     </TableRow>
   );
@@ -84,6 +107,7 @@ export function DeliveriesTable({
   showCosts,
   page,
   onPage,
+  onOpen,
 }: DeliveriesTableProps) {
   const campusName = (id: string) =>
     showCampus
@@ -114,6 +138,7 @@ export function DeliveriesTable({
                   delivery={delivery}
                   campusName={campusName(delivery.campusId)}
                   showCosts={showCosts}
+                  onOpen={onOpen}
                 />
               ))}
             </TableBody>

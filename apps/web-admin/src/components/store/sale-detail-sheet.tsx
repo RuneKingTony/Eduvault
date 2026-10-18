@@ -7,14 +7,12 @@ import { FINANCE_READ_GATE } from '@eduvault/policy';
 import { fmtDate, naira } from '@eduvault/shared';
 import {
   Button,
-  ErrorMessage,
   Sheet,
   SheetContent,
   SheetDescription,
   SheetFooter,
   SheetHeader,
   SheetTitle,
-  Skeleton,
   Table,
   TableBody,
   TableCell,
@@ -26,26 +24,13 @@ import {
 import { useApi } from '../../api';
 import { API_URL } from '../../env';
 import { storeSaleQueryOptions } from '../../queries';
+import { Fact } from './fact';
+import { SheetPending } from './sheet-pending';
 
 interface SaleDetailSheetProps {
   saleId: string | undefined;
   onClose: () => void;
   onStatement: (studentId: string) => void;
-}
-
-function Fact({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="flex flex-col">
-      <dt className="text-sm text-muted-foreground">{label}</dt>
-      <dd>{children}</dd>
-    </div>
-  );
 }
 
 function LinesTable({ sale }: { sale: Sale }) {
@@ -184,15 +169,7 @@ function Loaded({
 }) {
   const sale = useQuery(storeSaleQueryOptions(useApi(), saleId));
   if (sale.data === undefined) {
-    return sale.error === null ? (
-      <div role="status" aria-label="Loading" className="px-4">
-        <Skeleton className="h-48 w-full" />
-      </div>
-    ) : (
-      <div className="px-4">
-        <ErrorMessage error={sale.error} />
-      </div>
-    );
+    return <SheetPending error={sale.error} />;
   }
   return (
     <>

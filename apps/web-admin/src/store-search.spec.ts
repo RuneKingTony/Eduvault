@@ -16,6 +16,7 @@ describe('parseStoreSearch', () => {
         sell: 1,
         count: '1',
         sale: ' sale-1 ',
+        delivery: ' del-1 ',
       })
     ).toEqual({
       tab: 'deliveries',
@@ -30,6 +31,7 @@ describe('parseStoreSearch', () => {
       sell: 1,
       count: 1,
       sale: 'sale-1',
+      delivery: 'del-1',
     });
   });
 
@@ -53,6 +55,7 @@ describe('parseStoreSearch', () => {
         sell: 'yes',
         count: 'yes',
         sale: ' ',
+        delivery: ' ',
       })
     ).toEqual({
       tab: undefined,
@@ -67,6 +70,7 @@ describe('parseStoreSearch', () => {
       sell: undefined,
       count: undefined,
       sale: undefined,
+      delivery: undefined,
     });
   });
 });

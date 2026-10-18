@@ -24,7 +24,6 @@ import {
   SheetFooter,
   SheetHeader,
   SheetTitle,
-  Skeleton,
   Table,
   TableBody,
   TableCell,
@@ -64,6 +63,7 @@ import {
   newDeliveryReference,
 } from './store-text';
 import { MaskedMoney } from './masked-money';
+import { SheetPending } from './sheet-pending';
 import { SwitchField } from './switch-field';
 import { useShowCosts } from './use-show-costs';
 
@@ -493,11 +493,7 @@ function SheetBody({
     );
   }
   if (loading.status === 'waiting') {
-    return (
-      <div role="status" aria-label="Loading" className="px-4">
-        <Skeleton className="h-48 w-full" />
-      </div>
-    );
+    return <SheetPending />;
   }
   return (
     <DeliveryForm
