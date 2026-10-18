@@ -269,6 +269,7 @@ describe('MemberPage leave card', () => {
     expect(screen.getByText('Approved')).toBeVisible();
     expect(screen.getByText('Waiting')).toBeVisible();
     expect(screen.queryByText('Private reason')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Cancel leave' })).toBeNull();
     expect(api.leave.list).toHaveBeenCalledWith({
       query: { status: 'all', userId: 'user-emeka' },
     });

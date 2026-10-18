@@ -94,15 +94,18 @@ export function renderWithApi(
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
-  return render(
-    <QueryClientProvider client={queryClient}>
-      <ApiProvider api={api as unknown as Api}>
-        <PermissionsProvider value={access}>
-          <TooltipProvider>{ui}</TooltipProvider>
-        </PermissionsProvider>
-      </ApiProvider>
-    </QueryClientProvider>
-  );
+  return {
+    ...render(
+      <QueryClientProvider client={queryClient}>
+        <ApiProvider api={api as unknown as Api}>
+          <PermissionsProvider value={access}>
+            <TooltipProvider>{ui}</TooltipProvider>
+          </PermissionsProvider>
+        </ApiProvider>
+      </QueryClientProvider>
+    ),
+    queryClient,
+  };
 }
 
 export { fakeAccess } from '@eduvault/auth-client';

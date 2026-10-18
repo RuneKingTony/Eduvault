@@ -95,6 +95,7 @@ describe('ErrorFilter', () => {
       'student_discount_approved_not_self',
       'staff_leave_approved_not_self',
       'staff_leave_rejected_not_self',
+      'staff_leave_cancelled_not_self',
     ]) {
       expect(run({ code: '23514', constraint }).body.code).toBe('SelfApproval');
     }
@@ -114,6 +115,18 @@ describe('ErrorFilter', () => {
         },
       });
     }
+  });
+
+  it('answers a refused delete of a leave request with a plain 409', () => {
+    expect(
+      run({ code: '23514', constraint: 'staff_leave_never_deleted' })
+    ).toEqual({
+      status: 409,
+      body: {
+        code: 'Conflict',
+        message: 'The change breaks a rule on this record',
+      },
+    });
   });
 
   it('keeps a creditMinor from the exception in the body', () => {

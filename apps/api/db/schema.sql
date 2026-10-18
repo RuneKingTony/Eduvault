@@ -407,6 +407,32 @@ CREATE FUNCTION public.seed_ledger_accounts(org text) RETURNS void
 $$;
 
 --
+-- Name: staff_leave_guard(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.staff_leave_guard() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+  cancel_columns CONSTANT text[] := ARRAY['status', 'cancelled_by', 'cancelled_at', 'cancellation_reason', 'updated_at'];
+BEGIN
+  IF TG_OP = 'DELETE' THEN
+    RAISE EXCEPTION 'a staff_leave is never deleted'
+      USING ERRCODE = 'check_violation', CONSTRAINT = 'staff_leave_never_deleted';
+  END IF;
+  IF OLD.status = 'submitted' THEN
+    RETURN NEW;
+  END IF;
+  IF OLD.status = 'approved' AND NEW.status = 'cancelled'
+    AND to_jsonb(NEW) - cancel_columns = to_jsonb(OLD) - cancel_columns THEN
+    RETURN NEW;
+  END IF;
+  RAISE EXCEPTION 'a decided staff_leave cannot change'
+    USING ERRCODE = 'check_violation', CONSTRAINT = 'staff_leave_decided_frozen';
+END;
+$$;
+
+--
 -- Name: stock_count_not_empty(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -1291,9 +1317,15 @@ CREATE TABLE public.staff_leave (
     rejection_reason text,
     cancelled_at timestamp with time zone,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT staff_leave_approved_columns CHECK (((status = 'approved'::text) = ((approved_by IS NOT NULL) AND (approved_at IS NOT NULL)))),
+    cancelled_by text,
+    cancellation_reason text,
+    CONSTRAINT staff_leave_approved_columns CHECK ((((status = 'approved'::text) OR (cancelled_by IS NOT NULL)) = ((approved_by IS NOT NULL) AND (approved_at IS NOT NULL)))),
     CONSTRAINT staff_leave_approved_not_self CHECK (((approved_by IS NULL) OR (approved_by <> created_by))),
+    CONSTRAINT staff_leave_cancellation_reason_check CHECK (((char_length(btrim(cancellation_reason)) >= 1) AND (char_length(btrim(cancellation_reason)) <= 500))),
+    CONSTRAINT staff_leave_cancelled_by_columns CHECK (((cancelled_by IS NOT NULL) = (cancellation_reason IS NOT NULL))),
+    CONSTRAINT staff_leave_cancelled_by_status CHECK (((cancelled_by IS NULL) OR (status = 'cancelled'::text))),
     CONSTRAINT staff_leave_cancelled_columns CHECK (((status = 'cancelled'::text) = (cancelled_at IS NOT NULL))),
+    CONSTRAINT staff_leave_cancelled_not_self CHECK (((cancelled_by IS NULL) OR (cancelled_by <> created_by))),
     CONSTRAINT staff_leave_cover_check CHECK ((char_length(cover) <= 200)),
     CONSTRAINT staff_leave_dates CHECK ((ends_on >= starts_on)),
     CONSTRAINT staff_leave_reason_check CHECK (((char_length(btrim(reason)) >= 1) AND (char_length(btrim(reason)) <= 500))),
@@ -1302,6 +1334,16 @@ CREATE TABLE public.staff_leave (
     CONSTRAINT staff_leave_rejection_reason_check CHECK (((char_length(btrim(rejection_reason)) >= 1) AND (char_length(btrim(rejection_reason)) <= 500))),
     CONSTRAINT staff_leave_status_check CHECK ((status = ANY (ARRAY['submitted'::text, 'approved'::text, 'rejected'::text, 'cancelled'::text]))),
     CONSTRAINT staff_leave_type_check CHECK ((type = ANY (ARRAY['annual'::text, 'sick'::text, 'personal'::text, 'study'::text, 'parental'::text])))
+);
+
+--
+-- Name: staff_leave_seen; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.staff_leave_seen (
+    organization_id text NOT NULL,
+    user_id text NOT NULL,
+    seen_at timestamp with time zone NOT NULL
 );
 
 --
@@ -2300,6 +2342,13 @@ ALTER TABLE ONLY public.staff_leave
 
 ALTER TABLE ONLY public.staff_leave
     ADD CONSTRAINT staff_leave_pkey PRIMARY KEY (id);
+
+--
+-- Name: staff_leave_seen staff_leave_seen_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.staff_leave_seen
+    ADD CONSTRAINT staff_leave_seen_pkey PRIMARY KEY (organization_id, user_id);
 
 --
 -- Name: stock_count stock_count_id_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
@@ -3413,7 +3462,7 @@ CREATE TRIGGER payment_void_immutable BEFORE DELETE OR UPDATE ON public.payment_
 -- Name: staff_leave staff_leave_immutable; Type: TRIGGER; Schema: public; Owner: -
 --
 
-CREATE TRIGGER staff_leave_immutable BEFORE DELETE OR UPDATE ON public.staff_leave FOR EACH ROW EXECUTE FUNCTION public.approval_record_immutable();
+CREATE TRIGGER staff_leave_immutable BEFORE DELETE OR UPDATE ON public.staff_leave FOR EACH ROW EXECUTE FUNCTION public.staff_leave_guard();
 
 --
 -- Name: stock_count stock_count_immutable; Type: TRIGGER; Schema: public; Owner: -
@@ -4351,6 +4400,13 @@ ALTER TABLE ONLY public.staff_leave
     ADD CONSTRAINT staff_leave_approved_by_fkey FOREIGN KEY (approved_by) REFERENCES public."user"(id) ON DELETE RESTRICT;
 
 --
+-- Name: staff_leave staff_leave_cancelled_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.staff_leave
+    ADD CONSTRAINT staff_leave_cancelled_by_fkey FOREIGN KEY (cancelled_by) REFERENCES public."user"(id) ON DELETE RESTRICT;
+
+--
 -- Name: staff_leave staff_leave_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -4370,6 +4426,20 @@ ALTER TABLE ONLY public.staff_leave
 
 ALTER TABLE ONLY public.staff_leave
     ADD CONSTRAINT staff_leave_rejected_by_fkey FOREIGN KEY (rejected_by) REFERENCES public."user"(id) ON DELETE RESTRICT;
+
+--
+-- Name: staff_leave_seen staff_leave_seen_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.staff_leave_seen
+    ADD CONSTRAINT staff_leave_seen_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE CASCADE;
+
+--
+-- Name: staff_leave_seen staff_leave_seen_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.staff_leave_seen
+    ADD CONSTRAINT staff_leave_seen_user_id_fkey FOREIGN KEY (user_id) REFERENCES public."user"(id) ON DELETE CASCADE;
 
 --
 -- Name: stock_count stock_count_approved_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -4914,4 +4984,5 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20261017090300'),
     ('20261017100000'),
     ('20261017110000'),
-    ('20261017110100');
+    ('20261017110100'),
+    ('20261018090000');

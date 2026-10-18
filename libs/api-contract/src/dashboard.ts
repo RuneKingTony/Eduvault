@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { moneyAccountKindSchema } from './finance';
+import { decidedLeaveStatusSchema, leaveTypeSchema } from './leave';
 import { currencySchema, idSchema } from './schemas';
 import { storeTermFiguresSchema } from './store';
 
@@ -62,6 +63,20 @@ export const dashboardTaskSchema = z.discriminatedUnion('kind', [
     kind: z.literal('approvalsWaiting'),
     count: countSchema,
     items: z.array(z.object({ label: z.string(), details: z.string() })).max(2),
+  }),
+  z.object({
+    kind: z.literal('leaveDecided'),
+    count: countSchema,
+    items: z
+      .array(
+        z.object({
+          type: leaveTypeSchema,
+          startsOn: z.iso.date(),
+          endsOn: z.iso.date(),
+          status: decidedLeaveStatusSchema,
+        })
+      )
+      .max(2),
   }),
   z.object({
     kind: z.literal('noRole'),

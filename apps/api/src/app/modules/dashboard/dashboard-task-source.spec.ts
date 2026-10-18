@@ -30,6 +30,8 @@ const shuffled: DashboardTask[] = [
   },
   unsentRound('r-1'),
   { kind: 'lowStock', count: 1, names: [] },
+  { kind: 'approvalsWaiting', count: 1, items: [] },
+  { kind: 'leaveDecided', count: 1, items: [] },
 ];
 
 describe('orderTasks', () => {
@@ -42,6 +44,8 @@ describe('orderTasks', () => {
       'notInClass',
       'noClassTeacher',
       'lowStock',
+      'approvalsWaiting',
+      'leaveDecided',
       'noRole',
       'announcementDrafts',
     ]);

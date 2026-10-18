@@ -527,7 +527,9 @@ export interface Session {
 export interface StaffLeave {
   approved_at: Timestamp | null;
   approved_by: string | null;
+  cancellation_reason: string | null;
   cancelled_at: Timestamp | null;
+  cancelled_by: string | null;
   cover: string | null;
   created_at: Generated<Timestamp>;
   created_by: string;
@@ -542,6 +544,12 @@ export interface StaffLeave {
   status: Generated<string>;
   type: string;
   updated_at: Generated<Timestamp>;
+}
+
+export interface StaffLeaveSeen {
+  organization_id: string;
+  seen_at: Timestamp;
+  user_id: string;
 }
 
 export interface StockCount {
@@ -848,6 +856,7 @@ export interface DB {
   school_setting: SchoolSetting;
   session: Session;
   staff_leave: StaffLeave;
+  staff_leave_seen: StaffLeaveSeen;
   stock_count: StockCount;
   stock_count_line: StockCountLine;
   stock_delivery: StockDelivery;

@@ -12,7 +12,13 @@ import { expect, type Fixtures, type TestUser } from './support/base-test';
 import { YEAR_2027, createSchoolYear } from './support/factories/calendar';
 import { assignClassTeacher, createClass } from './support/factories/classes';
 import { createAnnouncement } from './support/factories/announcements';
-import { askLeave, approveLeave } from './support/factories/leave';
+import {
+  approvedLeave,
+  approveLeave,
+  askLeave,
+  cancelLeave,
+  markLeaveSeen,
+} from './support/factories/leave';
 import { bankAccount, owes, recordCash } from './support/factories/payments';
 import { createStudent } from './support/factories/students';
 import { createItem, openStock } from './support/factories/store';
@@ -1385,5 +1391,98 @@ test.describe('leave on the dashboard', () => {
     expect(await texts(ikejaApprover)).not.toContain(
       'A request was declined: Exams that week'
     );
+  });
+
+  test('tells a requester about decisions on their leave until they see them, and nobody else', async ({
+    api,
+    schools: { owner, lekkiOnly, noPermission },
+  }) => {
+    expect(
+      taskOf(await tasksOf(api, lekkiOnly), 'leaveDecided')
+    ).toBeUndefined();
+
+    const first = await askLeave(api, lekkiOnly, { startsOn: '2026-10-22' });
+    const second = await askLeave(api, lekkiOnly, { startsOn: '2026-10-29' });
+    expect(
+      taskOf(await tasksOf(api, lekkiOnly), 'leaveDecided')
+    ).toBeUndefined();
+
+    await approveLeave(api, owner, first.id);
+    await api(owner)
+      .post(`/leave/${second.id}/decline`)
+      .send({ reason: 'Exams that week' })
+      .expect(200);
+
+    expect(taskOf(await tasksOf(api, lekkiOnly), 'leaveDecided')).toEqual({
+      kind: 'leaveDecided',
+      count: 2,
+      items: [
+        {
+          type: 'annual',
+          startsOn: '2026-10-29',
+          endsOn: '2026-10-29',
+          status: 'rejected',
+        },
+        {
+          type: 'annual',
+          startsOn: '2026-10-22',
+          endsOn: '2026-10-22',
+          status: 'approved',
+        },
+      ],
+    });
+    expect(taskOf(await tasksOf(api, owner), 'leaveDecided')).toBeUndefined();
+    expect(
+      taskOf(await tasksOf(api, noPermission), 'leaveDecided')
+    ).toBeUndefined();
+
+    await markLeaveSeen(api, lekkiOnly).expect(200);
+    expect(
+      taskOf(await tasksOf(api, lekkiOnly), 'leaveDecided')
+    ).toBeUndefined();
+
+    await cancelLeave(api, owner, first.id);
+    expect(taskOf(await tasksOf(api, lekkiOnly), 'leaveDecided')).toMatchObject(
+      {
+        count: 1,
+        items: [{ status: 'cancelled', startsOn: '2026-10-22' }],
+      }
+    );
+  });
+
+  test('writes the cancel sentence to the requester and the approvers in scope', async ({
+    api,
+    addMember,
+    createUser,
+    withPermissions,
+    schools: { owner, orgA, lekki, ikeja, lekkiOnly },
+  }) => {
+    const emeka = await addMember(
+      orgA,
+      await createUser({ name: 'Emeka Obi' }),
+      { roles: ['teacher'], campuses: [lekki] }
+    );
+    const ikejaApprover = await withPermissions(orgA, ['leave:approve'], {
+      campuses: [ikeja],
+    });
+    const leave = await approvedLeave(
+      api,
+      { requester: emeka, approver: owner },
+      {
+        type: 'sick',
+        startsOn: '2026-10-22',
+        endsOn: '2026-10-23',
+      }
+    );
+    await cancelLeave(api, owner, leave.id);
+
+    const cancelled =
+      'Emeka Obi’s sick leave (22 Oct 2026 – 23 Oct 2026) was cancelled.';
+    const texts = async (actor: Actor) =>
+      (await activityOf(api, actor)).items.map((item) => item.text);
+    expect(await texts(emeka)).toContain(cancelled);
+    expect(await texts(owner)).toContain(cancelled);
+    expect(await texts(ikejaApprover)).not.toContain(cancelled);
+    expect(await texts(lekkiOnly)).not.toContain(cancelled);
   });
 });

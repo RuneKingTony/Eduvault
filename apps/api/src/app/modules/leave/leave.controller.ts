@@ -53,6 +53,17 @@ export class LeaveController {
     return this.leave.withdraw(org, params.id);
   }
 
+  @Post('me/leave/seen')
+  @HttpCode(200)
+  @StaffOnlyAuth(LEAVE_STAFF_ONLY_MESSAGE)
+  seen(
+    @Org() org: OrgContext,
+    @Body(zod(routes.seen.body))
+    body: Parameters<LeaveService['markSeen']>[1]
+  ): Promise<RouteOutput<typeof routes.seen>> {
+    return this.leave.markSeen(org, body);
+  }
+
   @Get('leave')
   @OrganizationAuth('leave', 'approve')
   list(
@@ -82,5 +93,16 @@ export class LeaveController {
     @Body(zod(routes.decline.body)) body: { reason: string }
   ): Promise<RouteOutput<typeof routes.decline>> {
     return this.leave.decline(org, params.id, body.reason);
+  }
+
+  @Post('leave/:id/cancel')
+  @HttpCode(200)
+  @OrganizationAuth('leave', 'approve')
+  cancel(
+    @Org() org: OrgContext,
+    @Param(zod(routes.cancel.params)) params: { id: string },
+    @Body(zod(routes.cancel.body)) body: { reason: string }
+  ): Promise<RouteOutput<typeof routes.cancel>> {
+    return this.leave.cancel(org, params.id, body.reason);
   }
 }

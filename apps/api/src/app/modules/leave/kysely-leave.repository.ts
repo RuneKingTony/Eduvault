@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { sql, type Kysely, type RawBuilder } from 'kysely';
 import {
+  LEAVE_UNSEEN_MAX,
   leaveStatusSchema,
   leaveTypeSchema,
   type LeaveListQuery,
@@ -15,11 +16,13 @@ import { KYSELY_TOKEN, type Database } from '../../common/db/tokens';
 import { inScope } from '../../common/students';
 import {
   LeaveRepository,
+  asDecided,
   type LeaveEntry,
   type LeaveScope,
   type LeaveTx,
   type LockedLeave,
   type NewLeave,
+  type UnseenDecisions,
   type WaitingLeave,
 } from './leave.repository';
 
@@ -39,7 +42,15 @@ interface EntryRow {
   rejected_at: Date | null;
   decider_name: string | null;
   rejection_reason: string | null;
+  cancelled_by: string | null;
+  cancelled_at: Date | null;
+  canceller_name: string | null;
+  cancellation_reason: string | null;
   created_at: Date;
+}
+
+interface UnseenRow extends EntryRow {
+  unseen_total: string;
 }
 
 interface LockedRow {
@@ -69,12 +80,21 @@ const ENTRY_COLUMNS = sql`
   ${day('sl.starts_on')} AS starts_on, ${day('sl.ends_on')} AS ends_on,
   sl.reason, sl.cover, sl.status, sl.approved_by, sl.approved_at,
   sl.rejected_by, sl.rejected_at, du.name AS decider_name,
-  sl.rejection_reason, sl.created_at`;
+  sl.rejection_reason, sl.cancelled_by, sl.cancelled_at,
+  xu.name AS canceller_name, sl.cancellation_reason, sl.created_at`;
 
 const ENTRY_JOINS = sql`
   FROM staff_leave sl
   JOIN "user" cu ON cu.id = sl.created_by
-  LEFT JOIN "user" du ON du.id = COALESCE(sl.approved_by, sl.rejected_by)`;
+  LEFT JOIN "user" du ON du.id = COALESCE(sl.approved_by, sl.rejected_by)
+  LEFT JOIN "user" xu ON xu.id = sl.cancelled_by`;
+
+const DECIDED_AT = sql`
+  CASE sl.status
+    WHEN 'approved' THEN sl.approved_at
+    WHEN 'rejected' THEN sl.rejected_at
+    WHEN 'cancelled' THEN CASE WHEN sl.cancelled_by IS NOT NULL THEN sl.cancelled_at END
+  END`;
 
 const LOCKED_COLUMNS = sql`
   sl.id, sl.created_by, cu.name AS requester_name, sl.type,
@@ -108,6 +128,10 @@ const toEntry = (row: EntryRow, viewerId: string): LeaveEntry => ({
   rejectedAt: isoOrNull(row.rejected_at),
   deciderName: row.decider_name,
   rejectionReason: row.rejection_reason,
+  cancelledBy: row.cancelled_by,
+  cancelledAt: isoOrNull(row.cancelled_at),
+  cancellerName: row.canceller_name,
+  cancellationReason: row.cancellation_reason,
   createdAt: iso(row.created_at),
   isOwn: row.created_by === viewerId,
 });
@@ -231,6 +255,24 @@ class KyselyLeaveTx implements LeaveTx {
     return this.decisions.reject(id, reason);
   }
 
+  async cancel(id: string, reason: string): Promise<boolean> {
+    const now = new Date();
+    const result = await this.trx
+      .updateTable('staff_leave')
+      .set({
+        status: 'cancelled',
+        cancelled_by: this.who.userId,
+        cancelled_at: now,
+        cancellation_reason: reason,
+        updated_at: now,
+      })
+      .where('id', '=', id)
+      .where('organization_id', '=', this.organizationId)
+      .where('status', '=', 'approved')
+      .executeTakeFirst();
+    return result.numUpdatedRows > 0n;
+  }
+
   record(input: ActivityInput): Promise<void> {
     return this.activity.record(this.trx, input);
   }
@@ -297,6 +339,40 @@ export class KyselyLeaveRepository extends LeaveRepository {
         AND ${requesterInScope(scope)} AND ${status} AND ${requester}
       ORDER BY sl.starts_on DESC, sl.created_at DESC, sl.id`.execute(this.db);
     return rows.map((row) => toEntry(row, viewerId));
+  }
+
+  async unseenDecisions(
+    organizationId: string,
+    userId: string
+  ): Promise<UnseenDecisions> {
+    const { rows } = await sql<UnseenRow>`
+      SELECT ${ENTRY_COLUMNS}, COUNT(*) OVER () AS unseen_total ${ENTRY_JOINS}
+      LEFT JOIN staff_leave_seen sv
+        ON sv.organization_id = sl.organization_id AND sv.user_id = sl.created_by
+      WHERE sl.organization_id = ${organizationId} AND sl.created_by = ${userId}
+        AND ${DECIDED_AT} > COALESCE(sv.seen_at, '-infinity'::timestamptz)
+      ORDER BY ${DECIDED_AT} DESC, sl.id
+      LIMIT ${LEAVE_UNSEEN_MAX}`.execute(this.db);
+    return {
+      items: rows.map((row) => asDecided(toEntry(row, userId))),
+      count: Number(rows[0]?.unseen_total ?? 0),
+    };
+  }
+
+  async markSeen(
+    organizationId: string,
+    userId: string,
+    at: Date
+  ): Promise<void> {
+    await this.db
+      .insertInto('staff_leave_seen')
+      .values({ organization_id: organizationId, user_id: userId, seen_at: at })
+      .onConflict((conflict) =>
+        conflict.columns(['organization_id', 'user_id']).doUpdateSet({
+          seen_at: sql<Date>`GREATEST(staff_leave_seen.seen_at, ${at})`,
+        })
+      )
+      .execute();
   }
 
   async otherApproverExists(

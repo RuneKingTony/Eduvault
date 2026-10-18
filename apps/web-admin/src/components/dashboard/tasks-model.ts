@@ -1,5 +1,11 @@
 import type { DashboardTask } from '@eduvault/api-contract';
-import { countOf, fmtDate } from '@eduvault/shared';
+import {
+  LEAVE_DECISION_LABELS,
+  LEAVE_TYPE_LABELS,
+  countOf,
+  fmtDate,
+  fmtDateRange,
+} from '@eduvault/shared';
 import type { TaskTarget } from './target-link';
 
 export interface TaskAction {
@@ -179,6 +185,24 @@ const approvalsWaiting = (task: Counted<'approvalsWaiting'>): TaskRow => ({
   extra: null,
 });
 
+const leaveDecided = (task: Counted<'leaveDecided'>): TaskRow => ({
+  key: task.kind,
+  kind: task.kind,
+  tone: 'default',
+  title:
+    task.count === 1
+      ? 'Your leave request was decided'
+      : `${task.count} decisions on your leave`,
+  subline: task.items
+    .map(
+      (item) =>
+        `${LEAVE_TYPE_LABELS[item.type]} ${fmtDateRange(item.startsOn, item.endsOn)}: ${LEAVE_DECISION_LABELS[item.status]}`
+    )
+    .join(' · '),
+  action: { label: 'See', target: { to: '/approvals' } },
+  extra: null,
+});
+
 const noRole = (task: Counted<'noRole'>): TaskRow => ({
   key: `${task.kind}-${task.memberId}`,
   kind: task.kind,
@@ -244,6 +268,9 @@ export function taskRow(task: DashboardTask): TaskRow {
     }
     case 'announcementDrafts': {
       return announcementDrafts(task);
+    }
+    case 'leaveDecided': {
+      return leaveDecided(task);
     }
     case 'noRole': {
       return noRole(task);

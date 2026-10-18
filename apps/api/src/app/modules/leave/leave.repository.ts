@@ -1,5 +1,10 @@
 import type { LeaveDto, LeaveListQuery } from '@eduvault/api-contract';
-import type { LeaveStatus, LeaveType } from '@eduvault/shared';
+import {
+  isDecidedLeaveStatus,
+  type DecidedLeaveStatus,
+  type LeaveStatus,
+  type LeaveType,
+} from '@eduvault/shared';
 import type { ActivityInput } from '../../common/activity';
 import type { CampusScope } from '../../common/campus-scope';
 
@@ -9,6 +14,15 @@ export interface LeaveScope {
 }
 
 export type LeaveEntry = Omit<LeaveDto, 'days'>;
+export type DecidedEntry = LeaveEntry & { status: DecidedLeaveStatus };
+
+export function asDecided(entry: LeaveEntry): DecidedEntry {
+  const { status } = entry;
+  if (!isDecidedLeaveStatus(status)) {
+    throw new Error(`Leave ${entry.id} is ${status}, not decided`);
+  }
+  return { ...entry, status };
+}
 
 export interface LockedLeave {
   id: string;
@@ -18,6 +32,11 @@ export interface LockedLeave {
   startsOn: string;
   endsOn: string;
   status: LeaveStatus;
+}
+
+export interface UnseenDecisions {
+  items: DecidedEntry[];
+  count: number;
 }
 
 export interface NewLeave {
@@ -48,6 +67,7 @@ export interface LeaveTx {
   withdraw(id: string): Promise<boolean>;
   approve(id: string): Promise<boolean>;
   reject(id: string, reason: string): Promise<boolean>;
+  cancel(id: string, reason: string): Promise<boolean>;
   record(input: ActivityInput): Promise<void>;
 }
 
@@ -76,6 +96,17 @@ export abstract class LeaveRepository {
     organizationId: string,
     userId: string
   ): Promise<boolean>;
+
+  abstract unseenDecisions(
+    organizationId: string,
+    userId: string
+  ): Promise<UnseenDecisions>;
+
+  abstract markSeen(
+    organizationId: string,
+    userId: string,
+    at: Date
+  ): Promise<void>;
 
   abstract waiting(scope: LeaveScope): Promise<WaitingLeave[]>;
 }

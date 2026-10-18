@@ -219,6 +219,58 @@ describe('taskRow charges', () => {
   });
 });
 
+describe('taskRow leave decided', () => {
+  it('says one request was decided and names it', () => {
+    expect(
+      taskRow({
+        kind: 'leaveDecided',
+        count: 1,
+        items: [
+          {
+            type: 'annual',
+            startsOn: '2026-10-22',
+            endsOn: '2026-10-23',
+            status: 'cancelled',
+          },
+        ],
+      })
+    ).toEqual({
+      key: 'leaveDecided',
+      kind: 'leaveDecided',
+      tone: 'default',
+      title: 'Your leave request was decided',
+      subline: 'Annual leave 22 Oct 2026 – 23 Oct 2026: Cancelled',
+      action: { label: 'See', target: { to: '/approvals' } },
+      extra: null,
+    });
+  });
+
+  it('counts several decisions and names the first two', () => {
+    const row = taskRow({
+      kind: 'leaveDecided',
+      count: 4,
+      items: [
+        {
+          type: 'sick',
+          startsOn: '2026-10-26',
+          endsOn: '2026-10-26',
+          status: 'approved',
+        },
+        {
+          type: 'study',
+          startsOn: '2026-11-02',
+          endsOn: '2026-11-03',
+          status: 'rejected',
+        },
+      ],
+    });
+    expect(row.title).toBe('4 decisions on your leave');
+    expect(row.subline).toBe(
+      'Sick leave 26 Oct 2026: Approved · Study leave 2 Nov 2026 – 3 Nov 2026: Declined'
+    );
+  });
+});
+
 describe('taskRow low stock', () => {
   it('counts the items, lists the first three and opens the Store', () => {
     expect(

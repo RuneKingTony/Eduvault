@@ -32,6 +32,81 @@ export const LEAVE_STATUS_LABELS = {
   cancelled: 'Withdrawn',
 } as const satisfies Record<LeaveStatus, string>;
 
+export const DECIDED_LEAVE_STATUSES = [
+  'approved',
+  'rejected',
+  'cancelled',
+] as const satisfies readonly LeaveStatus[];
+export type DecidedLeaveStatus = (typeof DECIDED_LEAVE_STATUSES)[number];
+
+export const isDecidedLeaveStatus = (
+  status: LeaveStatus
+): status is DecidedLeaveStatus =>
+  (DECIDED_LEAVE_STATUSES as readonly LeaveStatus[]).includes(status);
+
+export const LEAVE_DECISION_LABELS = {
+  approved: LEAVE_STATUS_LABELS.approved,
+  rejected: LEAVE_STATUS_LABELS.rejected,
+  cancelled: 'Cancelled',
+} as const satisfies Record<DecidedLeaveStatus, string>;
+
+export interface LeaveOutcome {
+  status: LeaveStatus;
+  cancelledBy: string | null;
+}
+
+export const isCancelledByApprover = (leave: LeaveOutcome): boolean =>
+  leave.status === 'cancelled' && leave.cancelledBy !== null;
+
+export const leaveDecisionAt = (
+  leave: LeaveOutcome & {
+    approvedAt: string | null;
+    rejectedAt: string | null;
+    cancelledAt: string | null;
+  }
+): string | null => {
+  if (leave.status === 'approved') {
+    return leave.approvedAt;
+  }
+  if (leave.status === 'rejected') {
+    return leave.rejectedAt;
+  }
+  return isCancelledByApprover(leave) ? leave.cancelledAt : null;
+};
+
+export type LeaveCancelBlock = 'notApproved' | 'started';
+
+export const leaveCancelBlock = (
+  leave: { status: LeaveStatus; startsOn: string },
+  today: string
+): LeaveCancelBlock | null => {
+  if (leave.status !== 'approved') {
+    return 'notApproved';
+  }
+  return leave.startsOn <= today ? 'started' : null;
+};
+
+export const leaveStatusLabel = (leave: LeaveOutcome): string =>
+  isCancelledByApprover(leave)
+    ? LEAVE_DECISION_LABELS.cancelled
+    : LEAVE_STATUS_LABELS[leave.status];
+
+export const leaveReasonLine = (
+  leave: LeaveOutcome & {
+    deciderName: string | null;
+    rejectionReason: string | null;
+    cancellerName: string | null;
+    cancellationReason: string | null;
+  }
+): string | null => {
+  if (leave.status === 'rejected') {
+    return `Declined by ${leave.deciderName}: ${leave.rejectionReason}`;
+  }
+  return isCancelledByApprover(leave)
+    ? `Cancelled by ${leave.cancellerName}: ${leave.cancellationReason}`
+    : null;
+};
+
 export const leaveTypeLower = (type: LeaveType): string =>
   LEAVE_TYPE_LABELS[type].toLowerCase();
 

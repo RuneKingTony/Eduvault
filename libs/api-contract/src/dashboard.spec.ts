@@ -31,6 +31,24 @@ describe('dashboardTaskSchema', () => {
     { kind: 'lowStock', count: 4, names: ['Tie', 'School shirt, Size 12'] },
     { kind: 'noRole', memberId: id(1), name: 'Ada Obi' },
     {
+      kind: 'leaveDecided',
+      count: 2,
+      items: [
+        {
+          type: 'annual',
+          startsOn: '2026-10-22',
+          endsOn: '2026-10-23',
+          status: 'cancelled',
+        },
+        {
+          type: 'sick',
+          startsOn: '2026-10-26',
+          endsOn: '2026-10-26',
+          status: 'approved',
+        },
+      ],
+    },
+    {
       kind: 'approvalsWaiting',
       count: 2,
       items: [

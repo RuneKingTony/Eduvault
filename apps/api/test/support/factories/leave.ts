@@ -30,3 +30,33 @@ export async function approveLeave(
   return (await api(actor).post(`/leave/${id}/approve`).expect(200))
     .body as LeaveDto;
 }
+
+export async function approvedLeave(
+  api: Api,
+  people: { requester: TestUser; approver: TestUser },
+  body: Partial<CreateLeaveInput> = {}
+): Promise<LeaveDto> {
+  const leave = await askLeave(api, people.requester, body);
+  return approveLeave(api, people.approver, leave.id);
+}
+
+export function markLeaveSeen(
+  api: Api,
+  actor: TestUser,
+  through = new Date().toISOString()
+) {
+  return api(actor).post('/me/leave/seen').send({ through });
+}
+
+export async function cancelLeave(
+  api: Api,
+  actor: TestUser,
+  id: string
+): Promise<LeaveDto> {
+  return (
+    await api(actor)
+      .post(`/leave/${id}/cancel`)
+      .send({ reason: 'Cover is short' })
+      .expect(200)
+  ).body as LeaveDto;
+}

@@ -1,14 +1,20 @@
-import type { LeaveListQuery } from '@eduvault/api-contract';
-import type { LeaveStatus, LeaveType } from '@eduvault/shared';
+import { LEAVE_UNSEEN_MAX, type LeaveListQuery } from '@eduvault/api-contract';
+import {
+  isCancelledByApprover,
+  type LeaveStatus,
+  type LeaveType,
+} from '@eduvault/shared';
 import type { ActivityInput } from '../../common/activity';
 import { canSeeCampus } from '../../common/campus-scope';
 import {
   LeaveRepository,
+  asDecided,
   type LeaveEntry,
   type LeaveScope,
   type LeaveTx,
   type LockedLeave,
   type NewLeave,
+  type UnseenDecisions,
   type WaitingLeave,
 } from './leave.repository';
 
@@ -23,6 +29,9 @@ interface StoredLeave {
   status: LeaveStatus;
   deciderId: string | null;
   rejectionReason: string | null;
+  cancelledBy: string | null;
+  cancellationReason: string | null;
+  decidedAt: string | null;
   createdAt: string;
 }
 
@@ -88,6 +97,10 @@ class FakeLeaveTx implements LeaveTx {
     });
   }
 
+  cancel(id: string, reason: string): Promise<boolean> {
+    return this.store.cancel(id, { userId: this.userId, reason });
+  }
+
   record(input: ActivityInput): Promise<void> {
     this.store.events.push(input);
     return Promise.resolve();
@@ -100,6 +113,7 @@ export class FakeLeaveRepository extends LeaveRepository {
   readonly names = new Map<string, string>();
   readonly campuses = new Map<string, string[]>();
   readonly approvers = new Set<string>();
+  readonly seen = new Map<string, Date>();
   private sequence = 0;
 
   seed(
@@ -115,6 +129,9 @@ export class FakeLeaveRepository extends LeaveRepository {
       status: 'submitted',
       deciderId: null,
       rejectionReason: null,
+      cancelledBy: null,
+      cancellationReason: null,
+      decidedAt: null,
       createdAt: `2026-10-0${this.sequence}T08:00:00.000Z`,
       ...row,
     };
@@ -137,6 +154,7 @@ export class FakeLeaveRepository extends LeaveRepository {
 
   toEntry(row: StoredLeave, viewerId: string): LeaveEntry {
     const decided = row.deciderId !== null;
+    const approved = row.status === 'approved' || row.cancelledBy !== null;
     return {
       id: row.id,
       createdBy: row.createdBy,
@@ -147,12 +165,17 @@ export class FakeLeaveRepository extends LeaveRepository {
       reason: row.reason,
       cover: row.cover,
       status: row.status,
-      approvedBy: row.status === 'approved' ? row.deciderId : null,
-      approvedAt: row.status === 'approved' ? row.createdAt : null,
+      approvedBy: approved ? row.deciderId : null,
+      approvedAt: approved ? row.createdAt : null,
       rejectedBy: row.status === 'rejected' ? row.deciderId : null,
       rejectedAt: row.status === 'rejected' ? row.createdAt : null,
       deciderName: decided ? this.nameOf(row.deciderId ?? '') : null,
       rejectionReason: row.rejectionReason,
+      cancelledBy: row.cancelledBy,
+      cancelledAt: row.cancelledBy === null ? null : row.decidedAt,
+      cancellerName:
+        row.cancelledBy === null ? null : this.nameOf(row.cancelledBy),
+      cancellationReason: row.cancellationReason,
       createdAt: row.createdAt,
       isOwn: row.createdBy === viewerId,
     };
@@ -189,7 +212,51 @@ export class FakeLeaveRepository extends LeaveRepository {
     row.status = change.status;
     row.deciderId = change.status === 'cancelled' ? null : change.userId;
     row.rejectionReason = change.reason ?? null;
+    row.decidedAt = new Date().toISOString();
     return Promise.resolve(true);
+  }
+
+  cancel(
+    id: string,
+    change: { userId: string; reason: string }
+  ): Promise<boolean> {
+    const row = this.rows.find((candidate) => candidate.id === id);
+    if (row?.status !== 'approved') {
+      return Promise.resolve(false);
+    }
+    row.status = 'cancelled';
+    row.cancelledBy = change.userId;
+    row.cancellationReason = change.reason;
+    row.decidedAt = new Date().toISOString();
+    return Promise.resolve(true);
+  }
+
+  unseenDecisions(
+    _organizationId: string,
+    userId: string
+  ): Promise<UnseenDecisions> {
+    const seenAt = this.seen.get(userId)?.toISOString() ?? '';
+    const unseen = this.rows
+      .filter(
+        (row) =>
+          row.createdBy === userId &&
+          row.decidedAt !== null &&
+          row.decidedAt > seenAt &&
+          (row.status !== 'cancelled' || isCancelledByApprover(row))
+      )
+      .toSorted((a, b) => (b.decidedAt ?? '').localeCompare(a.decidedAt ?? ''));
+    return Promise.resolve({
+      items: unseen
+        .slice(0, LEAVE_UNSEEN_MAX)
+        .map((row) => asDecided(this.toEntry(row, userId))),
+      count: unseen.length,
+    });
+  }
+
+  markSeen(_organizationId: string, userId: string, at: Date): Promise<void> {
+    const before = this.seen.get(userId);
+    this.seen.set(userId, before !== undefined && before > at ? before : at);
+    return Promise.resolve();
   }
 
   find(
