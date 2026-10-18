@@ -19,7 +19,7 @@ import {
   type MemberRecord,
   type Viewer,
 } from './members.repository';
-import { MembersService } from './members.service';
+import { MembersService, teachingEndOnRoleChange } from './members.service';
 
 const ORG = 'school-a';
 const LEKKI = 'campus-lekki';
@@ -163,6 +163,17 @@ const context = (
   headers: new Headers(),
   ...overrides,
 });
+
+const withClassRead = () =>
+  context({
+    permissions: toPermissionMap([
+      'member:update',
+      'student:read',
+      'student:create',
+      'class:read',
+      'campus:readAll',
+    ]),
+  });
 
 const actingContext = (writes: boolean) =>
   context({
@@ -366,18 +377,18 @@ describe('updateRoles', () => {
 
   it('writes the draft with member kept and only the campus difference', async () => {
     const { service, admin } = setup([person('t', ['member'], [LEKKI])]);
-    await service.updateRoles(context(), 't', {
-      roles: ['teacher'],
+    await service.updateRoles(withClassRead(), 't', {
+      roles: ['form-tutor'],
       campusIds: [IKEJA],
     });
     expect(admin.setRolesAndCampuses).toHaveBeenCalledWith({
       memberId: 't',
       organizationId: ORG,
       userId: 'user-t',
-      roles: ['member', 'teacher'],
+      roles: ['member', 'form-tutor'],
       addCampusIds: [IKEJA],
       removeCampusIds: [LEKKI],
-      keepClassTeaching: false,
+      teachingEnd: { kind: 'removedCampuses' },
     });
   });
 
@@ -389,9 +400,110 @@ describe('updateRoles', () => {
         roles: ['member', 'principal'],
         addCampusIds: [],
         removeCampusIds: [],
-        keepClassTeaching: true,
+        teachingEnd: { kind: 'none' },
       })
     );
+  });
+
+  it('ends every row when the draft drops class:read', async () => {
+    const { service, admin } = setup([
+      person('t', ['member', 'form-tutor'], [LEKKI]),
+    ]);
+    await service.updateRoles(withClassRead(), 't', {
+      roles: ['administrator'],
+      campusIds: [LEKKI],
+    });
+    expect(admin.setRolesAndCampuses).toHaveBeenCalledWith(
+      expect.objectContaining({ teachingEnd: { kind: 'all' } })
+    );
+  });
+
+  it('ends rows outside the final campuses when the draft drops campus:readAll', async () => {
+    const { service, admin } = setup([
+      person('t', ['member', 'principal'], [LEKKI, IKEJA]),
+    ]);
+    await service.updateRoles(withClassRead(), 't', {
+      roles: ['form-tutor'],
+      campusIds: [LEKKI],
+    });
+    expect(admin.setRolesAndCampuses).toHaveBeenCalledWith(
+      expect.objectContaining({
+        removeCampusIds: [IKEJA],
+        teachingEnd: { kind: 'outside', campusIds: [LEKKI] },
+      })
+    );
+  });
+});
+
+describe('teachingEndOnRoleChange', () => {
+  const teacher = toPermissionMap(['class:read']);
+  const bursar = toPermissionMap(['student:read']);
+  const reader = toPermissionMap(['class:read', 'campus:readAll']);
+  const manager = toPermissionMap(['campus:readAll']);
+  const finalCampusIds = [LEKKI];
+
+  it('keeps everything when the new roles hold campus:readAll', () => {
+    expect(
+      teachingEndOnRoleChange({
+        before: teacher,
+        after: reader,
+        finalCampusIds,
+      })
+    ).toEqual({ kind: 'none' });
+    expect(
+      teachingEndOnRoleChange({
+        before: reader,
+        after: manager,
+        finalCampusIds,
+      })
+    ).toEqual({ kind: 'none' });
+  });
+
+  it('ends every row when the new roles lack class:read', () => {
+    expect(
+      teachingEndOnRoleChange({
+        before: teacher,
+        after: bursar,
+        finalCampusIds,
+      })
+    ).toEqual({ kind: 'all' });
+    expect(
+      teachingEndOnRoleChange({ before: reader, after: bursar, finalCampusIds })
+    ).toEqual({ kind: 'all' });
+    expect(
+      teachingEndOnRoleChange({
+        before: manager,
+        after: bursar,
+        finalCampusIds,
+      })
+    ).toEqual({ kind: 'all' });
+  });
+
+  it('ends rows outside the final campuses when only campus:readAll is dropped', () => {
+    expect(
+      teachingEndOnRoleChange({
+        before: reader,
+        after: teacher,
+        finalCampusIds,
+      })
+    ).toEqual({ kind: 'outside', campusIds: finalCampusIds });
+  });
+
+  it('ends rows on the removed campuses when no permission is dropped', () => {
+    expect(
+      teachingEndOnRoleChange({
+        before: teacher,
+        after: toPermissionMap(['class:read', 'student:read']),
+        finalCampusIds,
+      })
+    ).toEqual({ kind: 'removedCampuses' });
+    expect(
+      teachingEndOnRoleChange({
+        before: bursar,
+        after: teacher,
+        finalCampusIds,
+      })
+    ).toEqual({ kind: 'removedCampuses' });
   });
 });
 
@@ -406,7 +518,7 @@ describe('updateCampuses', () => {
       userId: 'user-t',
       addCampusIds: ['campus-vi'],
       removeCampusIds: [],
-      keepClassTeaching: false,
+      teachingEnd: { kind: 'removedCampuses' },
     });
   });
 
@@ -418,7 +530,7 @@ describe('updateCampuses', () => {
       userId: 'user-t',
       addCampusIds: [],
       removeCampusIds: [IKEJA],
-      keepClassTeaching: false,
+      teachingEnd: { kind: 'removedCampuses' },
     });
   });
 
@@ -428,7 +540,7 @@ describe('updateCampuses', () => {
     ]);
     await service.updateCampuses(context(), 't', { campusIds: [LEKKI] });
     expect(admin.setCampuses).toHaveBeenCalledWith(
-      expect.objectContaining({ keepClassTeaching: true })
+      expect.objectContaining({ teachingEnd: { kind: 'none' } })
     );
   });
 

@@ -15,9 +15,19 @@ import {
   waitForAuditRows,
   type Fixtures,
 } from './support/base-test';
-import { createSchoolYear } from './support/factories/calendar';
+import {
+  YEAR_2026,
+  YEAR_2027,
+  createSchoolYear,
+} from './support/factories/calendar';
 import { approveLeave, askLeave } from './support/factories/leave';
 import { assignClassTeacher, createClass } from './support/factories/classes';
+import {
+  MATHS,
+  assignSubjectTeacher,
+  createSubject,
+} from './support/factories/subjects';
+import { makeCurrent } from './support/factories/terms';
 import {
   twoSchoolsWithoutStudents,
   type TwoSchoolsWithoutStudents,
@@ -113,6 +123,14 @@ const teachingOf = async (pool: Fixtures['pool'], userId: string) =>
   (
     await pool.query<{ class_arm_id: string }>(
       'SELECT class_arm_id FROM class_arm_teacher WHERE user_id = $1',
+      [userId]
+    )
+  ).rows.map((row) => row.class_arm_id);
+
+const subjectTeachingOf = async (pool: Fixtures['pool'], userId: string) =>
+  (
+    await pool.query<{ class_arm_id: string }>(
+      'SELECT class_arm_id FROM subject_teacher WHERE user_id = $1',
       [userId]
     )
   ).rows.map((row) => row.class_arm_id);
@@ -1591,6 +1609,265 @@ test.describe('members', () => {
         .expect(404);
 
       expect(await teachingOf(pool, teacher.id)).toEqual([arm.id]);
+    });
+
+    test('a role change that drops class:read ends this year’s class and subject rows, and keeps earlier years’', async ({
+      api,
+      app,
+      pool,
+      createUser,
+      addMember,
+      schools: { orgA, owner, lekki },
+    }) => {
+      await createSchoolYear(app, owner, YEAR_2026);
+      await createSchoolYear(app, owner, YEAR_2027);
+      const teacher = await addMember(orgA, await createUser(), {
+        roles: ['teacher'],
+        campuses: [lekki],
+      });
+      const gold = await createClass(app, owner, { campusId: lekki.id });
+      const silver = await createClass(app, owner, { campusId: lekki.id });
+      const subject = await createSubject(app, owner, MATHS);
+      await makeCurrent(api, owner, { year: YEAR_2026.name, sequence: 1 });
+      await assignClassTeacher(app, owner, {
+        classId: silver.id,
+        userId: teacher.id,
+      });
+      await assignSubjectTeacher(app, owner, {
+        arm: silver,
+        subjectId: subject.id,
+        userId: teacher.id,
+      });
+      await makeCurrent(api, owner, { year: YEAR_2027.name, sequence: 1 });
+      await assignClassTeacher(app, owner, {
+        classId: gold.id,
+        userId: teacher.id,
+      });
+      await assignSubjectTeacher(app, owner, {
+        arm: gold,
+        subjectId: subject.id,
+        userId: teacher.id,
+      });
+
+      await putRoles(api, owner, {
+        id: await idOf(api, owner, teacher.id),
+        roles: ['bursar'],
+        campusIds: [lekki.id],
+      }).expect(200);
+
+      expect(await teachingOf(pool, teacher.id)).toEqual([silver.id]);
+      expect(await subjectTeachingOf(pool, teacher.id)).toEqual([silver.id]);
+      const detail = (await api(owner).get(`/classes/${gold.id}`).expect(200))
+        .body as { classTeachers: { userId: string }[] };
+      expect(detail.classTeachers).toEqual([]);
+    });
+
+    test('dropping campus:readAll ends the rows outside the campuses they stay on', async ({
+      api,
+      app,
+      pool,
+      createUser,
+      addMember,
+      schools: { orgA, owner, lekki, ikeja },
+    }) => {
+      await createSchoolYear(app, owner);
+      const principal = await addMember(orgA, await createUser(), {
+        roles: ['principal'],
+        campuses: [lekki],
+      });
+      const atLekki = await createClass(app, owner, { campusId: lekki.id });
+      const atIkeja = await createClass(app, owner, { campusId: ikeja.id });
+      const subject = await createSubject(app, owner, MATHS);
+      for (const arm of [atLekki, atIkeja]) {
+        await assignClassTeacher(app, owner, {
+          classId: arm.id,
+          userId: principal.id,
+        });
+        await assignSubjectTeacher(app, owner, {
+          arm,
+          subjectId: subject.id,
+          userId: principal.id,
+        });
+      }
+
+      await putRoles(api, owner, {
+        id: await idOf(api, owner, principal.id),
+        roles: ['teacher'],
+        campusIds: [lekki.id],
+      }).expect(200);
+
+      expect(await teachingOf(pool, principal.id)).toEqual([atLekki.id]);
+      expect(await subjectTeachingOf(pool, principal.id)).toEqual([atLekki.id]);
+    });
+
+    test('keeps the rows when the new roles hold campus:readAll without class:read', async ({
+      api,
+      app,
+      pool,
+      createRole,
+      createUser,
+      addMember,
+      schools: { orgA, owner, lekki },
+    }) => {
+      await createSchoolYear(app, owner);
+      await createRole(orgA, {
+        slug: 'auditor',
+        label: 'Auditor',
+        permissions: ['campus:readAll', 'student:read'],
+      });
+      const teacher = await addMember(orgA, await createUser(), {
+        roles: ['teacher'],
+        campuses: [lekki],
+      });
+      const gold = await createClass(app, owner, { campusId: lekki.id });
+      await assignClassTeacher(app, owner, {
+        classId: gold.id,
+        userId: teacher.id,
+      });
+      await assignSubjectTeacher(app, owner, {
+        arm: gold,
+        subjectId: (await createSubject(app, owner, MATHS)).id,
+        userId: teacher.id,
+      });
+
+      await putRoles(api, owner, {
+        id: await idOf(api, owner, teacher.id),
+        roles: ['auditor'],
+      }).expect(200);
+
+      expect(await teachingOf(pool, teacher.id)).toEqual([gold.id]);
+      expect(await subjectTeachingOf(pool, teacher.id)).toEqual([gold.id]);
+    });
+
+    test('moving from a campus:readAll role without class:read to one with neither ends the rows on their own campus too', async ({
+      api,
+      app,
+      pool,
+      createRole,
+      createUser,
+      addMember,
+      schools: { orgA, owner, lekki },
+    }) => {
+      await createSchoolYear(app, owner);
+      await createRole(orgA, {
+        slug: 'auditor',
+        label: 'Auditor',
+        permissions: ['campus:readAll', 'student:read'],
+      });
+      const auditor = await addMember(orgA, await createUser(), {
+        roles: ['teacher'],
+        campuses: [lekki],
+      });
+      const gold = await createClass(app, owner, { campusId: lekki.id });
+      await assignClassTeacher(app, owner, {
+        classId: gold.id,
+        userId: auditor.id,
+      });
+      await assignSubjectTeacher(app, owner, {
+        arm: gold,
+        subjectId: (await createSubject(app, owner, MATHS)).id,
+        userId: auditor.id,
+      });
+      const id = await idOf(api, owner, auditor.id);
+      await putRoles(api, owner, { id, roles: ['auditor'] }).expect(200);
+      expect(await teachingOf(pool, auditor.id)).toEqual([gold.id]);
+
+      await putRoles(api, owner, {
+        id,
+        roles: ['bursar'],
+        campusIds: [lekki.id],
+      }).expect(200);
+
+      expect(await teachingOf(pool, auditor.id)).toEqual([]);
+      expect(await subjectTeachingOf(pool, auditor.id)).toEqual([]);
+    });
+
+    test('keeps the rows when a role change drops nothing', async ({
+      api,
+      app,
+      pool,
+      createUser,
+      addMember,
+      schools: { orgA, owner, lekki },
+    }) => {
+      await createSchoolYear(app, owner);
+      const teacher = await addMember(orgA, await createUser(), {
+        roles: ['teacher'],
+        campuses: [lekki],
+      });
+      const gold = await createClass(app, owner, { campusId: lekki.id });
+      await assignClassTeacher(app, owner, {
+        classId: gold.id,
+        userId: teacher.id,
+      });
+      await assignSubjectTeacher(app, owner, {
+        arm: gold,
+        subjectId: (await createSubject(app, owner, MATHS)).id,
+        userId: teacher.id,
+      });
+
+      await putRoles(api, owner, {
+        id: await idOf(api, owner, teacher.id),
+        roles: ['teacher', 'bursar'],
+        campusIds: [lekki.id],
+      }).expect(200);
+
+      expect(await teachingOf(pool, teacher.id)).toEqual([gold.id]);
+      expect(await subjectTeachingOf(pool, teacher.id)).toEqual([gold.id]);
+    });
+
+    test('another school’s owner cannot change roles, and a role change here leaves the member’s rows in the other school', async ({
+      api,
+      app,
+      pool,
+      createUser,
+      addMember,
+      schools: { orgA, orgB, owner, ownerB, lekki, campusB },
+    }) => {
+      await createSchoolYear(app, owner);
+      await createSchoolYear(app, ownerB);
+      const teacher = await addMember(orgA, await createUser(), {
+        roles: ['teacher'],
+        campuses: [lekki],
+      });
+      await addMember(orgB, teacher, {
+        roles: ['teacher'],
+        campuses: [campusB],
+      });
+      const here = await createClass(app, owner, { campusId: lekki.id });
+      const there = await createClass(app, ownerB, { campusId: campusB.id });
+      await assignClassTeacher(app, owner, {
+        classId: here.id,
+        userId: teacher.id,
+      });
+      await assignClassTeacher(app, ownerB, {
+        classId: there.id,
+        userId: teacher.id,
+      });
+      await assignSubjectTeacher(app, ownerB, {
+        arm: there,
+        subjectId: (await createSubject(app, ownerB, MATHS)).id,
+        userId: teacher.id,
+      });
+      const id = await idOf(api, owner, teacher.id);
+
+      await putRoles(api, ownerB, {
+        id,
+        roles: ['bursar'],
+        campusIds: [campusB.id],
+      }).expect(404);
+      expect(await teachingOf(pool, teacher.id)).toEqual(
+        expect.arrayContaining([here.id, there.id])
+      );
+
+      await putRoles(api, owner, {
+        id,
+        roles: ['bursar'],
+        campusIds: [lekki.id],
+      }).expect(200);
+
+      expect(await teachingOf(pool, teacher.id)).toEqual([there.id]);
+      expect(await subjectTeachingOf(pool, teacher.id)).toEqual([there.id]);
     });
   });
 

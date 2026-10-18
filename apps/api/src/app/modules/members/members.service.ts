@@ -30,10 +30,15 @@ import {
   permissionsOfRoles,
   roleDiff,
   validateRoleCombo,
+  type PermissionMap,
   type RoleDiff,
   withMemberRole,
 } from '@eduvault/policy';
-import { MemberAdminService, type OrgContext } from '../../common/auth';
+import {
+  MemberAdminService,
+  type OrgContext,
+  type TeachingEnd,
+} from '../../common/auth';
 import { canSeeCampus, type CampusScope } from '../../common/campus-scope';
 import { computeClassScope } from '../../common/class-scope';
 import { CampusService } from '../campus/campus.service';
@@ -60,6 +65,7 @@ interface RolesInput {
 interface CampusChange {
   add: string[];
   remove: string[];
+  final: string[];
 }
 
 interface Account {
@@ -113,13 +119,40 @@ function campusChange(
       (campusId) => !record.campusIds.includes(campusId)
     ),
     remove: record.campusIds.filter((campusId) => !finalSet.has(campusId)),
+    final: [...finalSet],
   };
 }
 
-const readsAllCampuses = (
+const campusLeaveTeachingEnd = (
   roles: readonly string[],
   entries: readonly SchoolRoleEntry[]
-): boolean => can(permissionsOfRoles(roles, entries), 'campus', 'readAll');
+): TeachingEnd =>
+  can(permissionsOfRoles(roles, entries), 'campus', 'readAll')
+    ? { kind: 'none' }
+    : { kind: 'removedCampuses' };
+
+interface RoleChangeTeaching {
+  before: PermissionMap;
+  after: PermissionMap;
+  finalCampusIds: readonly string[];
+}
+
+export function teachingEndOnRoleChange({
+  before,
+  after,
+  finalCampusIds,
+}: RoleChangeTeaching): TeachingEnd {
+  if (can(after, 'campus', 'readAll')) {
+    return { kind: 'none' };
+  }
+  if (!can(after, 'class', 'read')) {
+    return { kind: 'all' };
+  }
+  if (can(before, 'campus', 'readAll')) {
+    return { kind: 'outside', campusIds: finalCampusIds };
+  }
+  return { kind: 'removedCampuses' };
+}
 
 const titleOrDefault = (title: string | undefined): string =>
   title === undefined || title === '' ? DEFAULT_MEMBER_TITLE : title;
@@ -202,7 +235,7 @@ export class MembersService {
       await this.checkRoleChange({ ctx, record, draft, entries, input });
       const campuses =
         input.campusIds === undefined
-          ? { add: [], remove: [] }
+          ? { add: [], remove: [], final: record.campusIds }
           : campusChange(ctx, record, input.campusIds);
       await this.admin.setRolesAndCampuses({
         memberId: record.id,
@@ -211,7 +244,11 @@ export class MembersService {
         roles: draft,
         addCampusIds: campuses.add,
         removeCampusIds: campuses.remove,
-        keepClassTeaching: readsAllCampuses(draft, entries),
+        teachingEnd: teachingEndOnRoleChange({
+          before: permissionsOfRoles(record.roles, entries),
+          after: permissionsOfRoles(draft, entries),
+          finalCampusIds: campuses.final,
+        }),
       });
       return this.reload(ctx, record.id, entries);
     });
@@ -248,7 +285,7 @@ export class MembersService {
         userId: record.userId,
         addCampusIds: change.add,
         removeCampusIds: change.remove,
-        keepClassTeaching: readsAllCampuses(record.roles, entries),
+        teachingEnd: campusLeaveTeachingEnd(record.roles, entries),
       });
       return this.reload(ctx, record.id, entries);
     });
