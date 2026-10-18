@@ -187,7 +187,7 @@ Scopes applied: campus scope and class scope (see [Scope rules](#scope-rules)). 
 - Buttons: "Cancel" (ghost) and "Record leaving" (destructive, icon `user-x`).
 - On success:
   - Toast (success) "Recorded as left. Nothing was deleted." with the action "Left tab".
-  - Activity: "{name} recorded as left: {reason}." The balance is not part of the text: activity rows are read per pillar (D-315), so a balance in a student-pillar row would show money to members without `invoice:read` or `payment:read` ([D-320](../technical-reference.md#decision-log)).
+  - Activity: "{name} recorded as left: {reason}." The balance is not in the activity: rows are read per pillar (S-13, D-315), so it stays in Who owes and the dialog callout ([D-327](../technical-reference.md#decision-log)).
 - The dialog is also opened by the Inactive tab's "Record leaving" and by the danger callout's button.
 
 ### Undo leaving (dialog)

@@ -1,7 +1,9 @@
 import type { Pool } from 'pg';
 import type { StudentDetail, StudentList } from '@eduvault/api-contract';
 import { expect, type Fixtures } from './support/base-test';
+import { receivableBalance } from './support/factories/billing';
 import { assignClassTeacher, createClass } from './support/factories/classes';
+import { importOpening } from './support/factories/finance';
 import { createStudent } from './support/factories/students';
 import { makeCurrent } from './support/factories/terms';
 import { schoolsTest } from './support/two-schools';
@@ -249,6 +251,44 @@ test.describe('record leaving', () => {
       guardians: 1,
       users: 1,
     });
+  });
+
+  test('names no balance in the leaving activity when the student owes', async ({
+    api,
+    app,
+    pool,
+    schools: { orgA, owner, studentLekki },
+  }) => {
+    await importOpening(app, owner, {
+      items: [
+        {
+          studentId: studentLekki.id,
+          amountMinor: 1_200_000,
+          direction: 'debt',
+          effectiveOn: '2026-09-01',
+        },
+      ],
+    });
+    expect(
+      await receivableBalance(pool, orgA.id, studentLekki.id)
+    ).toBeGreaterThan(0);
+
+    await api(owner)
+      .post(`/students/${studentLekki.id}/leave`)
+      .send({ reason: 'relocated', lastDay: studentLekki.admittedOn })
+      .expect(201);
+
+    const rows = await rowsOf(
+      pool,
+      `SELECT text, data FROM activity_event WHERE subject_id = $1 AND kind = 'student.left'`,
+      [studentLekki.id]
+    );
+    expect(rows).toEqual([
+      {
+        text: `${studentLekki.firstName} ${studentLekki.lastName} recorded as left: Relocated.`,
+        data: { reason: 'relocated', lastDay: studentLekki.admittedOn },
+      },
+    ]);
   });
 
   test('shows the last day on the Left tab', async ({
