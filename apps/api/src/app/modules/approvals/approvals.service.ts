@@ -16,6 +16,7 @@ import {
 import { can, holds } from '@eduvault/policy';
 import { ApprovalRegistry, type WaitingApproval } from '../../common/approvals';
 import type { OrgContext } from '../../common/auth';
+import { CampusService } from '../campus/campus.service';
 import { ApprovalsRepository } from './approvals.repository';
 
 const oldestFirst = (a: ApprovalItem, b: ApprovalItem): number =>
@@ -68,13 +69,17 @@ const mayShow = (ctx: OrgContext, item: ApprovalItem): boolean =>
 export class ApprovalsService {
   constructor(
     private readonly registry: ApprovalRegistry,
-    private readonly approvals: ApprovalsRepository
+    private readonly approvals: ApprovalsRepository,
+    private readonly campuses: CampusService
   ) {}
 
   async list(ctx: OrgContext, query: ApprovalListQuery): Promise<ApprovalList> {
+    if (query.campusId !== undefined) {
+      await this.campuses.assertInScope(ctx, query.campusId);
+    }
     const [currency, items] = await Promise.all([
       this.approvals.currency(ctx.organizationId),
-      this.waiting(ctx),
+      this.waiting(ctx, query.campusId),
     ]);
     const decidable = items.filter((item) => item.decide !== 'other').length;
     const shown = items.filter(
@@ -119,13 +124,16 @@ export class ApprovalsService {
     };
   }
 
-  private async waiting(ctx: OrgContext): Promise<ApprovalItem[]> {
+  private async waiting(
+    ctx: OrgContext,
+    campusId?: string
+  ): Promise<ApprovalItem[]> {
     if (!sees(ctx)) {
       return [];
     }
     const scope = {
       organizationId: ctx.organizationId,
-      campusScope: ctx.campusScope,
+      campusScope: campusId === undefined ? ctx.campusScope : [campusId],
     };
     const lists = await Promise.all(
       this.registry.all().map((provider) => provider.waiting(scope))

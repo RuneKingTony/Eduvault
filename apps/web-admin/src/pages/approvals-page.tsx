@@ -11,6 +11,8 @@ import { usePermissions } from '@eduvault/auth-client';
 import { can } from '@eduvault/policy';
 import {
   Badge,
+  Button,
+  CampusSelect,
   Card,
   CardContent,
   Empty,
@@ -38,7 +40,7 @@ import { LeaveOnlyApprovalsPage } from '../components/leave/leave-only-approvals
 import { MyLeaveCard } from '../components/leave/my-leave-card';
 import { QueryState } from '../components/money/query-state';
 import type { ApprovalsSearch } from '../approvals-search';
-import { approvalsQueryOptions } from '../queries';
+import { approvalsQueryOptions, campusesQueryOptions } from '../queries';
 
 function Header() {
   return (
@@ -86,62 +88,81 @@ function QueueEmpty() {
 
 const TAB_LABELS = { all: 'All', money: 'Money', leave: 'Leave' } as const;
 
-function Toolbar({
+function PillarTabs({
   data,
   tab,
-  includeOthers,
   onTab,
-  onIncludeOthers,
 }: {
   data: ApprovalList;
   tab: ApprovalsSearch['tab'];
-  includeOthers: boolean;
   onTab: (tab: ApprovalsSearch['tab']) => void;
-  onIncludeOthers: (include: boolean) => void;
 }) {
-  const showTabs =
-    tab !== undefined || (data.pillars.money > 0 && data.pillars.leave > 0);
   const counts = {
     all: data.pillars.money + data.pillars.leave,
     ...data.pillars,
   };
+  return (
+    <Tabs
+      value={tab ?? 'all'}
+      onValueChange={(next) => {
+        onTab(APPROVAL_PILLARS.find((pillar) => pillar === next));
+      }}
+    >
+      <TabsList>
+        {(['all', ...APPROVAL_PILLARS] as const).map((value) => (
+          <TabsTrigger key={value} value={value}>
+            {TAB_LABELS[value]}
+            <Badge variant="secondary">{counts[value]}</Badge>
+          </TabsTrigger>
+        ))}
+      </TabsList>
+    </Tabs>
+  );
+}
+
+function Toolbar({
+  data,
+  tab,
+  campus,
+  campuses,
+  includeOthers,
+  onTab,
+  onCampus,
+  onIncludeOthers,
+}: {
+  data: ApprovalList;
+  tab: ApprovalsSearch['tab'];
+  campus: ApprovalsSearch['campus'];
+  campuses: readonly { id: string; name: string }[];
+  includeOthers: boolean;
+  onTab: (tab: ApprovalsSearch['tab']) => void;
+  onCampus: (campus: ApprovalsSearch['campus']) => void;
+  onIncludeOthers: (include: boolean) => void;
+}) {
+  const showTabs =
+    tab !== undefined || (data.pillars.money > 0 && data.pillars.leave > 0);
   const showOthers = data.othersCount > 0 || includeOthers;
-  if (!showTabs && !showOthers) {
+  if (!showTabs && !showOthers && campuses.length <= 1) {
     return null;
   }
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
-      {showTabs ? (
-        <Tabs
-          value={tab ?? 'all'}
-          onValueChange={(next) => {
-            onTab(APPROVAL_PILLARS.find((pillar) => pillar === next));
-          }}
-        >
-          <TabsList>
-            {(['all', ...APPROVAL_PILLARS] as const).map((value) => (
-              <TabsTrigger key={value} value={value}>
-                {TAB_LABELS[value]}
-                <Badge variant="secondary">{counts[value]}</Badge>
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
-      ) : (
-        <span />
-      )}
-      {showOthers ? (
-        <span className="flex items-center gap-2">
-          <Switch
-            id="include-others"
-            checked={includeOthers}
-            onCheckedChange={onIncludeOthers}
-          />
-          <Label htmlFor="include-others">
-            Include {data.othersCount} that others approve
-          </Label>
-        </span>
-      ) : null}
+      {showTabs ? <PillarTabs data={data} tab={tab} onTab={onTab} /> : <span />}
+      <div className="flex flex-wrap items-center gap-3">
+        <CampusSelect campuses={campuses} value={campus} onChange={onCampus} />
+        {showOthers ? (
+          <span className="flex items-center gap-2">
+            <Switch
+              id="include-others"
+              checked={includeOthers}
+              onCheckedChange={onIncludeOthers}
+            />
+            <Label htmlFor="include-others">
+              Include {data.othersCount} that others approve
+            </Label>
+          </span>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -222,6 +243,84 @@ function useDecisionTargets() {
   };
 }
 
+function useFilterPage(filter: string) {
+  const [paged, setPaged] = useState({ filter, page: 1 });
+  return [
+    paged.filter === filter ? paged.page : 1,
+    (page: number) => {
+      setPaged({ filter, page });
+    },
+  ] as const;
+}
+
+function useApprovalsQueue(
+  search: ApprovalsSearch,
+  onSearchChange: (next: ApprovalsSearch) => void
+) {
+  const api = useApi();
+  const [includeOthers, setIncludeOthers] = useState(false);
+  const [page, setPage] = useFilterPage(
+    `${search.tab ?? ''}|${search.campus ?? ''}|${includeOthers}`
+  );
+  const campuses = useQuery(campusesQueryOptions(api)).data ?? [];
+  const queue = useQuery(
+    approvalsQueryOptions(api, page, {
+      includeOthers,
+      pillar: search.tab,
+      campusId: search.campus,
+    })
+  );
+  const lastPage = Math.ceil((queue.data?.total ?? 0) / APPROVAL_PAGE_SIZE);
+  if (queue.data?.items.length === 0 && lastPage > 0 && page > lastPage) {
+    setPage(lastPage);
+  }
+  return {
+    page,
+    setPage,
+    includeOthers,
+    setIncludeOthers,
+    campuses,
+    queue,
+    pickTab: (tab: ApprovalsSearch['tab']) => {
+      setPage(1);
+      onSearchChange({ ...search, tab });
+    },
+    pickCampus: (campus: ApprovalsSearch['campus']) => {
+      setPage(1);
+      onSearchChange({ ...search, campus });
+    },
+  };
+}
+
+function CampusRecovery({
+  failed,
+  campuses,
+  value,
+  onChange,
+}: {
+  failed: boolean;
+  campuses: readonly { id: string; name: string }[];
+  value: ApprovalsSearch['campus'];
+  onChange: (campus: ApprovalsSearch['campus']) => void;
+}) {
+  if (!failed || value === undefined) {
+    return null;
+  }
+  return (
+    <div className="flex flex-wrap items-center gap-3">
+      <CampusSelect campuses={campuses} value={value} onChange={onChange} />
+      <Button
+        variant="outline"
+        onClick={() => {
+          onChange(undefined);
+        }}
+      >
+        Show all campuses
+      </Button>
+    </div>
+  );
+}
+
 function Queue({
   canAct,
   search,
@@ -231,42 +330,37 @@ function Queue({
   search: ApprovalsSearch;
   onSearchChange: (next: ApprovalsSearch) => void;
 }) {
-  const [page, setPage] = useState(1);
-  const [includeOthers, setIncludeOthers] = useState(false);
+  const view = useApprovalsQueue(search, onSearchChange);
   const targets = useDecisionTargets();
-  const queue = useQuery(
-    approvalsQueryOptions(useApi(), page, {
-      includeOthers,
-      pillar: search.tab,
-    })
-  );
-  const lastPage = Math.ceil((queue.data?.total ?? 0) / APPROVAL_PAGE_SIZE);
-  if (queue.data?.items.length === 0 && lastPage > 0 && page > lastPage) {
-    setPage(lastPage);
-  }
   return (
     <>
-      <QueryState query={queue} skeletonClassName="h-48">
+      <CampusRecovery
+        failed={view.queue.isError && view.queue.data === undefined}
+        campuses={view.campuses}
+        value={search.campus}
+        onChange={view.pickCampus}
+      />
+      <QueryState query={view.queue} skeletonClassName="h-48">
         {(data) => (
           <>
             <Toolbar
               data={data}
               tab={search.tab}
-              includeOthers={includeOthers}
-              onTab={(tab) => {
-                setPage(1);
-                onSearchChange({ tab });
-              }}
+              campus={search.campus}
+              campuses={view.campuses}
+              includeOthers={view.includeOthers}
+              onTab={view.pickTab}
+              onCampus={view.pickCampus}
               onIncludeOthers={(include) => {
-                setPage(1);
-                setIncludeOthers(include);
+                view.setPage(1);
+                view.setIncludeOthers(include);
               }}
             />
             <QueueTable
               data={data}
-              canAct={canAct}
-              page={page}
-              onPage={setPage}
+              canAct={canAct && !view.queue.isPlaceholderData}
+              page={view.page}
+              onPage={view.setPage}
               onApprove={targets.setApproving}
               onDecline={targets.setDeclining}
             />
@@ -276,7 +370,7 @@ function Queue({
       <DecisionDialogs
         approving={targets.approving}
         declining={targets.declining}
-        currency={queue.data?.currency ?? 'NGN'}
+        currency={view.queue.data?.currency ?? 'NGN'}
         onClose={targets.close}
       />
     </>

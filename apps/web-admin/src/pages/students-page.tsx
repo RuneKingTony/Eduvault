@@ -23,6 +23,7 @@ import {
   Alert,
   AlertDescription,
   Button,
+  CampusSelect,
   Empty,
   EmptyDescription,
   EmptyHeader,
@@ -236,26 +237,15 @@ function CampusFilter({
   search: StudentsSearch;
   onChange: Patch;
 }) {
-  const api = useApi();
-  const campuses = useQuery(campusesQueryOptions(api));
-  if ((campuses.data ?? []).length <= 1) {
-    return null;
-  }
+  const campuses = useQuery(campusesQueryOptions(useApi()));
   return (
-    <NativeSelect
-      aria-label="Campus"
-      value={search.campusId ?? ALL}
-      onChange={(event) => {
-        onChange({ campusId: event.target.value || undefined });
+    <CampusSelect
+      campuses={campuses.data ?? []}
+      value={search.campusId}
+      onChange={(campusId) => {
+        onChange({ campusId });
       }}
-    >
-      <NativeSelectOption value={ALL}>All campuses</NativeSelectOption>
-      {(campuses.data ?? []).map((campus) => (
-        <NativeSelectOption key={campus.id} value={campus.id}>
-          {campus.name}
-        </NativeSelectOption>
-      ))}
-    </NativeSelect>
+    />
   );
 }
 
