@@ -1,6 +1,5 @@
-import { parsePage } from './search-page';
 import { STUDENT_TABS, type StudentTab } from '@eduvault/api-contract';
-import { textOf } from '@eduvault/shared';
+import { pageOf, textOf } from '@eduvault/shared';
 
 export interface StudentsSearch {
   tab?: StudentTab;
@@ -24,7 +23,7 @@ export function parseStudentsSearch(
     q: textOf(search['q']),
     campusId: textOf(search['campusId']),
     levelId: textOf(search['levelId']),
-    page: parsePage(search),
+    page: pageOf(search['page']),
     admit: textOf(search['admit']) === '1' ? 1 : undefined,
     dialog: search['dialog'] === 'start-year' ? 'start-year' : undefined,
   };

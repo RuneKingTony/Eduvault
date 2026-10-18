@@ -1,4 +1,4 @@
-import { parsePage } from './search-page';
+import { pageOf } from '@eduvault/shared';
 
 interface CalendarSearch {
   page?: number;
@@ -10,7 +10,7 @@ export function parseCalendarSearch(
   search: Record<string, unknown>
 ): CalendarSearch {
   return {
-    page: parsePage(search),
+    page: pageOf(search['page']),
     dialog: search['dialog'] === 'new-year' ? 'new-year' : undefined,
   };
 }
