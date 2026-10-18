@@ -10,8 +10,10 @@ import {
   placeStudentSchema,
   startNewSchoolYearSchema,
   studentCountsSchema,
+  studentDetailSchema,
   studentListQuerySchema,
   studentListSchema,
+  studentRowSchema,
   updateStudentSchema,
 } from './students';
 
@@ -326,5 +328,77 @@ describe('startNewSchoolYearSchema', () => {
         rows: [{ studentId: id, outcome: 'graduate' }],
       }).success
     ).toBe(true);
+  });
+});
+
+describe('student finance fields', () => {
+  const row = {
+    id,
+    firstName: 'Ada',
+    lastName: 'Eze',
+    admissionNumber: 'ADM-1',
+    life: 'active',
+    dueLeft: false,
+    isNewIntake: true,
+    notSeenSince: null,
+    notSeenBy: null,
+    weeksAway: null,
+    currentPlacement: null,
+    latestClassName: null,
+    effectiveCampus: { id, name: 'Lekki' },
+    admittedOn: '2026-09-01',
+    exit: null,
+    graduatedSessionName: null,
+  };
+  const detail = {
+    ...row,
+    gender: 'F',
+    dateOfBirth: '2014-03-03',
+    homeCampus: { id, name: 'Lekki' },
+    portalLogin: null,
+    notSeenNote: null,
+    archivedBy: null,
+    history: [],
+    nextTerm: null,
+    canMoveForNextTerm: false,
+    canUndoLeaving: false,
+  };
+  const finance = {
+    balanceMinor: -5000,
+    chargedThisTermMinor: null,
+    paidThisTermMinor: 120_000,
+  };
+  const counts = { active: 1, new: 1, inactive: 0, left: 0, graduated: 0 };
+
+  it('parses a row with and without the finance fields', () => {
+    expect(studentRowSchema.parse(row)).not.toHaveProperty('balanceMinor');
+    expect(studentRowSchema.parse({ ...row, ...finance })).toMatchObject(
+      finance
+    );
+  });
+
+  it('refuses a fractional balance', () => {
+    expect(
+      studentRowSchema.safeParse({ ...row, balanceMinor: 1.5 }).success
+    ).toBe(false);
+  });
+
+  it('parses a list with and without the currency', () => {
+    const list = { items: [row], total: 1, counts, startYear: null };
+    expect(studentListSchema.parse(list)).not.toHaveProperty('currency');
+    expect(
+      studentListSchema.parse({
+        ...list,
+        items: [{ ...row, ...finance }],
+        currency: 'ngn',
+      }).currency
+    ).toBe('NGN');
+  });
+
+  it('parses a detail with and without the finance fields and currency', () => {
+    expect(studentDetailSchema.parse(detail)).not.toHaveProperty('currency');
+    expect(
+      studentDetailSchema.parse({ ...detail, ...finance, currency: 'NGN' })
+    ).toMatchObject({ ...finance, currency: 'NGN' });
   });
 });

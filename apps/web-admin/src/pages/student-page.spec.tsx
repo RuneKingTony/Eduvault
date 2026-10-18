@@ -967,3 +967,36 @@ describe('StudentPage reset login', () => {
     expect(screen.queryByText('Logins created')).not.toBeInTheDocument();
   });
 });
+
+describe('StudentPage Statement button', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it.each(['invoice:read', 'payment:read'] as const)(
+    'shows the header link to the statement and the Fees tab with %s',
+    async (permission) => {
+      setup({ access: accessWith('student:read', permission) });
+      const link = await screen.findByRole('link', { name: 'Statement' });
+      expect(link).toHaveAttribute('href', `/finance/accounts/${STUDENT_ID}`);
+      expect(screen.getByRole('tab', { name: 'Fees' })).toBeInTheDocument();
+    }
+  );
+
+  it('shows neither the button nor the money tiles without finance read', async () => {
+    setup({ access: accessWith('student:read', 'feeLine:read') });
+    await screen.findByText('Admission no.');
+    expect(
+      screen.queryByRole('link', { name: 'Statement' })
+    ).not.toBeInTheDocument();
+    await openFees();
+    expect(screen.queryByText('Owing')).not.toBeInTheDocument();
+  });
+
+  it('keeps the button for a read-only acting super admin', async () => {
+    setup({ access: actingAccess(false) });
+    expect(
+      await screen.findByRole('link', { name: 'Statement' })
+    ).toBeInTheDocument();
+  });
+});

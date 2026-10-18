@@ -1,8 +1,16 @@
 import { Client, type Pool } from 'pg';
 import { vi } from 'vitest';
+import type { StudentStatement } from '@eduvault/api-contract';
 import { StudentService } from '../src/app/modules/student/student.service';
-import { expect } from './support/base-test';
+import { expect, type Fixtures, type TestUser } from './support/base-test';
+import {
+  TUITION_MINOR,
+  chargeFixture,
+  prepare,
+  sendRun,
+} from './support/factories/billing';
 import { orgContextFor } from './support/factories/org-context';
+import { bankAccount, owes, recordCash } from './support/factories/payments';
 import { assignClassTeacher } from './support/factories/classes';
 import { createStudent, ensureClass } from './support/factories/students';
 import { schoolsTest } from './support/two-schools';
@@ -635,5 +643,168 @@ test.describe('student detail', () => {
     expect(await portalName(studentIkeja.id)).toBe(
       `${studentIkeja.firstName} ${studentIkeja.lastName}`
     );
+  });
+});
+
+test.describe('students money fields', () => {
+  const OPENING = 4_000_000;
+  const PAID = 10_000_000;
+  const FINANCE_FIELDS = [
+    'balanceMinor',
+    'chargedThisTermMinor',
+    'paidThisTermMinor',
+  ] as const;
+
+  const chargeAndPay = async ({
+    api,
+    app,
+    owner,
+    clock,
+    studentId,
+  }: {
+    api: Fixtures['api'];
+    app: Fixtures['app'];
+    owner: TestUser;
+    clock: { today: () => string };
+    studentId: string;
+  }) => {
+    const fixture = await chargeFixture(app, api, owner);
+    await owes(app, owner, { studentId, amountMinor: OPENING });
+    const { runId } = await prepare(api, owner, {
+      termId: fixture.firstTermId,
+      scope: 'school',
+    });
+    await sendRun(api, owner, runId ?? '');
+    const account = await bankAccount(app, owner);
+    await recordCash(api, owner, {
+      accountId: account.id,
+      paidOn: clock.today(),
+      allocations: [{ studentId, amountMinor: PAID }],
+    });
+  };
+
+  test('gives a finance reader the balance, this term’s charges and payments and the currency', async ({
+    api,
+    app,
+    clock,
+    schools: { owner, studentLekki },
+  }) => {
+    await chargeAndPay({
+      api,
+      app,
+      owner,
+      clock,
+      studentId: studentLekki.id,
+    });
+
+    const statement = (
+      await api(owner)
+        .get(`/finance/students/${studentLekki.id}/statement`)
+        .expect(200)
+    ).body as StudentStatement;
+    const list = await api(owner).get('/students?tab=new').expect(200);
+    const detail = await api(owner)
+      .get(`/students/${studentLekki.id}`)
+      .expect(200);
+    const row = (list.body.items as Row[]).find(
+      (item) => item.id === studentLekki.id
+    );
+
+    const expected = {
+      balanceMinor: statement.totals.balanceMinor,
+      chargedThisTermMinor: TUITION_MINOR,
+      paidThisTermMinor: PAID,
+    };
+    expect(statement.totals.balanceMinor).toBe(OPENING + TUITION_MINOR - PAID);
+    expect(row).toMatchObject(expected);
+    expect(detail.body).toMatchObject(expected);
+    expect(list.body.currency).toBe(statement.currency);
+    expect(detail.body.currency).toBe(statement.currency);
+  });
+
+  test('shows a student with no payments a zero paid figure and the whole charge', async ({
+    api,
+    app,
+    clock,
+    schools: { owner, studentLekki, studentIkeja },
+  }) => {
+    await chargeAndPay({
+      api,
+      app,
+      owner,
+      clock,
+      studentId: studentLekki.id,
+    });
+
+    const list = await api(owner).get('/students?tab=new').expect(200);
+    const row = (list.body.items as Row[]).find(
+      (item) => item.id === studentIkeja.id
+    );
+
+    expect(row).toMatchObject({
+      balanceMinor: TUITION_MINOR,
+      chargedThisTermMinor: TUITION_MINOR,
+      paidThisTermMinor: 0,
+    });
+  });
+
+  test('reads the same fields with payment:read alone', async ({
+    api,
+    withPermissions,
+    schools: { orgA, lekki, studentLekki },
+  }) => {
+    const reader = await withPermissions(
+      orgA,
+      ['student:read', 'payment:read'],
+      {
+        campuses: [lekki],
+      }
+    );
+
+    const list = await api(reader).get('/students').expect(200);
+    const detail = await api(reader)
+      .get(`/students/${studentLekki.id}`)
+      .expect(200);
+
+    expect(list.body.currency).toBeDefined();
+    expect(list.body.items[0]).toMatchObject({ balanceMinor: 0 });
+    expect(detail.body).toMatchObject({ balanceMinor: 0 });
+    expect(detail.body.currency).toBeDefined();
+  });
+
+  test('leaves the money fields and the currency out for a teacher', async ({
+    api,
+    app,
+    clock,
+    addMember,
+    createUser,
+    schools: { owner, orgA, lekki, studentLekki },
+  }) => {
+    await chargeAndPay({
+      api,
+      app,
+      owner,
+      clock,
+      studentId: studentLekki.id,
+    });
+    const mine = await ensureClass(app, owner, lekki.id);
+    const teacher = await addMember(orgA, await createUser(), {
+      roles: ['teacher'],
+      campuses: [lekki],
+    });
+    await assignClassTeacher(app, owner, { classId: mine, userId: teacher.id });
+
+    const list = await api(teacher).get('/students').expect(200);
+    const detail = await api(teacher)
+      .get(`/students/${studentLekki.id}`)
+      .expect(200);
+
+    expect(list.body.items).toHaveLength(1);
+    expect(list.body).not.toHaveProperty('currency');
+    expect(detail.body).not.toHaveProperty('currency');
+    for (const field of FINANCE_FIELDS) {
+      expect(list.body.items[0]).not.toHaveProperty(field);
+      expect(detail.body).not.toHaveProperty(field);
+    }
   });
 });

@@ -1,7 +1,7 @@
 import { Fragment, type ReactNode } from 'react';
 import { ChevronDownIcon, ChevronRightIcon, UserXIcon } from 'lucide-react';
 import type { StudentRow, StudentTab } from '@eduvault/api-contract';
-import { fmtDate } from '@eduvault/shared';
+import { fmtDate, money } from '@eduvault/shared';
 import {
   Button,
   Table,
@@ -13,12 +13,15 @@ import {
 } from '@eduvault/ui';
 import type { GuardianAction, StudentRef } from './guardian-actions';
 import { GuardianPanel } from './guardian-lines';
+import { BalanceBadge } from './payments/balance-badge';
 import { StatusBadges, StudentNameCell, nameOf } from './student-bits';
 
 interface ColumnFlags {
   guardianRead: boolean;
   campusColumn: boolean;
   canArchive: boolean;
+  financeRead: boolean;
+  currency: string | undefined;
 }
 
 interface RowActions {
@@ -89,6 +92,42 @@ function reason(row: StudentRow): ReactNode {
   );
 }
 
+const balanceColumn = (
+  id: string,
+  header: string,
+  currency: string
+): Column => ({
+  id,
+  header,
+  cell: (row) =>
+    row.balanceMinor === undefined ? (
+      '—'
+    ) : (
+      <BalanceBadge balanceMinor={row.balanceMinor} currency={currency} />
+    ),
+});
+
+const termMoneyColumn = (
+  field: 'chargedThisTermMinor' | 'paidThisTermMinor',
+  header: string,
+  currency: string
+): Column => ({
+  id: field,
+  header,
+  cell: (row) => {
+    const minor = row[field];
+    return minor === undefined || minor === null ? '—' : money(minor, currency);
+  },
+});
+
+const financeColumns = (
+  flags: ColumnFlags,
+  build: (currency: string) => Column[]
+): Column[] =>
+  flags.financeRead && flags.currency !== undefined
+    ? build(flags.currency)
+    : [];
+
 const recordLeaving: Column = {
   id: 'record-leaving',
   header: '',
@@ -115,6 +154,9 @@ const TAB_COLUMNS: Record<StudentTab, (flags: ColumnFlags) => Column[]> = {
     { id: 'class', header: 'Class', cell: currentClass },
     ...(flags.campusColumn ? [campus] : []),
     ...(flags.guardianRead ? [paysFees] : []),
+    ...financeColumns(flags, (currency) => [
+      balanceColumn('school-fees', 'School fees', currency),
+    ]),
     status,
   ],
   new: (flags) => [
@@ -125,6 +167,11 @@ const TAB_COLUMNS: Record<StudentTab, (flags: ColumnFlags) => Column[]> = {
       header: 'Admitted',
       cell: (row) => fmtDate(row.admittedOn),
     },
+    ...financeColumns(flags, (currency) => [
+      termMoneyColumn('chargedThisTermMinor', 'Charged this term', currency),
+      termMoneyColumn('paidThisTermMinor', 'Paid this term', currency),
+      balanceColumn('still-owes', 'Still owes', currency),
+    ]),
   ],
   inactive: (flags) => [
     { id: 'class', header: 'Class', cell: latestClass },
@@ -132,6 +179,9 @@ const TAB_COLUMNS: Record<StudentTab, (flags: ColumnFlags) => Column[]> = {
     { id: 'not-seen', header: 'Not seen since', cell: notSeen },
     { id: 'weeks', header: 'Weeks away', cell: (row) => row.weeksAway ?? '—' },
     status,
+    ...financeColumns(flags, (currency) => [
+      balanceColumn('owes', 'Owes', currency),
+    ]),
     ...(flags.canArchive ? [recordLeaving] : []),
   ],
   left: (flags) => [
@@ -139,6 +189,9 @@ const TAB_COLUMNS: Record<StudentTab, (flags: ColumnFlags) => Column[]> = {
     ...(flags.campusColumn ? [campus] : []),
     { id: 'left-on', header: 'Left on', cell: (row) => fmtDate(row.exit?.on) },
     { id: 'reason', header: 'Reason', cell: reason },
+    ...financeColumns(flags, (currency) => [
+      balanceColumn('still-owes', 'Still owes', currency),
+    ]),
   ],
   graduated: (flags) => [
     { id: 'class', header: 'Final class', cell: latestClass },
@@ -153,6 +206,9 @@ const TAB_COLUMNS: Record<StudentTab, (flags: ColumnFlags) => Column[]> = {
       header: 'School year',
       cell: (row) => row.graduatedSessionName ?? '—',
     },
+    ...financeColumns(flags, (currency) => [
+      balanceColumn('still-owes', 'Still owes', currency),
+    ]),
   ],
 };
 

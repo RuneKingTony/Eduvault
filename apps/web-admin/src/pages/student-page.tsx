@@ -72,6 +72,7 @@ import {
   ResetStudentLoginDialog,
 } from '../components/student-detail-dialogs';
 import { StudentMenu, useMenuItems } from '../components/student-menu';
+import { StatementButton } from '../components/student-statement-button';
 import { studentQueryOptions } from '../queries';
 
 interface StudentPageProps {
@@ -390,7 +391,10 @@ function StudentHeader({
             {student.admissionNumber} · {where}
           </p>
         </div>
-        {actions}
+        <div className="flex flex-wrap items-center gap-2">
+          <StatementButton studentId={student.id} />
+          {actions}
+        </div>
       </header>
     </>
   );

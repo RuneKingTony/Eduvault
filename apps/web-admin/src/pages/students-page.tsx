@@ -17,7 +17,8 @@ import {
   type StudentList,
   type StudentTab,
 } from '@eduvault/api-contract';
-import { useCan, usePermissions } from '@eduvault/auth-client';
+import { useCan, useCanAny, usePermissions } from '@eduvault/auth-client';
+import { FINANCE_READ_GATE } from '@eduvault/policy';
 import {
   Alert,
   AlertDescription,
@@ -377,14 +378,17 @@ function LoadingRows() {
   );
 }
 
-function useColumnFlags() {
+function useColumnFlags(currency: string | undefined) {
   const api = useApi();
   const guardianRead = useCan('guardian', 'read');
   const canArchive = useCan('student', 'archive');
+  const financeRead = useCanAny(FINANCE_READ_GATE);
   const campuses = useQuery(campusesQueryOptions(api));
   return {
     guardianRead,
     canArchive,
+    financeRead,
+    currency,
     campusColumn: (campuses.data ?? []).length > 1,
   };
 }
@@ -401,7 +405,7 @@ function StudentsTableArea({
   const api = useApi();
   const { search, onSearchChange } = props;
   const list = useQuery(studentsQueryOptions(api, search));
-  const flags = useColumnFlags();
+  const flags = useColumnFlags(list.data?.currency);
   const year = useCurrentYear();
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
   const toggle = (id: string) => {

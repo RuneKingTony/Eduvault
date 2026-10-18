@@ -11,6 +11,12 @@ import {
 } from '@eduvault/api-contract';
 import { Clock, schoolToday } from '../../common/clock';
 import { KYSELY_TOKEN, type Database } from '../../common/db/tokens';
+import { invoiceTotalSql } from '../../common/fees';
+import { receivableBalanceSql } from '../../common/ledger';
+import {
+  currentTermWindowCte,
+  termPaymentPredicate,
+} from '../../common/payments';
 import { visibleStudentsCte } from '../../common/students';
 import { exitReasonLabel } from './exit-reasons';
 import {
@@ -22,6 +28,7 @@ import {
 } from './lifecycle';
 import {
   StudentRepository,
+  type StudentDetailTarget,
   type StudentListParams,
   type StudentListResult,
 } from './student.repository';
@@ -58,6 +65,10 @@ interface RowFacts {
   latest_class_name: string | null;
   latest_level_name: string | null;
   payers: string[] | null;
+  balance_minor: string | null;
+  charged_minor: string | null;
+  paid_minor: string | null;
+  currency: string | null;
 }
 
 interface CountsRow {
@@ -135,7 +146,50 @@ const countsCte = sql`
     FROM visible
   )`;
 
-const rowsCte = (withGuardians: boolean): RawBuilder<unknown> => sql`
+const financeLateral = (withFinance: boolean): RawBuilder<unknown> => {
+  const enabled = withFinance ? sql`TRUE` : sql`FALSE`;
+  return sql`
+    LEFT JOIN LATERAL (
+      SELECT
+        ${receivableBalanceSql('page')}::text AS balance_minor,
+        CASE WHEN tw.term_id IS NULL THEN NULL ELSE (
+          SELECT COALESCE(sum(${invoiceTotalSql('i')}), 0)::text
+          FROM invoice i
+          WHERE i.organization_id = page.organization_id
+            AND i.student_id = page.id
+            AND i.term_id = tw.term_id
+            AND i.kind = 'term' AND i.status = 'issued'
+        ) END AS charged_minor,
+        CASE WHEN tw.term_id IS NULL THEN NULL ELSE (
+          SELECT COALESCE(sum(pa.amount_minor), 0)::text
+          FROM payment_allocation pa
+          JOIN payment p ON p.id = pa.payment_id AND p.organization_id = pa.organization_id
+          WHERE pa.organization_id = page.organization_id
+            AND pa.student_id = page.id
+            AND ${termPaymentPredicate(sql`tw.since_day`, sql`tw.ends_on`)}
+        ) END AS paid_minor
+      FROM (SELECT 1) one
+      LEFT JOIN term_window tw ON TRUE
+    ) fin ON ${enabled}`;
+};
+
+const currencySql = (
+  organizationId: string,
+  withFinance: boolean
+): RawBuilder<string | null> =>
+  withFinance
+    ? sql<string>`(SELECT sa.currency FROM school_account sa WHERE sa.organization_id = ${organizationId})`
+    : sql<null>`NULL::text`;
+
+interface RowsOptions {
+  withGuardians: boolean;
+  withFinance: boolean;
+}
+
+const rowsCte = ({
+  withGuardians,
+  withFinance,
+}: RowsOptions): RawBuilder<unknown> => sql`
   page_rows AS (
     SELECT
       page.*,
@@ -147,7 +201,10 @@ const rowsCte = (withGuardians: boolean): RawBuilder<unknown> => sql`
       grad.name AS graduated_session_name,
       latest.class_name AS latest_class_name,
       latest.level_name AS latest_level_name,
-      payer.payers
+      payer.payers,
+      fin.balance_minor,
+      fin.charged_minor,
+      fin.paid_minor
     FROM page
     JOIN team home ON home.id = page.home_campus_id
     JOIN team campus ON campus.id = page.campus_id
@@ -185,6 +242,7 @@ const rowsCte = (withGuardians: boolean): RawBuilder<unknown> => sql`
       JOIN guardian g ON g.id = gs.guardian_id AND g.organization_id = gs.organization_id
       WHERE gs.student_id = page.id AND gs.pays_fees
     ) payer ON ${withGuardians ? sql`TRUE` : sql`FALSE`}
+    ${financeLateral(withFinance)}
   )`;
 
 interface ListInput {
@@ -198,6 +256,7 @@ function listStatement({ organizationId, scope, params, today }: ListInput) {
   const offset = (params.page - 1) * params.pageSize;
   return sql<ListRow>`
     WITH ${visibleStudentsCte({ organizationId, ...scope, today })},
+    ${currentTermWindowCte(organizationId)},
     filtered AS (SELECT visible.* FROM visible WHERE ${filterPredicate(params)}),
     ${countsCte},
     page AS (
@@ -206,26 +265,32 @@ function listStatement({ organizationId, scope, params, today }: ListInput) {
       ORDER BY ${TAB_ORDERS[params.tab]}
       LIMIT ${params.pageSize} OFFSET ${offset}
     ),
-    ${rowsCte(params.withGuardians)}
-    SELECT counts.*, page_rows.*
+    ${rowsCte(params)}
+    SELECT counts.*, page_rows.*, ${currencySql(organizationId, params.withFinance)} AS currency
     FROM counts
     LEFT JOIN page_rows ON TRUE
     ORDER BY page_rows.position NULLS LAST`;
 }
 
-interface DetailInput {
+interface DetailInput extends StudentDetailTarget {
   organizationId: string;
   scope: StudentVisibility;
-  id: string;
   today: string;
 }
 
-function detailStatement({ organizationId, scope, id, today }: DetailInput) {
+function detailStatement({
+  organizationId,
+  scope,
+  id,
+  withFinance,
+  today,
+}: DetailInput) {
   return sql<RowFacts>`
     WITH ${visibleStudentsCte({ organizationId, ...scope, today, studentId: id })},
+    ${currentTermWindowCte(organizationId)},
     page AS (SELECT visible.*, 1 AS position FROM visible),
-    ${rowsCte(false)}
-    SELECT page_rows.* FROM page_rows`;
+    ${rowsCte({ withGuardians: false, withFinance })}
+    SELECT page_rows.*, ${currencySql(organizationId, withFinance)} AS currency FROM page_rows`;
 }
 
 function toStudentRow(row: RowFacts, today: string): StudentRow {
@@ -264,6 +329,29 @@ function toStudentRow(row: RowFacts, today: string): StudentRow {
     exit: toExit(row),
     graduatedSessionName: row.graduated_session_name,
     ...(row.payers === null ? {} : { payers: row.payers }),
+    ...toFinance(row),
+  };
+}
+
+const toCurrency = (row: { currency: string | null }) =>
+  row.currency === null ? {} : { currency: row.currency };
+
+const minorOrNull = (value: string | null): number | null =>
+  value === null ? null : Number(value);
+
+function toFinance(
+  row: RowFacts
+): Pick<
+  StudentRow,
+  'balanceMinor' | 'chargedThisTermMinor' | 'paidThisTermMinor'
+> {
+  if (row.balance_minor === null) {
+    return {};
+  }
+  return {
+    balanceMinor: Number(row.balance_minor),
+    chargedThisTermMinor: minorOrNull(row.charged_minor),
+    paidThisTermMinor: minorOrNull(row.paid_minor),
   };
 }
 
@@ -381,19 +469,21 @@ export class KyselyStudentRepository extends StudentRepository {
         .map((row) => toStudentRow(row, today)),
       total: first.total,
       counts: toCounts(first),
+      ...toCurrency(first),
     };
   }
 
   async findDetail(
     organizationId: string,
     scope: StudentVisibility,
-    id: string
+    { id, withFinance }: StudentDetailTarget
   ): Promise<StudentDetail | undefined> {
     const today = schoolToday({ organizationId }, this.clock);
     const { rows } = await detailStatement({
       organizationId,
       scope,
       id,
+      withFinance,
       today,
     }).execute(this.db);
     const [row] = rows;
@@ -418,6 +508,7 @@ export class KyselyStudentRepository extends StudentRepository {
           : { id: row.archived_by, name: row.archived_by_name ?? '' },
       history,
       ...toTermAbilities(row, term),
+      ...toCurrency(row),
     };
   }
 
