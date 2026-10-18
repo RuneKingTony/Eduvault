@@ -9,6 +9,9 @@ const access = (...permissions: Permission[]) => {
   return { pillars, foundationSubjects };
 };
 
+const finance = (...permissions: Permission[]) =>
+  activityAccess(toPermissionMap(permissions), 'viewer');
+
 describe('activityAccess', () => {
   it('shows platform rows only to a member with no permission', () => {
     expect(access()).toEqual({ pillars: ['platform'], foundationSubjects: [] });
@@ -46,16 +49,62 @@ describe('activityAccess', () => {
     });
   });
 
-  it('never opens finance, whatever the member holds', () => {
-    const everything = access(
+  it('opens round rows with invoice:read alone', () => {
+    expect(finance('invoice:read').pillars).toEqual(['platform', 'finance']);
+    expect(finance('invoice:read').financeSubjects).toEqual(['billing_run']);
+  });
+
+  it('opens payment and cancellation rows with payment:read alone', () => {
+    expect(finance('payment:read').pillars).toEqual(['platform', 'finance']);
+    expect(finance('payment:read').financeSubjects).toEqual([
+      'payment',
+      'payment_void',
+    ]);
+  });
+
+  it('opens adjustment and discount rows with adjustment:read alone', () => {
+    expect(finance('adjustment:read').pillars).toEqual(['platform', 'finance']);
+    expect(finance('adjustment:read').financeSubjects).toEqual([
+      'adjustment',
+      'student_discount',
+    ]);
+  });
+
+  it('opens every finance subject with all three read permissions', () => {
+    expect(
+      finance('invoice:read', 'payment:read', 'adjustment:read').financeSubjects
+    ).toEqual([
+      'payment',
+      'payment_void',
+      'billing_run',
+      'adjustment',
+      'student_discount',
+    ]);
+  });
+
+  it('keeps finance closed for finance permissions that read none of its records', () => {
+    const closed = access(
+      'feeLine:read',
+      'schoolAccount:read',
+      'adjustment:create',
       'student:read',
       'session:read',
-      'member:read',
-      'feeLine:read',
-      'schoolAccount:read'
+      'member:read'
     );
-    expect(everything.pillars).not.toContain('finance');
-    expect(everything.foundationSubjects).toEqual(['student', 'school_year']);
+    expect(closed.pillars).not.toContain('finance');
+    expect(closed.foundationSubjects).toEqual(['student', 'school_year']);
+  });
+
+  it('keeps finance closed for teacher-style permissions', () => {
+    expect(
+      access('class:read', 'guardian:read', 'subject:read').pillars
+    ).not.toContain('finance');
+  });
+
+  it('keeps finance closed for the own-record finance permissions', () => {
+    expect(access('invoice:readOwn', 'payment:readOwn').pillars).not.toContain(
+      'finance'
+    );
   });
 
   it('hides foundation rows of other subjects', () => {

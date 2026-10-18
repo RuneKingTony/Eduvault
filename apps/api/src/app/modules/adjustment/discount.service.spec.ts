@@ -76,8 +76,8 @@ const rejected = async (work: Promise<unknown>) => {
 const messageOf = (error: unknown) => (error as BadRequestException).message;
 
 describe('DiscountService.create', () => {
-  it('saves a waiting discount from a later term', async () => {
-    const { service } = setup();
+  it('saves a waiting discount from a later term, with no activity row', async () => {
+    const { repo, service } = setup();
     const result = await service.create(chika, scholarship());
     expect(result.autoApproved).toBe(false);
     expect(result.discount).toMatchObject({
@@ -88,6 +88,7 @@ describe('DiscountService.create', () => {
       fromTerm: { id: 't2' },
       toTerm: null,
     });
+    expect(repo.recorded).toEqual([]);
   });
 
   it('takes the current term, a fixed amount on the whole charge and an Until', async () => {
@@ -176,25 +177,92 @@ describe('DiscountService.create', () => {
       status: 'approved',
       approvedBy: null,
     });
+    expect(repo.recorded).toEqual([
+      {
+        organizationId: 'school-a',
+        campusId: 'lekki',
+        pillar: 'finance',
+        kind: 'discount.approved',
+        actorUserId: 'chika',
+        subjectType: 'student_discount',
+        subjectId: result.discount.id,
+        text: 'Discount for Halima Bello (50%) applied by chika.',
+        data: {
+          discountId: result.discount.id,
+          studentId: HALIMA,
+          discountKind: 'percent',
+          value: 50,
+          autoApproved: true,
+        },
+      },
+    ]);
   });
 });
 
 describe('DiscountService.approve and decline', () => {
-  it('approves a waiting discount, naming the approver', async () => {
-    const { service } = setup();
+  it('approves a waiting discount, naming the approver, and records one row', async () => {
+    const { repo, service } = setup();
     const { discount } = await service.create(chika, scholarship());
     expect(await service.approve(grace, discount.id)).toMatchObject({
       status: 'approved',
       approvedBy: 'grace',
     });
+    expect(repo.recorded).toEqual([
+      {
+        organizationId: 'school-a',
+        campusId: 'lekki',
+        pillar: 'finance',
+        kind: 'discount.approved',
+        actorUserId: 'grace',
+        subjectType: 'student_discount',
+        subjectId: discount.id,
+        text: 'Discount for Halima Bello (50%) approved by grace.',
+        data: {
+          discountId: discount.id,
+          studentId: HALIMA,
+          discountKind: 'percent',
+          value: 50,
+          autoApproved: false,
+        },
+      },
+    ]);
   });
 
-  it('declines with a reason and keeps it', async () => {
-    const { service } = setup();
+  it('declines with a reason, keeps it and records one row', async () => {
+    const { repo, service } = setup();
     const { discount } = await service.create(chika, scholarship());
     expect(
       await service.decline(grace, discount.id, ' Not agreed ')
     ).toMatchObject({ status: 'rejected', rejectionReason: 'Not agreed' });
+    expect(repo.recorded).toEqual([
+      {
+        organizationId: 'school-a',
+        campusId: 'lekki',
+        pillar: 'finance',
+        kind: 'discount.declined',
+        actorUserId: 'grace',
+        subjectType: 'student_discount',
+        subjectId: discount.id,
+        text: 'Discount for Halima Bello was declined by grace.',
+        data: {
+          discountId: discount.id,
+          studentId: HALIMA,
+          discountKind: 'percent',
+          value: 50,
+        },
+      },
+    ]);
+  });
+
+  it('records nothing for a second decision or a self-approval', async () => {
+    const { repo, service } = setup();
+    const { discount } = await service.create(chika, scholarship());
+    await rejected(service.approve(chika, discount.id));
+    await service.approve(grace, discount.id);
+    repo.recorded = [];
+    await rejected(service.approve(as('yemi'), discount.id));
+    await rejected(service.decline(as('yemi'), discount.id, 'No'));
+    expect(repo.recorded).toEqual([]);
   });
 
   it('refuses a blank decline reason with 400', async () => {

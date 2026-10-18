@@ -27,7 +27,7 @@ import {
   PaymentRepository,
   type ExistingPayment,
   type InsertOutcome,
-  type NewPayment,
+  type NewRecordedPayment,
   type PaymentPage,
   type PaymentScope,
   type RecordingAccount,
@@ -101,8 +101,12 @@ class FakePayments extends PaymentRepository {
   proofState: ProofState = 'free';
   proofUploaders: string[] = [];
   providerPayment: ExistingPayment | undefined;
-  outcome: InsertOutcome = { status: 'recorded', id: 'payment-1' };
-  inserted: NewPayment[] = [];
+  outcome: InsertOutcome = {
+    status: 'recorded',
+    id: 'payment-1',
+    receiptNumber: 'RCT-1',
+  };
+  inserted: NewRecordedPayment[] = [];
 
   currency() {
     return Promise.resolve('NGN');
@@ -150,7 +154,7 @@ class FakePayments extends PaymentRepository {
     return Promise.resolve(this.providerPayment);
   }
 
-  insert(input: NewPayment) {
+  insert(input: NewRecordedPayment) {
     this.inserted.push(input);
     return Promise.resolve(this.outcome);
   }
@@ -242,6 +246,17 @@ describe('PaymentService.record', () => {
     await expect(service.record(ctx, body)).resolves.toMatchObject({
       replayed: true,
     });
+    expect(payments.inserted).toHaveLength(1);
+  });
+
+  it('hands the recorder’s name to the repository for the activity row', async () => {
+    const { payments, service } = setup();
+
+    await service.record(ctx, body);
+
+    expect(payments.inserted.map((row) => row.userName)).toEqual([
+      ctx.user.name,
+    ]);
   });
 });
 

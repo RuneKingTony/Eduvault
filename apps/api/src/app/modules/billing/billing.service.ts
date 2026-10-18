@@ -126,6 +126,7 @@ export class BillingService {
       scope: scopeOf(ctx),
       runId: id,
       userId: ctx.user.id,
+      userName: ctx.user.name,
       ...this.plans.stamp(ctx),
     });
     assertDone(outcome, {

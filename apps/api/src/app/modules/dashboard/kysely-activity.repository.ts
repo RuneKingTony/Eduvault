@@ -60,13 +60,19 @@ const rowAccess = (
 ): RawBuilder<boolean> => {
   const pillars = sql.join(
     access.pillars
-      .filter((pillar) => pillar !== 'foundation')
+      .filter((pillar) => pillar !== 'foundation' && pillar !== 'finance')
       .map((pillar) => sql`${pillar}`)
   );
   const parts = [
     sql<boolean>`e.pillar IN (${pillars})`,
     leaveRow(access, scope),
   ];
+  if (access.financeSubjects.length > 0) {
+    parts.push(sql<boolean>`(
+      e.pillar = 'finance'
+      AND e.subject_type IN (${sql.join(access.financeSubjects)})
+    )`);
+  }
   if (access.foundationSubjects.includes('school_year')) {
     parts.push(
       sql<boolean>`(e.pillar = 'foundation' AND e.subject_type = 'school_year')`

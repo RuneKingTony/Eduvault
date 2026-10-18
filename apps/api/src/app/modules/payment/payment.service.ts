@@ -119,6 +119,7 @@ export class PaymentService {
       ...checked,
       organizationId: ctx.organizationId,
       userId: ctx.user.id,
+      userName: ctx.user.name,
       year: documentYear(this.clock),
       reference: input.reference,
       requestHash,

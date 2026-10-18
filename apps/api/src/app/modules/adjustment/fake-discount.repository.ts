@@ -1,10 +1,13 @@
 import type { StudentDiscountListQuery } from '@eduvault/api-contract';
+import type { ActivityInput } from '../../common/activity';
 import type { WaitingApproval } from '../../common/approvals';
 import type { AdjustmentScope } from './adjustment.repository';
 import {
   DiscountRepository,
   type DiscountPage,
   type DiscountRecord,
+  type DiscountTx,
+  type LockedDiscount,
   type TermChoice,
   type NewDiscount,
   type FeeTypeCheck,
@@ -27,15 +30,13 @@ export class FakeDiscountRepository extends DiscountRepository {
   feeTypes = new Set<string>();
   otherAccounts = new Set<string>();
   stored: StoredDiscount[] = [];
+  recorded: ActivityInput[] = [];
   approveChanges = true;
   private counter = 0;
+  private actor = '';
 
   currency(): Promise<string> {
     return Promise.resolve('NGN');
-  }
-
-  approvalOn(): Promise<boolean> {
-    return Promise.resolve(this.switchOn);
   }
 
   studentInScope(_scope: AdjustmentScope, studentId: string): Promise<boolean> {
@@ -68,7 +69,40 @@ export class FakeDiscountRepository extends DiscountRepository {
     );
   }
 
-  insert(input: NewDiscount): Promise<string> {
+  withTx<T>(
+    _scope: AdjustmentScope,
+    userId: string,
+    work: (tx: DiscountTx) => Promise<T>
+  ): Promise<T> {
+    this.actor = userId;
+    return work(this.tx());
+  }
+
+  private tx(): DiscountTx {
+    return {
+      currency: () => Promise.resolve('NGN'),
+      approvalOn: () => Promise.resolve(this.switchOn),
+      student: (id) =>
+        Promise.resolve(
+          this.studentsInScope.has(id)
+            ? { id, name: 'Halima Bello', campusId: 'lekki' }
+            : undefined
+        ),
+      insert: (input) => Promise.resolve(this.add(input)),
+      lock: (id) => Promise.resolve(this.lockOf(id)),
+      approve: (id) => Promise.resolve(this.decide(id, 'approved')),
+      reject: (id, reason) =>
+        Promise.resolve(this.decide(id, 'rejected', reason)),
+      activity: {
+        recordMany: (inputs) => {
+          this.recorded.push(...inputs);
+          return Promise.resolve();
+        },
+      },
+    };
+  }
+
+  private add(input: NewDiscount): string {
     this.counter += 1;
     const id = `discount-${this.counter}`;
     this.stored.push({
@@ -79,7 +113,46 @@ export class FakeDiscountRepository extends DiscountRepository {
       rejectionReason: null,
       endedBy: null,
     });
-    return Promise.resolve(id);
+    return id;
+  }
+
+  private lockOf(id: string): LockedDiscount | undefined {
+    const row = this.stored.find((candidate) => candidate.id === id);
+    return (
+      row && {
+        id: row.id,
+        status: row.status,
+        createdById: row.userId,
+        kind: row.kind,
+        value: row.value,
+        student: {
+          id: row.studentId,
+          name: 'Halima Bello',
+          campusId: 'lekki',
+        },
+      }
+    );
+  }
+
+  private decide(
+    id: string,
+    status: 'approved' | 'rejected',
+    reason?: string
+  ): boolean {
+    const row = this.stored.find((candidate) => candidate.id === id);
+    if (
+      row?.status !== 'submitted' ||
+      (status === 'approved' && !this.approveChanges)
+    ) {
+      return false;
+    }
+    Object.assign(
+      row,
+      status === 'approved'
+        ? { status, approvedBy: this.actor }
+        : { status, rejectionReason: reason }
+    );
+    return true;
   }
 
   findById(
@@ -131,39 +204,6 @@ export class FakeDiscountRepository extends DiscountRepository {
     _query: StudentDiscountListQuery
   ): Promise<DiscountPage> {
     return Promise.resolve({ items: [], total: 0, waitingCount: 0 });
-  }
-
-  approve(
-    _scope: AdjustmentScope,
-    id: string,
-    userId: string
-  ): Promise<boolean> {
-    const row = this.stored.find((candidate) => candidate.id === id);
-    if (
-      row !== undefined &&
-      this.approveChanges &&
-      row.status === 'submitted'
-    ) {
-      Object.assign(row, { status: 'approved', approvedBy: userId });
-      return Promise.resolve(true);
-    }
-    return Promise.resolve(false);
-  }
-
-  reject(
-    _scope: AdjustmentScope,
-    id: string,
-    decision: { userId: string; reason: string }
-  ): Promise<boolean> {
-    const row = this.stored.find((candidate) => candidate.id === id);
-    if (row?.status === 'submitted') {
-      Object.assign(row, {
-        status: 'rejected',
-        rejectionReason: decision.reason,
-      });
-      return Promise.resolve(true);
-    }
-    return Promise.resolve(false);
   }
 
   end(

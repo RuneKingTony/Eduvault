@@ -3,15 +3,23 @@ import { can, type PermissionMap } from '@eduvault/policy';
 
 export type FoundationSubject = 'student' | 'school_year' | 'announcement';
 
+export type FinanceSubject =
+  | 'payment'
+  | 'payment_void'
+  | 'billing_run'
+  | 'adjustment'
+  | 'student_discount';
+
 export interface ActivityAccess {
   pillars: ActivityPillarName[];
   foundationSubjects: FoundationSubject[];
+  financeSubjects: FinanceSubject[];
   /** Leave events are personal: the requester sees their own, approvers those in their campus scope. */
   viewerId: string;
   leaveApprover: boolean;
 }
 
-/** Finance rows stay hidden until a finance read permission exists. */
+/** Finance rows are campus-scoped, never class-scoped; each subject opens with the permission that reads its records. */
 export function activityAccess(
   permissions: PermissionMap,
   viewerId: string
@@ -33,9 +41,23 @@ export function activityAccess(
   if (foundationSubjects.length > 0) {
     pillars.push('foundation');
   }
+  const financeSubjects: FinanceSubject[] = [];
+  if (can(permissions, 'payment', 'read')) {
+    financeSubjects.push('payment', 'payment_void');
+  }
+  if (can(permissions, 'invoice', 'read')) {
+    financeSubjects.push('billing_run');
+  }
+  if (can(permissions, 'adjustment', 'read')) {
+    financeSubjects.push('adjustment', 'student_discount');
+  }
+  if (financeSubjects.length > 0) {
+    pillars.push('finance');
+  }
   return {
     pillars,
     foundationSubjects,
+    financeSubjects,
     viewerId,
     leaveApprover: can(permissions, 'leave', 'approve'),
   };

@@ -7,3 +7,4 @@ export * from './current-campus';
 export * from './class-name';
 export * from './payment-allocations';
 export * from './paying-guardian';
+export * from './student-identity';

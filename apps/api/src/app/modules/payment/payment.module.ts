@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ActivityModule } from '../../common/activity';
 import {
   ApprovalRegistryModule,
   registerApprovals,
@@ -21,6 +22,7 @@ import { PaymentService } from './payment.service';
     LedgerPosterModule,
     MoneyAccountModule,
     ApprovalRegistryModule,
+    ActivityModule,
   ],
   controllers: [PaymentController, PaymentVoidController],
   providers: [

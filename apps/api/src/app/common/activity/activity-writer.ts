@@ -16,6 +16,10 @@ export interface ActivityInput {
   data?: Record<string, unknown>;
 }
 
+export interface ActivityRecorder {
+  recordMany(inputs: readonly ActivityInput[]): Promise<void>;
+}
+
 const SECRET_KEY = /pass(?:word|wd)|secret|token/i;
 
 function secretKeyIn(value: unknown): string | undefined {
@@ -36,15 +40,33 @@ function secretKeyIn(value: unknown): string | undefined {
 
 @Injectable()
 export class ActivityWriter {
-  async record(db: Kysely<DB>, input: ActivityInput): Promise<void> {
-    const data = input.data ?? {};
-    const secret = secretKeyIn(data);
-    if (secret !== undefined) {
-      throw new Error(`Activity data must not hold a secret: ${secret}`);
+  within(db: Kysely<DB>): ActivityRecorder {
+    return {
+      recordMany: (inputs) => this.recordMany(db, inputs),
+    };
+  }
+
+  record(db: Kysely<DB>, input: ActivityInput): Promise<void> {
+    return this.recordMany(db, [input]);
+  }
+
+  async recordMany(
+    db: Kysely<DB>,
+    inputs: readonly ActivityInput[]
+  ): Promise<void> {
+    if (inputs.length === 0) {
+      return;
     }
-    await db
-      .insertInto('activity_event')
-      .values({
+    const values = inputs.map((input) => {
+      const data = input.data ?? {};
+      const secret = secretKeyIn(data);
+      if (secret !== undefined) {
+        throw new Error(`Activity data must not hold a secret: ${secret}`);
+      }
+      if (input.pillar === 'finance' && input.campusId === null) {
+        throw new Error('A finance activity row needs a campus');
+      }
+      return {
         organization_id: input.organizationId,
         campus_id: input.campusId,
         pillar: input.pillar,
@@ -54,7 +76,8 @@ export class ActivityWriter {
         subject_id: input.subjectId,
         text: input.text,
         data: JSON.stringify(data),
-      })
-      .execute();
+      };
+    });
+    await db.insertInto('activity_event').values(values).execute();
   }
 }

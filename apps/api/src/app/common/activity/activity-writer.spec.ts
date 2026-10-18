@@ -9,7 +9,7 @@ import {
 import type { DB } from '../../../db/db-types';
 import { ActivityWriter, type ActivityInput } from './activity-writer';
 
-const run = async (input: ActivityInput) => {
+const run = async (...inputs: ActivityInput[]) => {
   const compiled: CompiledQuery[] = [];
   const db = new Kysely<DB>({
     dialect: {
@@ -22,7 +22,7 @@ const run = async (input: ActivityInput) => {
       compiled.push(event.query);
     },
   });
-  await new ActivityWriter().record(db, input);
+  await new ActivityWriter().recordMany(db, inputs);
   return compiled;
 };
 
@@ -38,6 +38,18 @@ const base: ActivityInput = {
 };
 
 describe('ActivityWriter', () => {
+  it('inserts several rows in one statement and none for an empty list', async () => {
+    const compiled = await run(base, { ...base, subjectId: 'student-2' });
+    expect(compiled).toHaveLength(1);
+    expect(await run()).toEqual([]);
+  });
+
+  it('refuses a finance row without a campus', async () => {
+    await expect(
+      run({ ...base, pillar: 'finance', campusId: null })
+    ).rejects.toThrow('A finance activity row needs a campus');
+  });
+
   it('inserts one row with the data as JSON', async () => {
     const [query] = await run({
       ...base,

@@ -4,8 +4,10 @@ import type {
   StudentDiscount,
   StudentDiscountListQuery,
 } from '@eduvault/api-contract';
+import type { ActivityRecorder } from '../../common/activity';
 import type { WaitingApproval } from '../../common/approvals';
 import type { TermPosition } from '../../common/fees';
+import type { StudentIdentity } from '../../common/students';
 import type { AdjustmentScope } from './adjustment.repository';
 
 export interface TermInfo {
@@ -41,6 +43,26 @@ export interface DiscountRecord {
   until: TermPosition | null;
 }
 
+export interface LockedDiscount {
+  id: string;
+  status: ApprovalStatus;
+  createdById: string | null;
+  kind: DiscountKind;
+  value: number;
+  student: StudentIdentity;
+}
+
+export interface DiscountTx {
+  student(studentId: string): Promise<StudentIdentity | undefined>;
+  insert(input: NewDiscount): Promise<string>;
+  lock(id: string): Promise<LockedDiscount | undefined>;
+  approve(id: string): Promise<boolean>;
+  reject(id: string, reason: string): Promise<boolean>;
+  readonly activity: ActivityRecorder;
+  currency(): Promise<string>;
+  approvalOn(): Promise<boolean>;
+}
+
 export type FeeTypeCheck = 'ok' | 'missing' | 'not_fee_type';
 
 export interface DiscountPage {
@@ -51,8 +73,6 @@ export interface DiscountPage {
 
 export abstract class DiscountRepository {
   abstract currency(organizationId: string): Promise<string>;
-
-  abstract approvalOn(organizationId: string): Promise<boolean>;
 
   abstract studentInScope(
     scope: AdjustmentScope,
@@ -73,7 +93,11 @@ export abstract class DiscountRepository {
     ledgerAccountId: string
   ): Promise<FeeTypeCheck>;
 
-  abstract insert(input: NewDiscount): Promise<string>;
+  abstract withTx<T>(
+    scope: AdjustmentScope,
+    userId: string,
+    work: (tx: DiscountTx) => Promise<T>
+  ): Promise<T>;
 
   abstract findById(
     scope: AdjustmentScope,
@@ -84,18 +108,6 @@ export abstract class DiscountRepository {
     scope: AdjustmentScope,
     query: StudentDiscountListQuery
   ): Promise<DiscountPage>;
-
-  abstract approve(
-    scope: AdjustmentScope,
-    id: string,
-    userId: string
-  ): Promise<boolean>;
-
-  abstract reject(
-    scope: AdjustmentScope,
-    id: string,
-    decision: { userId: string; reason: string }
-  ): Promise<boolean>;
 
   abstract end(
     scope: AdjustmentScope,

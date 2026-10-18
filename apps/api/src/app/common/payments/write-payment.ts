@@ -37,7 +37,7 @@ export interface NewPayment {
 }
 
 export type InsertOutcome =
-  | { status: 'recorded'; id: string }
+  | { status: 'recorded'; id: string; receiptNumber: string }
   | { status: 'replayed'; id: string }
   | { status: 'reference_used' }
   | { status: 'provider_reference_used' }
@@ -167,7 +167,7 @@ async function create(
       }))
     )
     .execute();
-  return { status: 'recorded', id: paymentId };
+  return { status: 'recorded', id: paymentId, receiptNumber };
 }
 
 export async function writePayment(

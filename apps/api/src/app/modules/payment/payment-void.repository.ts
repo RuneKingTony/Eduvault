@@ -4,6 +4,7 @@ import type {
   PaymentVoidItem,
   PaymentVoidListQuery,
 } from '@eduvault/api-contract';
+import type { ActivityRecorder, CampusAmount } from '../../common/activity';
 import type { WaitingApproval } from '../../common/approvals';
 import type { LedgerLine, PostInput } from '../../common/ledger';
 import type { PaymentScope } from './payment.repository';
@@ -56,6 +57,9 @@ export interface PaymentVoidTx {
   lockVoid(voidId: string): Promise<VoidRecord | undefined>;
   approve(voidId: string, entryId: string): Promise<boolean>;
   reject(voidId: string, reason: string): Promise<boolean>;
+  allocationShares(paymentId: string): Promise<CampusAmount[]>;
+  readonly activity: ActivityRecorder;
+  currency(): Promise<string>;
 }
 
 export abstract class PaymentVoidRepository {

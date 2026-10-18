@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ActivityModule } from '../../common/activity';
 import {
   ApprovalRegistryModule,
   registerApprovals,
@@ -14,7 +15,12 @@ import { KyselyAdjustmentRepository } from './kysely-adjustment.repository';
 import { KyselyDiscountRepository } from './kysely-discount.repository';
 
 @Module({
-  imports: [EduvaultAuthModule, LedgerPosterModule, ApprovalRegistryModule],
+  imports: [
+    EduvaultAuthModule,
+    LedgerPosterModule,
+    ApprovalRegistryModule,
+    ActivityModule,
+  ],
   controllers: [AdjustmentController],
   providers: [
     AdjustmentService,

@@ -19,6 +19,12 @@ import {
   type StudentDiscountList,
   type StudentDiscountListQuery,
 } from '@eduvault/api-contract';
+import {
+  discountApprovedActivity,
+  discountDeclinedActivity,
+  financeActorIn,
+  studentFacts,
+} from '../../common/activity';
 import { assertDeclineReason, decide } from '../../common/approvals';
 import type { OrgContext } from '../../common/auth';
 import type { AdjustmentScope } from './adjustment.repository';
@@ -68,31 +74,70 @@ export class DiscountService {
     }
     await this.checkFeeType(ctx.organizationId, input.ledgerAccountId);
     await this.checkTerms(ctx.organizationId, input);
-    const autoApproved = !(await this.discounts.approvalOn(ctx.organizationId));
-    const id = await this.discounts.insert({
-      organizationId: ctx.organizationId,
-      userId: ctx.user.id,
-      studentId: input.studentId,
-      kind: input.kind,
-      value: input.value,
-      ledgerAccountId: input.ledgerAccountId,
-      fromTermId: input.fromTermId,
-      toTermId: input.toTermId ?? null,
-      reason: input.reason,
-      autoApproved,
+    const made = await this.discounts.withTx(scope, ctx.user.id, async (tx) => {
+      const student = await tx.student(input.studentId);
+      if (student === undefined) {
+        throw new NotFoundException(ADJUSTMENT_STUDENT_NOT_FOUND_MESSAGE);
+      }
+      const autoApproved = !(await tx.approvalOn());
+      const created = await tx.insert({
+        organizationId: ctx.organizationId,
+        userId: ctx.user.id,
+        studentId: input.studentId,
+        kind: input.kind,
+        value: input.value,
+        ledgerAccountId: input.ledgerAccountId,
+        fromTermId: input.fromTermId,
+        toTermId: input.toTermId ?? null,
+        reason: input.reason,
+        autoApproved,
+      });
+      if (autoApproved) {
+        await tx.activity.recordMany(
+          discountApprovedActivity(
+            await financeActorIn(ctx, tx),
+            {
+              id: created,
+              kind: input.kind,
+              value: input.value,
+              ...studentFacts(student),
+            },
+            true
+          )
+        );
+      }
+      return { id: created, autoApproved };
     });
-    return { discount: await this.item(scope, id), autoApproved };
+    return {
+      discount: await this.item(scope, made.id),
+      autoApproved: made.autoApproved,
+    };
   }
 
   async approve(ctx: OrgContext, id: string): Promise<StudentDiscount> {
     const scope = scopeOf(ctx);
-    const found = await this.discounts.findById(scope, id);
-    if (found === undefined) {
-      throw notFound();
-    }
-    await decide({ actorId: ctx.user.id, createdBy: found.createdById }, () =>
-      this.discounts.approve(scope, id, ctx.user.id)
-    );
+    await this.discounts.withTx(scope, ctx.user.id, async (tx) => {
+      const found = await tx.lock(id);
+      if (found === undefined) {
+        throw notFound();
+      }
+      await decide(
+        { actorId: ctx.user.id, createdBy: found.createdById },
+        async () => {
+          const changed = await tx.approve(id);
+          if (changed) {
+            await tx.activity.recordMany(
+              discountApprovedActivity(
+                await financeActorIn(ctx, tx),
+                { ...found, ...studentFacts(found.student) },
+                false
+              )
+            );
+          }
+          return changed;
+        }
+      );
+    });
     return this.item(scope, id);
   }
 
@@ -103,16 +148,27 @@ export class DiscountService {
   ): Promise<StudentDiscount> {
     const declineReason = assertDeclineReason(reason);
     const scope = scopeOf(ctx);
-    const found = await this.discounts.findById(scope, id);
-    if (found === undefined) {
-      throw notFound();
-    }
-    await decide({ actorId: ctx.user.id, createdBy: found.createdById }, () =>
-      this.discounts.reject(scope, id, {
-        userId: ctx.user.id,
-        reason: declineReason,
-      })
-    );
+    await this.discounts.withTx(scope, ctx.user.id, async (tx) => {
+      const found = await tx.lock(id);
+      if (found === undefined) {
+        throw notFound();
+      }
+      await decide(
+        { actorId: ctx.user.id, createdBy: found.createdById },
+        async () => {
+          const changed = await tx.reject(id, declineReason);
+          if (changed) {
+            await tx.activity.recordMany(
+              discountDeclinedActivity(await financeActorIn(ctx, tx), {
+                ...found,
+                ...studentFacts(found.student),
+              })
+            );
+          }
+          return changed;
+        }
+      );
+    });
     return this.item(scope, id);
   }
 

@@ -21,6 +21,10 @@ export type {
   NewPayment,
 } from '../../common/payments';
 
+export interface NewRecordedPayment extends NewPayment {
+  userName: string;
+}
+
 export interface PaymentScope {
   organizationId: string;
   campusScope: CampusScope;
@@ -89,7 +93,7 @@ export abstract class PaymentRepository {
     providerReference: string
   ): Promise<ExistingPayment | undefined>;
 
-  abstract insert(input: NewPayment): Promise<InsertOutcome>;
+  abstract insert(input: NewRecordedPayment): Promise<InsertOutcome>;
 
   abstract recordingPeople(scope: PaymentScope): Promise<RecordingPeople>;
 }

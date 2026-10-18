@@ -51,6 +51,7 @@ describe('ActivityService', () => {
         access: {
           pillars: ['platform', 'access', 'foundation'],
           foundationSubjects: ['student'],
+          financeSubjects: [],
           viewerId: 'caller',
           leaveApprover: false,
         },
@@ -65,6 +66,7 @@ describe('ActivityService', () => {
     expect(repository.calls[0]?.access).toEqual({
       pillars: ['platform'],
       foundationSubjects: [],
+      financeSubjects: [],
       viewerId: 'caller',
       leaveApprover: false,
     });
