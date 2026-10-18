@@ -52,6 +52,15 @@ export const APPROVAL_KIND_PERMISSION = {
   store_write_off: 'adjustment:approve',
 } as const satisfies Record<ApprovalKind, Permission>;
 
+export const APPROVAL_KIND_READ_PERMISSION = {
+  payment_void: 'adjustment:read',
+  credit_note: 'adjustment:read',
+  write_off: 'adjustment:read',
+  refund: 'adjustment:read',
+  discount: 'adjustment:read',
+  store_write_off: 'store:read',
+} as const satisfies Record<MoneyApprovalKind, Permission>;
+
 export const APPROVAL_PAGE_SIZE = 10;
 export const APPROVAL_PREVIEW_SIZE = 5;
 export const APPROVAL_REASON_MAX = 500;

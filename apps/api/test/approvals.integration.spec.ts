@@ -652,6 +652,205 @@ test.describe('leave in the queue', () => {
   });
 });
 
+const submittedStockCount = async (
+  api: Parameters<typeof askVoid>[0],
+  owner: Parameters<typeof askVoid>[1],
+  campusId: string
+) => {
+  const tie = await createItem(api, owner, {
+    name: 'Tie',
+    variant: null,
+    costPriceMinor: 100_000,
+    sellPriceMinor: 150_000,
+  });
+  await openStock(api, owner, {
+    campusId,
+    lines: [{ itemId: tie.id, quantity: 3, unitCostMinor: 100_000 }],
+  });
+  return submitCount(api, owner, {
+    campusId,
+    lines: [{ itemId: tie.id, countedQuantity: 2 }],
+  });
+};
+
+const waitWriteOffAndStockCount = async (
+  api: Parameters<typeof askVoid>[0],
+  app: Parameters<typeof owes>[0],
+  lekkiSide: {
+    owner: Parameters<typeof askVoid>[1];
+    lekki: { id: string };
+    lekkiOnly: Parameters<typeof askVoid>[1];
+    studentLekki: { id: string };
+  }
+) => {
+  const { owner, lekki, lekkiOnly, studentLekki } = lekkiSide;
+  await owes(app, owner, { studentId: studentLekki.id, amountMinor: OWED });
+  await askAdjustment(api, lekkiOnly, {
+    kind: 'write_off',
+    studentId: studentLekki.id,
+    amountMinor: 100_000,
+    reason: 'Left the school',
+  });
+  return submittedStockCount(api, owner, lekki.id);
+};
+
+const countStatus = async (
+  api: Parameters<typeof askVoid>[0],
+  owner: Parameters<typeof askVoid>[1],
+  id: string
+): Promise<string> =>
+  (
+    (await api(owner).get(`/store/counts/${id}`).expect(200)).body as {
+      status: string;
+    }
+  ).status;
+
+test.describe('someone else’s rows for a viewer without adjustment:approve', () => {
+  test('keeps a store write-off from a leave approver who reads adjustments but not the store', async ({
+    api,
+    app,
+    withPermissions,
+    schools: { owner, orgA, lekki, lekkiOnly, studentLekki },
+  }) => {
+    const count = await waitWriteOffAndStockCount(api, app, {
+      owner,
+      lekki,
+      lekkiOnly,
+      studentLekki,
+    });
+    const reader = await withPermissions(
+      orgA,
+      ['leave:approve', 'adjustment:read'],
+      { campuses: [lekki] }
+    );
+
+    const shown = await queueWith(api, reader, true);
+
+    expect(shown.items.map((item) => [item.kind, item.decide])).toEqual([
+      ['write_off', 'other'],
+    ]);
+    expect(shown.othersCount).toBe(1);
+    await api(reader).post(`/store/counts/${count.id}/approve`).expect(403);
+    expect(await countStatus(api, owner, count.id)).toBe('submitted');
+  });
+
+  test('shows the store write-off but not the write-off as someone else’s to a reader of the store alone, who still cannot decide it', async ({
+    api,
+    app,
+    withPermissions,
+    schools: { owner, orgA, lekki, lekkiOnly, studentLekki },
+  }) => {
+    const count = await waitWriteOffAndStockCount(api, app, {
+      owner,
+      lekki,
+      lekkiOnly,
+      studentLekki,
+    });
+    const reader = await withPermissions(
+      orgA,
+      ['leave:approve', 'store:read'],
+      { campuses: [lekki] }
+    );
+
+    const hidden = await queueWith(api, reader, false);
+    const shown = await queueWith(api, reader, true);
+
+    expect(hidden).toMatchObject({ items: [], total: 0, othersCount: 1 });
+    expect(shown.items).toEqual([
+      expect.objectContaining({
+        kind: 'store_write_off',
+        id: count.id,
+        decide: 'other',
+      }),
+    ]);
+    await api(reader).post(`/store/counts/${count.id}/approve`).expect(403);
+    await api(reader)
+      .post(`/store/counts/${count.id}/decline`)
+      .send({ reason: 'Recount the shelf first' })
+      .expect(403);
+    expect(await countStatus(api, owner, count.id)).toBe('submitted');
+  });
+
+  test('shows both the write-off and the store write-off as someone else’s to a reader of adjustments and the store', async ({
+    api,
+    app,
+    withPermissions,
+    schools: { owner, orgA, lekki, lekkiOnly, studentLekki },
+  }) => {
+    const count = await waitWriteOffAndStockCount(api, app, {
+      owner,
+      lekki,
+      lekkiOnly,
+      studentLekki,
+    });
+    const reader = await withPermissions(
+      orgA,
+      ['leave:approve', 'adjustment:read', 'store:read'],
+      { campuses: [lekki] }
+    );
+
+    const shown = await queueWith(api, reader, true);
+
+    expect(shown.items.map((item) => [item.kind, item.decide])).toEqual([
+      ['write_off', 'other'],
+      ['store_write_off', 'other'],
+    ]);
+    expect(shown.othersCount).toBe(2);
+    await api(reader).post(`/store/counts/${count.id}/approve`).expect(403);
+    expect(await countStatus(api, owner, count.id)).toBe('submitted');
+  });
+
+  test('gives a reader of adjustments and the store with neither approve permission an empty queue', async ({
+    api,
+    app,
+    withPermissions,
+    schools: { owner, orgA, lekki, lekkiOnly, studentLekki },
+  }) => {
+    await waitWriteOffAndStockCount(api, app, {
+      owner,
+      lekki,
+      lekkiOnly,
+      studentLekki,
+    });
+    const reader = await withPermissions(
+      orgA,
+      ['adjustment:read', 'store:read'],
+      { campuses: [lekki] }
+    );
+
+    expect(await queueWith(api, reader, true)).toMatchObject({
+      items: [],
+      total: 0,
+      othersCount: 0,
+    });
+  });
+
+  test('never shows another campus’s store write-off or write-off to a reader on one campus', async ({
+    api,
+    app,
+    withPermissions,
+    schools: { owner, orgA, lekki, ikeja, lekkiOnly, studentLekki },
+  }) => {
+    await waitWriteOffAndStockCount(api, app, {
+      owner,
+      lekki,
+      lekkiOnly,
+      studentLekki,
+    });
+    const reader = await withPermissions(
+      orgA,
+      ['leave:approve', 'adjustment:read', 'store:read'],
+      { campuses: [ikeja] }
+    );
+
+    expect(await queueWith(api, reader, true)).toMatchObject({
+      items: [],
+      total: 0,
+      othersCount: 0,
+    });
+  });
+});
+
 const queueFor = async (
   api: Parameters<typeof askVoid>[0],
   actor: Parameters<typeof askVoid>[1],

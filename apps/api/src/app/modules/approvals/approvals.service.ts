@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import {
   APPROVAL_KIND_LABELS,
   APPROVAL_KIND_PERMISSION,
+  APPROVAL_KIND_READ_PERMISSION,
   APPROVAL_PAGE_SIZE,
   APPROVAL_PREVIEW_SIZE,
   isMoneyApproval,
@@ -13,7 +14,7 @@ import {
   type ApprovalListQuery,
   type ApprovalSummary,
 } from '@eduvault/api-contract';
-import { can, holds } from '@eduvault/policy';
+import { holds } from '@eduvault/policy';
 import { ApprovalRegistry, type WaitingApproval } from '../../common/approvals';
 import type { OrgContext } from '../../common/auth';
 import { CampusService } from '../campus/campus.service';
@@ -59,11 +60,11 @@ const sees = (ctx: OrgContext): boolean =>
     holds(ctx.permissions, permission)
   );
 
-/** A viewer who decides only leave learns about money requests only if they may read them. */
+/** A request the viewer cannot decide reaches them only if they may read its own kind. */
 const mayShow = (ctx: OrgContext, item: ApprovalItem): boolean =>
   item.decide !== 'other' ||
   !isMoneyApproval(item.kind) ||
-  can(ctx.permissions, 'adjustment', 'read');
+  holds(ctx.permissions, APPROVAL_KIND_READ_PERMISSION[item.kind]);
 
 @Injectable()
 export class ApprovalsService {
