@@ -16,7 +16,8 @@ type FinanceSubject =
   | 'adjustment'
   | 'student_discount'
   | 'fee_line'
-  | 'term';
+  | 'term'
+  | 'store_sale';
 
 export interface FinanceActor {
   organizationId: string;
@@ -57,6 +58,19 @@ export interface DiscountFacts {
   studentId: string;
   studentName: string;
   campusId: string;
+}
+
+export interface StoreSaleFacts {
+  id: string;
+  number: string;
+  paymentId: string;
+  receiptNumber: string;
+  studentId: string;
+  studentName: string;
+  campusId: string;
+  campusName: string;
+  itemCount: number;
+  totalMinor: number;
 }
 
 export const financeActor = (
@@ -208,6 +222,29 @@ export function paymentRecordedActivity(
       },
     })
   );
+}
+
+export function storeSaleRecordedActivity(
+  actor: FinanceActor,
+  sale: StoreSaleFacts
+): ActivityInput[] {
+  return [
+    finance(actor, {
+      campusId: sale.campusId,
+      kind: 'store_sale.recorded',
+      subject: { type: 'store_sale', id: sale.id },
+      text: `${sale.studentName} bought ${countOf(sale.itemCount, 'item', 'items')} at the ${sale.campusName} store for ${money(sale.totalMinor, actor.currency)} (sale ${sale.number}, receipt ${sale.receiptNumber}), recorded by ${actor.name}.`,
+      data: {
+        saleId: sale.id,
+        number: sale.number,
+        paymentId: sale.paymentId,
+        receiptNumber: sale.receiptNumber,
+        studentId: sale.studentId,
+        amountMinor: sale.totalMinor,
+        items: sale.itemCount,
+      },
+    }),
+  ];
 }
 
 export function paymentCancelledActivity(

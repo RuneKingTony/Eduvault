@@ -37,6 +37,7 @@ import {
 import { entriesFor, receivableBalance } from './support/factories/billing';
 import {
   createMoneyAccount,
+  financeActivityRows,
   ledgerAccountId,
   postEntry,
 } from './support/factories/finance';
@@ -147,25 +148,43 @@ test.beforeEach(({ clock }) => {
 });
 
 test.describe('recording a student purchase', () => {
-  test('writes no finance activity row', async ({
+  test('writes one store_sale.recorded finance row on the store’s campus', async ({
     api,
     app,
     pool,
     schools,
   }) => {
-    const { owner, orgA, studentLekki } = schools;
-    const { shirt } = await counter(app, api, schools);
+    const { owner, orgA, lekki, studentLekki } = schools;
+    const { shirt, tie } = await counter(app, api, schools);
 
-    await sell(api, owner, {
+    const sale = await sell(api, owner, {
       studentId: studentLekki.id,
-      lines: [{ itemId: shirt.id, quantity: 1 }],
+      lines: [
+        { itemId: shirt.id, quantity: 2 },
+        { itemId: tie.id, quantity: 1 },
+      ],
     });
 
-    const { rows } = await pool.query(
-      `SELECT 1 FROM activity_event WHERE organization_id = $1 AND pillar = 'finance'`,
-      [orgA.id]
+    const rows = await financeActivityRows(pool, orgA.id);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      kind: 'store_sale.recorded',
+      campus_id: lekki.id,
+      subject_type: 'store_sale',
+      subject_id: sale.id,
+      data: {
+        saleId: sale.id,
+        number: sale.number,
+        receiptNumber: sale.receiptNumber,
+        studentId: studentLekki.id,
+        amountMinor: 2 * SHIRT_PRICE + TIE_PRICE,
+        items: 3,
+      },
+    });
+    expect(rows[0]?.text).toContain('bought 3 items at the Lekki store for ₦');
+    expect(rows[0]?.text).toContain(
+      `(sale ${sale.number}, receipt ${sale.receiptNumber})`
     );
-    expect(rows).toEqual([]);
   });
 
   test('posts the charge, its cost, the payment and the movements in one go, with the balance unchanged', async ({
@@ -379,6 +398,7 @@ test.describe('refusals leave nothing behind', () => {
         )
       ).rows
     ).toEqual(sequences.rows);
+    expect(await financeActivityRows(pool, orgA.id)).toEqual([]);
     expect(await stockOf(api, owner, { item: shirt, campusId: lekki.id })).toBe(
       10
     );
@@ -429,6 +449,7 @@ test.describe('refusals leave nothing behind', () => {
     expect(res.status).toBe(409);
     expect(res.body.message).toBe(STORE_SALE_REFERENCE_TAKEN_MESSAGE);
     expect(await saleTables(pool)).toEqual(before);
+    expect(await financeActivityRows(pool, orgA.id)).toEqual([]);
     expect(await receivableBalance(pool, orgA.id, studentLekki.id)).toBe(0);
     expect(await stockOf(api, owner, { item: shirt, campusId: lekki.id })).toBe(
       10
@@ -441,7 +462,7 @@ test.describe('refusals leave nothing behind', () => {
     pool,
     schools,
   }) => {
-    const { owner, studentLekki } = schools;
+    const { owner, orgA, studentLekki } = schools;
     const { tie } = await counter(app, api, schools);
     const before = await saleTables(pool);
 
@@ -459,6 +480,7 @@ test.describe('refusals leave nothing behind', () => {
       storeSaleStockShortMessage(3, 'Tie', 'Lekki')
     );
     expect(await saleTables(pool)).toEqual(before);
+    expect(await financeActivityRows(pool, orgA.id)).toEqual([]);
   });
 
   test('two sales of the last unit at once: one is recorded, the other is told the shelf is empty', async ({
@@ -690,7 +712,7 @@ test.describe('replaying a reference', () => {
     pool,
     schools,
   }) => {
-    const { owner, studentLekki } = schools;
+    const { owner, orgA, studentLekki } = schools;
     const { shirt } = await counter(app, api, schools);
     const body = saleBody({
       studentId: studentLekki.id,
@@ -699,8 +721,10 @@ test.describe('replaying a reference', () => {
     const first = (await api(owner).post('/store/sales').send(body).expect(201))
       .body as RecordedSale;
     const before = await saleTables(pool);
+    expect(await financeActivityRows(pool, orgA.id)).toHaveLength(1);
 
     const again = await api(owner).post('/store/sales').send(body).expect(200);
+    expect(await financeActivityRows(pool, orgA.id)).toHaveLength(1);
 
     expect(again.body).toMatchObject({
       id: first.id,
@@ -1444,7 +1468,7 @@ test.describe('isolation', () => {
     pool,
     schools,
   }) => {
-    const { owner, studentLekki } = schools;
+    const { owner, orgA, studentLekki } = schools;
     const { cash, sale } = await made(app, api, schools);
     await owes(app, owner, {
       studentId: studentLekki.id,
@@ -1481,6 +1505,11 @@ test.describe('isolation', () => {
         ]
       )
     ).rejects.toThrow(/has no lines/);
+    expect(
+      (await financeActivityRows(pool, orgA.id)).filter(
+        (event) => event.kind === 'store_sale.recorded'
+      )
+    ).toHaveLength(1);
   });
 
   test('the same sale sent twice at the same time is one sale (case 10)', async ({
@@ -1489,7 +1518,7 @@ test.describe('isolation', () => {
     pool,
     schools,
   }) => {
-    const { owner, studentLekki } = schools;
+    const { owner, orgA, studentLekki } = schools;
     const { shirt } = await counter(app, api, schools);
     const body = saleBody({
       studentId: studentLekki.id,
@@ -1506,6 +1535,7 @@ test.describe('isolation', () => {
     ]);
     expect((await saleTables(pool)).store_sale).toBe(1);
     expect((await saleTables(pool)).payment).toBe(1);
+    expect(await financeActivityRows(pool, orgA.id)).toHaveLength(1);
   });
 
   test('an acting super admin without a reason cannot record a sale (case 12)', async ({

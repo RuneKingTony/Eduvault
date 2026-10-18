@@ -49,6 +49,7 @@ export interface SaleLineRequest {
 export interface NewSale {
   organizationId: string;
   userId: string;
+  userName: string;
   year: number;
   today: string;
   reference: string;

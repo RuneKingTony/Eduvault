@@ -15,10 +15,12 @@ import {
   paymentRecordedActivity,
   roundCancelledActivity,
   roundSentActivity,
+  storeSaleRecordedActivity,
   type AdjustmentFacts,
   type DiscountFacts,
   type FinanceActor,
   type PaymentFacts,
+  type StoreSaleFacts,
 } from './finance-activity';
 
 const LEKKI = 'campus-lekki';
@@ -218,6 +220,58 @@ describe('paymentRecordedActivity', () => {
     expect(row?.text).toBe(
       'Payment RCT-2026-0012 of GHS 20,000 from Mrs Danjuma recorded by Tunde Bakare.'
     );
+  });
+});
+
+describe('storeSaleRecordedActivity', () => {
+  const sale: StoreSaleFacts = {
+    id: 'sale-1',
+    number: 'ISS-2026-0004',
+    paymentId: 'payment-9',
+    receiptNumber: 'RCT-2026-0021',
+    studentId: 'student-1',
+    studentName: 'Bola Ade',
+    campusId: LEKKI,
+    campusName: 'Lekki',
+    itemCount: 3,
+    totalMinor: 1_350_000,
+  };
+
+  it('writes one finance row on the store campus', () => {
+    expect(storeSaleRecordedActivity(actor, sale)).toEqual([
+      {
+        organizationId: 'org-1',
+        campusId: LEKKI,
+        pillar: 'finance',
+        kind: 'store_sale.recorded',
+        actorUserId: 'user-1',
+        subjectType: 'store_sale',
+        subjectId: 'sale-1',
+        text: 'Bola Ade bought 3 items at the Lekki store for ₦13,500 (sale ISS-2026-0004, receipt RCT-2026-0021), recorded by Tunde Bakare.',
+        data: {
+          saleId: 'sale-1',
+          number: 'ISS-2026-0004',
+          paymentId: 'payment-9',
+          receiptNumber: 'RCT-2026-0021',
+          studentId: 'student-1',
+          amountMinor: 1_350_000,
+          items: 3,
+        },
+      },
+    ]);
+  });
+
+  it('says "1 item" for a single item', () => {
+    const [row] = storeSaleRecordedActivity(actor, { ...sale, itemCount: 1 });
+    expect(row?.text).toContain('Bola Ade bought 1 item at the Lekki store');
+  });
+
+  it('formats the amount in the school currency', () => {
+    const [row] = storeSaleRecordedActivity(
+      { ...actor, currency: 'GHS' },
+      sale
+    );
+    expect(row?.text).toContain('for GHS 13,500 (sale');
   });
 });
 

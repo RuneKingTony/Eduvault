@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ActivityModule } from '../../common/activity';
 import {
   ApprovalRegistryModule,
   registerApprovals,
@@ -21,7 +22,12 @@ import { StoreRepository } from './store.repository';
 import { StoreReadService } from './store-read.service';
 
 @Module({
-  imports: [EduvaultAuthModule, LedgerPosterModule, ApprovalRegistryModule],
+  imports: [
+    EduvaultAuthModule,
+    LedgerPosterModule,
+    ApprovalRegistryModule,
+    ActivityModule,
+  ],
   controllers: [StoreController, SaleController, StockCountController],
   providers: [
     ItemService,

@@ -123,6 +123,7 @@ describe('SaleService.record', () => {
     expect(sales.inserted[0]).toMatchObject({
       organizationId: 'school-a',
       userId: 'chika',
+      userName: 'Chika',
       year: 2026,
       today: '2026-10-07',
       reference: body.reference,
