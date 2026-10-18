@@ -1,4 +1,5 @@
-import { parsePage } from './search-page';
+import { pageOf as pageParamOf } from '@eduvault/shared';
+
 export const SUBJECT_TABS = ['catalogue', 'by-level', 'teachers'] as const;
 export type SubjectTab = (typeof SUBJECT_TABS)[number];
 
@@ -13,7 +14,7 @@ export function parseSubjectsSearch(
   const tab = search['tab'];
   return {
     tab: tab === 'by-level' || tab === 'teachers' ? tab : undefined,
-    page: parsePage(search),
+    page: pageParamOf(search['page']),
   };
 }
 

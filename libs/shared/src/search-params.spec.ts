@@ -12,6 +12,9 @@ describe('search params', () => {
     expect(pageOf('3')).toBe(3);
     expect(pageOf(1)).toBeUndefined();
     expect(pageOf('x')).toBeUndefined();
+    expect(pageOf(3)).toBe(3);
+    expect(pageOf(2.5)).toBeUndefined();
+    expect(pageOf(undefined)).toBeUndefined();
   });
 
   it('matches one of the options', () => {

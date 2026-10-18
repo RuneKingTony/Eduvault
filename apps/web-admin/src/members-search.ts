@@ -1,5 +1,4 @@
-import { textOf } from '@eduvault/shared';
-import { parsePage } from './search-page';
+import { pageOf, textOf } from '@eduvault/shared';
 
 export interface MembersSearch {
   q?: string;
@@ -15,7 +14,7 @@ export function parseMembersSearch(
   return {
     q: textOf(search['q']),
     role: textOf(search['role']),
-    page: parsePage(search),
+    page: pageOf(search['page']),
     add: textOf(search['add']) === '1' ? 1 : undefined,
   };
 }
