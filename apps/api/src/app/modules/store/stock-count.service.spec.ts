@@ -110,6 +110,7 @@ describe('StockCountService.submit', () => {
     expect(count.lines).toHaveLength(2);
     expect(repo.movements).toEqual([]);
     expect(repo.posted).toEqual([]);
+    expect(repo.recorded).toEqual([]);
   });
 
   it('makes a count with a difference wait, valued at the average', async () => {
@@ -123,6 +124,7 @@ describe('StockCountService.submit', () => {
     });
     expect(repo.movements).toEqual([]);
     expect(repo.posted).toEqual([]);
+    expect(repo.recorded).toEqual([]);
   });
 
   it('reads expected stock under the lock, not from the request', async () => {
@@ -152,12 +154,55 @@ describe('StockCountService.submit', () => {
     });
   });
 
+  it('writes one applied activity row on the store campus when approval is off', async () => {
+    const { repo, service } = setup();
+    repo.switchedOff = true;
+    const count = await service.submit(chika, submission([TIE, 2]));
+    expect(repo.recorded).toHaveLength(1);
+    expect(repo.recorded[0]).toMatchObject({
+      organizationId: 'school-a',
+      campusId: LEKKI,
+      pillar: 'finance',
+      kind: 'store_write_off.approved',
+      actorUserId: 'chika',
+      subjectType: 'stock_count',
+      subjectId: count.id,
+      data: {
+        countId: count.id,
+        number: count.number,
+        storeId: STORE,
+        differences: 1,
+        netMinor: 116_667,
+        autoApproved: true,
+      },
+    });
+    expect(repo.recorded[0]?.text).toContain('1 item differs');
+    expect(repo.recorded[0]?.text).toContain('lost, applied by chika.');
+  });
+
+  it('writes the applied row with no net value when the differences cancel out', async () => {
+    const { repo, service } = setup();
+    repo.switchedOff = true;
+    repo.setStock(STORE, TIE, { onHand: 2, valueMinor: 300_000 });
+    repo.setStock(STORE, SHIRT, { onHand: 2, valueMinor: 300_000 });
+    repo.seedItem(item({ id: SHIRT, costPriceMinor: 150_000 }));
+    await service.submit(chika, submission([TIE, 1], [SHIRT, 3]));
+    expect(repo.posted).toEqual([]);
+    expect(repo.recorded).toHaveLength(1);
+    expect(repo.recorded[0]?.data).toMatchObject({
+      differences: 2,
+      netMinor: 0,
+    });
+    expect(repo.recorded[0]?.text).toContain('no net value');
+  });
+
   it('applies a matched count with no movements even when approval is off', async () => {
     const { repo, service } = setup();
     repo.switchedOff = true;
     const count = await service.submit(chika, submission([TIE, 3]));
     expect(count.status).toBe('matched');
     expect(repo.movements).toEqual([]);
+    expect(repo.recorded).toEqual([]);
   });
 
   it('answers 409 with the waiting number when the store already has one', async () => {
@@ -241,13 +286,63 @@ describe('StockCountService.approve', () => {
     });
     expect(repo.movements).toEqual([]);
     expect(repo.posted).toEqual([]);
+    expect(repo.recorded).toEqual([]);
   });
 
-  it('answers 404 for a count that is not in scope', async () => {
-    const { service } = setup();
+  it('answers 404 for a count that is not in scope and writes no activity', async () => {
+    const { repo, service } = setup();
     expect(await rejected(service.approve(grace, 'nope'))).toBeInstanceOf(
       NotFoundException
     );
+    expect(repo.recorded).toEqual([]);
+  });
+
+  it('writes one approved activity row on the store campus, by the approver', async () => {
+    const { repo, service } = setup();
+    const count = await service.submit(chika, submission([TIE, 2]));
+    expect(repo.recorded).toEqual([]);
+    await service.approve(grace, count.id);
+    expect(repo.recorded).toHaveLength(1);
+    expect(repo.recorded[0]).toMatchObject({
+      campusId: LEKKI,
+      pillar: 'finance',
+      kind: 'store_write_off.approved',
+      actorUserId: 'grace',
+      subjectType: 'stock_count',
+      subjectId: count.id,
+      data: {
+        countId: count.id,
+        number: count.number,
+        storeId: STORE,
+        differences: 1,
+        netMinor: 116_667,
+        autoApproved: false,
+      },
+    });
+    expect(repo.recorded[0]?.text).toContain('lost, approved by grace.');
+  });
+
+  it('writes a found row with a negative net for a surplus', async () => {
+    const { repo, service } = setup();
+    const count = await service.submit(chika, submission([SHIRT, 5]));
+    await service.approve(grace, count.id);
+    expect(repo.recorded[0]?.data).toMatchObject({ netMinor: -325_000 });
+    expect(repo.recorded[0]?.text).toContain('found, approved by grace.');
+  });
+
+  it('writes the row with no net value when the differences cancel out', async () => {
+    const { repo, service } = setup();
+    repo.setStock(STORE, TIE, { onHand: 2, valueMinor: 300_000 });
+    repo.setStock(STORE, SHIRT, { onHand: 2, valueMinor: 300_000 });
+    repo.seedItem(item({ id: SHIRT, costPriceMinor: 150_000 }));
+    const count = await service.submit(chika, submission([TIE, 1], [SHIRT, 3]));
+    await service.approve(grace, count.id);
+    expect(repo.recorded).toHaveLength(1);
+    expect(repo.recorded[0]?.data).toMatchObject({
+      differences: 2,
+      netMinor: 0,
+    });
+    expect(repo.recorded[0]?.text).toContain('no net value');
   });
 
   it('moves one tie out at its average and posts Dr 5300 / Cr 1300', async () => {
@@ -310,9 +405,10 @@ describe('StockCountService.approve', () => {
       message: ALREADY_DECIDED_MESSAGE,
     });
     expect(repo.posted).toHaveLength(1);
+    expect(repo.recorded).toHaveLength(1);
   });
 
-  it('answers 409 AlreadyDecided when it lost the conditional update', async () => {
+  it('answers 409 AlreadyDecided when it lost the conditional update, writing no activity', async () => {
     const { repo, service } = setup();
     const count = await service.submit(chika, submission([TIE, 2]));
     repo.approveChanges = false;
@@ -320,6 +416,7 @@ describe('StockCountService.approve', () => {
     expect((error as ConflictException).getResponse()).toMatchObject({
       code: 'AlreadyDecided',
     });
+    expect(repo.recorded).toEqual([]);
   });
 
   it('answers 409 when stock has moved since the count and writes nothing', async () => {
@@ -331,16 +428,18 @@ describe('StockCountService.approve', () => {
     expect((error as ConflictException).message).toBe(STOCK_MOVED_MESSAGE);
     expect(repo.movements).toEqual([]);
     expect(repo.posted).toEqual([]);
+    expect(repo.recorded).toEqual([]);
     expect(repo.stored[0]?.status).toBe('submitted');
   });
 
-  it('refuses to approve a matched count', async () => {
-    const { service } = setup();
+  it('refuses to approve a matched count and writes no activity', async () => {
+    const { repo, service } = setup();
     const count = await service.submit(chika, submission([TIE, 3]));
     const error = await rejected(service.approve(grace, count.id));
     expect((error as ConflictException).getResponse()).toMatchObject({
       code: 'AlreadyDecided',
     });
+    expect(repo.recorded).toEqual([]);
   });
 });
 
@@ -366,8 +465,31 @@ describe('StockCountService.decline', () => {
     expect(repo.posted).toEqual([]);
   });
 
-  it('answers 409 SelfApproval for the counter, 404 out of scope and 409 once decided', async () => {
-    const { service } = setup();
+  it('writes one declined activity row with the trimmed reason and no amount', async () => {
+    const { repo, service } = setup();
+    const count = await service.submit(chika, submission([TIE, 2]));
+    await service.decline(grace, count.id, ' Recount first ');
+    expect(repo.recorded).toHaveLength(1);
+    expect(repo.recorded[0]).toMatchObject({
+      campusId: LEKKI,
+      pillar: 'finance',
+      kind: 'store_write_off.declined',
+      actorUserId: 'grace',
+      subjectType: 'stock_count',
+      subjectId: count.id,
+      text: `Store write-off ${count.number} at the Lekki store was declined: Recount first`,
+      data: {
+        countId: count.id,
+        number: count.number,
+        storeId: STORE,
+        differences: 1,
+      },
+    });
+    expect(repo.recorded[0]?.data).not.toHaveProperty('netMinor');
+  });
+
+  it('answers 409 SelfApproval for the counter, 404 out of scope and 409 once decided, writing one row', async () => {
+    const { repo, service } = setup();
     const count = await service.submit(chika, submission([TIE, 2]));
     const own = await rejected(service.decline(chika, count.id, 'No'));
     expect((own as ConflictException).getResponse()).toMatchObject({
@@ -376,11 +498,22 @@ describe('StockCountService.decline', () => {
     expect(await rejected(service.decline(grace, 'nope', 'No'))).toBeInstanceOf(
       NotFoundException
     );
+    expect(repo.recorded).toEqual([]);
     await service.decline(grace, count.id, 'No');
     const again = await rejected(service.decline(grace, count.id, 'No'));
     expect((again as ConflictException).getResponse()).toMatchObject({
       code: 'AlreadyDecided',
     });
+    expect(repo.recorded).toHaveLength(1);
+  });
+
+  it('writes no activity row for a blank reason or a matched count', async () => {
+    const { repo, service } = setup();
+    const matched = await service.submit(chika, submission([TIE, 3]));
+    await rejected(service.decline(grace, matched.id, 'No'));
+    const waiting = await service.submit(chika, submission([TIE, 2]));
+    await rejected(service.decline(grace, waiting.id, '  '));
+    expect(repo.recorded).toEqual([]);
   });
 });
 

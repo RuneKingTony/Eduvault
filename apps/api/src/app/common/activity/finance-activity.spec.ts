@@ -16,11 +16,14 @@ import {
   roundCancelledActivity,
   roundSentActivity,
   storeSaleRecordedActivity,
+  storeWriteOffApprovedActivity,
+  storeWriteOffDeclinedActivity,
   type AdjustmentFacts,
   type DiscountFacts,
   type FinanceActor,
   type PaymentFacts,
   type StoreSaleFacts,
+  type StoreWriteOffFacts,
 } from './finance-activity';
 
 const LEKKI = 'campus-lekki';
@@ -272,6 +275,121 @@ describe('storeSaleRecordedActivity', () => {
       sale
     );
     expect(row?.text).toContain('for GHS 13,500 (sale');
+  });
+});
+
+describe('store write-off activity', () => {
+  const count: StoreWriteOffFacts = {
+    id: 'count-1',
+    number: 'CNT-2026-0002',
+    storeId: 'store-1',
+    campusId: LEKKI,
+    campusName: 'Lekki',
+  };
+  const approved = { netMinor: 450_000, differences: 2, autoApproved: false };
+
+  it('writes one finance row on the store campus for a loss', () => {
+    expect(storeWriteOffApprovedActivity(actor, count, approved)).toEqual([
+      {
+        organizationId: 'org-1',
+        campusId: LEKKI,
+        pillar: 'finance',
+        kind: 'store_write_off.approved',
+        actorUserId: 'user-1',
+        subjectType: 'stock_count',
+        subjectId: 'count-1',
+        text: 'Store write-off CNT-2026-0002 at the Lekki store: 2 items differ, ₦4,500 lost, approved by Tunde Bakare.',
+        data: {
+          countId: 'count-1',
+          number: 'CNT-2026-0002',
+          storeId: 'store-1',
+          differences: 2,
+          netMinor: 450_000,
+          autoApproved: false,
+        },
+      },
+    ]);
+  });
+
+  it('words a gain as found and keeps the net signed in the data', () => {
+    const [row] = storeWriteOffApprovedActivity(actor, count, {
+      ...approved,
+      netMinor: -120_000,
+    });
+    expect(row?.text).toContain('2 items differ, ₦1,200 found, approved by');
+    expect(row?.data).toMatchObject({ netMinor: -120_000 });
+  });
+
+  it('says "no net value" when the differences cancel out', () => {
+    const [row] = storeWriteOffApprovedActivity(actor, count, {
+      ...approved,
+      netMinor: 0,
+    });
+    expect(row?.text).toContain('2 items differ, no net value, approved by');
+    expect(row?.data).toMatchObject({ netMinor: 0 });
+  });
+
+  it('says "applied" when approval is off', () => {
+    const [row] = storeWriteOffApprovedActivity(actor, count, {
+      ...approved,
+      autoApproved: true,
+    });
+    expect(row?.text).toContain('₦4,500 lost, applied by Tunde Bakare.');
+    expect(row?.data).toMatchObject({ autoApproved: true });
+  });
+
+  it('says "1 item differs" for a single differing item', () => {
+    const [row] = storeWriteOffApprovedActivity(actor, count, {
+      ...approved,
+      differences: 1,
+    });
+    expect(row?.text).toContain('at the Lekki store: 1 item differs, ');
+  });
+
+  it('formats the amount in the school currency', () => {
+    const [row] = storeWriteOffApprovedActivity(
+      { ...actor, currency: 'GHS' },
+      count,
+      approved
+    );
+    expect(row?.text).toContain('GHS 4,500 lost');
+  });
+
+  it('writes the decline with its reason and no amount', () => {
+    expect(
+      storeWriteOffDeclinedActivity(actor, count, {
+        differences: 2,
+        reason: 'Recount the shelf first',
+      })
+    ).toEqual([
+      {
+        organizationId: 'org-1',
+        campusId: LEKKI,
+        pillar: 'finance',
+        kind: 'store_write_off.declined',
+        actorUserId: 'user-1',
+        subjectType: 'stock_count',
+        subjectId: 'count-1',
+        text: 'Store write-off CNT-2026-0002 at the Lekki store was declined: Recount the shelf first',
+        data: {
+          countId: 'count-1',
+          number: 'CNT-2026-0002',
+          storeId: 'store-1',
+          differences: 2,
+        },
+      },
+    ]);
+  });
+
+  it('never writes a null campus', () => {
+    const rows = [
+      ...storeWriteOffApprovedActivity(actor, count, approved),
+      ...storeWriteOffDeclinedActivity(actor, count, {
+        differences: 1,
+        reason: 'No',
+      }),
+    ];
+    expect(rows.map((row) => row.campusId)).toEqual([LEKKI, LEKKI]);
   });
 });
 

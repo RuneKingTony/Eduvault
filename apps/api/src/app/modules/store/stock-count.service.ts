@@ -18,6 +18,12 @@ import {
   type StockCountListQuery,
   type SubmitStockCount,
 } from '@eduvault/api-contract';
+import {
+  financeActorIn,
+  storeWriteOffApprovedActivity,
+  storeWriteOffDeclinedActivity,
+  type StoreWriteOffFacts,
+} from '../../common/activity';
 import { assertDeclineReason, decide } from '../../common/approvals';
 import type { OrgContext } from '../../common/auth';
 import { Clock } from '../../common/clock';
@@ -51,6 +57,22 @@ interface Applied {
   store: StoreRef;
   lines: readonly CountLineFacts[];
 }
+
+interface Posted {
+  entryId: string | undefined;
+  netMinor: number;
+}
+
+const differingLines = (lines: readonly CountLineFacts[]): number =>
+  lines.filter((line) => lineDifference(line) !== 0).length;
+
+const writeOffFacts = (counted: Applied): StoreWriteOffFacts => ({
+  id: counted.id,
+  number: counted.number,
+  storeId: counted.store.id,
+  campusId: counted.store.campusId,
+  campusName: counted.store.campusName,
+});
 
 @Injectable()
 export class StockCountService {
@@ -118,10 +140,19 @@ export class StockCountService {
           if (plan.status === 'moved') {
             throw new ConflictException(STOCK_MOVED_MESSAGE);
           }
-          return tx.approve(
-            id,
-            await this.apply(tx, ctx, { counted: found, plan })
-          );
+          const { entryId, netMinor } = await this.apply(tx, ctx, {
+            counted: found,
+            plan,
+          });
+          const changed = await tx.approve(id, entryId);
+          if (changed) {
+            await this.recordApproved(tx, ctx, {
+              counted: found,
+              netMinor,
+              autoApproved: false,
+            });
+          }
+          return changed;
         }
       );
     });
@@ -141,8 +172,25 @@ export class StockCountService {
       }
       await decide(
         { actorId: ctx.user.id, createdBy: found.createdBy },
-        async () =>
-          found.status === 'submitted' && (await tx.reject(id, declineReason))
+        async () => {
+          if (
+            found.status !== 'submitted' ||
+            !(await tx.reject(id, declineReason))
+          ) {
+            return false;
+          }
+          await tx.activity.recordMany(
+            storeWriteOffDeclinedActivity(
+              await financeActorIn(ctx, tx),
+              writeOffFacts(found),
+              {
+                differences: differingLines(found.lines),
+                reason: declineReason,
+              }
+            )
+          );
+          return true;
+        }
       );
     });
     return this.item(ctx, id);
@@ -202,30 +250,57 @@ export class StockCountService {
       store,
       lines,
     };
-    const differs = lines.some((line) => lineDifference(line) !== 0);
-    const waits = differs && (await tx.approvalOn());
-    const journalEntryId =
-      differs && !waits
-        ? await this.applyNow(tx, ctx, { counted, stock })
-        : null;
-    let status: NewStockCount['status'] = 'matched';
-    if (differs) {
-      status = waits ? 'submitted' : 'approved';
-    }
+    const { status, applied } = await this.settle(tx, ctx, { counted, stock });
     await tx.insertCount({
       id: counted.id,
       number: counted.number,
       storeId: store.id,
       status,
       note: input.note,
-      journalEntryId,
+      journalEntryId: applied?.entryId ?? null,
       lines: lines.map((line) => ({
         itemId: line.itemId,
         expectedQuantity: line.expectedQuantity,
         countedQuantity: line.countedQuantity,
       })),
     });
+    if (applied !== undefined) {
+      await this.recordApproved(tx, ctx, {
+        counted,
+        netMinor: applied.netMinor,
+        autoApproved: true,
+      });
+    }
     return counted.id;
+  }
+
+  private async settle(
+    tx: StockCountTx,
+    ctx: OrgContext,
+    now: { counted: Applied; stock: ReadonlyMap<string, StockLevel> }
+  ): Promise<{ status: NewStockCount['status']; applied?: Posted }> {
+    if (differingLines(now.counted.lines) === 0) {
+      return { status: 'matched' };
+    }
+    if (await tx.approvalOn()) {
+      return { status: 'submitted' };
+    }
+    return { status: 'approved', applied: await this.applyNow(tx, ctx, now) };
+  }
+
+  private async recordApproved(
+    tx: StockCountTx,
+    ctx: OrgContext,
+    outcome: { counted: Applied; netMinor: number; autoApproved: boolean }
+  ): Promise<void> {
+    const { counted, ...write } = outcome;
+    await tx.activity.recordMany(
+      storeWriteOffApprovedActivity(
+        await financeActorIn(ctx, tx),
+        writeOffFacts(counted),
+        { ...write, differences: differingLines(counted.lines) }
+      )
+    );
   }
 
   private async checkedItems(tx: StockCountTx, input: SubmitStockCount) {
@@ -247,20 +322,20 @@ export class StockCountService {
     tx: StockCountTx,
     ctx: OrgContext,
     now: { counted: Applied; stock: ReadonlyMap<string, StockLevel> }
-  ): Promise<string | null> {
+  ): Promise<Posted> {
     const { counted, stock } = now;
     const plan = approvalPlan(counted.lines, stock);
     if (plan.status === 'moved') {
       throw new ConflictException(STOCK_MOVED_MESSAGE);
     }
-    return (await this.apply(tx, ctx, { counted, plan })) ?? null;
+    return this.apply(tx, ctx, { counted, plan });
   }
 
   private async apply(
     tx: StockCountTx,
     ctx: OrgContext,
     applied: { counted: Applied; plan: Ready }
-  ): Promise<string | undefined> {
+  ): Promise<Posted> {
     const { counted, plan } = applied;
     await tx.insertMovements({
       id: counted.id,
@@ -279,6 +354,9 @@ export class StockCountService {
       ...accounts,
       netMinor: plan.netMinor,
     });
-    return posting === undefined ? undefined : tx.post(posting);
+    return {
+      entryId: posting === undefined ? undefined : await tx.post(posting),
+      netMinor: plan.netMinor,
+    };
   }
 }

@@ -4,6 +4,7 @@ import type {
   StockCountListQuery,
   StockCountStatus,
 } from '@eduvault/api-contract';
+import type { ActivityRecorder } from '../../common/activity';
 import type { ApprovalProvider } from '../../common/approvals';
 import type { PostInput } from '../../common/ledger';
 import type { CountLineFacts, CountMovement, StockLevel } from './stock-count';
@@ -38,6 +39,8 @@ export interface CountSystemAccounts {
 }
 
 export interface StockCountTx {
+  readonly activity: ActivityRecorder;
+  currency(): Promise<string>;
   store(campusId: string): Promise<StoreRef | undefined>;
   items(ids: readonly string[]): Promise<ItemRecord[]>;
   waitingNumber(storeId: string): Promise<string | undefined>;

@@ -5,6 +5,7 @@ import type {
   StockCountListQuery,
   StockCountStatus,
 } from '@eduvault/api-contract';
+import type { ActivityInput } from '../../common/activity';
 import type { WaitingApproval } from '../../common/approvals';
 import { canSeeCampus } from '../../common/campus-scope';
 import type { PostInput } from '../../common/ledger';
@@ -39,6 +40,7 @@ export class FakeStockCountRepository extends StockCountRepository {
   switchedOff = false;
   stored: StoredCount[] = [];
   posted: PostInput[] = [];
+  recorded: ActivityInput[] = [];
   movements: (CountMovement & { number: string })[] = [];
   lockedItems: string[][] = [];
   lostRaces = 0;
@@ -66,6 +68,7 @@ export class FakeStockCountRepository extends StockCountRepository {
     this.actor = userId;
     const stored = structuredClone(this.stored);
     const posted = [...this.posted];
+    const recorded = [...this.recorded];
     const movements = [...this.movements];
     const nextNo = this.nextNo;
     try {
@@ -73,6 +76,7 @@ export class FakeStockCountRepository extends StockCountRepository {
     } catch (error) {
       this.stored = stored;
       this.posted = posted;
+      this.recorded = recorded;
       this.movements = movements;
       this.nextNo = nextNo;
       throw error;
@@ -195,8 +199,10 @@ export class FakeStockCountRepository extends StockCountRepository {
     | 'lockStock'
     | 'systemAccounts'
     | 'lockCount'
+    | 'currency'
   > {
     return {
+      currency: () => Promise.resolve('NGN'),
       store: (campusId) => Promise.resolve(this.stores.get(campusId)),
       items: (ids) =>
         Promise.resolve(
@@ -240,9 +246,15 @@ export class FakeStockCountRepository extends StockCountRepository {
 
   private writes(): Pick<
     StockCountTx,
-    'nextNumber' | 'post' | 'insertMovements' | 'insertCount'
+    'nextNumber' | 'post' | 'insertMovements' | 'insertCount' | 'activity'
   > {
     return {
+      activity: {
+        recordMany: (inputs) => {
+          this.recorded.push(...inputs);
+          return Promise.resolve();
+        },
+      },
       nextNumber: (year) =>
         Promise.resolve(
           `CNT-${year}-${String(this.nextNo++).padStart(4, '0')}`

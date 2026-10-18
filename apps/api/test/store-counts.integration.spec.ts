@@ -17,7 +17,10 @@ import type { Pool } from 'pg';
 import { acting, expect, type Fixtures } from './support/base-test';
 import { switchApproval } from './support/factories/approvals';
 import { entriesFor } from './support/factories/billing';
-import { createMoneyAccount } from './support/factories/finance';
+import {
+  createMoneyAccount,
+  financeActivityRows,
+} from './support/factories/finance';
 import {
   approveCount,
   countBody,
@@ -818,9 +821,10 @@ test.describe('isolation', () => {
   test('another school’s ids answer 404 and its lists hold none of A’s counts (cases 1, 2 and 7)', async ({
     api,
     app,
+    pool,
     schools,
   }) => {
-    const { owner, ownerB, lekki, campusB } = schools;
+    const { owner, ownerB, orgA, orgB, lekki, campusB } = schools;
     const { tie } = await stocked(app, api, schools);
     const count = await submitCount(api, owner, {
       campusId: lekki.id,
@@ -865,6 +869,8 @@ test.describe('isolation', () => {
           .body as StockCountList
       ).items
     ).toHaveLength(1);
+    expect(await financeActivityRows(pool, orgA.id)).toEqual([]);
+    expect(await financeActivityRows(pool, orgB.id)).toEqual([]);
   });
 
   test('the composite foreign keys refuse a count or line that points into another school (case 7)', async ({

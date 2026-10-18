@@ -15,6 +15,7 @@ import {
   isApprovalOn,
   type WaitingApproval,
 } from '../../common/approvals';
+import { ActivityWriter, type ActivityRecorder } from '../../common/activity';
 import { inCampusScope } from '../../common/db/in-campus-scope';
 import { KYSELY_TOKEN, type Database } from '../../common/db/tokens';
 import { uniqueViolation } from '../../common/db/unique-violation';
@@ -24,6 +25,7 @@ import {
 } from '../../common/documents';
 import {
   LedgerPoster,
+  schoolCurrency,
   systemAccountId,
   type PostInput,
 } from '../../common/ledger';
@@ -63,12 +65,14 @@ interface RecordRow {
 
 class KyselyStockCountTx implements StockCountTx {
   private readonly decisions: ReturnType<typeof decisionsFor>;
+  readonly activity: ActivityRecorder;
 
   constructor(
     private readonly trx: Kysely<DB>,
-    private readonly poster: LedgerPoster,
+    private readonly deps: { poster: LedgerPoster; activity: ActivityRecorder },
     private readonly who: { scope: StoreScope; userId: string }
   ) {
+    this.activity = deps.activity;
     this.decisions = decisionsFor(trx, {
       table: 'stock_count',
       organizationId: who.scope.organizationId,
@@ -78,6 +82,10 @@ class KyselyStockCountTx implements StockCountTx {
 
   private get organizationId(): string {
     return this.who.scope.organizationId;
+  }
+
+  currency(): Promise<string> {
+    return schoolCurrency(this.trx, this.organizationId);
   }
 
   async store(campusId: string): Promise<StoreRef | undefined> {
@@ -153,7 +161,7 @@ class KyselyStockCountTx implements StockCountTx {
   }
 
   async post(entry: PostInput): Promise<string> {
-    const { entry: posted } = await this.poster.post(this.trx, entry);
+    const { entry: posted } = await this.deps.poster.post(this.trx, entry);
     return posted.id;
   }
 
@@ -265,7 +273,8 @@ class KyselyStockCountTx implements StockCountTx {
 export class KyselyStockCountRepository extends StockCountRepository {
   constructor(
     @Inject(KYSELY_TOKEN) private readonly db: Database,
-    private readonly poster: LedgerPoster
+    private readonly poster: LedgerPoster,
+    private readonly activity: ActivityWriter
   ) {
     super();
   }
@@ -279,7 +288,13 @@ export class KyselyStockCountRepository extends StockCountRepository {
       return await this.db
         .transaction()
         .execute((trx) =>
-          work(new KyselyStockCountTx(trx, this.poster, { scope, userId }))
+          work(
+            new KyselyStockCountTx(
+              trx,
+              { poster: this.poster, activity: this.activity.within(trx) },
+              { scope, userId }
+            )
+          )
         );
     } catch (error) {
       if (uniqueViolation(error) === WAITING_KEY) {
