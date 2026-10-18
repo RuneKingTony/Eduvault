@@ -111,10 +111,11 @@ describe('routes', () => {
     expect(contract.billingRuns.cancel.path).toBe('/billing-runs/:id/cancel');
   });
 
-  it('has read-only charge routes', () => {
+  it('reads charges and adds one-off charges, with no edit or delete', () => {
     expect(
       Object.values(contract.invoices).map((route) => route.method)
-    ).toEqual(['GET', 'GET']);
+    ).toEqual(['GET', 'GET', 'POST']);
+    expect(contract.invoices.create.path).toBe('/invoices');
   });
 
   it('names the discounts account by its system key', () => {

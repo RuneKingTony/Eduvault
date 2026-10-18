@@ -6,6 +6,7 @@ import {
   type MoneyAccountKind,
 } from './finance';
 import {
+  datedReference,
   idSchema,
   memberRefSchema,
   paymentMethodSchema,
@@ -133,13 +134,8 @@ export const storeSaleReplayedMessage = (
 ): string =>
   `Reference ${reference} was already recorded as ${receiptNumber}. Nothing was posted twice.`;
 
-const SALE_REFERENCE_SUFFIX_LENGTH = 8;
-
 export const storeSaleReference = (date: string, uuid: string): string =>
-  `STORE-${date.replaceAll('-', '')}-${uuid
-    .replaceAll('-', '')
-    .slice(0, SALE_REFERENCE_SUFFIX_LENGTH)
-    .toUpperCase()}`;
+  datedReference('STORE', date, uuid);
 
 const SALE_ACCOUNT_KINDS = {
   pos: ['pos'],

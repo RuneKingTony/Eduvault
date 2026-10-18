@@ -1,4 +1,3 @@
-import { chargePostingLines } from '../../common/fees';
 import type { PostInput } from '../../common/ledger';
 
 interface SaleEntries {
@@ -8,14 +7,6 @@ interface SaleEntries {
   effectiveOn: string;
   postedBy: string;
   campusId: string;
-}
-
-interface ChargePostingInput extends SaleEntries {
-  studentId: string;
-  studentName: string;
-  receivableId: string;
-  salesAccountId: string;
-  lines: readonly { amountMinor: number }[];
 }
 
 interface CostPostingInput extends SaleEntries {
@@ -32,24 +23,8 @@ export const saleLineDescription = (
 export const saleCostReference = (chargeNumber: string): string =>
   `${chargeNumber}-COST`;
 
-export const saleChargePosting = (input: ChargePostingInput): PostInput => ({
-  organizationId: input.organizationId,
-  reference: input.chargeNumber,
-  kind: 'store',
-  effectiveOn: input.effectiveOn,
-  memo: `Store purchase · ${input.studentName}`,
-  postedBy: input.postedBy,
-  sourceId: input.invoiceId,
-  lines: chargePostingLines({
-    lines: input.lines.map((line) => ({
-      ledgerAccountId: input.salesAccountId,
-      amountMinor: line.amountMinor,
-    })),
-    receivableId: input.receivableId,
-    studentId: input.studentId,
-    campusId: input.campusId,
-  }),
-});
+export const saleChargeMemo = (studentName: string): string =>
+  `Store purchase · ${studentName}`;
 
 export const saleCostPosting = (
   input: CostPostingInput

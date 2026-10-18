@@ -195,8 +195,8 @@ export const CAP_AREAS: readonly CapArea[] = [
     label: 'Charges',
     important: false,
     see: ['invoice:read'],
-    change: ['invoice:bill'],
-    changeDesc: 'Charge students and send the charges',
+    change: ['invoice:bill', 'invoice:charge'],
+    changeDesc: 'Charge students, send the charges and add one-off charges',
     extras: [],
   },
   {

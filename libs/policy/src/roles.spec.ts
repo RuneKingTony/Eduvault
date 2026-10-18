@@ -146,8 +146,8 @@ describe('roles', () => {
     }
   });
 
-  it('gives the bursar invoice bill and read, the administrator and principal invoice read, and the portal roles invoice readOwn', () => {
-    expect(starter('bursar').invoice).toEqual(['bill', 'read']);
+  it('gives the bursar invoice bill, charge and read, the administrator and principal invoice read only, and the portal roles invoice readOwn', () => {
+    expect(starter('bursar').invoice).toEqual(['bill', 'charge', 'read']);
     expect(starter('administrator').invoice).toEqual(['read']);
     expect(starter('principal').invoice).toEqual(['read']);
     expect(starter('teacher').invoice).toBeUndefined();
@@ -204,6 +204,7 @@ describe('roles', () => {
   it('counts invoice:read but not invoice:bill in READ_PERMS', () => {
     expect(READ_PERMS).toContain('invoice:read');
     expect(READ_PERMS).not.toContain('invoice:bill');
+    expect(READ_PERMS).not.toContain('invoice:charge');
   });
 
   it('gives the administrator and principal every announcement permission and nobody else any', () => {

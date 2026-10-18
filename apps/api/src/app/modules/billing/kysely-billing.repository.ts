@@ -26,8 +26,8 @@ import {
   formatDocumentNumber,
 } from '../../common/documents';
 import {
-  chargePostingLines,
   discountFacts,
+  sendCharge,
   invoiceTotalSql,
   type ChargeableFeeLine,
   type DiscountFacts,
@@ -971,59 +971,18 @@ export class KyselyBillingRepository extends BillingRepository {
     }
   ): Promise<void> {
     const { input, draft } = send;
-    const { organizationId } = input.scope;
-    const value = await allocateDocumentNumber(trx, {
-      organizationId,
-      kind: 'invoice',
+    await sendCharge(trx, this.poster, {
+      invoiceId: draft.id,
+      organizationId: input.scope.organizationId,
+      studentId: draft.student_id,
+      campusId: draft.campus_id,
+      receivableId: send.receivableId,
+      journalKind: 'invoice',
+      memo: `Term fees · ${draft.firstName} ${draft.lastName}`,
+      lines: send.lines,
+      today: input.today,
+      actorId: input.userId,
       year: input.year,
     });
-    const number = formatDocumentNumber('invoice', input.year, value);
-    const entryId = await this.postCharge(trx, { ...send, number });
-    await trx
-      .updateTable('invoice')
-      .set({
-        status: 'issued',
-        number,
-        issued_at: sql<Date>`now()`,
-        issued_by: input.userId,
-        journal_entry_id: entryId,
-      })
-      .where('id', '=', draft.id)
-      .where('organization_id', '=', organizationId)
-      .where('status', '=', 'draft')
-      .execute();
-  }
-
-  private async postCharge(
-    trx: Kysely<DB>,
-    send: {
-      input: IssueRound;
-      receivableId: string;
-      draft: SendableDraft;
-      lines: LedgerChargeLine[];
-      number: string;
-    }
-  ): Promise<string> {
-    const { input, draft, number } = send;
-    const { organizationId } = input.scope;
-    const { entry, replayed } = await this.poster.post(trx, {
-      organizationId,
-      reference: number,
-      kind: 'invoice',
-      effectiveOn: input.today,
-      memo: `Term fees · ${draft.firstName} ${draft.lastName}`,
-      postedBy: input.userId,
-      sourceId: draft.id,
-      lines: chargePostingLines({
-        lines: send.lines,
-        receivableId: send.receivableId,
-        studentId: draft.student_id,
-        campusId: draft.campus_id,
-      }),
-    });
-    if (replayed) {
-      throw new Error(`Charge number ${number} was already posted`);
-    }
-    return entry.id;
   }
 }

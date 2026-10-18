@@ -52,6 +52,7 @@ Milestones follow the data model's phase order ([D-005](../technical-reference.m
 | M3.5  | Approvals queue (provider shape), counts and bell, approval rules, fee reductions, cancelled balances, refunds, discount screens, payment cancellations        | M3.4       | 57, 55, 53, 33 |
 | M3.6  | Staff leave: request, withdraw, approve and decline in Approvals (`leave:approve`)                                                                             | M3.5       | 22             |
 | M3.7  | Portal Fees and family statement                                                                                                                               | M3.4, M2.8 | 72             |
+| M3.8  | One-off charges: the New charge sheet and `POST /invoices`, a client reference with replay, billing and store charges on one shared send helper                | M3.3       | 58, 52         |
 
 ### M4 Store and subjects (F2)
 
@@ -102,6 +103,7 @@ The dashboard grows with each slice; [70-dashboard.md](70-dashboard.md) maps eve
 | [55 Discounts and refunds](55-discounts-and-refunds.md)                          | M3.3 (discount table), M3.5                       |
 | [56 Money accounts and categories](56-money-accounts-and-categories.md)          | M3.1                                              |
 | [57 Approvals](57-approvals.md)                                                  | M3.5, M3.6 (leave), M4.5 (store write-offs)       |
+| [58 One-off charges](58-one-off-charges.md)                                      | M3.8                                              |
 | [60 Subjects](60-subjects.md)                                                    | M4.1, M4.2                                        |
 | [61 Store](61-store.md)                                                          | M4.3, M4.4, M4.5                                  |
 | [70 Dashboard](70-dashboard.md)                                                  | M2.6, then a card per slice                       |

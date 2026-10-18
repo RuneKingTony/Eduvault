@@ -29,11 +29,12 @@ const insertDraft = (
     campusId: string;
     runId?: string | null;
     kind?: string;
+    reference?: string | null;
   }
 ) =>
   pool.query(
-    `INSERT INTO invoice (organization_id, student_id, term_id, campus_id, billing_run_id, kind)
-     VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+    `INSERT INTO invoice (organization_id, student_id, term_id, campus_id, billing_run_id, kind, reference, request_hash)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
     [
       v.organizationId,
       v.studentId,
@@ -41,6 +42,8 @@ const insertDraft = (
       v.campusId,
       v.runId ?? null,
       v.kind ?? 'store',
+      v.reference ?? null,
+      v.reference === undefined || v.reference === null ? null : 'hash',
     ]
   );
 
@@ -364,6 +367,114 @@ test.describe('invoice constraints', () => {
     await insert('campus', lekki.id);
     await expect(insert('school', null)).rejects.toThrow(
       /billing_run_organization_id_number_key/
+    );
+  });
+});
+
+test.describe('one-off charge reference constraints', () => {
+  test('needs a reference and a hash exactly on a one-off charge', async ({
+    api,
+    app,
+    pool,
+    schools: { owner, orgA, lekki, studentLekki },
+  }) => {
+    const fixture = await chargeFixture(app, api, owner);
+    const draft = {
+      organizationId: orgA.id,
+      studentId: studentLekki.id,
+      termId: fixture.firstTermId,
+      campusId: lekki.id,
+    };
+
+    await expect(
+      insertDraft(pool, { ...draft, kind: 'adhoc' })
+    ).rejects.toThrow(/invoice_adhoc_reference/);
+    await expect(
+      insertDraft(pool, { ...draft, kind: 'store', reference: 'ONEOFF-1' })
+    ).rejects.toThrow(/invoice_adhoc_reference/);
+    await expect(
+      pool.query(
+        `INSERT INTO invoice (organization_id, student_id, term_id, campus_id, kind, reference)
+         VALUES ($1, $2, $3, $4, 'adhoc', 'ONEOFF-2')`,
+        [orgA.id, studentLekki.id, fixture.firstTermId, lekki.id]
+      )
+    ).rejects.toThrow(/invoice_adhoc_reference/);
+    await expect(
+      insertDraft(pool, { ...draft, kind: 'adhoc', reference: ' ' })
+    ).rejects.toThrow(/invoice_reference_check/);
+    await expect(
+      insertDraft(pool, { ...draft, kind: 'adhoc', reference: 'x'.repeat(81) })
+    ).rejects.toThrow(/invoice_reference_check/);
+    await expect(
+      insertDraft(pool, { ...draft, kind: 'adhoc', reference: 'ONEOFF-3' })
+    ).resolves.toBeDefined();
+  });
+
+  test('refuses a reference twice in one school and allows it in another', async ({
+    api,
+    app,
+    pool,
+    schools: { owner, orgA, orgB, campusB, lekki, studentB, studentLekki },
+  }) => {
+    const fixture = await chargeFixture(app, api, owner);
+    const termBId =
+      (
+        await pool.query<{ id: string }>(
+          `SELECT id FROM term WHERE organization_id = $1 LIMIT 1`,
+          [orgB.id]
+        )
+      ).rows[0]?.id ?? '';
+    const inA = {
+      organizationId: orgA.id,
+      studentId: studentLekki.id,
+      termId: fixture.firstTermId,
+      campusId: lekki.id,
+      kind: 'adhoc',
+      reference: 'ONEOFF-SAME',
+    };
+
+    await insertDraft(pool, inA);
+    await expect(insertDraft(pool, inA)).rejects.toThrow(
+      /invoice_reference_key/
+    );
+    await expect(
+      insertDraft(pool, {
+        organizationId: orgB.id,
+        studentId: studentB.id,
+        termId: termBId,
+        campusId: campusB.id,
+        kind: 'adhoc',
+        reference: 'ONEOFF-SAME',
+      })
+    ).resolves.toBeDefined();
+  });
+
+  test('freezes the reference and the hash after insert', async ({
+    api,
+    app,
+    pool,
+    schools: { owner, orgA, lekki, studentLekki },
+  }) => {
+    const fixture = await chargeFixture(app, api, owner);
+    const { rows } = await insertDraft(pool, {
+      organizationId: orgA.id,
+      studentId: studentLekki.id,
+      termId: fixture.firstTermId,
+      campusId: lekki.id,
+      kind: 'adhoc',
+      reference: 'ONEOFF-FROZEN',
+    });
+    const id = rows[0].id as string;
+
+    await rejects(
+      pool,
+      [`UPDATE invoice SET reference = 'ONEOFF-OTHER' WHERE id = $1`, [id]],
+      /only the status, number and issue details/
+    );
+    await rejects(
+      pool,
+      [`UPDATE invoice SET request_hash = 'other' WHERE id = $1`, [id]],
+      /only the status, number and issue details/
     );
   });
 });

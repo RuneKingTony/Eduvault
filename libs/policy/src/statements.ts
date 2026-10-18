@@ -9,7 +9,7 @@ export const statements = {
   session: ['create', 'read', 'update', 'setCurrent'],
   class: ['create', 'read', 'readAll', 'update', 'assignTeacher'],
   feeLine: ['create', 'read', 'readOwn', 'update', 'retire'],
-  invoice: ['bill', 'read', 'readOwn'],
+  invoice: ['bill', 'charge', 'read', 'readOwn'],
   payment: ['record', 'read', 'readOwn', 'void'],
   adjustment: ['create', 'read', 'approve'],
   announcement: ['create', 'read', 'update'],
@@ -102,6 +102,8 @@ export const PERM_HELP: Partial<Record<Permission, string>> = {
     'Renames, retires and restores subjects, sets each level’s subjects and chooses elective students.',
   'invoice:bill':
     'Prepares, sends and cancels rounds of student charges, on the campuses they see.',
+  'invoice:charge':
+    "Adds one-off charges to a student's account, on the campuses they see.",
   'invoice:read': 'Sees rounds and charges, and what each one posted.',
   'invoice:readOwn':
     'Students see their own charges. Guardians see their children’s.',

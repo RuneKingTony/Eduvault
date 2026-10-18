@@ -10,6 +10,7 @@ import {
   feeLineCreatedActivity,
   feeLineRetiredActivity,
   feeLinesCopiedActivity,
+  oneOffChargeActivity,
   paymentCancellationDeclinedActivity,
   paymentCancelledActivity,
   paymentRecordedActivity,
@@ -21,6 +22,7 @@ import {
   type AdjustmentFacts,
   type DiscountFacts,
   type FinanceActor,
+  type OneOffChargeFacts,
   type PaymentFacts,
   type StoreSaleFacts,
   type StoreWriteOffFacts,
@@ -834,5 +836,44 @@ describe('feeLinesCopiedActivity', () => {
 
   it('writes nothing when no line was copied', () => {
     expect(feeLinesCopiedActivity(actor, terms, [])).toEqual([]);
+  });
+});
+
+describe('oneOffChargeActivity', () => {
+  const charge: OneOffChargeFacts = {
+    id: 'invoice-1',
+    number: 'CHG-2026-0031',
+    studentId: 'student-1',
+    studentName: 'Bola Ade',
+    campusId: LEKKI,
+    totalMinor: 1_750_000,
+  };
+
+  it('writes one finance row on the student’s campus', () => {
+    expect(oneOffChargeActivity(actor, charge)).toEqual([
+      {
+        organizationId: 'org-1',
+        campusId: LEKKI,
+        pillar: 'finance',
+        kind: 'charge.adhoc',
+        actorUserId: 'user-1',
+        subjectType: 'invoice',
+        subjectId: 'invoice-1',
+        text: 'Charged Bola Ade ₦17,500 (CHG-2026-0031)',
+        data: {
+          invoiceId: 'invoice-1',
+          number: 'CHG-2026-0031',
+          studentId: 'student-1',
+          amountMinor: 1_750_000,
+        },
+      },
+    ]);
+  });
+
+  it('formats the amount in the school currency', () => {
+    const [row] = oneOffChargeActivity({ ...actor, currency: 'GHS' }, charge);
+    expect(row?.text).toBe(
+      `Charged Bola Ade ${money(1_750_000, 'GHS')} (CHG-2026-0031)`
+    );
   });
 });

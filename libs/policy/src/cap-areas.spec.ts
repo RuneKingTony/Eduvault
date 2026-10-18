@@ -252,7 +252,7 @@ describe('capSummary', () => {
       'Parents and guardians: add guardians and link them to students',
       'Announcements: write, publish, pin and withdraw announcements',
       'Fees: set and change what each class pays',
-      'Charges: charge students and send the charges',
+      'Charges: charge students, send the charges and add one-off charges',
       'Payments: record payments and issue receipts',
       'Asks to cancel payments',
       'Discounts and refunds: ask for refunds, fee reductions, cancelled balances and discounts',
@@ -299,7 +299,7 @@ describe('capSummary', () => {
       'Students: can see',
       'Parents and guardians: can see',
       'Fees: set and change what each class pays',
-      'Charges: charge students and send the charges',
+      'Charges: charge students, send the charges and add one-off charges',
       'Payments: record payments and issue receipts',
       'Asks to cancel payments',
       'Discounts and refunds: ask for refunds, fee reductions, cancelled balances and discounts',
@@ -431,17 +431,28 @@ describe('the Charges area', () => {
     expect(charges.group).toBe('Money');
     expect(charges.label).toBe('Charges');
     expect(charges.see).toEqual(['invoice:read']);
-    expect(charges.change).toEqual(['invoice:bill']);
-    expect(charges.changeDesc).toBe('Charge students and send the charges');
+    expect(charges.change).toEqual(['invoice:bill', 'invoice:charge']);
+    expect(charges.changeDesc).toBe(
+      'Charge students, send the charges and add one-off charges'
+    );
     expect(charges.important).toBe(false);
   });
 
-  it('is see for invoice:read, change with invoice:bill and custom for a lone bill', () => {
+  it('is see for invoice:read, change with bill and charge, and custom without both', () => {
     expect(capLevel(toPermissionMap(['invoice:read']), charges)).toBe('see');
     expect(
-      capLevel(toPermissionMap(['invoice:read', 'invoice:bill']), charges)
+      capLevel(
+        toPermissionMap(['invoice:read', 'invoice:bill', 'invoice:charge']),
+        charges
+      )
     ).toBe('change');
+    expect(
+      capLevel(toPermissionMap(['invoice:read', 'invoice:bill']), charges)
+    ).toBe('see');
     expect(capLevel(toPermissionMap(['invoice:bill']), charges)).toBe('custom');
+    expect(capLevel(toPermissionMap(['invoice:charge']), charges)).toBe(
+      'custom'
+    );
   });
 
   it('keeps invoice:readOwn in the Portal area, not the legacy list', () => {
@@ -451,7 +462,7 @@ describe('the Charges area', () => {
 
   it('summarises the bursar as able to charge and the administrator as able to see', () => {
     expect(summaryFor('bursar')).toContain(
-      'Charges: charge students and send the charges'
+      'Charges: charge students, send the charges and add one-off charges'
     );
     expect(summaryFor('administrator')).toContain('Charges: can see');
     expect(summaryFor('principal')).toContain('Charges: can see');

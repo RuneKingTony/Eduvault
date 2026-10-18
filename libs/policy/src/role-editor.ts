@@ -243,6 +243,7 @@ export const ACTION_WORDS: Record<Action, string> = {
   manageAccounts: 'manage accounts',
   retire: 'retire',
   bill: 'charge students',
+  charge: 'add one-off charges',
   record: 'record',
   receive: 'receive stock',
   issue: 'sell to students',

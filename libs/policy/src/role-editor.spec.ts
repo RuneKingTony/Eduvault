@@ -403,8 +403,9 @@ describe('Advanced grid vocabulary', () => {
     expect(RESOURCE_PILLARS.leave).toBe('People and access');
   });
 
-  it('words the bill action', () => {
+  it('words the bill and charge actions', () => {
     expect(ACTION_WORDS.bill).toBe('charge students');
+    expect(ACTION_WORDS.charge).toBe('add one-off charges');
   });
 });
 
