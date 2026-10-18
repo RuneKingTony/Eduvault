@@ -153,6 +153,14 @@ describe('approvalListQuerySchema', () => {
       false
     );
   });
+
+  it('accepts a campus id, leaves it out by default and refuses a blank one', () => {
+    expect(approvalListQuerySchema.parse({ campusId: id }).campusId).toBe(id);
+    expect(approvalListQuerySchema.parse({}).campusId).toBeUndefined();
+    expect(approvalListQuerySchema.safeParse({ campusId: '' }).success).toBe(
+      false
+    );
+  });
 });
 
 describe('approvalListSchema', () => {

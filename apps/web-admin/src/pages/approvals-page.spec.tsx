@@ -13,6 +13,7 @@ import {
   COUNT_APPROVAL_ID,
 } from '../test-approvals';
 import { leaveDto, myLeave } from '../test-leave';
+import { IKEJA, LEKKI } from '../test-members';
 import { APPROVAL_KIND_UI } from '../components/approvals/approval-copy';
 import { renderPayments } from '../test-payments';
 import { actingAccess, fakeAccess, starterAccess } from '../test-utils';
@@ -34,17 +35,22 @@ function setup(
     mine?: ReturnType<typeof myLeave>;
     search?: ApprovalsSearch;
     onSearch?: (next: ApprovalsSearch) => void;
+    campuses?: (typeof LEKKI)[];
+    listError?: Error;
   } = {}
 ) {
   const done = { id: 'x', status: 'approved' };
   const api = {
+    campuses: { list: vi.fn().mockResolvedValue(options.campuses ?? [LEKKI]) },
     approvals: {
       list: vi
         .fn()
         .mockImplementation(({ query }: { query: { page: number } }) =>
-          Promise.resolve(
-            options.listFor?.(query.page) ?? options.list ?? approvalList()
-          )
+          options.listError === undefined
+            ? Promise.resolve(
+                options.listFor?.(query.page) ?? options.list ?? approvalList()
+              )
+            : Promise.reject(options.listError)
         ),
     },
     paymentVoids: {
@@ -572,6 +578,157 @@ describe('ApprovalsPage leave rows', () => {
     });
     await waitFor(() => {
       expect(api.approvals.list.mock.calls.length).toBeGreaterThan(1);
+    });
+  });
+});
+
+describe('ApprovalsPage campus picker', () => {
+  const two = [LEKKI, IKEJA];
+  const both = approvalList([voidApproval(), leaveApproval()]);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('hides the Campus select with one campus', async () => {
+    setup({ list: both, campuses: [LEKKI] });
+    await screen.findByText('Cancel a payment');
+    expect(screen.queryByRole('combobox', { name: 'Campus' })).toBeNull();
+  });
+
+  it('shows the Campus select with two campuses, All campuses first', async () => {
+    setup({ list: both, campuses: two });
+    const select = await screen.findByRole('combobox', { name: 'Campus' });
+    expect(
+      within(select)
+        .getAllByRole('option')
+        .map((option) => option.textContent)
+    ).toEqual(['All campuses', LEKKI.name, IKEJA.name]);
+    expect(select).toHaveValue('');
+  });
+
+  it('shows the select even when the tabs and the switch are hidden', async () => {
+    setup({ list: approvalList([voidApproval()]), campuses: two });
+    expect(
+      await screen.findByRole('combobox', { name: 'Campus' })
+    ).toBeVisible();
+    expect(screen.queryByRole('tab')).toBeNull();
+    expect(screen.queryByRole('switch')).toBeNull();
+  });
+
+  it('keeps the picked tab when a campus is chosen', async () => {
+    const onSearch = vi.fn();
+    setup({
+      list: both,
+      campuses: two,
+      search: { tab: 'leave' },
+      onSearch,
+    });
+    fireEvent.change(await screen.findByRole('combobox', { name: 'Campus' }), {
+      target: { value: IKEJA.id },
+    });
+    expect(onSearch).toHaveBeenCalledWith({ tab: 'leave', campus: IKEJA.id });
+  });
+
+  it('starts over on page 1 when a campus is chosen', async () => {
+    const first = Array.from({ length: 10 }, (_, index) =>
+      approvalItem({ id: `first-${index}`, details: `Request ${index}` })
+    );
+    setup({
+      listFor: (page) =>
+        approvalList(page === 1 ? first : [voidApproval()], { total: 11 }),
+      campuses: two,
+    });
+    fireEvent.click(await screen.findByRole('button', { name: 'Page 2' }));
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Page 2' })).toHaveAttribute(
+        'aria-current',
+        'page'
+      );
+    });
+    fireEvent.change(screen.getByRole('combobox', { name: 'Campus' }), {
+      target: { value: IKEJA.id },
+    });
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Page 1' })).toHaveAttribute(
+        'aria-current',
+        'page'
+      );
+    });
+  });
+
+  it('keeps the Campus select when the picked campus is refused, so All campuses is one pick away', async () => {
+    const onSearch = vi.fn();
+    setup({
+      campuses: two,
+      search: { campus: 'stale-campus' },
+      listError: new Error('Campus not found'),
+      onSearch,
+    });
+    expect(await screen.findByText('Campus not found')).toBeVisible();
+    expect(screen.getByRole('combobox', { name: 'Campus' })).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Show all campuses' }));
+    expect(onSearch).toHaveBeenCalledWith({ campus: undefined });
+  });
+
+  it('gives a single-campus viewer a way back to All campuses when the picked campus is refused', async () => {
+    const onSearch = vi.fn();
+    setup({
+      campuses: [LEKKI],
+      search: { campus: 'stale-campus' },
+      listError: new Error('Campus not found'),
+      onSearch,
+    });
+    expect(await screen.findByText('Campus not found')).toBeVisible();
+    expect(screen.queryByRole('combobox', { name: 'Campus' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Show all campuses' }));
+    expect(onSearch).toHaveBeenCalledWith({ campus: undefined });
+  });
+
+  it('asks for the picked campus', async () => {
+    const api = setup({
+      list: both,
+      campuses: two,
+      search: { campus: IKEJA.id },
+    });
+    expect(await screen.findByRole('combobox', { name: 'Campus' })).toHaveValue(
+      IKEJA.id
+    );
+    expect(api.approvals.list).toHaveBeenCalledWith({
+      query: { page: 1, includeOthers: false, campusId: IKEJA.id },
+    });
+  });
+
+  it('clears the campus with All campuses and keeps the tab', async () => {
+    const onSearch = vi.fn();
+    setup({
+      list: both,
+      campuses: two,
+      search: { tab: 'money', campus: IKEJA.id },
+      onSearch,
+    });
+    fireEvent.change(await screen.findByRole('combobox', { name: 'Campus' }), {
+      target: { value: '' },
+    });
+    expect(onSearch).toHaveBeenCalledWith({ tab: 'money', campus: undefined });
+  });
+
+  it('keeps the campus when a tab is chosen', async () => {
+    const onSearch = vi.fn();
+    setup({
+      list: both,
+      campuses: two,
+      search: { campus: LEKKI.id },
+      onSearch,
+    });
+    const leave = await screen.findByRole('tab', { name: /Leave/ });
+    fireEvent.mouseDown(leave);
+    fireEvent.click(leave);
+    await waitFor(() => {
+      expect(onSearch).toHaveBeenCalledWith({
+        tab: 'leave',
+        campus: LEKKI.id,
+      });
     });
   });
 });

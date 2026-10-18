@@ -1,3 +1,4 @@
+import { NotFoundException } from '@nestjs/common';
 import { APPROVAL_PAGE_SIZE } from '@eduvault/api-contract';
 import { toPermissionMap, type Permission } from '@eduvault/policy';
 import {
@@ -6,6 +7,7 @@ import {
   type WaitingApproval,
 } from '../../common/approvals';
 import type { OrgContext } from '../../common/auth';
+import type { CampusService } from '../campus/campus.service';
 import { ApprovalsRepository } from './approvals.repository';
 import { ApprovalsService } from './approvals.service';
 
@@ -32,12 +34,13 @@ const org = (
     approve?: boolean;
     acting?: boolean;
     permissions?: Permission[];
+    campusScope?: OrgContext['campusScope'];
   } = {}
 ) =>
   ({
     organizationId: 'school-a',
     user: { id: userId },
-    campusScope: 'all',
+    campusScope: options.campusScope ?? 'all',
     permissions: toPermissionMap(
       options.permissions ??
         (options.approve === false ? ['payment:read'] : ['adjustment:approve'])
@@ -53,13 +56,23 @@ class FakeApprovals extends ApprovalsRepository {
   }
 }
 
-const serviceOver = (...providers: ApprovalProvider[]) => {
+const inScope = {
+  assertInScope: () => Promise.resolve(),
+} as unknown as CampusService;
+
+const serviceWith = (
+  campuses: CampusService,
+  ...providers: ApprovalProvider[]
+) => {
   const registry = new ApprovalRegistry();
   for (const source of providers) {
     registry.add(source);
   }
-  return new ApprovalsService(registry, new FakeApprovals());
+  return new ApprovalsService(registry, new FakeApprovals(), campuses);
 };
+
+const serviceOver = (...providers: ApprovalProvider[]) =>
+  serviceWith(inScope, ...providers);
 
 const voidItem = waiting({
   kind: 'payment_void',
@@ -168,6 +181,128 @@ describe('ApprovalsService.list', () => {
       page1
     );
     expect(list.items).toHaveLength(1);
+  });
+});
+
+const inCampus = (campusId: string, over: Partial<WaitingApproval>) =>
+  waiting({ campusId, ...over });
+
+const scopedProvider = (...items: WaitingApproval[]) => ({
+  waiting: vi.fn((scope: Parameters<ApprovalProvider['waiting']>[0]) =>
+    Promise.resolve(
+      items.filter(
+        (item) =>
+          scope.campusScope === 'all' ||
+          (item.campusId !== null && scope.campusScope.includes(item.campusId))
+      )
+    )
+  ),
+});
+
+describe('ApprovalsService.list campus picker', () => {
+  const lekkiVoid = inCampus('lekki', {
+    id: 'lekki-void',
+    kind: 'payment_void',
+  });
+  const ikejaLeave = inCampus('ikeja', {
+    id: 'ikeja-leave',
+    kind: 'leave',
+    createdById: 'ayo',
+  });
+  const ikejaOther = inCampus('ikeja', { id: 'ikeja-money' });
+
+  it('hands every provider the picked campus as the scope', async () => {
+    const source = scopedProvider(lekkiVoid, ikejaLeave);
+    const assertInScope = vi.fn().mockResolvedValue(undefined);
+    const service = serviceWith(
+      { assertInScope } as unknown as CampusService,
+      source
+    );
+    const grace = org('grace');
+
+    const list = await service.list(grace, { ...page1, campusId: 'lekki' });
+
+    expect(assertInScope).toHaveBeenCalledWith(grace, 'lekki');
+    expect(source.waiting).toHaveBeenCalledWith({
+      organizationId: 'school-a',
+      campusScope: ['lekki'],
+    });
+    expect(list.items.map((item) => item.id)).toEqual(['lekki-void']);
+  });
+
+  it('keeps the viewer’s own campus scope when no campus is picked', async () => {
+    const source = scopedProvider(lekkiVoid, ikejaOther);
+    const service = serviceWith(inScope, source);
+
+    const list = await service.list(
+      org('grace', { campusScope: ['lekki', 'ikeja'] }),
+      page1
+    );
+
+    expect(source.waiting).toHaveBeenCalledWith({
+      organizationId: 'school-a',
+      campusScope: ['lekki', 'ikeja'],
+    });
+    expect(list.total).toBe(2);
+  });
+
+  it('counts others and pillars from the narrowed list', async () => {
+    const service = serviceOver(
+      scopedProvider(lekkiVoid, ikejaLeave, ikejaOther)
+    );
+    const grace = org('grace', {
+      permissions: ['adjustment:approve', 'adjustment:read'],
+    });
+
+    const all = await service.list(grace, page1);
+    const ikeja = await service.list(grace, { ...page1, campusId: 'ikeja' });
+
+    expect(all.othersCount).toBe(1);
+    expect(all.pillars).toEqual({ money: 2, leave: 0 });
+    expect(ikeja.othersCount).toBe(1);
+    expect(ikeja.pillars).toEqual({ money: 1, leave: 0 });
+    expect(ikeja.total).toBe(1);
+  });
+
+  it('never narrows the summary', async () => {
+    const source = scopedProvider(lekkiVoid, ikejaOther);
+    const summary = await serviceWith(inScope, source).summary(org('grace'));
+
+    expect(source.waiting).toHaveBeenCalledWith({
+      organizationId: 'school-a',
+      campusScope: 'all',
+    });
+    expect(summary.waitingForMe).toBe(2);
+  });
+
+  it('passes on the 404 and asks no provider when the campus is out of scope', async () => {
+    const source = scopedProvider(lekkiVoid);
+    const service = serviceWith(
+      {
+        assertInScope: () =>
+          Promise.reject(new NotFoundException('Campus not found')),
+      } as unknown as CampusService,
+      source
+    );
+
+    await expect(
+      service.list(org('grace'), { ...page1, campusId: 'elsewhere' })
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(source.waiting).not.toHaveBeenCalled();
+  });
+
+  it('gives a member who cannot approve an empty list for a valid campus', async () => {
+    const source = scopedProvider(lekkiVoid);
+    const service = serviceWith(inScope, source);
+
+    const list = await service.list(org('yemi', { approve: false }), {
+      ...page1,
+      campusId: 'lekki',
+    });
+
+    expect(list.items).toEqual([]);
+    expect(list.total).toBe(0);
+    expect(source.waiting).not.toHaveBeenCalled();
   });
 });
 

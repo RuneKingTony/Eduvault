@@ -651,3 +651,135 @@ test.describe('leave in the queue', () => {
     });
   });
 });
+
+const queueFor = async (
+  api: Parameters<typeof askVoid>[0],
+  actor: Parameters<typeof askVoid>[1],
+  campusId: string
+): Promise<ApprovalList> =>
+  (await api(actor).get(`/approvals?campusId=${campusId}`).expect(200))
+    .body as ApprovalList;
+
+test.describe('the campus picker', () => {
+  test('narrows an owner’s queue to the picked campus, and the summary stays school-wide', async ({
+    api,
+    app,
+    withPermissions,
+    schools: {
+      owner,
+      orgA,
+      lekki,
+      ikeja,
+      lekkiOnly,
+      studentLekki,
+      studentIkeja,
+    },
+  }) => {
+    await owes(app, owner, { studentId: studentLekki.id, amountMinor: OWED });
+    await owes(app, owner, { studentId: studentIkeja.id, amountMinor: OWED });
+    const ikejaAsker = await withPermissions(
+      orgA,
+      ['adjustment:create', 'adjustment:read'],
+      { campuses: [ikeja] }
+    );
+    const atLekki = await askAdjustment(api, lekkiOnly, {
+      kind: 'credit_note',
+      studentId: studentLekki.id,
+      amountMinor: 100_000,
+      reason: 'Lekki one',
+    });
+    const atIkeja = await askAdjustment(api, ikejaAsker, {
+      kind: 'credit_note',
+      studentId: studentIkeja.id,
+      amountMinor: 100_000,
+      reason: 'Ikeja one',
+    });
+
+    const both = await queue(api, owner);
+    const onLekki = await queueFor(api, owner, lekki.id);
+    const onIkeja = await queueFor(api, owner, ikeja.id);
+
+    expect(both.items.map((item) => item.id)).toEqual(
+      expect.arrayContaining([atLekki.adjustment.id, atIkeja.adjustment.id])
+    );
+    expect(both.total).toBe(2);
+    expect(onLekki.items.map((item) => item.id)).toEqual([
+      atLekki.adjustment.id,
+    ]);
+    expect(onLekki).toMatchObject({ total: 1, othersCount: 0 });
+    expect(onIkeja.items.map((item) => item.id)).toEqual([
+      atIkeja.adjustment.id,
+    ]);
+    expect(await summary(api, owner)).toMatchObject({
+      waitingForMe: 2,
+      byNav: { approvals: 2, payments: 2, store: 0 },
+    });
+  });
+
+  test('shows a payment void allocated to students on both campuses under either campus', async ({
+    api,
+    app,
+    schools: { owner, lekki, ikeja, studentLekki, studentIkeja },
+  }) => {
+    const account = await bankAccount(app, owner);
+    const receipt = await recordCash(api, owner, {
+      accountId: account.id,
+      allocations: [
+        { studentId: studentLekki.id, amountMinor: 100_000 },
+        { studentId: studentIkeja.id, amountMinor: 100_000 },
+      ],
+    });
+    const { void: asked } = await askVoid(api, owner, receipt.id);
+
+    for (const campus of [lekki, ikeja]) {
+      const list = await queueFor(api, owner, campus.id);
+      expect(list.items.map((item) => item.id)).toEqual([asked.id]);
+    }
+  });
+
+  test('lists leave under the requester’s campus only, and not a requester on no campus', async ({
+    api,
+    clock,
+    addMember,
+    createUser,
+    schools: { owner, orgA, lekki, ikeja, lekkiOnly },
+  }) => {
+    clock.set('2026-10-12');
+    const drifter = await addMember(orgA, await createUser(), {
+      roles: ['teacher'],
+      campuses: [],
+    });
+    const atLekki = await askLeave(api, lekkiOnly, { startsOn: '2026-10-22' });
+    const noCampus = await askLeave(api, drifter, { startsOn: '2026-10-23' });
+
+    const all = await queue(api, owner);
+    const onLekki = await queueFor(api, owner, lekki.id);
+    const onIkeja = await queueFor(api, owner, ikeja.id);
+
+    expect(all.total).toBe(2);
+    expect(all.items.map((item) => item.id)).toEqual(
+      expect.arrayContaining([atLekki.id, noCampus.id])
+    );
+    expect(onLekki.items.map((item) => item.id)).toEqual([atLekki.id]);
+    expect(onIkeja.items).toEqual([]);
+  });
+
+  test('answers 404 for a campus outside the viewer’s scope or another school’s', async ({
+    api,
+    withPermissions,
+    schools: { owner, orgA, lekki, ikeja, campusB },
+  }) => {
+    const ikejaApprover = await withPermissions(
+      orgA,
+      ['adjustment:read', 'adjustment:approve'],
+      { campuses: [ikeja] }
+    );
+
+    await api(ikejaApprover).get(`/approvals?campusId=${lekki.id}`).expect(404);
+    await api(owner).get(`/approvals?campusId=${campusB.id}`).expect(404);
+    expect(await queueFor(api, ikejaApprover, ikeja.id)).toMatchObject({
+      items: [],
+      total: 0,
+    });
+  });
+});

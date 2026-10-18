@@ -13,12 +13,11 @@ import type { Item } from '@eduvault/api-contract';
 import { useCan, usePermissions } from '@eduvault/auth-client';
 import {
   Button,
+  CampusSelect,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  NativeSelect,
-  NativeSelectOption,
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -79,36 +78,6 @@ function InfoPopover() {
         transfer). It is never added to school fees. Stock is kept per campus.
       </PopoverContent>
     </Popover>
-  );
-}
-
-function CampusSelect({
-  search,
-  campuses,
-  onSearchChange,
-}: PageProps & { campuses: readonly { id: string; name: string }[] }) {
-  if (campuses.length <= 1) {
-    return null;
-  }
-  return (
-    <NativeSelect
-      aria-label="Campus"
-      value={search.campus ?? ''}
-      onChange={(event) => {
-        onSearchChange({
-          ...search,
-          campus: event.target.value === '' ? undefined : event.target.value,
-          page: undefined,
-        });
-      }}
-    >
-      <NativeSelectOption value="">All campuses</NativeSelectOption>
-      {campuses.map((campus) => (
-        <NativeSelectOption key={campus.id} value={campus.id}>
-          {campus.name}
-        </NativeSelectOption>
-      ))}
-    </NativeSelect>
   );
 }
 
@@ -187,12 +156,11 @@ function Header({
   showCosts,
   onShowCosts,
 }: PageProps & { showCosts: boolean; onShowCosts: (on: boolean) => void }) {
-  const api = useApi();
   const canReceive = useCan('store', 'receive');
   const canIssue = useCan('store', 'issue');
   const canCount = useCan('store', 'count');
   const { campusScope } = usePermissions();
-  const campuses = useQuery(campusesQueryOptions(api)).data ?? [];
+  const campuses = useQuery(campusesQueryOptions(useApi())).data ?? [];
   return (
     <header className="flex flex-wrap items-start justify-between gap-3">
       <div className="flex flex-col gap-1">
@@ -215,9 +183,11 @@ function Header({
           onCheckedChange={onShowCosts}
         />
         <CampusSelect
-          search={search}
           campuses={campuses}
-          onSearchChange={onSearchChange}
+          value={search.campus}
+          onChange={(campus) => {
+            onSearchChange({ ...search, campus, page: undefined });
+          }}
         />
         <Actions
           canIssue={canIssue}

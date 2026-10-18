@@ -96,6 +96,7 @@ export const approvalListQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   includeOthers: z.union([z.boolean(), z.stringbool()]).default(false),
   pillar: approvalPillarSchema.optional(),
+  campusId: idSchema.optional(),
 });
 export type ApprovalListQuery = z.output<typeof approvalListQuerySchema>;
 

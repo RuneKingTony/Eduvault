@@ -827,23 +827,33 @@ export const APPROVALS_REFRESH_MS = 60_000;
 interface ApprovalsView {
   includeOthers: boolean;
   pillar: ApprovalPillar | undefined;
+  campusId: string | undefined;
 }
 
-const PLAIN_VIEW: ApprovalsView = { includeOthers: false, pillar: undefined };
+const PLAIN_VIEW: ApprovalsView = {
+  includeOthers: false,
+  pillar: undefined,
+  campusId: undefined,
+};
 
 export const approvalsQueryOptions = (
   api: Api,
   page: number,
-  { includeOthers, pillar }: ApprovalsView = PLAIN_VIEW
+  { includeOthers, pillar, campusId }: ApprovalsView = PLAIN_VIEW
 ) =>
   queryOptions({
-    queryKey: [...APPROVALS_KEY, 'list', { page, includeOthers, pillar }],
+    queryKey: [
+      ...APPROVALS_KEY,
+      'list',
+      { page, includeOthers, pillar, campusId },
+    ],
     queryFn: () =>
       api.approvals.list({
         query: {
           page,
           includeOthers,
           ...(pillar === undefined ? {} : { pillar }),
+          ...(campusId === undefined ? {} : { campusId }),
         },
       }),
     placeholderData: keepPreviousData,
