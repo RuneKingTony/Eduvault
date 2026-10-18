@@ -435,6 +435,7 @@ export type Delivery = z.infer<typeof deliverySchema>;
 
 export const deliveryLineSchema = z.object({
   itemId: idSchema,
+  itemName: z.string(),
   displayName: z.string(),
   retired: z.boolean(),
   quantity: z.number().int().positive(),

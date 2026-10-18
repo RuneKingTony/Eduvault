@@ -58,6 +58,7 @@ const toDelivery = (row: DeliveryRow): Delivery => ({
 
 const toDeliveryLine = (line: LineRow): DeliveryLine => ({
   itemId: line.item_id,
+  itemName: line.name,
   displayName: itemDisplayName({ name: line.name, variant: line.variant }),
   retired: line.retired,
   quantity: line.quantity,

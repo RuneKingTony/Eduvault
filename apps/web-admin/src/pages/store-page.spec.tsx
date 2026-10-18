@@ -10,11 +10,14 @@ import { SHOW_COSTS_KEY } from '../components/store/use-show-costs';
 import { IKEJA, LEKKI } from '../test-members';
 import {
   BANK_ACCOUNT_ID,
+  DELIVERY_ID,
   LEVEL_ID,
   SHIRT_ID,
   SALE_ID,
   stockCount,
   stockCountList,
+  deliveryDetail,
+  deliveryLine,
   deliveryList,
   itemList,
   moneyAccountList,
@@ -58,6 +61,7 @@ function setup(
     access?: ReturnType<typeof ownerAccess>;
     search?: Search;
     campuses?: (typeof LEKKI)[];
+    delivery?: ReturnType<typeof deliveryDetail>;
     items?: (args: { query: { page?: number } }) => Promise<ItemList>;
     summary?: ReturnType<typeof storeSummary>;
   } = {}
@@ -83,6 +87,7 @@ function setup(
         .mockResolvedValue(
           deliveryList([openingDelivery(), recordedDelivery()])
         ),
+      delivery: vi.fn().mockResolvedValue(options.delivery ?? deliveryDetail()),
       createItem: vi.fn(),
       updateItem: vi.fn(),
       recordDelivery: vi.fn().mockResolvedValue(recordedDelivery()),
@@ -193,6 +198,71 @@ describe('StorePage', () => {
 
     expect(await screen.findByText('₦35,000')).toBeVisible();
     expect(screen.getByText('₦100,000')).toBeVisible();
+  });
+
+  it('opens a delivery by putting its id in the address', async () => {
+    const { onSearchChange } = setup({ search: { tab: 'deliveries' } });
+
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'DEL-2026-0001' })
+    );
+
+    expect(onSearchChange).toHaveBeenCalledWith({
+      tab: 'deliveries',
+      delivery: DELIVERY_ID,
+    });
+  });
+
+  it('shows the delivery sheet and takes an item to the Items tab on the delivery campus', async () => {
+    const { api, onSearchChange } = setup({
+      search: { tab: 'deliveries', delivery: DELIVERY_ID },
+    });
+
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'School shirt, Size 12' })
+    );
+
+    expect(api.store.delivery).toHaveBeenCalledWith({
+      params: { id: DELIVERY_ID },
+    });
+    expect(onSearchChange).toHaveBeenCalledWith({
+      campus: LEKKI.id,
+      q: 'School shirt',
+      retired: undefined,
+    });
+  });
+
+  it('keeps the chosen campus for a single-campus viewer and shows retired items', async () => {
+    const { onSearchChange } = setup({
+      campuses: [LEKKI],
+      search: { tab: 'deliveries', delivery: DELIVERY_ID },
+      delivery: deliveryDetail({
+        lines: [deliveryLine({ retired: true })],
+      }),
+    });
+
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'School shirt, Size 12' })
+    );
+
+    expect(onSearchChange).toHaveBeenCalledWith({
+      campus: undefined,
+      q: 'School shirt',
+      retired: 1,
+    });
+  });
+
+  it('closes the delivery sheet by clearing it from the address', async () => {
+    const { onSearchChange } = setup({
+      search: { tab: 'deliveries', delivery: DELIVERY_ID },
+    });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Close' }));
+
+    expect(onSearchChange).toHaveBeenCalledWith({
+      tab: 'deliveries',
+      delivery: undefined,
+    });
   });
 
   it('shows the Low stock badge at the low level, and turns the low filter on from the Stock value tile', async () => {

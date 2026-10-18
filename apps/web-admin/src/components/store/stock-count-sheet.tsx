@@ -20,7 +20,6 @@ import {
   SheetFooter,
   SheetHeader,
   SheetTitle,
-  Skeleton,
   Table,
   TableBody,
   TableCell,
@@ -46,6 +45,7 @@ import {
   withCounted,
   type CountState,
 } from './stock-count-model';
+import { SheetPending } from './sheet-pending';
 import { countSubmittedMessage, itemDetail } from './store-text';
 
 interface StockCountSheetProps {
@@ -289,11 +289,7 @@ function SheetBody({
     );
   }
   if (campuses.data === undefined || items.data === undefined) {
-    return (
-      <div role="status" aria-label="Loading" className="px-4">
-        <Skeleton className="h-48 w-full" />
-      </div>
-    );
+    return <SheetPending />;
   }
   return (
     <CountForm
