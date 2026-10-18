@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  FEE_COPY_NO_SOURCE_MESSAGE,
   FEE_EVERY_CAMPUS_MESSAGE,
   FEE_LINE_ALREADY_RETIRED_MESSAGE,
   FEE_LINE_RETIRED_MESSAGE,
@@ -66,12 +67,18 @@ function setup(...seeded: FeeLine[]) {
   lines.rows.push(...seeded);
   lines.terms.set('term-1', {
     id: 'term-1',
+    name: 'First term',
+    schoolYearName: '2026/2027',
     sessionId: 'session-1',
+    startsOn: '2026-09-07',
     endsOn: '2026-12-18',
   });
   lines.terms.set('past', {
     id: 'past',
+    name: 'Third term',
+    schoolYearName: '2025/2026',
     sessionId: 'session-0',
+    startsOn: '2026-04-20',
     endsOn: '2026-07-24',
   });
   lines.levels.set('jss2', { id: 'jss2', name: 'JSS 2' });
@@ -307,5 +314,187 @@ describe('FeeLineService.list', () => {
       includeRetired: true,
     });
     expect(byType.map((row) => row.id)).toEqual(['line-2']);
+  });
+});
+
+describe('FeeLineService.copySource', () => {
+  it('answers 404 for a term outside the school', async () => {
+    const { service } = setup();
+    await expect(
+      service.copySource(everyone, 'elsewhere')
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('names no source for the earliest term', async () => {
+    const { service } = setup();
+    await expect(service.copySource(everyone, 'past')).resolves.toEqual({
+      sourceTerm: null,
+      liveLineCount: 0,
+      targetHasLines: false,
+    });
+  });
+
+  it('counts the live lines of the previous term and flags a target with lines', async () => {
+    const { service } = setup(
+      line({ id: 'a', termId: 'past' }),
+      line({ id: 'b', termId: 'past', feeTypeId: 'pta' }),
+      line({
+        id: 'c',
+        termId: 'past',
+        feeTypeId: 'pta',
+        retiredAt: '2026-07-01T00:00:00.000Z',
+      })
+    );
+    await expect(service.copySource(everyone, 'term-1')).resolves.toEqual({
+      sourceTerm: {
+        id: 'past',
+        name: 'Third term',
+        schoolYearName: '2025/2026',
+      },
+      liveLineCount: 2,
+      targetHasLines: false,
+    });
+    const filled = setup(
+      line({ id: 'a', termId: 'past' }),
+      line({ id: 'b', termId: 'term-1' })
+    );
+    await expect(
+      filled.service.copySource(everyone, 'term-1')
+    ).resolves.toMatchObject({ liveLineCount: 1, targetHasLines: true });
+  });
+});
+
+describe('FeeLineService.copySource for a campus-scoped caller', () => {
+  it('names the source term but reports no school-wide counts', async () => {
+    const { service } = setup(
+      line({ id: 'a', termId: 'past' }),
+      line({ id: 'b', termId: 'term-1' })
+    );
+    await expect(service.copySource(lekkiOnly, 'term-1')).resolves.toEqual({
+      sourceTerm: {
+        id: 'past',
+        name: 'Third term',
+        schoolYearName: '2025/2026',
+      },
+      liveLineCount: 0,
+      targetHasLines: false,
+    });
+  });
+});
+
+describe('FeeLineService.copy', () => {
+  it('refuses a campus-scoped member with 403 before looking at the term', async () => {
+    const { service, lines } = setup(line({ termId: 'past' }));
+    const refused = service.copy(lekkiOnly, { termId: 'elsewhere' });
+    await expect(refused).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(refused).rejects.toThrow(FEE_EVERY_CAMPUS_MESSAGE);
+    expect(lines.copies).toEqual([]);
+  });
+
+  it('answers 404 for a term outside the school', async () => {
+    const { service } = setup();
+    await expect(
+      service.copy(everyone, { termId: 'elsewhere' })
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('answers 400 when the term has ended', async () => {
+    const { service } = setup(line({ termId: 'past' }));
+    await expect(service.copy(everyone, { termId: 'past' })).rejects.toThrow(
+      FEE_TERM_ENDED_MESSAGE
+    );
+  });
+
+  it('answers 400 when there is no earlier term', async () => {
+    const { service, lines } = setup();
+    lines.terms.delete('past');
+    const refused = service.copy(everyone, { termId: 'term-1' });
+    await expect(refused).rejects.toBeInstanceOf(BadRequestException);
+    await expect(refused).rejects.toThrow(FEE_COPY_NO_SOURCE_MESSAGE);
+  });
+
+  it('answers 400 naming the source when it has no live lines', async () => {
+    const { service, lines } = setup(
+      line({ termId: 'past', retiredAt: '2026-07-01T00:00:00.000Z' })
+    );
+    const refused = service.copy(everyone, { termId: 'term-1' });
+    await expect(refused).rejects.toBeInstanceOf(BadRequestException);
+    await expect(refused).rejects.toThrow(
+      'Third term, 2025/2026 has no fees to copy.'
+    );
+    expect(lines.copies).toEqual([]);
+  });
+
+  it('answers 400 naming the source when every source line is retired during the copy', async () => {
+    const { service, lines } = setup(
+      line({ termId: 'past', retiredAt: '2026-07-01T00:00:00.000Z' })
+    );
+    vi.spyOn(lines, 'liveLineCount').mockResolvedValue(1);
+    const refused = service.copy(everyone, { termId: 'term-1' });
+    await expect(refused).rejects.toBeInstanceOf(BadRequestException);
+    await expect(refused).rejects.toThrow(
+      'Third term, 2025/2026 has no fees to copy.'
+    );
+  });
+
+  it('answers 409 naming the target when it already has a live line', async () => {
+    const { service, lines } = setup(
+      line({ id: 'a', termId: 'past' }),
+      line({ id: 'b', termId: 'term-1' })
+    );
+    const refused = service.copy(everyone, { termId: 'term-1' });
+    await expect(refused).rejects.toBeInstanceOf(ConflictException);
+    await expect(refused).rejects.toThrow(
+      'First term, 2026/2027 already has fees. Change them one at a time instead.'
+    );
+    expect(lines.rows.filter((row) => row.termId === 'term-1')).toHaveLength(1);
+  });
+
+  it('treats a target with only retired lines as empty', async () => {
+    const { service } = setup(
+      line({ id: 'a', termId: 'past' }),
+      line({
+        id: 'b',
+        termId: 'term-1',
+        retiredAt: '2026-10-01T00:00:00.000Z',
+      })
+    );
+    await expect(
+      service.copy(everyone, { termId: 'term-1' })
+    ).resolves.toMatchObject({ copied: 1 });
+  });
+
+  it('copies only the live lines and returns the count and source term', async () => {
+    const { service, lines } = setup(
+      line({ id: 'a', termId: 'past' }),
+      line({ id: 'b', termId: 'past', feeTypeId: 'pta', name: 'PTA' }),
+      line({
+        id: 'c',
+        termId: 'past',
+        feeTypeId: 'pta',
+        retiredAt: '2026-07-01T00:00:00.000Z',
+      })
+    );
+    await expect(service.copy(everyone, { termId: 'term-1' })).resolves.toEqual(
+      {
+        copied: 2,
+        sourceTerm: {
+          id: 'past',
+          name: 'Third term',
+          schoolYearName: '2025/2026',
+        },
+      }
+    );
+    expect(lines.copies).toEqual([
+      {
+        organizationId: 'school-a',
+        userId: 'caller',
+        fromTermId: 'past',
+        toTermId: 'term-1',
+      },
+    ]);
+    const copied = lines.rows.filter((row) => row.termId === 'term-1');
+    expect(copied.map((row) => row.name)).toEqual(['Tuition', 'PTA']);
+    expect(lines.rows.filter((row) => row.termId === 'past')).toHaveLength(3);
   });
 });

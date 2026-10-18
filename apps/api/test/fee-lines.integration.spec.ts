@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
+import type { INestApplication } from '@nestjs/common';
 import type { Pool } from 'pg';
 import {
+  FEE_COPY_NO_SOURCE_MESSAGE,
   FEE_EVERY_CAMPUS_MESSAGE,
   FEE_LINE_ALREADY_RETIRED_MESSAGE,
   FEE_LINE_AMOUNT_MESSAGE,
@@ -8,14 +10,22 @@ import {
   FEE_TERM_ENDED_MESSAGE,
   FEE_TYPE_INVALID_MESSAGE,
   FEE_TYPE_NOT_FOUND_MESSAGE,
+  feeTermLabel,
   type FeeCandidates,
+  type FeeCopyResult,
+  type FeeCopySource,
   type FeeGrid,
   type FeeLine,
   type FeePreview,
   type FeeSetup,
   type FeeType,
 } from '@eduvault/api-contract';
-import { acting, expect } from './support/base-test';
+import {
+  acting,
+  expect,
+  type Fixtures,
+  type TestUser,
+} from './support/base-test';
 import { createSchoolYear, YEAR_2027 } from './support/factories/calendar';
 import { createFeeLine, feeFixture } from './support/factories/fees';
 import { ledgerAccountId } from './support/factories/finance';
@@ -77,7 +87,51 @@ const tuitionBody = (
 });
 
 const termNames = (setup: FeeSetup) =>
-  setup.terms.map((term) => `${term.name}, ${term.schoolYearName}`);
+  setup.terms.map((term) => feeTermLabel(term));
+
+const copyScenario = async (
+  app: INestApplication,
+  api: Fixtures['api'],
+  schools: { owner: TestUser; lekki: { id: string } }
+) => {
+  const { owner, lekki } = schools;
+  const fixture = await feeFixture(app, api, owner);
+  await createSchoolYear(app, owner, YEAR_2027);
+  await makeCurrent(api, owner, { year: '2026/2027', sequence: 3 });
+  const third = await termOf(api, owner, { year: '2026/2027', sequence: 3 });
+  const next = await termOf(api, owner, { year: '2027/2028', sequence: 1 });
+  const inThird = { ...fixture, termId: third.id };
+  const as = { app, actor: owner };
+  await createFeeLine(as, inThird, {
+    name: 'Tuition',
+    amountMinor: 18_000_000,
+  });
+  await createFeeLine(as, inThird, {
+    name: 'Lekki tuition',
+    campusId: lekki.id,
+    amountMinor: 17_000_000,
+  });
+  await createFeeLine(as, inThird, {
+    name: 'School bus',
+    feeType: 'School bus',
+    amountMinor: 4_500_000,
+    isOptional: true,
+  });
+  await createFeeLine(as, inThird, {
+    name: 'PTA fee',
+    feeType: 'PTA fee',
+    amountMinor: 500_000,
+    appliesTo: 'new',
+  });
+  const old = await createFeeLine(as, inThird, {
+    name: 'Old PTA',
+    level: 'JSS1',
+    feeType: 'PTA fee',
+    amountMinor: 300_000,
+  });
+  await api(owner).post(`/fee-lines/${old.id}/retire`).expect(201);
+  return { fixture, third, next, inThird };
+};
 
 test.describe('fee lines', () => {
   test.describe('isolation', () => {
@@ -111,6 +165,13 @@ test.describe('fee lines', () => {
         .expect(404);
       await api(ownerB)
         .get(`/fee-lines/candidates?termId=${fixture.termId}`)
+        .expect(404);
+      await api(ownerB)
+        .post('/fee-lines/copy')
+        .send({ termId: fixture.termId })
+        .expect(404);
+      await api(ownerB)
+        .get(`/fee-lines/copy-source?termId=${fixture.termId}`)
         .expect(404);
       await api(ownerB)
         .put(
@@ -197,6 +258,28 @@ test.describe('fee lines', () => {
         .expect(404);
     });
 
+    test('3 and 4: copy-source gives a Lekki-only bursar the source term but no school-wide counts', async ({
+      api,
+      app,
+      schools: { owner, lekkiOnly, lekki },
+    }) => {
+      const { next, third } = await copyScenario(app, api, { owner, lekki });
+      const seen = (
+        await api(lekkiOnly)
+          .get(`/fee-lines/copy-source?termId=${next.id}`)
+          .expect(200)
+      ).body as FeeCopySource;
+      expect(seen).toEqual({
+        sourceTerm: {
+          id: third.id,
+          name: 'Third term',
+          schoolYearName: '2026/2027',
+        },
+        liveLineCount: 0,
+        targetHasLines: false,
+      });
+    });
+
     test('5: a member without feeLine permissions gets 403 on every fee route', async ({
       api,
       schools: { noPermission },
@@ -211,6 +294,8 @@ test.describe('fee lines', () => {
         ['post', '/fee-lines'],
         ['patch', `/fee-lines/${id}`],
         ['post', `/fee-lines/${id}/retire`],
+        ['get', `/fee-lines/copy-source?termId=${id}`],
+        ['post', '/fee-lines/copy'],
         ['get', '/fee-types'],
         ['post', '/fee-types'],
         ['get', `/students/${id}/fee-options`],
@@ -274,6 +359,8 @@ test.describe('fee lines', () => {
         ['post', '/fee-lines'],
         ['patch', `/fee-lines/${id}`],
         ['post', `/fee-lines/${id}/retire`],
+        ['get', `/fee-lines/copy-source?termId=${id}`],
+        ['post', '/fee-lines/copy'],
         ['get', '/fee-types'],
         ['post', '/fee-types'],
         ['get', `/students/${id}/fee-options`],
@@ -304,6 +391,13 @@ test.describe('fee lines', () => {
       await api(owner)
         .post('/fee-lines')
         .send(tuitionBody(fixture, { classLevelId: fixtureB.levelId('JSS2') }))
+        .expect(404);
+      await api(owner)
+        .post('/fee-lines/copy')
+        .send({ termId: fixtureB.termId })
+        .expect(404);
+      await api(owner)
+        .get(`/fee-lines/copy-source?termId=${fixtureB.termId}`)
         .expect(404);
       const foreignType = await api(owner)
         .post('/fee-lines')
@@ -406,6 +500,11 @@ test.describe('fee lines', () => {
             .send({ amountMinor: 2 }),
         () =>
           api(admin).post(`/fee-lines/${line.id}/retire`).set(acting(orgA.id)),
+        () =>
+          api(admin)
+            .post('/fee-lines/copy')
+            .set(acting(orgA.id))
+            .send({ termId: fixture.termId }),
         () =>
           api(admin)
             .post('/fee-types')
@@ -1340,6 +1439,239 @@ test.describe('fee lines', () => {
         )
         .send({ optedIn: true })
         .expect(404);
+    });
+  });
+
+  test.describe('copy', () => {
+    test('copies the live lines of the third term into the first term of the next year', async ({
+      api,
+      app,
+      pool,
+      schools: { owner, lekki },
+    }) => {
+      const { third, next } = await copyScenario(app, api, { owner, lekki });
+
+      const copied = (
+        await api(owner)
+          .post('/fee-lines/copy')
+          .send({ termId: next.id })
+          .expect(201)
+      ).body as FeeCopyResult;
+      expect(copied).toEqual({
+        copied: 4,
+        sourceTerm: {
+          id: third.id,
+          name: 'Third term',
+          schoolYearName: '2026/2027',
+        },
+      });
+
+      const target = (
+        await api(owner).get(`/fee-lines?termId=${next.id}`).expect(200)
+      ).body as FeeLine[];
+      expect(
+        target.map((row) => row.name).toSorted((a, b) => a.localeCompare(b))
+      ).toEqual(['Lekki tuition', 'PTA fee', 'School bus', 'Tuition']);
+      const bus = target.find((row) => row.name === 'School bus');
+      expect(bus).toMatchObject({
+        amountMinor: 4_500_000,
+        isOptional: true,
+        feeTypeName: 'School bus',
+      });
+      expect(target.find((row) => row.name === 'PTA fee')?.appliesTo).toBe(
+        'new'
+      );
+      expect(target.find((row) => row.name === 'Lekki tuition')?.campusId).toBe(
+        lekki.id
+      );
+      expect(target.every((row) => row.retiredAt === null)).toBe(true);
+
+      const source = (
+        await api(owner).get(`/fee-lines?termId=${third.id}`).expect(200)
+      ).body as FeeLine[];
+      expect(source).toHaveLength(5);
+      expect(source.filter((row) => row.retiredAt !== null)).toHaveLength(1);
+
+      const { rows } = await pool.query<{ created_by: string }>(
+        'SELECT created_by FROM fee_line WHERE term_id = $1',
+        [next.id]
+      );
+      expect(rows.map((row) => row.created_by)).toEqual(
+        Array.from({ length: 4 }, () => owner.id)
+      );
+    });
+
+    test('answers 409 for a second copy and saves nothing', async ({
+      api,
+      app,
+      schools: { owner, lekki },
+    }) => {
+      const { next } = await copyScenario(app, api, { owner, lekki });
+      await api(owner)
+        .post('/fee-lines/copy')
+        .send({ termId: next.id })
+        .expect(201);
+
+      const second = await api(owner)
+        .post('/fee-lines/copy')
+        .send({ termId: next.id })
+        .expect(409);
+      expect(second.body.message).toBe(
+        'First term, 2027/2028 already has fees. Change them one at a time instead.'
+      );
+      const target = (
+        await api(owner).get(`/fee-lines?termId=${next.id}`).expect(200)
+      ).body as FeeLine[];
+      expect(target).toHaveLength(4);
+    });
+
+    test('refuses a Lekki bursar and a member holding only feeLine:read with 403', async ({
+      api,
+      app,
+      withPermissions,
+      schools: { owner, orgA, lekkiOnly, lekki },
+    }) => {
+      const { next } = await copyScenario(app, api, { owner, lekki });
+      const refused = await api(lekkiOnly)
+        .post('/fee-lines/copy')
+        .send({ termId: next.id })
+        .expect(403);
+      expect(refused.body.message).toBe(FEE_EVERY_CAMPUS_MESSAGE);
+      const reader = await withPermissions(orgA, ['feeLine:read']);
+      await api(reader)
+        .post('/fee-lines/copy')
+        .send({ termId: next.id })
+        .expect(403);
+      await api(reader)
+        .get(`/fee-lines/copy-source?termId=${next.id}`)
+        .expect(200);
+      const target = (
+        await api(owner).get(`/fee-lines?termId=${next.id}`).expect(200)
+      ).body as FeeLine[];
+      expect(target).toEqual([]);
+    });
+
+    test('answers 400 for a term that has ended', async ({
+      api,
+      app,
+      clock,
+      schools: { owner, lekki },
+    }) => {
+      const { next } = await copyScenario(app, api, { owner, lekki });
+      clock.set('2029-01-10');
+      const ended = await api(owner)
+        .post('/fee-lines/copy')
+        .send({ termId: next.id })
+        .expect(400);
+      expect(ended.body.message).toBe(FEE_TERM_ENDED_MESSAGE);
+    });
+
+    test('answers 400 when there is no earlier term', async ({
+      api,
+      app,
+      schools: { owner },
+    }) => {
+      await feeFixture(app, api, owner);
+      const first = await termOf(api, owner, {
+        year: '2026/2027',
+        sequence: 1,
+      });
+      const refused = await api(owner)
+        .post('/fee-lines/copy')
+        .send({ termId: first.id })
+        .expect(400);
+      expect(refused.body.message).toBe(FEE_COPY_NO_SOURCE_MESSAGE);
+    });
+
+    test('reports the source term, its live count and whether the target has lines', async ({
+      api,
+      app,
+      schools: { owner, lekki },
+    }) => {
+      const { next, third, inThird } = await copyScenario(app, api, {
+        owner,
+        lekki,
+      });
+      const before = (
+        await api(owner)
+          .get(`/fee-lines/copy-source?termId=${next.id}`)
+          .expect(200)
+      ).body as FeeCopySource;
+      expect(before).toEqual({
+        sourceTerm: {
+          id: third.id,
+          name: 'Third term',
+          schoolYearName: '2026/2027',
+        },
+        liveLineCount: 4,
+        targetHasLines: false,
+      });
+
+      await createFeeLine(
+        { app, actor: owner },
+        { ...inThird, termId: next.id },
+        {
+          name: 'Tuition',
+          amountMinor: 19_000_000,
+        }
+      );
+      const after = (
+        await api(owner)
+          .get(`/fee-lines/copy-source?termId=${next.id}`)
+          .expect(200)
+      ).body as FeeCopySource;
+      expect(after.targetHasLines).toBe(true);
+    });
+
+    test('treats a target term with only retired lines as empty', async ({
+      api,
+      app,
+      schools: { owner, lekki },
+    }) => {
+      const { next, inThird } = await copyScenario(app, api, { owner, lekki });
+      const stale = await createFeeLine(
+        { app, actor: owner },
+        { ...inThird, termId: next.id },
+        { name: 'Tuition', amountMinor: 19_000_000 }
+      );
+      await api(owner).post(`/fee-lines/${stale.id}/retire`).expect(201);
+
+      const before = (
+        await api(owner)
+          .get(`/fee-lines/copy-source?termId=${next.id}`)
+          .expect(200)
+      ).body as FeeCopySource;
+      expect(before.targetHasLines).toBe(false);
+      await api(owner)
+        .post('/fee-lines/copy')
+        .send({ termId: next.id })
+        .expect(201);
+      const target = (
+        await api(owner).get(`/fee-lines?termId=${next.id}`).expect(200)
+      ).body as FeeLine[];
+      expect(target.filter((row) => row.retiredAt === null)).toHaveLength(4);
+    });
+
+    test('answers 409 to the second of two concurrent copies and saves one set of lines', async ({
+      api,
+      app,
+      schools: { owner, lekki },
+    }) => {
+      const { next } = await copyScenario(app, api, { owner, lekki });
+      const statuses = (
+        await Promise.all(
+          [1, 2].map(() =>
+            api(owner).post('/fee-lines/copy').send({ termId: next.id })
+          )
+        )
+      )
+        .map((res) => res.status)
+        .toSorted((a, b) => a - b);
+      expect(statuses).toEqual([201, 409]);
+      const target = (
+        await api(owner).get(`/fee-lines?termId=${next.id}`).expect(200)
+      ).body as FeeLine[];
+      expect(target).toHaveLength(4);
     });
   });
 });

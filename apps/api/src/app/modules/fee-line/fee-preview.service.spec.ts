@@ -57,7 +57,10 @@ function setup(rows: FeeLine[], context: StudentFeeContext | undefined) {
   lines.rows.push(...rows);
   lines.terms.set('term-1', {
     id: 'term-1',
+    name: 'First term',
+    schoolYearName: '2026/2027',
     sessionId: 's1',
+    startsOn: '2026-09-07',
     endsOn: '2026-12-18',
   });
   const options = new FakeFeeOptionRepository();

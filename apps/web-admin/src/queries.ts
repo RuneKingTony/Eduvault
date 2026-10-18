@@ -636,6 +636,12 @@ export const feeGridQueryOptions = (
     queryFn: () => api.feeLines.grid({ query }),
   });
 
+export const feeCopySourceQueryOptions = (api: Api, termId: string) =>
+  queryOptions({
+    queryKey: [...FEES_KEY, 'copy-source', termId],
+    queryFn: () => api.feeLines.copySource({ query: { termId } }),
+  });
+
 export const feeTypesQueryOptions = (api: Api) =>
   queryOptions({
     queryKey: [...FEES_KEY, 'types'],

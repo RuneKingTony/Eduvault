@@ -16,9 +16,24 @@ export interface FeeScope {
 
 export interface TermRef {
   id: string;
+  name: string;
+  schoolYearName: string;
   sessionId: string;
+  startsOn: string;
   endsOn: string;
 }
+
+export interface CopyFeeLines {
+  organizationId: string;
+  userId: string;
+  fromTermId: string;
+  toTermId: string;
+}
+
+export type CopyOutcome =
+  | { status: 'copied'; copied: number }
+  | { status: 'not_empty' }
+  | { status: 'source_empty' };
 
 export interface LevelRef {
   id: string;
@@ -58,6 +73,18 @@ export abstract class FeeLineRepository {
     organizationId: string,
     termId: string
   ): Promise<TermRef | undefined>;
+
+  abstract previousTerm(
+    organizationId: string,
+    termId: string
+  ): Promise<TermRef | undefined>;
+
+  abstract liveLineCount(
+    organizationId: string,
+    termId: string
+  ): Promise<number>;
+
+  abstract copyLines(input: CopyFeeLines): Promise<CopyOutcome>;
 
   abstract currency(organizationId: string): Promise<string>;
 

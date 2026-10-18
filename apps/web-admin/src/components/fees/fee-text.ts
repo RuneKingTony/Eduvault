@@ -1,5 +1,5 @@
 import type { FeeAppliesTo, FeeLine } from '@eduvault/api-contract';
-import { fmtDate } from '@eduvault/shared';
+import { countOf, fmtDate } from '@eduvault/shared';
 
 export const APPLIES_TO_LABELS: Record<FeeAppliesTo, string> = {
   all: 'Everyone',
@@ -39,6 +39,12 @@ export const amountChangedToast = (name: string, amount: string): string =>
 
 export const retiredToast = (name: string): string =>
   `${name} retired. It is kept for history.`;
+
+export const copyFeesBody = (count: number, source: string): string =>
+  `Copies the ${countOf(count, 'active fee', 'active fees')} of ${source}, with the same amounts, campuses and rules. Retired fees stay behind. Change any amount afterwards.`;
+
+export const copiedFeesToast = (count: number, source: string): string =>
+  `Copied ${countOf(count, 'fee', 'fees')} from ${source}. They apply from the next round of charges.`;
 
 export const feeTypeAddedToast = (name: string): string =>
   `${name} added as a fee type.`;

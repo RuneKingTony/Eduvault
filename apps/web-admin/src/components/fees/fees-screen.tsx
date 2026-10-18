@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { InfoIcon, PlusIcon } from 'lucide-react';
+import { CopyIcon, InfoIcon, PlusIcon } from 'lucide-react';
 import {
   TUITION_FEE_CODE,
+  type FeeCopySource,
   type FeeGrid,
   type FeeGroup,
   type FeeLine,
 } from '@eduvault/api-contract';
-import { Can } from '@eduvault/auth-client';
+import { Can, useCan } from '@eduvault/auth-client';
 import {
   Button,
   ErrorMessage,
@@ -26,6 +27,7 @@ import {
 } from '../../fee-terms';
 import type { FeesSearch } from '../../fees-search';
 import {
+  feeCopySourceQueryOptions,
   feeGridQueryOptions,
   feeLinesQueryOptions,
   feeSetupQueryOptions,
@@ -35,6 +37,7 @@ import { NoCurrentTermCallout } from '../no-current-term-callout';
 import { AddFeeSheet } from './add-fee-sheet';
 import { AllFeesCard } from './all-fees-card';
 import { ChangeAmountDialog } from './change-amount-dialog';
+import { CopyFeesDialog } from './copy-fees-dialog';
 import { FeeGridCard } from './fee-grid-card';
 import { FeePreviewCard } from './fee-preview-card';
 import { FEES_TIP } from './fee-text';
@@ -61,6 +64,61 @@ const COPY = {
     emptyAll: 'No other fees for this term',
   },
 } as const;
+
+function copyOffer(data: FeeCopySource | undefined) {
+  return data?.targetHasLines === false &&
+    data.liveLineCount > 0 &&
+    data.sourceTerm !== null
+    ? { source: data.sourceTerm, count: data.liveLineCount }
+    : undefined;
+}
+
+function useCopyOffer(group: FeeGroup, term: FeeTermOption | undefined) {
+  const api = useApi();
+  const canCreate = useCan('feeLine', 'create');
+  const canReadAll = useCan('campus', 'readAll');
+  const source = useQuery({
+    ...feeCopySourceQueryOptions(api, term?.id ?? ''),
+    enabled:
+      group === 'school' && term !== undefined && canCreate && canReadAll,
+  });
+  return copyOffer(source.data);
+}
+
+function CopyFromLastTerm({
+  group,
+  term,
+}: {
+  group: FeeGroup;
+  term: FeeTermOption | undefined;
+}) {
+  const [open, setOpen] = useState(false);
+  const offer = useCopyOffer(group, term);
+  if (offer === undefined || term === undefined) {
+    return null;
+  }
+  return (
+    <>
+      <Button
+        type="button"
+        variant="secondary"
+        onClick={() => {
+          setOpen(true);
+        }}
+      >
+        <CopyIcon />
+        Copy from last term
+      </Button>
+      <CopyFeesDialog
+        open={open}
+        source={offer.source}
+        count={offer.count}
+        target={term}
+        onOpenChange={setOpen}
+      />
+    </>
+  );
+}
 
 function Header({
   group,
@@ -111,6 +169,7 @@ function Header({
             </NativeSelectOption>
           ))}
         </NativeSelect>
+        <CopyFromLastTerm group={group} term={term} />
         <Can permission="feeLine:create">
           <Button type="button" onClick={onAdd}>
             <PlusIcon />

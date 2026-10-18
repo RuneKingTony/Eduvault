@@ -7,7 +7,11 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
-import { contract, type RouteOutput } from '@eduvault/api-contract';
+import {
+  contract,
+  type FeeCopyQuery,
+  type RouteOutput,
+} from '@eduvault/api-contract';
 import { Org, OrganizationAuth, type OrgContext } from '../../common/auth';
 import { zod } from '../../common/http/zod.pipe';
 import { FeeGridService } from './fee-grid.service';
@@ -68,6 +72,25 @@ export class FeeLineController {
     query: Parameters<FeePreviewService['preview']>[1]
   ): Promise<RouteOutput<typeof routes.preview>> {
     return this.previews.preview(org, query);
+  }
+
+  @Get('copy-source')
+  @OrganizationAuth('feeLine', 'read')
+  copySource(
+    @Org() org: OrgContext,
+    @Query(zod(routes.copySource.query)) query: FeeCopyQuery
+  ): Promise<RouteOutput<typeof routes.copySource>> {
+    return this.fees.copySource(org, query.termId);
+  }
+
+  @Post('copy')
+  @OrganizationAuth('feeLine', 'create')
+  copy(
+    @Org() org: OrgContext,
+    @Body(zod(routes.copy.body))
+    body: Parameters<FeeLineService['copy']>[1]
+  ): Promise<RouteOutput<typeof routes.copy>> {
+    return this.fees.copy(org, body);
   }
 
   @Post()

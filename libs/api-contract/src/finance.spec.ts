@@ -1,5 +1,6 @@
 import { contract } from './contract';
 import {
+  FEE_COPY_NO_SOURCE_MESSAGE,
   FEE_LINE_AMOUNT_MESSAGE,
   FEE_LINE_NAME_REQUIRED,
   FEE_TYPE_NAME_REQUIRED,
@@ -8,13 +9,18 @@ import {
   MONEY_ACCOUNT_NAME_REQUIRED,
   OPENING_AMOUNT_MESSAGE,
   cashBookQuerySchema,
+  copyFeeLinesSchema,
   createFeeLineSchema,
   createFeeTypeSchema,
   createLedgerAccountSchema,
   createMoneyAccountSchema,
+  feeCopyEmptySourceMessage,
+  feeCopyQuerySchema,
+  feeCopyTargetNotEmptyMessage,
   feeGridQuerySchema,
   feeLineDuplicateMessage,
   feeLineListQuerySchema,
+  feeTermLabel,
   journalQuerySchema,
   openingBalancesSchema,
   setFeeOptionSchema,
@@ -410,9 +416,47 @@ describe('feeLineDuplicateMessage', () => {
   });
 });
 
+describe('the fee copy messages', () => {
+  it('label a term by name and school year', () => {
+    expect(
+      feeTermLabel({ name: 'Third term', schoolYearName: '2026/2027' })
+    ).toBe('Third term, 2026/2027');
+  });
+
+  it('name the term in each refusal', () => {
+    const label = 'Third term, 2026/2027';
+    expect(FEE_COPY_NO_SOURCE_MESSAGE).toBe(
+      'There is no earlier term to copy fees from.'
+    );
+    expect(feeCopyEmptySourceMessage(label)).toBe(
+      'Third term, 2026/2027 has no fees to copy.'
+    );
+    expect(feeCopyTargetNotEmptyMessage(label)).toBe(
+      'Third term, 2026/2027 already has fees. Change them one at a time instead.'
+    );
+  });
+});
+
+describe('the fee copy schemas', () => {
+  it('take a term id in the query and the body', () => {
+    expect(feeCopyQuerySchema.safeParse({ termId: id }).success).toBe(true);
+    expect(feeCopyQuerySchema.safeParse({}).success).toBe(false);
+    expect(copyFeeLinesSchema.safeParse({ termId: id }).success).toBe(true);
+    expect(copyFeeLinesSchema.safeParse({}).success).toBe(false);
+  });
+
+  it('refuses extra keys in the body', () => {
+    expect(
+      copyFeeLinesSchema.safeParse({ termId: id, fromTermId: other }).success
+    ).toBe(false);
+  });
+});
+
 describe('the fee routes', () => {
   it('sit under the fee line, fee type and student option paths', () => {
     expect(contract.feeLines.grid.path).toBe('/fee-lines/grid');
+    expect(contract.feeLines.copySource.path).toBe('/fee-lines/copy-source');
+    expect(contract.feeLines.copy.method).toBe('POST');
     expect(contract.feeLines.retire.method).toBe('POST');
     expect(contract.feeTypes.create.path).toBe('/fee-types');
     expect(contract.feeOptions.set.method).toBe('PUT');

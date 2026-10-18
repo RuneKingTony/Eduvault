@@ -9,6 +9,7 @@ import {
 } from '@tanstack/react-router';
 import { render } from '@testing-library/react';
 import type {
+  FeeCopySource,
   FeeGrid,
   FeeGridCell,
   FeeGridRow,
@@ -65,6 +66,19 @@ const feeSetup = (): FeeSetup => ({
     { id: JSS1, name: 'JSS 1', sequence: 7 },
     { id: JSS2, name: 'JSS 2', sequence: 8 },
   ],
+});
+
+export const copySource = (
+  overrides: Partial<FeeCopySource> = {}
+): FeeCopySource => ({
+  sourceTerm: {
+    id: uuid(0x1_00),
+    name: 'Third term',
+    schoolYearName: '2025/2026',
+  },
+  liveLineCount: 12,
+  targetHasLines: false,
+  ...overrides,
 });
 
 export const feeLine = (overrides: Partial<FeeLine> = {}): FeeLine => ({
@@ -174,6 +188,7 @@ interface FeesApiOptions {
   grid?: FeeGrid;
   types?: FeeType[];
   preview?: FeePreview;
+  copySource?: FeeCopySource;
 }
 
 const pickerApi = () => ({
@@ -198,6 +213,11 @@ export function feesApi(options: FeesApiOptions = {}) {
       grid: vi.fn().mockResolvedValue(options.grid ?? feeGrid()),
       preview: vi.fn().mockResolvedValue(options.preview ?? preview()),
       candidates: vi.fn().mockResolvedValue(candidates()),
+      copySource: vi.fn().mockResolvedValue(options.copySource ?? copySource()),
+      copy: vi.fn().mockResolvedValue({
+        copied: 12,
+        sourceTerm: copySource().sourceTerm,
+      }),
       create: vi.fn().mockResolvedValue(feeLine({ name: 'Excursion' })),
       update: vi.fn().mockResolvedValue(feeLine({ amountMinor: 20_000_000 })),
       retire: vi
