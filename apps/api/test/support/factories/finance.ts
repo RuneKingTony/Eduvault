@@ -1,5 +1,6 @@
 import type { INestApplication } from '@nestjs/common';
 import type {
+  ActivityPage,
   CreateMoneyAccountInput,
   MoneyAccount,
   OpeningBalancesInput,
@@ -14,6 +15,7 @@ import {
 } from '../../../src/app/common/ledger';
 import { LedgerService } from '../../../src/app/modules/ledger/ledger.service';
 import { MoneyAccountService } from '../../../src/app/modules/money-account/money-account.service';
+import type { Fixtures, TestUser } from '../base-test';
 import { orgContextFor } from './org-context';
 
 export async function ledgerAccountId(
@@ -65,4 +67,16 @@ export async function importOpening(
     items: input.items ?? [],
     moneyAccounts: input.moneyAccounts ?? [],
   });
+}
+
+export async function financeTexts(
+  api: Fixtures['api'],
+  actor: TestUser
+): Promise<string[]> {
+  const page = (await api(actor).get('/activity?page=1').expect(200))
+    .body as ActivityPage;
+  return page.items
+    .filter((item) => item.pillar === 'finance')
+    .map((item) => item.text)
+    .toSorted((a, b) => a.localeCompare(b));
 }

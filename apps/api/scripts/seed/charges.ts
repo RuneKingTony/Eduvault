@@ -3,7 +3,6 @@ import type { OrgContext } from '../../src/app/common/auth';
 import { Clock } from '../../src/app/common/clock';
 import { KYSELY_TOKEN, type Database } from '../../src/app/common/db/tokens';
 import { BillingService } from '../../src/app/modules/billing/billing.service';
-import { FeeLineService } from '../../src/app/modules/fee-line/fee-line.service';
 import { orgContextFor } from './actors';
 import { emailOf } from './members';
 
@@ -108,7 +107,6 @@ async function seedFeeLines(
   termIds: readonly string[]
 ) {
   const db = app.get<Database>(KYSELY_TOKEN, { strict: false });
-  const fees = app.get(FeeLineService, { strict: false });
   const [levels, types] = await Promise.all([
     db
       .selectFrom('class_level')
@@ -120,12 +118,21 @@ async function seedFeeLines(
   for (const termId of termIds) {
     for (const level of levels) {
       for (const line of linesFor(level, types)) {
-        await fees.create(seed.owner, {
-          termId,
-          classLevelId: level.id,
-          campusId: null,
-          ...line,
-        });
+        await db
+          .insertInto('fee_line')
+          .values({
+            organization_id: seed.owner.organizationId,
+            term_id: termId,
+            class_level_id: level.id,
+            ledger_account_id: line.feeTypeId,
+            campus_id: null,
+            name: line.name,
+            amount_minor: String(line.amountMinor),
+            applies_to: 'all',
+            is_optional: false,
+            created_by: seed.owner.user.id,
+          })
+          .execute();
       }
     }
   }

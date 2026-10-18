@@ -82,6 +82,7 @@ function setup(...seeded: FeeLine[]) {
     endsOn: '2026-07-24',
   });
   lines.levels.set('jss2', { id: 'jss2', name: 'JSS 2' });
+  lines.campusNames.set('lekki', 'Lekki');
   lines.feeTypes.set('tuition', { id: 'tuition', code: 4010, name: 'Tuition' });
   lines.feeTypes.set('pta', { id: 'pta', code: 4020, name: 'PTA fee' });
   lines.otherAccounts.add('rent');
@@ -496,5 +497,184 @@ describe('FeeLineService.copy', () => {
     const copied = lines.rows.filter((row) => row.termId === 'term-1');
     expect(copied.map((row) => row.name)).toEqual(['Tuition', 'PTA']);
     expect(lines.rows.filter((row) => row.termId === 'past')).toHaveLength(3);
+  });
+});
+
+describe('FeeLineService activity rows', () => {
+  it('records one finance row for a created every-campus line', async () => {
+    const { service, lines } = setup();
+    await service.create(everyone, input());
+    expect(lines.recorded).toEqual([
+      expect.objectContaining({
+        organizationId: 'school-a',
+        campusId: null,
+        pillar: 'finance',
+        kind: 'fee_line.created',
+        actorUserId: 'caller',
+        subjectType: 'fee_line',
+        text: 'Chika Eze added Tuition (Tuition) for JSS 2, every campus, First term, 2026/2027: ₦180,000.',
+      }),
+    ]);
+  });
+
+  it('records a created campus line against its campus', async () => {
+    const { service, lines } = setup();
+    await service.create(lekkiOnly, input({ campusId: 'lekki' }));
+    expect(lines.recorded).toHaveLength(1);
+    expect(lines.recorded[0]).toMatchObject({
+      campusId: 'lekki',
+      kind: 'fee_line.created',
+    });
+    expect(lines.recorded[0]?.text).toContain('for JSS 2, Lekki,');
+  });
+
+  it('records the old and new amount when the amount changes', async () => {
+    const { service, lines } = setup(
+      line({ campusId: 'lekki', campusName: 'Lekki' })
+    );
+    await service.updateAmount(lekkiOnly, 'line-1', {
+      amountMinor: 20_000_000,
+    });
+    expect(lines.recorded).toEqual([
+      expect.objectContaining({
+        campusId: 'lekki',
+        kind: 'fee_line.amount_changed',
+        text: 'Chika Eze changed Tuition for JSS 2, Lekki, First term, 2026/2027 from ₦180,000 to ₦200,000.',
+        data: {
+          feeLineId: 'line-1',
+          termId: 'term-1',
+          previousAmountMinor: 18_000_000,
+          amountMinor: 20_000_000,
+        },
+      }),
+    ]);
+  });
+
+  it('records a retirement with a null campus for an every-campus line', async () => {
+    const { service, lines } = setup(line());
+    await service.retire(everyone, 'line-1');
+    expect(lines.recorded).toEqual([
+      expect.objectContaining({
+        campusId: null,
+        kind: 'fee_line.retired',
+        text: 'Chika Eze retired Tuition for JSS 2, every campus, First term, 2026/2027 (₦180,000).',
+      }),
+    ]);
+  });
+
+  it('records one row for a copy of every-campus lines only', async () => {
+    const { service, lines } = setup(
+      line({ id: 'a', termId: 'past' }),
+      line({ id: 'b', termId: 'past', feeTypeId: 'pta', name: 'PTA' })
+    );
+    await service.copy(everyone, { termId: 'term-1' });
+    expect(lines.recorded).toEqual([
+      expect.objectContaining({
+        campusId: null,
+        kind: 'fee_lines.copied',
+        subjectType: 'term',
+        subjectId: 'term-1',
+        text: 'Chika Eze copied 2 fee lines from Third term, 2025/2026 to First term, 2026/2027.',
+        data: { fromTermId: 'past', toTermId: 'term-1', copied: 2 },
+      }),
+    ]);
+  });
+
+  it('splits a copy row by campus so a campus keeps only its own count', async () => {
+    const { service, lines } = setup(
+      line({ id: 'a', termId: 'past' }),
+      line({ id: 'b', termId: 'past', feeTypeId: 'pta', name: 'PTA' }),
+      line({ id: 'c', termId: 'past', campusId: 'lekki', name: 'Lekki' })
+    );
+    await service.copy(everyone, { termId: 'term-1' });
+    expect(
+      lines.recorded.map(({ campusId, text, data }) => ({
+        campusId,
+        text,
+        copied: data?.['copied'],
+      }))
+    ).toEqual([
+      {
+        campusId: null,
+        text: 'Chika Eze copied 2 fee lines from Third term, 2025/2026 to First term, 2026/2027 (for every campus).',
+        copied: 2,
+      },
+      {
+        campusId: 'lekki',
+        text: 'Chika Eze copied 1 fee line from Third term, 2025/2026 to First term, 2026/2027 (for this campus).',
+        copied: 1,
+      },
+    ]);
+  });
+
+  it('records nothing for a duplicate line', async () => {
+    const { service, lines } = setup();
+    lines.duplicate = true;
+    await expect(service.create(everyone, input())).rejects.toBeInstanceOf(
+      ConflictException
+    );
+    expect(lines.recorded).toEqual([]);
+  });
+
+  it('records nothing for a retired line, an ended term or an out-of-scope line', async () => {
+    const { service, lines } = setup(
+      line({ retiredAt: '2026-10-02T00:00:00.000Z' }),
+      line({ id: 'line-2', termId: 'past' }),
+      line({ id: 'line-3', campusId: 'ikeja' })
+    );
+    await expect(
+      service.updateAmount(everyone, 'line-1', { amountMinor: 1 })
+    ).rejects.toBeInstanceOf(ConflictException);
+    await expect(service.retire(everyone, 'line-1')).rejects.toBeInstanceOf(
+      ConflictException
+    );
+    await expect(
+      service.updateAmount(everyone, 'line-2', { amountMinor: 1 })
+    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(service.retire(everyone, 'line-2')).rejects.toBeInstanceOf(
+      BadRequestException
+    );
+    await expect(
+      service.updateAmount(lekkiOnly, 'line-3', { amountMinor: 1 })
+    ).rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.retire(lekkiOnly, 'line-3')).rejects.toBeInstanceOf(
+      NotFoundException
+    );
+    expect(lines.recorded).toEqual([]);
+  });
+
+  it('writes no row when the amount is unchanged', async () => {
+    const { service, lines } = setup(line());
+    const unchanged = await service.updateAmount(everyone, 'line-1', {
+      amountMinor: 18_000_000,
+    });
+    expect(unchanged).toEqual(line());
+    expect(lines.recorded).toEqual([]);
+  });
+
+  it('still refuses an unchanged amount on a term that has ended', async () => {
+    const { service, lines } = setup(line({ termId: 'past' }));
+    await expect(
+      service.updateAmount(everyone, 'line-1', { amountMinor: 18_000_000 })
+    ).rejects.toThrow(FEE_TERM_ENDED_MESSAGE);
+    expect(lines.recorded).toEqual([]);
+  });
+
+  it('records nothing for a refused copy', async () => {
+    const { service, lines } = setup(
+      line({ id: 'a', termId: 'past' }),
+      line({ id: 'b', termId: 'term-1' })
+    );
+    await expect(
+      service.copy(everyone, { termId: 'term-1' })
+    ).rejects.toBeInstanceOf(ConflictException);
+    const empty = setup(
+      line({ termId: 'past', retiredAt: '2026-07-01T00:00:00.000Z' })
+    );
+    await expect(
+      empty.service.copy(everyone, { termId: 'term-1' })
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(lines.recorded).toEqual([]);
+    expect(empty.lines.recorded).toEqual([]);
   });
 });

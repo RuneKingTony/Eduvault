@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { Kysely } from 'kysely';
 import type { DB } from '../../../db/db-types';
+import { FEE_SCHEDULE_KINDS } from './fee-schedule-kinds';
 
 export type ActivityPillar = 'foundation' | 'finance' | 'access' | 'platform';
 
@@ -19,6 +20,10 @@ export interface ActivityInput {
 export interface ActivityRecorder {
   recordMany(inputs: readonly ActivityInput[]): Promise<void>;
 }
+
+const SCHOOL_WIDE_FINANCE_KINDS: ReadonlySet<string> = new Set(
+  Object.values(FEE_SCHEDULE_KINDS)
+);
 
 const SECRET_KEY = /pass(?:word|wd)|secret|token/i;
 
@@ -63,7 +68,11 @@ export class ActivityWriter {
       if (secret !== undefined) {
         throw new Error(`Activity data must not hold a secret: ${secret}`);
       }
-      if (input.pillar === 'finance' && input.campusId === null) {
+      if (
+        input.pillar === 'finance' &&
+        input.campusId === null &&
+        !SCHOOL_WIDE_FINANCE_KINDS.has(input.kind)
+      ) {
         throw new Error('A finance activity row needs a campus');
       }
       return {

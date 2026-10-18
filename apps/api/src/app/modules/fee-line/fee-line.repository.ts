@@ -6,6 +6,7 @@ import type {
   FeeSetup,
   FeeType,
 } from '@eduvault/api-contract';
+import type { ActivityInput, CopiedShare } from '../../common/activity';
 import type { CampusScope } from '../../common/campus-scope';
 import type { DiscountFacts, TermPosition } from '../../common/fees';
 
@@ -34,6 +35,19 @@ export type CopyOutcome =
   | { status: 'copied'; copied: number }
   | { status: 'not_empty' }
   | { status: 'source_empty' };
+
+export interface AmountChange {
+  organizationId: string;
+  id: string;
+  amountMinor: number;
+}
+
+export type LineActivity = (line: FeeLine) => ActivityInput[];
+export type AmountActivity = (
+  line: FeeLine,
+  previousAmountMinor: number
+) => ActivityInput[];
+export type CopyActivity = (copied: CopiedShare[]) => ActivityInput[];
 
 export interface LevelRef {
   id: string;
@@ -84,7 +98,10 @@ export abstract class FeeLineRepository {
     termId: string
   ): Promise<number>;
 
-  abstract copyLines(input: CopyFeeLines): Promise<CopyOutcome>;
+  abstract copyLines(
+    input: CopyFeeLines,
+    activity: CopyActivity
+  ): Promise<CopyOutcome>;
 
   abstract currency(organizationId: string): Promise<string>;
 
@@ -105,17 +122,20 @@ export abstract class FeeLineRepository {
     id: string
   ): Promise<LevelRef | undefined>;
 
-  abstract create(input: NewFeeLine): Promise<FeeLineOutcome>;
+  abstract create(
+    input: NewFeeLine,
+    activity: LineActivity
+  ): Promise<FeeLineOutcome>;
 
   abstract updateAmount(
-    organizationId: string,
-    id: string,
-    amountMinor: number
+    change: AmountChange,
+    activity: AmountActivity
   ): Promise<FeeLine | undefined>;
 
   abstract retire(
     organizationId: string,
-    id: string
+    id: string,
+    activity: LineActivity
   ): Promise<FeeLine | undefined>;
 }
 

@@ -2,17 +2,21 @@ import {
   ADJUSTMENT_KIND_LABELS,
   type AdjustmentKind,
   type DiscountKind,
+  type FeeLine,
 } from '@eduvault/api-contract';
 import { countOf, money } from '@eduvault/shared';
 import type { StudentIdentity } from '../students';
 import type { ActivityInput } from './activity-writer';
+import { FEE_SCHEDULE_KINDS } from './fee-schedule-kinds';
 
 type FinanceSubject =
   | 'payment'
   | 'payment_void'
   | 'billing_run'
   | 'adjustment'
-  | 'student_discount';
+  | 'student_discount'
+  | 'fee_line'
+  | 'term';
 
 export interface FinanceActor {
   organizationId: string;
@@ -82,7 +86,7 @@ export const studentFacts = (
 });
 
 interface RowFacts {
-  campusId: string;
+  campusId: string | null;
   kind: string;
   subject: { type: FinanceSubject; id: string };
   text: string;
@@ -311,4 +315,95 @@ export function discountDeclinedActivity(
       },
     }),
   ];
+}
+
+interface CopiedTerm {
+  id: string;
+  label: string;
+}
+
+const lineRow = (
+  actor: FinanceActor,
+  line: FeeLine,
+  row: Pick<RowFacts, 'kind' | 'text' | 'data'>
+): ActivityInput[] => [
+  finance(actor, {
+    ...row,
+    campusId: line.campusId,
+    subject: { type: 'fee_line', id: line.id },
+    data: { feeLineId: line.id, termId: line.termId, ...row.data },
+  }),
+];
+
+const lineWhere = (line: FeeLine, termLabel: string): string =>
+  `for ${line.levelName}, ${line.campusName ?? 'every campus'}, ${termLabel}`;
+
+export const feeLineCreatedActivity = (
+  actor: FinanceActor,
+  line: FeeLine,
+  termLabel: string
+): ActivityInput[] =>
+  lineRow(actor, line, {
+    kind: FEE_SCHEDULE_KINDS.created,
+    text: `${actor.name} added ${line.name} (${line.feeTypeName}) ${lineWhere(line, termLabel)}: ${money(line.amountMinor, actor.currency)}.`,
+    data: {
+      classLevelId: line.classLevelId,
+      feeTypeId: line.feeTypeId,
+      amountMinor: line.amountMinor,
+      appliesTo: line.appliesTo,
+      isOptional: line.isOptional,
+    },
+  });
+
+export const feeLineAmountChangedActivity = (
+  actor: FinanceActor,
+  line: FeeLine,
+  change: { previousAmountMinor: number; termLabel: string }
+): ActivityInput[] =>
+  lineRow(actor, line, {
+    kind: FEE_SCHEDULE_KINDS.amountChanged,
+    text: `${actor.name} changed ${line.name} ${lineWhere(line, change.termLabel)} from ${money(change.previousAmountMinor, actor.currency)} to ${money(line.amountMinor, actor.currency)}.`,
+    data: {
+      previousAmountMinor: change.previousAmountMinor,
+      amountMinor: line.amountMinor,
+    },
+  });
+
+export const feeLineRetiredActivity = (
+  actor: FinanceActor,
+  line: FeeLine,
+  termLabel: string
+): ActivityInput[] =>
+  lineRow(actor, line, {
+    kind: FEE_SCHEDULE_KINDS.retired,
+    text: `${actor.name} retired ${line.name} ${lineWhere(line, termLabel)} (${money(line.amountMinor, actor.currency)}).`,
+    data: { amountMinor: line.amountMinor },
+  });
+
+export interface CopiedShare {
+  campusId: string | null;
+  count: number;
+}
+
+const copyShare = (campusId: string | null, split: boolean): string => {
+  if (!split) {
+    return '';
+  }
+  return campusId === null ? ' (for every campus)' : ' (for this campus)';
+};
+
+export function feeLinesCopiedActivity(
+  actor: FinanceActor,
+  terms: { from: CopiedTerm; to: CopiedTerm },
+  copied: readonly CopiedShare[]
+): ActivityInput[] {
+  return copied.map(({ campusId, count }) =>
+    finance(actor, {
+      campusId,
+      kind: FEE_SCHEDULE_KINDS.copied,
+      subject: { type: 'term', id: terms.to.id },
+      text: `${actor.name} copied ${countOf(count, 'fee line', 'fee lines')} from ${terms.from.label} to ${terms.to.label}${copyShare(campusId, copied.length > 1)}.`,
+      data: { fromTermId: terms.from.id, toTermId: terms.to.id, copied: count },
+    })
+  );
 }
