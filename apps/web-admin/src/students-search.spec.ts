@@ -61,11 +61,30 @@ describe('the start-year dialog param', () => {
 describe('parseStudentSearch', () => {
   it('keeps dialog=leave for the student page and drops anything else', () => {
     expect(parseStudentSearch({ dialog: 'leave' })).toEqual({
+      tab: undefined,
       dialog: 'leave',
     });
     expect(parseStudentSearch({ dialog: 'start-year' })).toEqual({
+      tab: undefined,
       dialog: undefined,
     });
-    expect(parseStudentSearch({})).toEqual({ dialog: undefined });
+    expect(parseStudentSearch({})).toEqual({
+      tab: undefined,
+      dialog: undefined,
+    });
+  });
+
+  it('keeps tab=fees next to the dialog', () => {
+    expect(parseStudentSearch({ tab: 'fees', dialog: 'leave' })).toEqual({
+      tab: 'fees',
+      dialog: 'leave',
+    });
+  });
+
+  it('leaves Overview out, whether named, unknown or missing', () => {
+    expect(parseStudentSearch({ tab: 'overview' }).tab).toBeUndefined();
+    expect(parseStudentSearch({ tab: 'billing' }).tab).toBeUndefined();
+    expect(parseStudentSearch({ tab: 1 }).tab).toBeUndefined();
+    expect(parseStudentSearch({}).tab).toBeUndefined();
   });
 });

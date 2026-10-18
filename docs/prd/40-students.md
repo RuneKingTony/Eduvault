@@ -127,7 +127,7 @@ Scopes applied: campus scope and class scope (see [Scope rules](#scope-rules)). 
 
   `{owed}` is " ₦{balance} is still owed and stays in Who owes." It appears only when the balance is above zero and the viewer holds `invoice:read` or `payment:read`. For a Left student, `{date}` is the last day attended (STU-8).
 
-- **Tabs:** "Overview", and "Fees" only with `invoice:read` or `payment:read`.
+- **Tabs:** "Overview", and "Fees" only with `invoice:read`, `payment:read` or `feeLine:read` ([D-319](../technical-reference.md#decision-log)). Without any of them the page has no tab strip and shows Overview, and `?tab=fees` falls back to Overview. The tab is kept in the URL as `?tab=fees`; Overview is the default and stays out of it.
 - **Overview tab**
   - A two-column grid with two cards.
   - **Profile** (icon `user`), with the buttons "Edit details" (icon `pencil`, `student:update`, hidden once the student has left) and "Reset login" (icon `key-round`, `student:update`, shown while the portal login is active). "Edit details" opens a dialog with first name, last name, gender and date of birth, sends only what changed and refuses a date after today; "Reset login" asks for confirmation, then shows the new temporary password once in the "New login for {name}" dialog. A key-value list:
@@ -144,13 +144,15 @@ Scopes applied: campus scope and class scope (see [Scope rules](#scope-rules)). 
     - "Level".
     - "Class each term": one line per placement in term order, "{term}: **{class}**, {campus}".
     - "Status": the enrolment status badge (Active, Withdrawn, Completed), plus a "New student" badge (brand) when `is_new_student`.
-- **Fees tab** (M3; hidden until finance exists)
-  - Money tiles:
+- **Fees tab**
+  - Money tiles, only with `invoice:read` or `payment:read` (S-13). They show for Left and graduated students too, because a leaver can still owe:
     - "Owing" ₦X when owing, "Extra paid" ₦X when in credit, "Owing" "Nothing" at zero.
     - "Paid" ₦X.
     - "Reduced" ₦X, only when there were reductions.
     - "Total" ₦X.
-  - Then a primary button "Open statement" (icon `receipt-text`).
+  - Then a primary button "Open statement" (icon `receipt-text`, same gate), which opens the student's statement.
+  - **Optional fees** card, with `feeLine:read`: one switch per optional fee type of the student's level, switched with `feeLine:update` ([50-fees](50-fees.md)). Hidden when the level has no optional fee.
+  - Empty state "No fees to show" (icon `receipt-text`) when neither block is shown.
 - **Loading:** skeleton cards. **Read-only acting:** the menu and every action are hidden.
 
 ### Mark not seen since (dialog)
@@ -282,7 +284,7 @@ Scope (see [Scope rules](#scope-rules)):
   - A member with no class permission (a bursar) is not class-scoped.
   - Out-of-scope students answer 404 on every student route.
 - **S-12 Guardian data needs `guardian:read`:** the expand column, guardian search terms, the "Pays fees" column and the Guardians card.
-- **S-13 Money needs `invoice:read` or `payment:read`:** the balance columns, the Fees tab, the Statement button, the `{owed}` callout text and the leaving dialog's "still owed" callout. Finance never applies class scope.
+- **S-13 Money needs `invoice:read` or `payment:read`:** the balance columns, the Fees tab's money tiles, the Statement button, the `{owed}` callout text and the leaving dialog's "still owed" callout. Finance never applies class scope.
 
 Actions:
 
@@ -533,7 +535,7 @@ Start new school year:
 - Placements cover one term only; they roll forward within a year (S-31) and move across years with Start new school year (S-23 to S-30).
 - There is no way to move students into a new school year; Start new school year is new ([D-029](../technical-reference.md#decision-log)).
 - "GF" in the search placeholder and on numbers is hard-coded; use `school_account.admission_prefix` ([D-019](../technical-reference.md#decision-log)).
-- The fee figures and Fees tab depend on M3. Until then the columns, tab and Statement button stay hidden even for holders of `invoice:read`.
+- The Fees tab has shipped (money tiles, "Open statement" and the Optional fees card). The balance columns and the header Statement button still depend on M3 and stay hidden until they land, even for holders of `invoice:read`.
 
 ## Dependencies
 
@@ -543,5 +545,5 @@ Start new school year:
 - M2.3: classes, levels with `next_level_id`, class teachers and `classScope` on `OrgContext`; "Graduate class" on the class page.
 - M2.4 together with [41-admission](41-admission.md) and [42-guardians](42-guardians.md), including `activity_event` ([D-016](../technical-reference.md#decision-log)); M2.5 builds on M2.4.
 - M2.6: the dashboard students card, the "due to be marked Left" and "not in a class" tasks, and the activity feed.
-- M3.3 and M3.4: balances, the Fees tab, the Statement button, and Who owes for leavers. M4.1: subject teachers widen class scope.
+- M3.3 and M3.4: balances, the Statement button, and Who owes for leavers. M4.1: subject teachers widen class scope.
 - F3 grading: promotion replaces Start new school year ([D-029](../technical-reference.md#decision-log)).

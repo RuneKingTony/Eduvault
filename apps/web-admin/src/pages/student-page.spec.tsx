@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import {
   ApiError,
@@ -5,12 +6,14 @@ import {
   type LoginCredential,
   type MePermissions,
   type StudentDetail,
+  type StudentStatement,
 } from '@eduvault/api-contract';
 import { toPermissionMap, type Permission } from '@eduvault/policy';
 import { toast } from '@eduvault/ui';
 import { currentCalendar } from '../test-calendar';
 import { classSummary } from '../test-classes';
-import { actingAccess, fakeAccess, renderWithApi } from '../test-utils';
+import { renderPayments, statement } from '../test-payments';
+import { actingAccess, fakeAccess } from '../test-utils';
 import { guardianLink, preview, studentDetail } from '../test-students';
 import { StudentPage } from './student-page';
 
@@ -26,6 +29,28 @@ const accessWith = (...permissions: Permission[]): MePermissions =>
     campusScope: 'all',
   });
 
+const STUDENT_ID = '5b0f1e1e-6e53-4c52-9f1c-0a1d7a7f9c11';
+
+type PageProps = Parameters<typeof StudentPage>[0];
+
+function StatefulPage({ tab: initial, onTabChange, ...props }: PageProps) {
+  const [tab, setTab] = useState(initial);
+  return (
+    <StudentPage
+      {...props}
+      tab={tab}
+      onTabChange={(next) => {
+        setTab(next);
+        onTabChange(next);
+      }}
+    />
+  );
+}
+
+const openFees = async () => {
+  fireEvent.mouseDown(await screen.findByRole('tab', { name: 'Fees' }));
+};
+
 function setup(
   options: {
     student?: Partial<StudentDetail>;
@@ -34,6 +59,9 @@ function setup(
     logins?: LoginCredential[];
     initialDialog?: 'leave';
     feeOptions?: FeeOption[];
+    tab?: 'fees';
+    statement?: Partial<StudentStatement>;
+    statementError?: Error;
   } = {}
 ) {
   const detail = studentDetail(options.student);
@@ -68,24 +96,32 @@ function setup(
       list: vi.fn().mockResolvedValue(options.feeOptions ?? []),
       set: vi.fn().mockResolvedValue({ feeTypeId: 'bus', optedIn: true }),
     },
+    studentAccounts: {
+      statement: options.statementError
+        ? vi.fn().mockRejectedValue(options.statementError)
+        : vi.fn().mockResolvedValue(statement(options.statement)),
+    },
   };
   const onBack = vi.fn();
   const onOpenTab = vi.fn();
   const onDialogClosed = vi.fn();
-  renderWithApi(
-    <StudentPage
-      studentId="5b0f1e1e-6e53-4c52-9f1c-0a1d7a7f9c11"
+  const onTabChange = vi.fn();
+  renderPayments(
+    <StatefulPage
+      studentId={STUDENT_ID}
       schoolName="Greenfield College"
       logins={options.logins}
       initialDialog={options.initialDialog}
+      tab={options.tab}
+      onTabChange={onTabChange}
       onDialogClosed={onDialogClosed}
       onOpenTab={onOpenTab}
       onBack={onBack}
     />,
     api,
-    options.access
+    { access: options.access }
   );
-  return { students, api, onBack, onOpenTab, onDialogClosed };
+  return { students, api, onBack, onOpenTab, onDialogClosed, onTabChange };
 }
 
 describe('StudentPage', () => {
@@ -170,17 +206,27 @@ describe('StudentPage optional fees', () => {
 
   it('lists the optional fee types with a switch for each', async () => {
     setup({ feeOptions: [busOption(true)] });
+    await openFees();
     const row = await screen.findByRole('switch', { name: 'School bus' });
     expect(row).toBeChecked();
     expect(screen.getByText('Optional fees')).toBeInTheDocument();
   });
 
+  it('is not on Overview any more', async () => {
+    const { api } = setup({ feeOptions: [busOption(true)] });
+    await screen.findByText('Admission no.');
+    expect(screen.queryByText('Optional fees')).not.toBeInTheDocument();
+    expect(screen.queryByRole('switch')).not.toBeInTheDocument();
+    expect(api.feeOptions.list).not.toHaveBeenCalled();
+  });
+
   it('has no card when the student’s level has no optional fee', async () => {
     const { api } = setup({ feeOptions: [] });
-    await screen.findByRole('heading', { name: /Ada Okeke/ });
+    await openFees();
+    await screen.findByText('Open statement');
     await waitFor(() => {
       expect(api.feeOptions.list).toHaveBeenCalledWith({
-        params: { studentId: '5b0f1e1e-6e53-4c52-9f1c-0a1d7a7f9c11' },
+        params: { studentId: STUDENT_ID },
         query: {},
       });
     });
@@ -189,13 +235,11 @@ describe('StudentPage optional fees', () => {
 
   it('switches a fee on and toasts in the student’s first name', async () => {
     const { api } = setup({ feeOptions: [busOption(false)] });
+    await openFees();
     fireEvent.click(await screen.findByRole('switch', { name: 'School bus' }));
     await waitFor(() => {
       expect(api.feeOptions.set).toHaveBeenCalledWith({
-        params: {
-          studentId: '5b0f1e1e-6e53-4c52-9f1c-0a1d7a7f9c11',
-          feeTypeId: 'bus',
-        },
+        params: { studentId: STUDENT_ID, feeTypeId: 'bus' },
         body: { optedIn: true },
       });
     });
@@ -208,6 +252,7 @@ describe('StudentPage optional fees', () => {
 
   it('says no longer takes when switched off', async () => {
     setup({ feeOptions: [busOption(true)] });
+    await openFees();
     fireEvent.click(await screen.findByRole('switch', { name: 'School bus' }));
     await waitFor(() => {
       expect(toast.success).toHaveBeenCalledWith(
@@ -221,6 +266,7 @@ describe('StudentPage optional fees', () => {
       feeOptions: [busOption(true)],
       access: accessWith('student:read', 'feeLine:read'),
     });
+    await openFees();
     expect(
       await screen.findByRole('switch', { name: 'School bus' })
     ).toBeDisabled();
@@ -234,6 +280,165 @@ describe('StudentPage optional fees', () => {
     await screen.findByRole('heading', { name: /Ada Okeke/ });
     expect(screen.queryByText('Optional fees')).not.toBeInTheDocument();
     expect(api.feeOptions.list).not.toHaveBeenCalled();
+  });
+});
+
+describe('StudentPage Fees tab', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('shows the money tiles and the Open statement link with invoice:read', async () => {
+    const { api } = setup({
+      access: accessWith('student:read', 'invoice:read'),
+    });
+    await openFees();
+    expect(await screen.findByText('Owing')).toBeInTheDocument();
+    expect(screen.getByText('₦180,000')).toBeInTheDocument();
+    expect(screen.getByText('Paid')).toBeInTheDocument();
+    expect(screen.getByText('₦40,000')).toBeInTheDocument();
+    expect(screen.getByText('Total')).toBeInTheDocument();
+    expect(screen.getByText('₦220,000')).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'Open statement' })
+    ).toHaveAttribute('href', `/finance/accounts/${STUDENT_ID}`);
+    expect(api.studentAccounts.statement).toHaveBeenCalledWith({
+      params: { studentId: STUDENT_ID },
+      query: { page: undefined },
+    });
+  });
+
+  it('shows the tiles with payment:read alone', async () => {
+    setup({ access: accessWith('student:read', 'payment:read') });
+    await openFees();
+    expect(await screen.findByText('₦180,000')).toBeInTheDocument();
+  });
+
+  it('shows Extra paid for a credit balance', async () => {
+    setup({
+      statement: {
+        totals: {
+          balanceMinor: -500_000,
+          paidMinor: 22_500_000,
+          reducedMinor: 0,
+          totalMinor: 22_000_000,
+        },
+      },
+    });
+    await openFees();
+    expect(await screen.findByText('Extra paid')).toBeInTheDocument();
+    expect(screen.getByText('₦5,000')).toBeInTheDocument();
+    expect(screen.queryByText('Owing')).not.toBeInTheDocument();
+  });
+
+  it('shows Owing Nothing for a zero balance', async () => {
+    setup({
+      statement: {
+        totals: {
+          balanceMinor: 0,
+          paidMinor: 22_000_000,
+          reducedMinor: 0,
+          totalMinor: 22_000_000,
+        },
+      },
+    });
+    await openFees();
+    expect(await screen.findByText('Owing')).toBeInTheDocument();
+    expect(screen.getByText('Nothing')).toBeInTheDocument();
+  });
+
+  it('shows Reduced only when something was reduced', async () => {
+    setup({
+      statement: {
+        totals: {
+          balanceMinor: 17_000_000,
+          paidMinor: 4_000_000,
+          reducedMinor: 1_000_000,
+          totalMinor: 22_000_000,
+        },
+      },
+    });
+    await openFees();
+    expect(await screen.findByText('Reduced')).toBeInTheDocument();
+    expect(screen.getByText('₦10,000')).toBeInTheDocument();
+  });
+
+  it('leaves Reduced out when nothing was reduced', async () => {
+    setup();
+    await openFees();
+    await screen.findByText('Owing');
+    expect(screen.queryByText('Reduced')).not.toBeInTheDocument();
+  });
+
+  it('shows no tab strip and no money with student:read only', async () => {
+    const { api } = setup({ access: accessWith('student:read') });
+    await screen.findByText('Admission no.');
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
+    expect(screen.queryByText('Open statement')).not.toBeInTheDocument();
+    expect(screen.queryByText('Owing')).not.toBeInTheDocument();
+    expect(api.studentAccounts.statement).not.toHaveBeenCalled();
+  });
+
+  it('falls back to Overview for tab=fees without a Fees tab', async () => {
+    setup({ tab: 'fees', access: accessWith('student:read') });
+    expect(await screen.findByText('Admission no.')).toBeInTheDocument();
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
+  });
+
+  it('shows the Optional fees card but no money with feeLine:read only', async () => {
+    const { api } = setup({
+      feeOptions: [busOption(true)],
+      access: accessWith('student:read', 'feeLine:read'),
+    });
+    await openFees();
+    expect(await screen.findByText('Optional fees')).toBeInTheDocument();
+    expect(screen.queryByText('Owing')).not.toBeInTheDocument();
+    expect(screen.queryByText('Open statement')).not.toBeInTheDocument();
+    expect(api.studentAccounts.statement).not.toHaveBeenCalled();
+  });
+
+  it('says No fees to show when there is nothing the viewer can see', async () => {
+    setup({
+      feeOptions: [],
+      access: accessWith('student:read', 'feeLine:read'),
+    });
+    await openFees();
+    expect(await screen.findByText('No fees to show')).toBeInTheDocument();
+  });
+
+  it('opens on Fees for tab=fees', async () => {
+    setup({ tab: 'fees', feeOptions: [busOption(true)] });
+    expect(
+      await screen.findByRole('switch', { name: 'School bus' })
+    ).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Fees' })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+    expect(screen.queryByText('Admission no.')).not.toBeInTheDocument();
+  });
+
+  it('calls onTabChange when the tab changes', async () => {
+    const { onTabChange } = setup();
+    await openFees();
+    expect(onTabChange).toHaveBeenLastCalledWith('fees');
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Overview' }));
+    expect(onTabChange).toHaveBeenLastCalledWith(undefined);
+    expect(await screen.findByText('Admission no.')).toBeInTheDocument();
+  });
+
+  it('shows the statement error inside the tab', async () => {
+    setup({
+      statementError: new ApiError(500, {
+        code: 'UnknownError',
+        message: 'The statement could not be loaded.',
+      }),
+    });
+    await openFees();
+    expect(
+      await screen.findByText('The statement could not be loaded.')
+    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Open statement' })).toBeVisible();
   });
 });
 
