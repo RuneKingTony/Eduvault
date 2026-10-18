@@ -7,12 +7,15 @@ import {
 import { routeMatchLength } from '@eduvault/shared';
 import type { NavIconName } from '@eduvault/ui';
 import { isDev } from './env';
+import type { FileRoutesByTo } from './routeTree.gen';
+
+export type NavRoute = Exclude<keyof FileRoutesByTo, `${string}$${string}`>;
 
 export interface NavItem {
   id: string;
   label: string;
   pageTitle: string;
-  route: string;
+  route: NavRoute;
   icon: NavIconName;
   alsoActiveFor?: readonly string[];
   gate?: Gate;
@@ -27,7 +30,7 @@ export interface NavGroup {
 export interface SettingsSection {
   id: string;
   label: string;
-  route: string;
+  route: NavRoute;
   group: string;
   icon: NavIconName;
   gate?: Gate;
@@ -36,7 +39,7 @@ export interface SettingsSection {
 const SETTINGS_ITEM_ID = 'settings';
 const FEES_ITEM_ID = 'fees';
 
-const FEES_ENTRIES: readonly (readonly [route: string, gate: Gate])[] = [
+const FEES_ENTRIES: readonly (readonly [route: NavRoute, gate: Gate])[] = [
   ['/finance/accounts', FINANCE_READ_GATE],
   ['/finance/school-fees', ['feeLine:read']],
   ['/finance/billing', ['invoice:bill', 'invoice:read']],

@@ -58,13 +58,16 @@ function SectionSelect({
   pathname: string;
 }) {
   const navigate = useNavigate();
-  const current = groups
-    .flatMap((entry) => entry.sections)
-    .find((section) => underRoute(section.route, pathname));
+  const allSections = groups.flatMap((entry) => entry.sections);
+  const current = allSections.find((section) =>
+    underRoute(section.route, pathname)
+  );
   function choose(event: ChangeEvent<HTMLSelectElement>) {
-    const route = event.target.value;
-    if (route !== '') {
-      void navigate({ to: route });
+    const chosen = allSections.find(
+      (section) => section.route === event.target.value
+    );
+    if (chosen !== undefined) {
+      void navigate({ to: chosen.route });
     }
   }
   return (

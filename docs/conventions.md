@@ -122,6 +122,7 @@ Layout: `src/pages/*-page.tsx` (one routed page per file), `src/components/` (ap
 | SPA tests render with `renderWithApi` and a partial fake `Api`; auth components take a fake auth client; nothing mocks `fetch`                                                          | `no-restricted-globals` (SPAs), `review`                   |
 | Specs avoid focused or disabled tests, `expect` inside conditionals, duplicate titles and malformed matchers                                                                            | `@vitest/eslint-plugin` (recommended)                      |
 | Test files may use `!`, untyped values from supertest and mocks, and unbound `vi.fn()` references; production code may not                                                              | spec override in `eslint.config.mjs`                       |
+| A type-level guarantee is proved with `expectTypeOf` in a spec, which `vitest/expect-expect` counts as an assertion and `tsc` checks                                                    | spec override in `eslint.config.mjs`, `tsc`                |
 | Scope test runs to affected or named projects; never run the whole suite                                                                                                                | `pnpm test` exits with an error; [CLAUDE.md](../CLAUDE.md) |
 
 ### Isolation cases

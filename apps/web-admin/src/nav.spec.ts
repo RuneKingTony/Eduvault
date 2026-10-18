@@ -14,6 +14,7 @@ import {
   settingsLanding,
   settingsTrail,
   type NavGroup,
+  type NavRoute,
 } from './nav';
 
 const built = new Set([
@@ -381,14 +382,14 @@ describe('nav gates', () => {
             id: 'invoices',
             label: 'Invoices',
             pageTitle: 'Invoices',
-            route: '/invoices',
+            route: '/finance/invoices',
             icon: 'wallet',
             gate: ['student:create', 'student:read'],
           },
         ],
       },
     ];
-    const routes = new Set(['/invoices']);
+    const routes = new Set(['/finance/invoices']);
     expect(visibleNav(groups, routes, { student: ['read'] })).toHaveLength(1);
     expect(visibleNav(groups, routes, { team: ['read'] })).toEqual([]);
   });
@@ -513,5 +514,13 @@ describe('the Accounts item', () => {
     expect(findCurrent(NAV_GROUPS, '/finance/ledger')?.item.id).toBe(
       'accounts'
     );
+  });
+});
+
+describe('NavRoute', () => {
+  it('holds registered param-less paths only', () => {
+    expectTypeOf<'/finance/school-fees'>().toExtend<NavRoute>();
+    expectTypeOf<'/not-a-route'>().not.toExtend<NavRoute>();
+    expectTypeOf<'/finance/accounts/$studentId'>().not.toExtend<NavRoute>();
   });
 });

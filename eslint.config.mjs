@@ -412,6 +412,10 @@ export default [
       'max-nested-callbacks': 'off',
       'sonarjs/no-hardcoded-passwords': 'off',
       'unicorn/no-await-expression-member': 'off',
+      'vitest/expect-expect': [
+        'error',
+        { assertFunctionNames: ['expect', 'expectTypeOf'] },
+      ],
       '@typescript-eslint/no-non-null-assertion': 'off',
       '@typescript-eslint/no-unsafe-argument': 'off',
       '@typescript-eslint/no-unsafe-assignment': 'off',

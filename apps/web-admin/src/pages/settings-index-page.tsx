@@ -1,14 +1,14 @@
 import { ChevronRightIcon } from 'lucide-react';
 import { NavIcon } from '@eduvault/ui';
 import { SettingsHeader, SettingsSection } from '../components/settings-page';
-import type { SettingsSection as Item } from '../nav';
+import type { NavRoute, SettingsSection as Item } from '../nav';
 
 export function SettingsIndexPage({
   items,
   onOpen,
 }: {
   items: readonly Item[];
-  onOpen: (route: string) => void;
+  onOpen: (route: NavRoute) => void;
 }) {
   return (
     <section className="flex flex-col gap-4">
