@@ -30,6 +30,7 @@ import {
 import type { AdjustmentScope } from './adjustment.repository';
 import {
   DiscountRepository,
+  type DiscountEnding,
   type DiscountPage,
   type DiscountRecord,
   type DiscountTx,
@@ -221,9 +222,26 @@ class KyselyDiscountTx implements DiscountTx {
         createdById: row.created_by,
         kind: discountKindSchema.parse(row.kind),
         value: Number(row.value),
+        toTermId: row.to_term_id,
+        ended: row.ended_at !== null,
         student: toStudentIdentity({ ...row, id: row.student_id }),
       }
     );
+  }
+
+  async end(id: string, ending: DiscountEnding): Promise<boolean> {
+    const result = await this.trx
+      .updateTable('student_discount')
+      .set({
+        to_term_id: ending.lastTermId,
+        ended_at: new Date(),
+        ended_by: ending.userId,
+      })
+      .where('organization_id', '=', this.who.scope.organizationId)
+      .where('id', '=', id)
+      .where('status', '=', 'approved')
+      .executeTakeFirst();
+    return result.numUpdatedRows > 0n;
   }
 
   approve(id: string): Promise<boolean> {
@@ -376,25 +394,6 @@ export class KyselyDiscountRepository extends DiscountRepository {
       total: rows[0]?.total_rows ?? 0,
       waitingCount,
     };
-  }
-
-  async end(
-    scope: AdjustmentScope,
-    id: string,
-    ending: { userId: string; lastTermId: string }
-  ): Promise<boolean> {
-    const result = await this.db
-      .updateTable('student_discount')
-      .set({
-        to_term_id: ending.lastTermId,
-        ended_at: new Date(),
-        ended_by: ending.userId,
-      })
-      .where('organization_id', '=', scope.organizationId)
-      .where('id', '=', id)
-      .where('status', '=', 'approved')
-      .executeTakeFirst();
-    return result.numUpdatedRows > 0n;
   }
 
   async waiting(scope: AdjustmentScope): Promise<WaitingApproval[]> {

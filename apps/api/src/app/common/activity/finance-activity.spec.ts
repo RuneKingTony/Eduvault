@@ -5,6 +5,7 @@ import {
   adjustmentDeclinedActivity,
   discountApprovedActivity,
   discountDeclinedActivity,
+  discountEndedActivity,
   feeLineAmountChangedActivity,
   feeLineCreatedActivity,
   feeLineRetiredActivity,
@@ -12,6 +13,7 @@ import {
   paymentCancellationDeclinedActivity,
   paymentCancelledActivity,
   paymentRecordedActivity,
+  roundCancelledActivity,
   roundSentActivity,
   type AdjustmentFacts,
   type DiscountFacts,
@@ -100,6 +102,66 @@ describe('roundSentActivity', () => {
   it('writes nothing for a round with no charges', () => {
     expect(
       roundSentActivity(actor, { id: 'run-1', number: 'BR-1' }, [])
+    ).toEqual([]);
+  });
+});
+
+describe('roundCancelledActivity', () => {
+  it('writes one finance row for a single-campus round', () => {
+    expect(
+      roundCancelledActivity(actor, { id: 'run-1', number: 'BR-2026-0003' }, [
+        { campusId: LEKKI, amountMinor: 10_000_000 },
+        { campusId: LEKKI, amountMinor: 14_000_000 },
+      ])
+    ).toEqual([
+      {
+        organizationId: 'org-1',
+        campusId: LEKKI,
+        pillar: 'finance',
+        kind: 'round.cancelled',
+        actorUserId: 'user-1',
+        subjectType: 'billing_run',
+        subjectId: 'run-1',
+        text: 'Tunde Bakare cancelled round BR-2026-0003 before it was sent: 2 prepared charges, ₦240,000.',
+        data: {
+          runId: 'run-1',
+          number: 'BR-2026-0003',
+          charges: 2,
+          totalMinor: 24_000_000,
+        },
+      },
+    ]);
+  });
+
+  it('writes one row per campus with only that campus’s count and total', () => {
+    const rows = roundCancelledActivity(
+      actor,
+      { id: 'run-1', number: 'BR-1' },
+      [
+        { campusId: LEKKI, amountMinor: 100 },
+        { campusId: IKEJA, amountMinor: 500 },
+        { campusId: LEKKI, amountMinor: 200 },
+      ]
+    );
+    expect(rows.map((row) => [row.campusId, row.text])).toEqual([
+      [
+        LEKKI,
+        'Tunde Bakare cancelled round BR-1 before it was sent: 2 prepared charges, ₦3.',
+      ],
+      [
+        IKEJA,
+        'Tunde Bakare cancelled round BR-1 before it was sent: 1 prepared charge, ₦5.',
+      ],
+    ]);
+    expect(rows.map((row) => row.data)).toEqual([
+      { runId: 'run-1', number: 'BR-1', charges: 2, totalMinor: 300 },
+      { runId: 'run-1', number: 'BR-1', charges: 1, totalMinor: 500 },
+    ]);
+  });
+
+  it('writes nothing for a round with no charges', () => {
+    expect(
+      roundCancelledActivity(actor, { id: 'run-1', number: 'BR-1' }, [])
     ).toEqual([]);
   });
 });
@@ -328,6 +390,45 @@ describe('discount activity', () => {
     expect(row).toMatchObject({
       text: 'Discount for Chika Obi (₦5,000) applied by Tunde Bakare.',
       data: { autoApproved: true, value: 500_000 },
+    });
+  });
+
+  it('records a percent discount ending after its last term', () => {
+    expect(
+      discountEndedActivity(actor, discount, {
+        id: 'term-1',
+        label: 'First term 2026/2027',
+      })
+    ).toEqual([
+      {
+        organizationId: 'org-1',
+        campusId: IKEJA,
+        pillar: 'finance',
+        kind: 'discount.ended',
+        actorUserId: 'user-1',
+        subjectType: 'student_discount',
+        subjectId: 'disc-1',
+        text: 'Discount for Chika Obi (10%) ended by Tunde Bakare after First term 2026/2027.',
+        data: {
+          discountId: 'disc-1',
+          studentId: 'student-2',
+          discountKind: 'percent',
+          value: 10,
+          lastTermId: 'term-1',
+        },
+      },
+    ]);
+  });
+
+  it('shows a fixed discount ending in naira', () => {
+    const [row] = discountEndedActivity(
+      actor,
+      { ...discount, kind: 'fixed', value: 500_000 },
+      { id: 'term-2', label: 'Second term 2026/2027' }
+    );
+    expect(row).toMatchObject({
+      text: 'Discount for Chika Obi (₦5,000) ended by Tunde Bakare after Second term 2026/2027.',
+      data: { discountKind: 'fixed', value: 500_000, lastTermId: 'term-2' },
     });
   });
 

@@ -49,7 +49,14 @@ export interface LockedDiscount {
   createdById: string | null;
   kind: DiscountKind;
   value: number;
+  toTermId: string | null;
+  ended: boolean;
   student: StudentIdentity;
+}
+
+export interface DiscountEnding {
+  userId: string;
+  lastTermId: string;
 }
 
 export interface DiscountTx {
@@ -58,6 +65,7 @@ export interface DiscountTx {
   lock(id: string): Promise<LockedDiscount | undefined>;
   approve(id: string): Promise<boolean>;
   reject(id: string, reason: string): Promise<boolean>;
+  end(id: string, ending: DiscountEnding): Promise<boolean>;
   readonly activity: ActivityRecorder;
   currency(): Promise<string>;
   approvalOn(): Promise<boolean>;
@@ -108,12 +116,6 @@ export abstract class DiscountRepository {
     scope: AdjustmentScope,
     query: StudentDiscountListQuery
   ): Promise<DiscountPage>;
-
-  abstract end(
-    scope: AdjustmentScope,
-    id: string,
-    ending: { userId: string; lastTermId: string }
-  ): Promise<boolean>;
 
   abstract waiting(scope: AdjustmentScope): Promise<WaitingApproval[]>;
 }

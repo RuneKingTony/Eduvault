@@ -146,6 +146,186 @@ test.describe('finance activity', () => {
     expect(await financeRows(pool, orgA.id)).toHaveLength(2);
   });
 
+  test('cancelling a prepared round writes one row per campus with its share, and cancelling again writes nothing', async ({
+    api,
+    app,
+    pool,
+    schools: { owner, orgA, lekki, ikeja },
+  }) => {
+    const fixture = await chargeFixture(app, api, owner);
+    const prepared = await prepare(api, owner, {
+      termId: fixture.secondTermId,
+      scope: 'school',
+    });
+    expect(await financeRows(pool, orgA.id)).toEqual([]);
+
+    await api(owner).post(`/billing-runs/${prepared.runId}/cancel`).expect(201);
+
+    const rows = await financeRows(pool, orgA.id);
+    expect(rows.map((row) => row.kind)).toEqual([
+      'round.cancelled',
+      'round.cancelled',
+    ]);
+    expect(rows.map((row) => row.campus_id ?? '').toSorted(compare)).toEqual(
+      [lekki.id, ikeja.id].toSorted(compare)
+    );
+    for (const row of rows) {
+      expect(row.text).toMatch(
+        new RegExp(
+          String.raw`cancelled round ${prepared.number} before it was sent: 1 prepared charge, ₦220,000\.$`
+        )
+      );
+    }
+    await api(owner).post(`/billing-runs/${prepared.runId}/cancel`).expect(409);
+    expect(await financeRows(pool, orgA.id)).toHaveLength(2);
+  });
+
+  test('cancelling a sent round is refused and writes no cancelled row', async ({
+    api,
+    app,
+    pool,
+    schools: { owner, orgA },
+  }) => {
+    const fixture = await chargeFixture(app, api, owner);
+    const prepared = await prepare(api, owner, {
+      termId: fixture.secondTermId,
+      scope: 'school',
+    });
+    await sendRun(api, owner, prepared.runId ?? '');
+
+    await api(owner).post(`/billing-runs/${prepared.runId}/cancel`).expect(409);
+
+    expect((await financeRows(pool, orgA.id)).map((row) => row.kind)).toEqual([
+      'round.sent',
+      'round.sent',
+    ]);
+  });
+
+  test('a cancelled round’s rows reach a finance reader on that campus only, and no other school or member', async ({
+    api,
+    app,
+    schools: { owner, ownerB, lekkiOnly, noPermission },
+  }) => {
+    const fixture = await chargeFixture(app, api, owner);
+    const prepared = await prepare(api, owner, {
+      termId: fixture.secondTermId,
+      scope: 'school',
+    });
+    await api(owner).post(`/billing-runs/${prepared.runId}/cancel`).expect(201);
+
+    const cancelled = async (actor: typeof owner) =>
+      (await financeTexts(api, actor)).filter((text) =>
+        text.includes(`cancelled round ${prepared.number}`)
+      );
+    expect(await cancelled(owner)).toHaveLength(2);
+    expect(await cancelled(lekkiOnly)).toHaveLength(1);
+    expect(await financeTexts(api, noPermission)).toEqual([]);
+    expect(await financeTexts(api, ownerB)).toEqual([]);
+  });
+
+  test('another school cannot cancel a round or end a discount, and a refused try writes no row', async ({
+    api,
+    app,
+    pool,
+    schools: { owner, ownerB, orgA, studentLekki },
+  }) => {
+    const fixture = await chargeFixture(app, api, owner);
+    const prepared = await prepare(api, owner, {
+      termId: fixture.secondTermId,
+      scope: 'school',
+    });
+    await switchApproval(api, owner, { discount: false });
+    const { discount } = await askDiscount(api, owner, {
+      studentId: studentLekki.id,
+      kind: 'percent',
+      value: 10,
+      ledgerAccountId: null,
+      fromTermId: fixture.secondTermId,
+      reason: 'Staff child',
+    });
+    const before = await financeRows(pool, orgA.id);
+
+    await api(ownerB)
+      .post(`/billing-runs/${prepared.runId}/cancel`)
+      .expect(404);
+    await api(ownerB)
+      .post(`/finance/discounts/${discount.id}/end`)
+      .send({ lastTermId: fixture.secondTermId })
+      .expect(404);
+
+    expect(await financeRows(pool, orgA.id)).toEqual(before);
+    expect(await financeTexts(api, ownerB)).toEqual([]);
+  });
+
+  test('a discount ended on one campus is hidden from a reader on another campus and from a member without finance read', async ({
+    api,
+    app,
+    pool,
+    schools: { owner, orgA, ikeja, lekkiOnly, noPermission, studentIkeja },
+  }) => {
+    const fixture = await chargeFixture(app, api, owner);
+    await switchApproval(api, owner, { discount: false });
+    const { discount } = await askDiscount(api, owner, {
+      studentId: studentIkeja.id,
+      kind: 'percent',
+      value: 10,
+      ledgerAccountId: null,
+      fromTermId: fixture.secondTermId,
+      reason: 'Staff child',
+    });
+
+    await api(owner)
+      .post(`/finance/discounts/${discount.id}/end`)
+      .send({ lastTermId: fixture.secondTermId })
+      .expect(200);
+
+    const rows = (await financeRows(pool, orgA.id)).filter(
+      (row) => row.kind === 'discount.ended'
+    );
+    expect(kindsAndCampuses(rows)).toEqual([['discount.ended', ikeja.id]]);
+    expect(
+      (await financeTexts(api, lekkiOnly)).filter((text) =>
+        text.includes('ended by')
+      )
+    ).toEqual([]);
+    expect(await financeTexts(api, noPermission)).toEqual([]);
+  });
+
+  test('ending a discount writes one row on the student’s campus, and ending it again at the same term writes nothing', async ({
+    api,
+    app,
+    pool,
+    schools: { owner, ownerB, orgA, lekki, lekkiOnly, studentLekki },
+  }) => {
+    const fixture = await chargeFixture(app, api, owner);
+    const { discount } = await askDiscount(api, lekkiOnly, {
+      studentId: studentLekki.id,
+      kind: 'percent',
+      value: 10,
+      ledgerAccountId: null,
+      fromTermId: fixture.secondTermId,
+      reason: 'Staff child',
+    });
+    await approveDiscount(api, owner, discount.id);
+    const end = () =>
+      api(owner)
+        .post(`/finance/discounts/${discount.id}/end`)
+        .send({ lastTermId: fixture.secondTermId })
+        .expect(200);
+
+    await end();
+    await end();
+
+    const rows = (await financeRows(pool, orgA.id)).filter(
+      (row) => row.kind === 'discount.ended'
+    );
+    expect(kindsAndCampuses(rows)).toEqual([['discount.ended', lekki.id]]);
+    expect(rows[0]?.text).toMatch(
+      /^Discount for .+ \(10%\) ended by .+ after .+\.$/
+    );
+    expect(await financeTexts(api, ownerB)).toEqual([]);
+  });
+
   test('a cancellation writes a row when approved or declined, never when asked or decided twice', async ({
     api,
     app,

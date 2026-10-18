@@ -4,6 +4,7 @@ import type { WaitingApproval } from '../../common/approvals';
 import type { AdjustmentScope } from './adjustment.repository';
 import {
   DiscountRepository,
+  type DiscountEnding,
   type DiscountPage,
   type DiscountRecord,
   type DiscountTx,
@@ -32,6 +33,7 @@ export class FakeDiscountRepository extends DiscountRepository {
   stored: StoredDiscount[] = [];
   recorded: ActivityInput[] = [];
   approveChanges = true;
+  endChanges = true;
   private counter = 0;
   private actor = '';
 
@@ -93,6 +95,7 @@ export class FakeDiscountRepository extends DiscountRepository {
       approve: (id) => Promise.resolve(this.decide(id, 'approved')),
       reject: (id, reason) =>
         Promise.resolve(this.decide(id, 'rejected', reason)),
+      end: (id, ending) => Promise.resolve(this.finish(id, ending)),
       activity: {
         recordMany: (inputs) => {
           this.recorded.push(...inputs);
@@ -125,6 +128,8 @@ export class FakeDiscountRepository extends DiscountRepository {
         createdById: row.userId,
         kind: row.kind,
         value: row.value,
+        toTermId: row.toTermId,
+        ended: row.endedBy !== null,
         student: {
           id: row.studentId,
           name: 'Halima Bello',
@@ -132,6 +137,18 @@ export class FakeDiscountRepository extends DiscountRepository {
         },
       }
     );
+  }
+
+  private finish(id: string, ending: DiscountEnding): boolean {
+    const row = this.stored.find((candidate) => candidate.id === id);
+    if (row?.status !== 'approved' || !this.endChanges) {
+      return false;
+    }
+    Object.assign(row, {
+      toTermId: ending.lastTermId,
+      endedBy: ending.userId,
+    });
+    return true;
   }
 
   private decide(
@@ -204,22 +221,6 @@ export class FakeDiscountRepository extends DiscountRepository {
     _query: StudentDiscountListQuery
   ): Promise<DiscountPage> {
     return Promise.resolve({ items: [], total: 0, waitingCount: 0 });
-  }
-
-  end(
-    _scope: AdjustmentScope,
-    id: string,
-    ending: { userId: string; lastTermId: string }
-  ): Promise<boolean> {
-    const row = this.stored.find((candidate) => candidate.id === id);
-    if (row?.status === 'approved') {
-      Object.assign(row, {
-        toTermId: ending.lastTermId,
-        endedBy: ending.userId,
-      });
-      return Promise.resolve(true);
-    }
-    return Promise.resolve(false);
   }
 
   waiting(): Promise<WaitingApproval[]> {

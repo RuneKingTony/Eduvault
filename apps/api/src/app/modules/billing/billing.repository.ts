@@ -79,10 +79,10 @@ export interface RunAction {
   scope: BillingScope;
   runId: string;
   userId: string;
+  userName: string;
 }
 
 export interface IssueRound extends RunAction {
-  userName: string;
   today: string;
   year: number;
 }
