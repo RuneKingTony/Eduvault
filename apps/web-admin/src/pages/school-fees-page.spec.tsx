@@ -6,6 +6,7 @@ import {
   TERM_1,
   TERM_2,
   TUITION,
+  copySource,
   feeGrid,
   feeLine,
   feesApi,
@@ -15,6 +16,7 @@ import {
 } from '../test-fees';
 import { LEKKI } from '../test-announcements';
 import { ownerAccess, starterAccess } from '../test-utils';
+import { OtherFeesPage } from './other-fees-page';
 import { SchoolFeesPage } from './school-fees-page';
 
 vi.mock('@eduvault/ui', async (importOriginal) => ({
@@ -364,6 +366,95 @@ describe('SchoolFeesPage', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Create the first school year'
     );
+  });
+});
+
+describe('the Copy from last term button', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('shows for an owner when the term is empty and an earlier term has fees', async () => {
+    const { api } = setup();
+    expect(
+      await screen.findByRole('button', { name: 'Copy from last term' })
+    ).toBeInTheDocument();
+    expect(api.feeLines.copySource).toHaveBeenCalledWith({
+      query: { termId: TERM_1 },
+    });
+  });
+
+  it('opens the confirm dialog and copies into the chosen term', async () => {
+    const { api } = setup();
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Copy from last term' })
+    );
+    const dialog = await screen.findByRole('dialog');
+    expect(
+      within(dialog).getByText('Copy fees from Third term, 2025/2026?')
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).getByText('Into First term, 2026/2027.')
+    ).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Copy fees' }));
+    await waitFor(() => {
+      expect(api.feeLines.copy).toHaveBeenCalledWith({
+        body: { termId: TERM_1 },
+      });
+    });
+  });
+
+  it('is hidden when the term already has fees', async () => {
+    setup({ copySource: copySource({ targetHasLines: true }) });
+    await screen.findByRole('button', { name: 'Add a fee' });
+    expect(
+      screen.queryByRole('button', { name: 'Copy from last term' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('is hidden when there is no earlier term or it has no fees', async () => {
+    const none = setup({
+      copySource: copySource({ sourceTerm: null, liveLineCount: 0 }),
+    });
+    await screen.findByRole('button', { name: 'Add a fee' });
+    await waitFor(() => {
+      expect(none.api.feeLines.copySource).toHaveBeenCalled();
+    });
+    expect(
+      screen.queryByRole('button', { name: 'Copy from last term' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('is hidden from a member without campus:readAll and sends no copy-source request', async () => {
+    const { api } = setup({}, starterAccess('bursar'));
+    await screen.findByRole('button', { name: 'Add a fee' });
+    expect(
+      screen.queryByRole('button', { name: 'Copy from last term' })
+    ).not.toBeInTheDocument();
+    expect(api.feeLines.copySource).not.toHaveBeenCalled();
+  });
+
+  it('is hidden from a member who cannot create fees', async () => {
+    const { api } = setup({}, starterAccess('administrator'));
+    await screen.findByRole('combobox', { name: 'Term' });
+    expect(
+      screen.queryByRole('button', { name: 'Copy from last term' })
+    ).not.toBeInTheDocument();
+    expect(api.feeLines.copySource).not.toHaveBeenCalled();
+  });
+
+  it('is not offered on Other fees', async () => {
+    const api = feesApi();
+    renderFees(
+      <OtherFeesPage search={{}} onSearchChange={vi.fn()} />,
+      api,
+      ownerAccess()
+    );
+    await screen.findByRole('button', { name: 'Add a fee' });
+    expect(
+      screen.queryByRole('button', { name: 'Copy from last term' })
+    ).not.toBeInTheDocument();
+    expect(api.feeLines.copySource).not.toHaveBeenCalled();
   });
 });
 

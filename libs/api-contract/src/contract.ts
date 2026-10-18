@@ -90,10 +90,14 @@ import {
 import {
   cashBookQuerySchema,
   cashBookSchema,
+  copyFeeLinesSchema,
   createFeeLineSchema,
   createFeeTypeSchema,
   createLedgerAccountSchema,
   createMoneyAccountSchema,
+  feeCopyQuerySchema,
+  feeCopyResultSchema,
+  feeCopySourceSchema,
   feeGridQuerySchema,
   feeGridSchema,
   feeSetupSchema,
@@ -888,11 +892,23 @@ export const contract = defineContract({
       query: feeCandidatesQuerySchema,
       response: feeCandidatesSchema,
     }),
+    copySource: defineRoute({
+      method: 'GET',
+      path: '/fee-lines/copy-source',
+      query: feeCopyQuerySchema,
+      response: feeCopySourceSchema,
+    }),
     create: defineRoute({
       method: 'POST',
       path: '/fee-lines',
       body: createFeeLineSchema,
       response: feeLineSchema,
+    }),
+    copy: defineRoute({
+      method: 'POST',
+      path: '/fee-lines/copy',
+      body: copyFeeLinesSchema,
+      response: feeCopyResultSchema,
     }),
     update: defineRoute({
       method: 'PATCH',

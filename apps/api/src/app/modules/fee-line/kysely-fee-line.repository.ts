@@ -13,6 +13,8 @@ import { uniqueViolation } from '../../common/db/unique-violation';
 import { feeTypeQuery, schoolCurrency } from '../../common/ledger';
 import {
   FeeLineRepository,
+  type CopyFeeLines,
+  type CopyOutcome,
   type FeeLineOutcome,
   type FeeScope,
   type LevelRef,
@@ -58,6 +60,24 @@ const toLine = (row: LineRow): FeeLine => ({
   isOptional: row.is_optional,
   retiredAt: row.retired_at === null ? null : iso(row.retired_at),
   createdAt: iso(row.created_at),
+});
+
+interface TermRow {
+  id: string;
+  name: string;
+  school_year_name: string;
+  session_id: string;
+  starts_on: string;
+  ends_on: string;
+}
+
+const toTerm = (row: TermRow): TermRef => ({
+  id: row.id,
+  name: row.name,
+  schoolYearName: row.school_year_name,
+  sessionId: row.session_id,
+  startsOn: row.starts_on,
+  endsOn: row.ends_on,
 });
 
 @Injectable()
@@ -143,23 +163,130 @@ export class KyselyFeeLineRepository extends FeeLineRepository {
     return row && toLine(row);
   }
 
+  private terms() {
+    return this.db
+      .selectFrom('term')
+      .innerJoin('academic_session', (join) =>
+        join
+          .onRef('academic_session.id', '=', 'term.session_id')
+          .onRef(
+            'academic_session.organization_id',
+            '=',
+            'term.organization_id'
+          )
+      )
+      .select([
+        'term.id',
+        'term.name',
+        'academic_session.name as school_year_name',
+        'term.session_id',
+        sql<string>`to_char(term.starts_on, 'YYYY-MM-DD')`.as('starts_on'),
+        sql<string>`to_char(term.ends_on, 'YYYY-MM-DD')`.as('ends_on'),
+      ]);
+  }
+
   async findTerm(
     organizationId: string,
     termId: string
   ): Promise<TermRef | undefined> {
-    const row = await this.db
-      .selectFrom('term')
-      .select([
-        'id',
-        'session_id',
-        sql<string>`to_char(ends_on, 'YYYY-MM-DD')`.as('ends_on'),
-      ])
-      .where('organization_id', '=', organizationId)
-      .where('id', '=', termId)
+    const row = await this.terms()
+      .where('term.organization_id', '=', organizationId)
+      .where('term.id', '=', termId)
       .executeTakeFirst();
-    return (
-      row && { id: row.id, sessionId: row.session_id, endsOn: row.ends_on }
-    );
+    return row && toTerm(row);
+  }
+
+  async previousTerm(
+    organizationId: string,
+    termId: string
+  ): Promise<TermRef | undefined> {
+    const row = await this.terms()
+      .where('term.organization_id', '=', organizationId)
+      .where(
+        'term.starts_on',
+        '<',
+        this.db
+          .selectFrom('term as target')
+          .select('target.starts_on')
+          .where('target.organization_id', '=', organizationId)
+          .where('target.id', '=', termId)
+      )
+      .orderBy('term.starts_on', 'desc')
+      .limit(1)
+      .executeTakeFirst();
+    return row && toTerm(row);
+  }
+
+  async liveLineCount(organizationId: string, termId: string): Promise<number> {
+    const row = await this.db
+      .selectFrom('fee_line')
+      .select((eb) => eb.fn.countAll().as('count'))
+      .where('organization_id', '=', organizationId)
+      .where('term_id', '=', termId)
+      .where('retired_at', 'is', null)
+      .executeTakeFirstOrThrow();
+    return Number(row.count);
+  }
+
+  async copyLines(input: CopyFeeLines): Promise<CopyOutcome> {
+    try {
+      return await this.db.transaction().execute(async (trx) => {
+        const existing = await trx
+          .selectFrom('fee_line')
+          .select('id')
+          .where('organization_id', '=', input.organizationId)
+          .where('term_id', '=', input.toTermId)
+          .where('retired_at', 'is', null)
+          .limit(1)
+          .executeTakeFirst();
+        if (existing !== undefined) {
+          return { status: 'not_empty' };
+        }
+        const result = await trx
+          .insertInto('fee_line')
+          .columns([
+            'organization_id',
+            'term_id',
+            'class_level_id',
+            'ledger_account_id',
+            'campus_id',
+            'name',
+            'amount_minor',
+            'applies_to',
+            'is_optional',
+            'created_by',
+          ])
+          .expression((eb) =>
+            eb
+              .selectFrom('fee_line')
+              .select([
+                'organization_id',
+                eb.val(input.toTermId).as('term_id'),
+                'class_level_id',
+                'ledger_account_id',
+                'campus_id',
+                'name',
+                'amount_minor',
+                'applies_to',
+                'is_optional',
+                eb.val(input.userId).as('created_by'),
+              ])
+              .where('organization_id', '=', input.organizationId)
+              .where('term_id', '=', input.fromTermId)
+              .where('retired_at', 'is', null)
+          )
+          .executeTakeFirstOrThrow();
+        const copied = Number(result.numInsertedOrUpdatedRows ?? 0n);
+        return copied === 0
+          ? { status: 'source_empty' }
+          : { status: 'copied', copied };
+      });
+    } catch (error) {
+      if (uniqueViolation(error) === LIVE_LINE_KEY) {
+        return { status: 'not_empty' };
+      }
+      throw error;
+    }
   }
 
   currency(organizationId: string): Promise<string> {

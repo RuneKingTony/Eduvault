@@ -34,7 +34,10 @@ function setup(...rows: FeeLine[]) {
   lines.rows.push(...rows);
   lines.terms.set('term-1', {
     id: 'term-1',
+    name: 'First term',
+    schoolYearName: '2026/2027',
     sessionId: 'session-1',
+    startsOn: '2026-09-07',
     endsOn: '2026-12-18',
   });
   const feeTypes = new FakeFeeTypeRepository();

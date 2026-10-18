@@ -312,6 +312,16 @@ export const feeLineDuplicateMessage = (parts: {
 };
 export const feeTypeDuplicateMessage = (name: string): string =>
   `A fee type called ${name} already exists.`;
+export const FEE_COPY_NO_SOURCE_MESSAGE =
+  'There is no earlier term to copy fees from.';
+export const feeCopyEmptySourceMessage = (label: string): string =>
+  `${label} has no fees to copy.`;
+export const feeCopyTargetNotEmptyMessage = (label: string): string =>
+  `${label} already has fees. Change them one at a time instead.`;
+export const feeTermLabel = (term: {
+  name: string;
+  schoolYearName: string;
+}): string => `${term.name}, ${term.schoolYearName}`;
 
 export const feeAppliesToSchema = z.enum(FEE_APPLIES_TO);
 export type FeeAppliesTo = z.infer<typeof feeAppliesToSchema>;
@@ -453,6 +463,32 @@ export const updateFeeLineSchema = z.strictObject({
   amountMinor: feeAmountSchema,
 });
 export type UpdateFeeLineInput = z.input<typeof updateFeeLineSchema>;
+
+export const feeCopyQuerySchema = z.object({ termId: idSchema });
+export type FeeCopyQuery = z.output<typeof feeCopyQuerySchema>;
+
+export const copyFeeLinesSchema = z.strictObject({ termId: idSchema });
+export type CopyFeeLinesInput = z.input<typeof copyFeeLinesSchema>;
+
+export const feeCopyTermSchema = z.object({
+  id: idSchema,
+  name: z.string(),
+  schoolYearName: z.string(),
+});
+export type FeeCopyTerm = z.infer<typeof feeCopyTermSchema>;
+
+export const feeCopySourceSchema = z.object({
+  sourceTerm: feeCopyTermSchema.nullable(),
+  liveLineCount: z.number().int().nonnegative(),
+  targetHasLines: z.boolean(),
+});
+export type FeeCopySource = z.infer<typeof feeCopySourceSchema>;
+
+export const feeCopyResultSchema = z.object({
+  copied: z.number().int().positive(),
+  sourceTerm: feeCopyTermSchema,
+});
+export type FeeCopyResult = z.infer<typeof feeCopyResultSchema>;
 
 export const feePreviewQuerySchema = z.object({
   termId: idSchema,

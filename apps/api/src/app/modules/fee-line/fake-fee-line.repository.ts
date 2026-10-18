@@ -11,6 +11,8 @@ import {
   FeeStudentRepository,
   FeeTypeRepository,
   type ChargeFacts,
+  type CopyFeeLines,
+  type CopyOutcome,
   type FeeLineOutcome,
   type FeeScope,
   type FeeTypeOutcome,
@@ -28,8 +30,15 @@ export class FakeFeeLineRepository extends FeeLineRepository {
   feeTypes = new Map<string, FeeType>();
   otherAccounts = new Set<string>();
   created: NewFeeLine[] = [];
+  copies: CopyFeeLines[] = [];
   duplicate = false;
   setupResult: FeeSetup = { terms: [], levels: [] };
+
+  private live(termId: string): FeeLine[] {
+    return this.rows.filter(
+      (row) => row.termId === termId && row.retiredAt === null
+    );
+  }
 
   private visible(scope: FeeScope): FeeLine[] {
     return this.rows.filter(
@@ -60,6 +69,41 @@ export class FakeFeeLineRepository extends FeeLineRepository {
     termId: string
   ): Promise<TermRef | undefined> {
     return Promise.resolve(this.terms.get(termId));
+  }
+
+  previousTerm(
+    _organizationId: string,
+    termId: string
+  ): Promise<TermRef | undefined> {
+    const target = this.terms.get(termId);
+    const earlier = [...this.terms.values()]
+      .filter((term) => target !== undefined && term.startsOn < target.startsOn)
+      .toSorted((a, b) => b.startsOn.localeCompare(a.startsOn));
+    return Promise.resolve(earlier[0]);
+  }
+
+  liveLineCount(_organizationId: string, termId: string): Promise<number> {
+    return Promise.resolve(this.live(termId).length);
+  }
+
+  copyLines(input: CopyFeeLines): Promise<CopyOutcome> {
+    this.copies.push(input);
+    if (this.live(input.toTermId).length > 0) {
+      return Promise.resolve({ status: 'not_empty' });
+    }
+    const source = this.live(input.fromTermId);
+    if (source.length === 0) {
+      return Promise.resolve({ status: 'source_empty' });
+    }
+    this.rows.push(
+      ...source.map((row, index) => ({
+        ...row,
+        id: `copy-${this.copies.length}-${index + 1}`,
+        termId: input.toTermId,
+        createdAt: '2026-10-15T00:00:00.000Z',
+      }))
+    );
+    return Promise.resolve({ status: 'copied', copied: source.length });
   }
 
   findFeeType(

@@ -1,4 +1,4 @@
-import type { FeeSetupTerm } from '@eduvault/api-contract';
+import { feeTermLabel, type FeeSetupTerm } from '@eduvault/api-contract';
 
 export interface FeeTermOption {
   id: string;
@@ -11,7 +11,7 @@ export function feeTermOptions(
 ): FeeTermOption[] {
   return terms.map((term) => ({
     id: term.id,
-    label: `${term.name}, ${term.schoolYearName}`,
+    label: feeTermLabel(term),
     isCurrent: term.isCurrent,
   }));
 }

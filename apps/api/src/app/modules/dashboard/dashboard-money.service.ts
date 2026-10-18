@@ -1,5 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import type { DashboardCharged, DashboardMoney } from '@eduvault/api-contract';
+import {
+  feeTermLabel,
+  type DashboardCharged,
+  type DashboardMoney,
+} from '@eduvault/api-contract';
 import type { OrgContext } from '../../common/auth';
 import { BillingPlanService } from '../billing/billing-plan.service';
 import { InvoiceService } from '../invoice/invoice.service';
@@ -45,7 +49,7 @@ export class DashboardMoneyService {
     return {
       currency: totals.currency,
       termId: term.id,
-      termName: `${term.name}, ${term.schoolYearName}`,
+      termName: feeTermLabel(term),
       chargedMinor: totals.totalMinor,
       chargeCount: totals.count,
     };
