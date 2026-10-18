@@ -147,6 +147,27 @@ test.beforeEach(({ clock }) => {
 });
 
 test.describe('recording a student purchase', () => {
+  test('writes no finance activity row', async ({
+    api,
+    app,
+    pool,
+    schools,
+  }) => {
+    const { owner, orgA, studentLekki } = schools;
+    const { shirt } = await counter(app, api, schools);
+
+    await sell(api, owner, {
+      studentId: studentLekki.id,
+      lines: [{ itemId: shirt.id, quantity: 1 }],
+    });
+
+    const { rows } = await pool.query(
+      `SELECT 1 FROM activity_event WHERE organization_id = $1 AND pillar = 'finance'`,
+      [orgA.id]
+    );
+    expect(rows).toEqual([]);
+  });
+
   test('posts the charge, its cost, the payment and the movements in one go, with the balance unchanged', async ({
     api,
     app,

@@ -82,6 +82,7 @@ export interface RunAction {
 }
 
 export interface IssueRound extends RunAction {
+  userName: string;
   today: string;
   year: number;
 }

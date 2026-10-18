@@ -94,6 +94,7 @@ describe('AdjustmentService.create', () => {
       ledgerAccountId: 'discounts-given',
     });
     expect(repo.posted).toEqual([]);
+    expect(repo.recorded).toEqual([]);
   });
 
   it('numbers each request in turn', async () => {
@@ -273,6 +274,26 @@ describe('AdjustmentService.create', () => {
       journalEntryId: 'entry-1',
     });
     expect(repo.posted).toHaveLength(1);
+    expect(repo.recorded).toEqual([
+      {
+        organizationId: 'school-a',
+        campusId: 'lekki',
+        pillar: 'finance',
+        kind: 'adjustment.approved',
+        actorUserId: 'chika',
+        subjectType: 'adjustment',
+        subjectId: result.adjustment.id,
+        text: 'Reduce a fee ADJ-2026-0001 for Ada Obi, ₦10,000, applied by chika.',
+        data: {
+          adjustmentId: result.adjustment.id,
+          number: 'ADJ-2026-0001',
+          adjustmentKind: 'credit_note',
+          studentId: ADA,
+          amountMinor: 1_000_000,
+          autoApproved: true,
+        },
+      },
+    ]);
   });
 
   it('keeps a kind that is still on waiting while another is switched off', async () => {
@@ -432,6 +453,57 @@ describe('AdjustmentService.approve', () => {
   });
 });
 
+describe('AdjustmentService.approve activity', () => {
+  it.each([
+    ['credit_note', 'Reduce a fee', 1_000_000],
+    ['write_off', 'Cancel a balance', 1_000_000],
+    ['refund', 'Refund', 500_000],
+  ] as const)(
+    'records one row for an approved %s',
+    async (kind, label, amount) => {
+      const { repo, service } = setup(kind === 'refund' ? -500_000 : 1_200_000);
+      const { adjustment } = await service.create(chika, {
+        ...creditNote(),
+        kind,
+        amountMinor: amount,
+        ...(kind === 'refund' ? { moneyAccountId: GTBANK } : {}),
+      });
+
+      await service.approve(grace, adjustment.id);
+
+      expect(repo.recorded).toHaveLength(1);
+      expect(repo.recorded[0]).toMatchObject({
+        campusId: 'lekki',
+        pillar: 'finance',
+        kind: 'adjustment.approved',
+        actorUserId: 'grace',
+        subjectType: 'adjustment',
+        subjectId: adjustment.id,
+        data: {
+          adjustmentKind: kind,
+          autoApproved: false,
+          amountMinor: amount,
+        },
+      });
+      expect(repo.recorded[0]?.text).toMatch(
+        new RegExp(
+          String.raw`^${label} ADJ-2026-0001 for Ada Obi, .*, approved by grace\.$`
+        )
+      );
+    }
+  );
+
+  it('records nothing when the request was already decided', async () => {
+    const { repo, service } = setup();
+    const { adjustment } = await service.create(chika, creditNote());
+    repo.approveChanges = false;
+
+    await rejected(service.approve(grace, adjustment.id));
+
+    expect(repo.recorded).toEqual([]);
+  });
+});
+
 describe('AdjustmentService.decline', () => {
   it('keeps the reason and posts nothing', async () => {
     const { repo, service } = setup();
@@ -448,6 +520,37 @@ describe('AdjustmentService.decline', () => {
       rejectionReason: 'Not agreed',
     });
     expect(repo.posted).toEqual([]);
+    expect(repo.recorded).toEqual([
+      {
+        organizationId: 'school-a',
+        campusId: 'lekki',
+        pillar: 'finance',
+        kind: 'adjustment.declined',
+        actorUserId: 'grace',
+        subjectType: 'adjustment',
+        subjectId: adjustment.id,
+        text: 'Reduce a fee ADJ-2026-0001 for Ada Obi was declined: Not agreed',
+        data: {
+          adjustmentId: adjustment.id,
+          number: 'ADJ-2026-0001',
+          adjustmentKind: 'credit_note',
+          studentId: ADA,
+          amountMinor: 1_000_000,
+        },
+      },
+    ]);
+  });
+
+  it('records nothing for a decline that was refused', async () => {
+    const { repo, service } = setup();
+    const { adjustment } = await service.create(chika, creditNote());
+    await rejected(service.decline(chika, adjustment.id, 'No'));
+    await service.decline(grace, adjustment.id, 'No');
+    repo.recorded = [];
+
+    await rejected(service.decline(as('yemi'), adjustment.id, 'No'));
+
+    expect(repo.recorded).toEqual([]);
   });
 
   it('refuses a blank reason with 400', async () => {

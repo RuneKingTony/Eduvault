@@ -4,20 +4,19 @@ import type {
   AdjustmentListQuery,
   ApprovalStatus,
 } from '@eduvault/api-contract';
+import type { ActivityRecorder } from '../../common/activity';
 import type { WaitingApproval } from '../../common/approvals';
 import type { CampusScope } from '../../common/campus-scope';
 import type { PostInput } from '../../common/ledger';
+import type { StudentIdentity } from '../../common/students';
 
 export interface AdjustmentScope {
   organizationId: string;
   campusScope: CampusScope;
 }
 
-export interface StudentFacts {
-  id: string;
-  name: string;
+export interface StudentFacts extends StudentIdentity {
   admissionNumber: string;
-  campusId: string | null;
   balanceMinor: number;
 }
 
@@ -43,6 +42,10 @@ export interface AdjustmentRecord {
   reason: string;
   status: ApprovalStatus;
   createdBy: string | null;
+}
+
+export interface LockedAdjustment extends AdjustmentRecord {
+  student: StudentIdentity;
 }
 
 export interface NewAdjustment {
@@ -90,9 +93,11 @@ export interface AdjustmentTx {
   nextNumber(year: number): Promise<string>;
   post(entry: AdjustmentPost): Promise<string>;
   insert(input: NewAdjustment): Promise<void>;
-  lockAdjustment(id: string): Promise<AdjustmentRecord | undefined>;
+  lockAdjustment(id: string): Promise<LockedAdjustment | undefined>;
   approve(id: string, entryId: string): Promise<boolean>;
   reject(id: string, reason: string): Promise<boolean>;
+  readonly activity: ActivityRecorder;
+  currency(): Promise<string>;
 }
 
 export abstract class AdjustmentRepository {

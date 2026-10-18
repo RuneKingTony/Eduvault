@@ -19,6 +19,11 @@ import {
   type RequestPaymentVoidInput,
   type RequestedPaymentVoid,
 } from '@eduvault/api-contract';
+import {
+  financeActorIn,
+  paymentCancellationDeclinedActivity,
+  paymentCancelledActivity,
+} from '../../common/activity';
 import { assertDeclineReason, decide } from '../../common/approvals';
 import type { OrgContext } from '../../common/auth';
 import { Clock } from '../../common/clock';
@@ -101,6 +106,7 @@ export class PaymentVoidService {
       const entryId = await this.postMirror(tx, payment, reason);
       const id = await tx.insertApproved({ paymentId, reason, entryId });
       await tx.setPaymentStatus(paymentId, 'voided');
+      await this.recordCancelled(tx, ctx, { payment, autoApproved: true });
       return { id, autoApproved: true };
     });
     return {
@@ -131,6 +137,10 @@ export class PaymentVoidService {
           const changed = await tx.approve(id, entryId);
           if (changed) {
             await tx.setPaymentStatus(found.payment.id, 'voided');
+            await this.recordCancelled(tx, ctx, {
+              payment: found.payment,
+              autoApproved: false,
+            });
           }
           return changed;
         }
@@ -159,6 +169,11 @@ export class PaymentVoidService {
             (await tx.reject(id, declineReason));
           if (changed) {
             await tx.setPaymentStatus(found.payment.id, 'posted');
+            await this.recordDeclined(tx, ctx, {
+              payment: found.payment,
+              voidId: id,
+              reason: declineReason,
+            });
           }
           return changed;
         }
@@ -176,6 +191,41 @@ export class PaymentVoidService {
       throw voidNotFound();
     }
     return found;
+  }
+
+  private async recordCancelled(
+    tx: PaymentVoidTx,
+    ctx: OrgContext,
+    cancelled: { payment: VoidablePayment; autoApproved: boolean }
+  ): Promise<void> {
+    await tx.activity.recordMany(
+      paymentCancelledActivity(
+        await financeActorIn(ctx, tx),
+        cancelled.payment,
+        {
+          allocations: await tx.allocationShares(cancelled.payment.id),
+          autoApproved: cancelled.autoApproved,
+        }
+      )
+    );
+  }
+
+  private async recordDeclined(
+    tx: PaymentVoidTx,
+    ctx: OrgContext,
+    declined: { payment: VoidablePayment; voidId: string; reason: string }
+  ): Promise<void> {
+    await tx.activity.recordMany(
+      paymentCancellationDeclinedActivity(
+        await financeActorIn(ctx, tx),
+        declined.payment,
+        {
+          voidId: declined.voidId,
+          reason: declined.reason,
+          allocations: await tx.allocationShares(declined.payment.id),
+        }
+      )
+    );
   }
 
   private async postMirror(

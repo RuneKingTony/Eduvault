@@ -1093,7 +1093,7 @@ test.describe('recent activity', () => {
     expect(await texts(everywhere)).toEqual(['Login reset for a guardian.']);
   });
 
-  test('hides finance rows from everyone and shows school-wide rows to every member', async ({
+  test('hides finance rows from members without finance read and shows school-wide rows to every member', async ({
     api,
     pool,
     schools: { orgA, owner, noPermission },
@@ -1118,7 +1118,7 @@ test.describe('recent activity', () => {
     expect(seen.total).toBe(1);
     expect(
       (await activityOf(api, owner)).items.map((item) => item.text)
-    ).not.toContain('Payment recorded.');
+    ).toContain('Payment recorded.');
   });
 
   test('hides student events outside a teacher’s class scope', async ({

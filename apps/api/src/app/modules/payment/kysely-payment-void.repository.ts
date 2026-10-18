@@ -9,6 +9,11 @@ import {
 } from '@eduvault/api-contract';
 import type { DB } from '../../../db/db-types';
 import {
+  ActivityWriter,
+  type ActivityRecorder,
+  type CampusAmount,
+} from '../../common/activity';
+import {
   FORMER_MEMBER_NAME,
   countWaiting,
   decisionsFor,
@@ -17,7 +22,12 @@ import {
 } from '../../common/approvals';
 import { KYSELY_TOKEN, type Database } from '../../common/db/tokens';
 import { iso } from '../../common/db/rows';
-import { LedgerPoster, type LedgerLine } from '../../common/ledger';
+import {
+  LedgerPoster,
+  schoolCurrency,
+  type LedgerLine,
+} from '../../common/ledger';
+import { allocationShares } from '../../common/payments';
 import {
   allAllocationsInScopeSql,
   anyAllocationInScopeSql,
@@ -67,13 +77,15 @@ interface VoidRow extends PaymentRow {
 }
 
 class KyselyVoidTx implements PaymentVoidTx {
+  readonly activity: ActivityRecorder;
   private readonly decisions: ReturnType<typeof decisionsFor>;
 
   constructor(
     private readonly trx: Kysely<DB>,
-    private readonly poster: LedgerPoster,
+    private readonly deps: { poster: LedgerPoster; activity: ActivityRecorder },
     private readonly who: { scope: PaymentScope; userId: string }
   ) {
+    this.activity = deps.activity;
     this.decisions = decisionsFor(trx, {
       table: 'payment_void',
       organizationId: who.scope.organizationId,
@@ -137,7 +149,7 @@ class KyselyVoidTx implements PaymentVoidTx {
   }
 
   async post(entry: VoidPost): Promise<string> {
-    const { entry: posted } = await this.poster.post(this.trx, {
+    const { entry: posted } = await this.deps.poster.post(this.trx, {
       ...entry,
       organizationId: this.organizationId,
       postedBy: this.who.userId,
@@ -228,6 +240,17 @@ class KyselyVoidTx implements PaymentVoidTx {
   reject(voidId: string, reason: string): Promise<boolean> {
     return this.decisions.reject(voidId, reason);
   }
+
+  currency(): Promise<string> {
+    return schoolCurrency(this.trx, this.organizationId);
+  }
+
+  allocationShares(paymentId: string): Promise<CampusAmount[]> {
+    return allocationShares(this.trx, {
+      organizationId: this.organizationId,
+      paymentId,
+    });
+  }
 }
 
 interface ItemRow {
@@ -276,7 +299,8 @@ const ITEM_JOINS = sql`
 export class KyselyPaymentVoidRepository extends PaymentVoidRepository {
   constructor(
     @Inject(KYSELY_TOKEN) private readonly db: Database,
-    private readonly poster: LedgerPoster
+    private readonly poster: LedgerPoster,
+    private readonly activity: ActivityWriter
   ) {
     super();
   }
@@ -286,11 +310,18 @@ export class KyselyPaymentVoidRepository extends PaymentVoidRepository {
     userId: string,
     work: (tx: PaymentVoidTx) => Promise<T>
   ): Promise<T> {
-    return this.db
-      .transaction()
-      .execute((trx) =>
-        work(new KyselyVoidTx(trx, this.poster, { scope, userId }))
-      );
+    return this.db.transaction().execute((trx) =>
+      work(
+        new KyselyVoidTx(
+          trx,
+          { poster: this.poster, activity: this.activity.within(trx) },
+          {
+            scope,
+            userId,
+          }
+        )
+      )
+    );
   }
 
   async findVoid(

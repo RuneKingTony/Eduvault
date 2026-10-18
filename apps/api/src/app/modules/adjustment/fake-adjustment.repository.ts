@@ -3,6 +3,7 @@ import type {
   AdjustmentKind,
   AdjustmentListQuery,
 } from '@eduvault/api-contract';
+import type { ActivityInput } from '../../common/activity';
 import type { WaitingApproval } from '../../common/approvals';
 import {
   AdjustmentRepository,
@@ -35,6 +36,7 @@ export class FakeAdjustmentRepository extends AdjustmentRepository {
   refundAccounts = new Map<string, RefundAccountCheck>();
   stored: StoredAdjustment[] = [];
   posted: AdjustmentPost[] = [];
+  recorded: ActivityInput[] = [];
   numbers: string[] = [];
   declined: { id: string; reason: string }[] = [];
   approveChanges = true;
@@ -71,9 +73,10 @@ export class FakeAdjustmentRepository extends AdjustmentRepository {
 
   private reads(): Omit<
     AdjustmentTx,
-    'post' | 'insert' | 'nextNumber' | 'approve' | 'reject'
+    'post' | 'insert' | 'nextNumber' | 'approve' | 'reject' | 'activity'
   > {
     return {
+      currency: () => Promise.resolve('NGN'),
       lockStudent: (id) => Promise.resolve(this.students.get(id)),
       approvalOn: (kind) => Promise.resolve(!this.switchedOff.has(kind)),
       sentCharge: (_student, invoiceId) =>
@@ -100,16 +103,25 @@ export class FakeAdjustmentRepository extends AdjustmentRepository {
       },
       systemAccounts: (): Promise<SystemAccounts> =>
         Promise.resolve({ receivableId: 'receivable', badDebtId: 'bad-debt' }),
-      lockAdjustment: (id) =>
-        Promise.resolve(this.stored.find((row) => row.id === id)),
+      lockAdjustment: (id) => {
+        const row = this.stored.find((candidate) => candidate.id === id);
+        const student = row && this.students.get(row.studentId);
+        return Promise.resolve(row && student && { ...row, student });
+      },
     };
   }
 
   private writes(): Pick<
     AdjustmentTx,
-    'post' | 'insert' | 'nextNumber' | 'approve' | 'reject'
+    'post' | 'insert' | 'nextNumber' | 'approve' | 'reject' | 'activity'
   > {
     return {
+      activity: {
+        recordMany: (inputs) => {
+          this.recorded.push(...inputs);
+          return Promise.resolve();
+        },
+      },
       nextNumber: (year) => {
         const number = `ADJ-${year}-${String(this.nextNo++).padStart(4, '0')}`;
         this.numbers.push(number);

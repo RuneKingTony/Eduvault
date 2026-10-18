@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ActivityModule } from '../../common/activity';
 import { EduvaultAuthModule } from '../../common/auth';
 import { LedgerPosterModule } from '../../common/ledger';
 import { CampusModule } from '../campus/campus.module';
@@ -15,6 +16,7 @@ import { KyselyBillingRepository } from './kysely-billing.repository';
     CampusModule,
     InvoiceModule,
     LedgerPosterModule,
+    ActivityModule,
   ],
   controllers: [BillingController],
   exports: [BillingService, BillingPlanService],

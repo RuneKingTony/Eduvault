@@ -1,5 +1,10 @@
 import type { ActivityPillarName } from '@eduvault/api-contract';
-import { can, type PermissionMap } from '@eduvault/policy';
+import {
+  FINANCE_READ_GATE,
+  can,
+  canAny,
+  type PermissionMap,
+} from '@eduvault/policy';
 
 export type FoundationSubject = 'student' | 'school_year' | 'announcement';
 
@@ -11,7 +16,7 @@ export interface ActivityAccess {
   leaveApprover: boolean;
 }
 
-/** Finance rows stay hidden until a finance read permission exists. */
+/** Finance rows are campus-scoped, never class-scoped. */
 export function activityAccess(
   permissions: PermissionMap,
   viewerId: string
@@ -32,6 +37,9 @@ export function activityAccess(
   }
   if (foundationSubjects.length > 0) {
     pillars.push('foundation');
+  }
+  if (canAny(permissions, FINANCE_READ_GATE)) {
+    pillars.push('finance');
   }
   return {
     pillars,

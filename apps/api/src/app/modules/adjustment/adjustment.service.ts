@@ -22,6 +22,12 @@ import {
   type CreateAdjustment,
   type CreatedAdjustment,
 } from '@eduvault/api-contract';
+import {
+  adjustmentApprovedActivity,
+  adjustmentDeclinedActivity,
+  financeActorIn,
+  studentFacts,
+} from '../../common/activity';
 import { assertDeclineReason, decide } from '../../common/approvals';
 import type { OrgContext } from '../../common/auth';
 import { Clock } from '../../common/clock';
@@ -221,6 +227,15 @@ export class AdjustmentService {
           ? await this.post(tx, row, student)
           : null;
         await tx.insert({ ...row, approvedEntryId });
+        if (autoApproved) {
+          await tx.activity.recordMany(
+            adjustmentApprovedActivity(
+              await financeActorIn(ctx, tx),
+              { ...row, ...studentFacts(student) },
+              true
+            )
+          );
+        }
         return { id: row.id, autoApproved };
       }
     );
@@ -252,7 +267,20 @@ export class AdjustmentService {
             throw new ConflictException(problem.message);
           }
           await assertAccountsLive(tx, found);
-          return tx.approve(id, await this.post(tx, found, student));
+          const changed = await tx.approve(
+            id,
+            await this.post(tx, found, student)
+          );
+          if (changed) {
+            await tx.activity.recordMany(
+              adjustmentApprovedActivity(
+                await financeActorIn(ctx, tx),
+                { ...found, ...studentFacts(student) },
+                false
+              )
+            );
+          }
+          return changed;
         }
       );
     });
@@ -273,8 +301,21 @@ export class AdjustmentService {
       }
       await decide(
         { actorId: ctx.user.id, createdBy: found.createdBy },
-        async () =>
-          found.status === 'submitted' && (await tx.reject(id, declineReason))
+        async () => {
+          const changed =
+            found.status === 'submitted' &&
+            (await tx.reject(id, declineReason));
+          if (changed) {
+            await tx.activity.recordMany(
+              adjustmentDeclinedActivity(
+                await financeActorIn(ctx, tx),
+                { ...found, ...studentFacts(found.student) },
+                declineReason
+              )
+            );
+          }
+          return changed;
+        }
       );
     });
     return this.item(scope, id);

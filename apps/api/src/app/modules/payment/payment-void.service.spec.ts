@@ -17,6 +17,7 @@ import {
   type PaymentStatus,
   type PaymentVoidItem,
 } from '@eduvault/api-contract';
+import type { ActivityInput, CampusAmount } from '../../common/activity';
 import type { WaitingApproval } from '../../common/approvals';
 import type { OrgContext } from '../../common/auth';
 import { Clock } from '../../common/clock';
@@ -91,6 +92,8 @@ class FakeVoids extends PaymentVoidRepository {
   open = false;
   voids: StoredVoid[] = [];
   posted: VoidPost[] = [];
+  recorded: ActivityInput[] = [];
+  shares: CampusAmount[] = [{ campusId: 'lekki', amountMinor: 2_000_000 }];
   paymentStatus: PaymentStatus = 'posted';
   rejectChanges = true;
   approveChanges = true;
@@ -143,6 +146,14 @@ class FakeVoids extends PaymentVoidRepository {
           Object.assign(found, { status: 'rejected', rejectionReason: reason });
         }
         return Promise.resolve(this.rejectChanges);
+      },
+      currency: () => Promise.resolve('NGN'),
+      allocationShares: () => Promise.resolve(this.shares),
+      activity: {
+        recordMany: (inputs) => {
+          this.recorded.push(...inputs);
+          return Promise.resolve();
+        },
       },
     };
   }
@@ -249,6 +260,7 @@ describe('PaymentVoidService.request', () => {
     });
     expect(voids.posted).toEqual([]);
     expect(voids.paymentStatus).toBe('void_pending');
+    expect(voids.recorded).toEqual([]);
   });
 
   it('refuses a blank reason with 400', async () => {
@@ -332,6 +344,24 @@ describe('PaymentVoidService.request', () => {
     expect(result.void).toMatchObject({ status: 'approved', approvedBy: null });
     expect(voids.posted).toHaveLength(1);
     expect(voids.paymentStatus).toBe('voided');
+    expect(voids.recorded).toEqual([
+      {
+        organizationId: 'school-a',
+        campusId: 'lekki',
+        pillar: 'finance',
+        kind: 'payment.cancelled',
+        actorUserId: 'chika',
+        subjectType: 'payment',
+        subjectId: PAYMENT,
+        text: 'Payment RCT-2026-00098 (₦20,000 from Mrs Danjuma) was cancelled by chika.',
+        data: {
+          paymentId: PAYMENT,
+          receiptNumber: 'RCT-2026-00098',
+          amountMinor: 2_000_000,
+          autoApproved: true,
+        },
+      },
+    ]);
   });
 });
 
@@ -379,12 +409,40 @@ describe('PaymentVoidService.approve', () => {
     expect(voids.paymentStatus).toBe('voided');
   });
 
+  it('records one cancellation row per campus, naming the approver', async () => {
+    const { voids, service, id } = await waiting();
+    voids.shares = [
+      { campusId: 'lekki', amountMinor: 1_500_000 },
+      { campusId: 'ikeja', amountMinor: 500_000 },
+    ];
+
+    await service.approve(grace, id);
+
+    expect(
+      voids.recorded.map((row) => [row.campusId, row.kind, row.text])
+    ).toEqual([
+      [
+        'lekki',
+        'payment.cancelled',
+        'Payment RCT-2026-00098 from Mrs Danjuma (₦15,000 of it for this campus) was cancelled, approved by grace.',
+      ],
+      [
+        'ikeja',
+        'payment.cancelled',
+        'Payment RCT-2026-00098 from Mrs Danjuma (₦5,000 of it for this campus) was cancelled, approved by grace.',
+      ],
+    ]);
+    expect(voids.recorded[0]?.actorUserId).toBe('grace');
+    expect(voids.recorded[0]?.data).toMatchObject({ autoApproved: false });
+  });
+
   it('answers 403 when the receipt also pays students outside the finance scope, and posts nothing', async () => {
     const { voids, service, id } = await waiting();
     voids.payment = receipt({ everyAllocationInScope: false });
     const error = await rejected(service.approve(grace, id));
     expect(error).toBeInstanceOf(ForbiddenException);
     expect(voids.posted).toEqual([]);
+    expect(voids.recorded).toEqual([]);
   });
 
   it('answers 409 SelfApproval for the creator and posts nothing', async () => {
@@ -396,6 +454,7 @@ describe('PaymentVoidService.approve', () => {
       message: SELF_APPROVAL_MESSAGE,
     });
     expect(voids.posted).toEqual([]);
+    expect(voids.recorded).toEqual([]);
   });
 
   it('answers 404 for a void outside the finance scope', async () => {
@@ -409,6 +468,7 @@ describe('PaymentVoidService.approve', () => {
     const { voids, service, id } = await waiting();
     await service.approve(grace, id);
     voids.posted = [];
+    voids.recorded = [];
 
     const error = await rejected(service.approve(as('yemi'), id));
 
@@ -417,6 +477,7 @@ describe('PaymentVoidService.approve', () => {
       message: ALREADY_DECIDED_MESSAGE,
     });
     expect(voids.posted).toEqual([]);
+    expect(voids.recorded).toEqual([]);
   });
 
   it('answers 409 AlreadyDecided when the conditional update changes no row', async () => {
@@ -426,6 +487,7 @@ describe('PaymentVoidService.approve', () => {
     expect((error as ConflictException).getResponse()).toMatchObject({
       code: 'AlreadyDecided',
     });
+    expect(voids.recorded).toEqual([]);
   });
 });
 
@@ -441,6 +503,24 @@ describe('PaymentVoidService.decline', () => {
     });
     expect(voids.posted).toEqual([]);
     expect(voids.paymentStatus).toBe('posted');
+    expect(voids.recorded).toEqual([
+      {
+        organizationId: 'school-a',
+        campusId: 'lekki',
+        pillar: 'finance',
+        kind: 'payment_void.declined',
+        actorUserId: 'grace',
+        subjectType: 'payment_void',
+        subjectId: id,
+        text: 'Cancelling payment RCT-2026-00098 was declined: Not agreed',
+        data: {
+          voidId: id,
+          paymentId: PAYMENT,
+          receiptNumber: 'RCT-2026-00098',
+          amountMinor: 2_000_000,
+        },
+      },
+    ]);
   });
 
   it('accepts a new request after a decline', async () => {
@@ -469,6 +549,16 @@ describe('PaymentVoidService.decline', () => {
     expect((error as ConflictException).getResponse()).toMatchObject({
       code: 'SelfApproval',
     });
+  });
+
+  it('records no row for a void that was already decided', async () => {
+    const { voids, service, id } = await waiting();
+    voids.rejectChanges = false;
+    const error = await rejected(service.decline(grace, id, 'No'));
+    expect((error as ConflictException).getResponse()).toMatchObject({
+      code: 'AlreadyDecided',
+    });
+    expect(voids.recorded).toEqual([]);
   });
 
   it('answers 404 for a void outside the finance scope', async () => {

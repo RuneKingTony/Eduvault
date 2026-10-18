@@ -11,6 +11,12 @@ import {
   type BillingRunSummary,
 } from '@eduvault/api-contract';
 import { INACTIVE_AFTER_DAYS } from '@eduvault/shared';
+import {
+  ActivityWriter,
+  financeActor,
+  roundSentActivity,
+  type CampusAmount,
+} from '../../common/activity';
 import { chunks, day, iso } from '../../common/db/rows';
 import { KYSELY_TOKEN, type Database } from '../../common/db/tokens';
 import {
@@ -247,6 +253,9 @@ interface LedgerChargeLine {
   amountMinor: number;
 }
 
+type RunCheck =
+  { ok: true; number: string } | { ok: false; outcome: RunOutcome };
+
 interface SendableDraft {
   id: string;
   student_id: string;
@@ -259,7 +268,8 @@ interface SendableDraft {
 export class KyselyBillingRepository extends BillingRepository {
   constructor(
     @Inject(KYSELY_TOKEN) private readonly db: Database,
-    private readonly poster: LedgerPoster
+    private readonly poster: LedgerPoster,
+    private readonly activity: ActivityWriter
   ) {
     super();
   }
@@ -722,11 +732,26 @@ export class KyselyBillingRepository extends BillingRepository {
 
   issue(input: IssueRound): Promise<RunOutcome> {
     return this.db.transaction().execute(async (trx) => {
-      const refusal = await this.refuseRun(trx, input);
-      if (refusal !== undefined) {
-        return refusal;
+      const checked = await this.refuseRun(trx, input);
+      if (!checked.ok) {
+        return checked.outcome;
       }
-      await this.sendDrafts(trx, input);
+      const sent = await this.sendDrafts(trx, input);
+      const currency = await schoolCurrency(trx, input.scope.organizationId);
+      await this.activity.within(trx).recordMany(
+        roundSentActivity(
+          financeActor(
+            {
+              organizationId: input.scope.organizationId,
+              userId: input.userId,
+              name: input.userName,
+            },
+            currency
+          ),
+          { id: input.runId, number: checked.number },
+          sent
+        )
+      );
       await trx
         .updateTable('billing_run')
         .set({
@@ -743,9 +768,9 @@ export class KyselyBillingRepository extends BillingRepository {
 
   cancel(input: RunAction): Promise<RunOutcome> {
     return this.db.transaction().execute(async (trx) => {
-      const refusal = await this.refuseRun(trx, input);
-      if (refusal !== undefined) {
-        return refusal;
+      const checked = await this.refuseRun(trx, input);
+      if (!checked.ok) {
+        return checked.outcome;
       }
       const { organizationId } = input.scope;
       await trx
@@ -772,17 +797,17 @@ export class KyselyBillingRepository extends BillingRepository {
   private async refuseRun(
     trx: Kysely<DB>,
     input: RunAction
-  ): Promise<RunOutcome | undefined> {
+  ): Promise<RunCheck> {
     const { organizationId, campusScope } = input.scope;
     const run = await trx
       .selectFrom('billing_run')
-      .select('status')
+      .select(['status', 'number'])
       .where('id', '=', input.runId)
       .where('organization_id', '=', organizationId)
       .forUpdate()
       .executeTakeFirst();
     if (run === undefined) {
-      return { status: 'not_found' };
+      return { ok: false, outcome: { status: 'not_found' } };
     }
     const { rows } = await sql<{ total: number; in_scope: number }>`
       SELECT
@@ -795,18 +820,21 @@ export class KyselyBillingRepository extends BillingRepository {
     );
     const counts = rows[0];
     if (counts === undefined || counts.in_scope === 0) {
-      return { status: 'not_found' };
+      return { ok: false, outcome: { status: 'not_found' } };
     }
     const current = billingRunStatusSchema.parse(run.status);
     if (current !== 'draft') {
-      return { status: 'refused', current };
+      return { ok: false, outcome: { status: 'refused', current } };
     }
     return counts.in_scope === counts.total
-      ? undefined
-      : { status: 'out_of_scope' };
+      ? { ok: true, number: run.number }
+      : { ok: false, outcome: { status: 'out_of_scope' } };
   }
 
-  private async sendDrafts(trx: Kysely<DB>, input: IssueRound): Promise<void> {
+  private async sendDrafts(
+    trx: Kysely<DB>,
+    input: IssueRound
+  ): Promise<CampusAmount[]> {
     const { organizationId } = input.scope;
     const receivableId = await systemAccountId(
       trx,
@@ -832,24 +860,12 @@ export class KyselyBillingRepository extends BillingRepository {
       .where('i.billing_run_id', '=', input.runId)
       .where('i.status', '=', 'draft')
       .execute();
-    const linesByInvoice = new Map<string, LedgerChargeLine[]>();
-    for (const line of await trx
-      .selectFrom('invoice_line')
-      .select(['invoice_id', 'ledger_account_id', 'amount_minor'])
-      .where('organization_id', '=', organizationId)
-      .where(
-        'invoice_id',
-        'in',
-        drafts.map((row) => row.id)
-      )
-      .execute()) {
-      const lines = linesByInvoice.get(line.invoice_id) ?? [];
-      lines.push({
-        ledgerAccountId: line.ledger_account_id,
-        amountMinor: Number(line.amount_minor),
-      });
-      linesByInvoice.set(line.invoice_id, lines);
-    }
+    const linesByInvoice = await this.draftLines(
+      trx,
+      organizationId,
+      drafts.map((row) => row.id)
+    );
+    const sent: CampusAmount[] = [];
     for (const draft of sendOrder(
       drafts.map((row) => ({
         ...row,
@@ -858,13 +874,39 @@ export class KyselyBillingRepository extends BillingRepository {
         admissionNumber: row.admission_number,
       }))
     )) {
-      await this.sendOne(trx, {
-        input,
-        receivableId,
-        draft,
-        lines: linesByInvoice.get(draft.id) ?? [],
+      const lines = linesByInvoice.get(draft.id) ?? [];
+      await this.sendOne(trx, { input, receivableId, draft, lines });
+      sent.push({
+        campusId: draft.campus_id,
+        amountMinor: lines.reduce((sum, line) => sum + line.amountMinor, 0),
       });
     }
+    return sent;
+  }
+
+  private async draftLines(
+    trx: Kysely<DB>,
+    organizationId: string,
+    invoiceIds: readonly string[]
+  ): Promise<Map<string, LedgerChargeLine[]>> {
+    const linesByInvoice = new Map<string, LedgerChargeLine[]>();
+    if (invoiceIds.length === 0) {
+      return linesByInvoice;
+    }
+    for (const line of await trx
+      .selectFrom('invoice_line')
+      .select(['invoice_id', 'ledger_account_id', 'amount_minor'])
+      .where('organization_id', '=', organizationId)
+      .where('invoice_id', 'in', invoiceIds)
+      .execute()) {
+      const lines = linesByInvoice.get(line.invoice_id) ?? [];
+      lines.push({
+        ledgerAccountId: line.ledger_account_id,
+        amountMinor: Number(line.amount_minor),
+      });
+      linesByInvoice.set(line.invoice_id, lines);
+    }
+    return linesByInvoice;
   }
 
   private async sendOne(

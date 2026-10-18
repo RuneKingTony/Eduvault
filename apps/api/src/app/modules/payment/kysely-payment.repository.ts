@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { sql } from 'kysely';
+import { sql, type Kysely } from 'kysely';
 import type {
   Payment,
   PaymentListQuery,
@@ -7,6 +7,12 @@ import type {
   RecordingChild,
   RecordingPayer,
 } from '@eduvault/api-contract';
+import type { DB } from '../../../db/db-types';
+import {
+  ActivityWriter,
+  financeActor,
+  paymentRecordedActivity,
+} from '../../common/activity';
 import { inCampusScope } from '../../common/db/in-campus-scope';
 import { KYSELY_TOKEN, type Database } from '../../common/db/tokens';
 import { uniqueViolation } from '../../common/db/unique-violation';
@@ -17,12 +23,12 @@ import {
   schoolCurrency,
 } from '../../common/ledger';
 import {
+  allocationShares,
   findPaymentByColumn,
   paymentProofState,
   writePayment,
   type ExistingPayment,
   type InsertOutcome,
-  type NewPayment,
   type ProofState,
 } from '../../common/payments';
 import { currentCampusSql, inScope } from '../../common/students';
@@ -31,6 +37,7 @@ import {
   PaymentRepository,
   type PaymentPage,
   type PaymentScope,
+  type NewRecordedPayment,
   type RecordingAccount,
   type RecordingPeople,
 } from './payment.repository';
@@ -57,7 +64,8 @@ const toChild = (row: PersonRow): RecordingChild => ({
 export class KyselyPaymentRepository extends PaymentRepository {
   constructor(
     @Inject(KYSELY_TOKEN) private readonly db: Database,
-    private readonly poster: LedgerPoster
+    private readonly poster: LedgerPoster,
+    private readonly activity: ActivityWriter
   ) {
     super();
   }
@@ -178,14 +186,52 @@ export class KyselyPaymentRepository extends PaymentRepository {
     return paymentProofState(this.db, { organizationId, userId, fileId });
   }
 
-  async insert(input: NewPayment): Promise<InsertOutcome> {
+  async insert(input: NewRecordedPayment): Promise<InsertOutcome> {
     try {
-      return await this.db
-        .transaction()
-        .execute((trx) => writePayment(trx, this.poster, input));
+      return await this.db.transaction().execute(async (trx) => {
+        const outcome = await writePayment(trx, this.poster, input);
+        if (outcome.status === 'recorded') {
+          await this.recordActivity(trx, input, {
+            paymentId: outcome.id,
+            receiptNumber: outcome.receiptNumber,
+          });
+        }
+        return outcome;
+      });
     } catch (error) {
       return this.afterRace(error);
     }
+  }
+
+  private async recordActivity(
+    trx: Kysely<DB>,
+    input: NewRecordedPayment,
+    recorded: { paymentId: string; receiptNumber: string }
+  ): Promise<void> {
+    const { paymentId } = recorded;
+    const currency = await schoolCurrency(trx, input.organizationId);
+    const allocations = await allocationShares(trx, {
+      organizationId: input.organizationId,
+      paymentId,
+    });
+    await this.activity.within(trx).recordMany(
+      paymentRecordedActivity(
+        financeActor(
+          {
+            organizationId: input.organizationId,
+            userId: input.userId,
+            name: input.userName,
+          },
+          currency
+        ),
+        {
+          id: paymentId,
+          receiptNumber: recorded.receiptNumber,
+          payerName: input.payerName,
+        },
+        allocations
+      )
+    );
   }
 
   private afterRace(error: unknown): InsertOutcome {

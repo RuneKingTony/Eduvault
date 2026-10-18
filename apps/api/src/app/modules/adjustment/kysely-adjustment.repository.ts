@@ -12,6 +12,7 @@ import {
   type AdjustmentListQuery,
 } from '@eduvault/api-contract';
 import type { DB } from '../../../db/db-types';
+import { ActivityWriter, type ActivityRecorder } from '../../common/activity';
 import {
   decisionsFor,
   isApprovalOn,
@@ -29,13 +30,19 @@ import {
   schoolCurrency,
   systemAccountId,
 } from '../../common/ledger';
-import { currentCampusSql, inScope } from '../../common/students';
+import {
+  currentCampusSql,
+  inScope,
+  toStudentIdentity,
+  type StudentIdentityRow,
+} from '../../common/students';
 import {
   AdjustmentRepository,
   type AdjustmentPage,
   type AdjustmentPost,
   type AdjustmentRecord,
   type AdjustmentScope,
+  type LockedAdjustment,
   type AdjustmentTx,
   type CreditAccountCheck,
   type MoneyAccountPosting,
@@ -80,13 +87,15 @@ const toRecord = (row: AdjustmentRow): AdjustmentRecord => ({
 });
 
 class KyselyAdjustmentTx implements AdjustmentTx {
+  readonly activity: ActivityRecorder;
   private readonly decisions: ReturnType<typeof decisionsFor>;
 
   constructor(
     private readonly trx: Kysely<DB>,
-    private readonly poster: LedgerPoster,
+    private readonly deps: { poster: LedgerPoster; activity: ActivityRecorder },
     private readonly who: { scope: AdjustmentScope; userId: string }
   ) {
+    this.activity = deps.activity;
     this.decisions = decisionsFor(trx, {
       table: 'adjustment',
       organizationId: who.scope.organizationId,
@@ -105,7 +114,7 @@ class KyselyAdjustmentTx implements AdjustmentTx {
       first_name: string;
       last_name: string;
       admission_number: string;
-      campus_id: string | null;
+      campus_id: string;
     }>`
       SELECT st.id, st.first_name, st.last_name, st.admission_number,
         ${currentCampusSql('st')} AS campus_id
@@ -130,6 +139,10 @@ class KyselyAdjustmentTx implements AdjustmentTx {
       campusId: student.campus_id,
       balanceMinor: Number(rows[0]?.balance ?? 0),
     };
+  }
+
+  currency(): Promise<string> {
+    return schoolCurrency(this.trx, this.organizationId);
   }
 
   approvalOn(kind: AdjustmentKind): Promise<boolean> {
@@ -258,7 +271,7 @@ class KyselyAdjustmentTx implements AdjustmentTx {
   }
 
   async post(entry: AdjustmentPost): Promise<string> {
-    const { entry: posted } = await this.poster.post(this.trx, {
+    const { entry: posted } = await this.deps.poster.post(this.trx, {
       ...entry,
       organizationId: this.organizationId,
       postedBy: this.who.userId,
@@ -290,17 +303,24 @@ class KyselyAdjustmentTx implements AdjustmentTx {
       .execute();
   }
 
-  async lockAdjustment(id: string): Promise<AdjustmentRecord | undefined> {
-    const { rows } = await sql<AdjustmentRow>`
+  async lockAdjustment(id: string): Promise<LockedAdjustment | undefined> {
+    const { rows } = await sql<AdjustmentRow & Omit<StudentIdentityRow, 'id'>>`
       SELECT a.id, a.number, a.kind, a.student_id, a.invoice_id,
         a.ledger_account_id, a.money_account_id, a.amount_minor::text AS amount_minor,
-        a.reason, a.status, a.created_by
+        a.reason, a.status, a.created_by, st.first_name, st.last_name,
+        ${currentCampusSql('st')} AS campus_id
       FROM adjustment a
       JOIN student st ON st.id = a.student_id AND st.organization_id = a.organization_id
       WHERE a.id = ${id} AND a.organization_id = ${this.organizationId}
         AND ${inScope(currentCampusSql('st'), this.who.scope.campusScope)}
       FOR UPDATE OF a`.execute(this.trx);
-    return rows[0] && toRecord(rows[0]);
+    const row = rows[0];
+    return (
+      row && {
+        ...toRecord(row),
+        student: toStudentIdentity({ ...row, id: row.student_id }),
+      }
+    );
   }
 
   approve(id: string, entryId: string): Promise<boolean> {
@@ -316,7 +336,8 @@ class KyselyAdjustmentTx implements AdjustmentTx {
 export class KyselyAdjustmentRepository extends AdjustmentRepository {
   constructor(
     @Inject(KYSELY_TOKEN) private readonly db: Database,
-    private readonly poster: LedgerPoster
+    private readonly poster: LedgerPoster,
+    private readonly activity: ActivityWriter
   ) {
     super();
   }
@@ -330,11 +351,18 @@ export class KyselyAdjustmentRepository extends AdjustmentRepository {
     userId: string,
     work: (tx: AdjustmentTx) => Promise<T>
   ): Promise<T> {
-    return this.db
-      .transaction()
-      .execute((trx) =>
-        work(new KyselyAdjustmentTx(trx, this.poster, { scope, userId }))
-      );
+    return this.db.transaction().execute((trx) =>
+      work(
+        new KyselyAdjustmentTx(
+          trx,
+          { poster: this.poster, activity: this.activity.within(trx) },
+          {
+            scope,
+            userId,
+          }
+        )
+      )
+    );
   }
 
   findById(

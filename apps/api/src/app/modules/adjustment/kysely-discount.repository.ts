@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { sql } from 'kysely';
+import { sql, type Kysely } from 'kysely';
 import {
   approvalStatusSchema,
   discountKindSchema,
@@ -7,6 +7,7 @@ import {
   type StudentDiscountListQuery,
 } from '@eduvault/api-contract';
 import { naira } from '@eduvault/shared';
+import { ActivityWriter, type ActivityRecorder } from '../../common/activity';
 import {
   FORMER_MEMBER_NAME,
   countWaiting,
@@ -16,14 +17,23 @@ import {
 } from '../../common/approvals';
 import { iso, isoOrNull } from '../../common/db/rows';
 import { KYSELY_TOKEN, type Database } from '../../common/db/tokens';
+import type { DB } from '../../../db/db-types';
 import type { TermPosition } from '../../common/fees';
 import { feeTypeQuery, schoolCurrency } from '../../common/ledger';
-import { currentCampusSql, inScope } from '../../common/students';
+import {
+  currentCampusSql,
+  findStudentIdentity,
+  inScope,
+  toStudentIdentity,
+  type StudentIdentity,
+} from '../../common/students';
 import type { AdjustmentScope } from './adjustment.repository';
 import {
   DiscountRepository,
   type DiscountPage,
   type DiscountRecord,
+  type DiscountTx,
+  type LockedDiscount,
   type TermChoice,
   type FeeTypeCheck,
   type NewDiscount,
@@ -147,31 +157,117 @@ const toTermInfo = (row: TermRow): TermInfo => ({
   position: { sessionStartsOn: row.starts_on, sequence: row.sequence },
 });
 
+class KyselyDiscountTx implements DiscountTx {
+  readonly activity: ActivityRecorder;
+  private readonly decisions: ReturnType<typeof decisionsFor>;
+
+  constructor(
+    private readonly trx: Kysely<DB>,
+    activity: ActivityRecorder,
+    private readonly who: { scope: AdjustmentScope; userId: string }
+  ) {
+    this.activity = activity;
+    this.decisions = decisionsFor(trx, {
+      table: 'student_discount',
+      organizationId: who.scope.organizationId,
+      userId: who.userId,
+    });
+  }
+
+  currency(): Promise<string> {
+    return schoolCurrency(this.trx, this.who.scope.organizationId);
+  }
+
+  approvalOn(): Promise<boolean> {
+    return isApprovalOn(this.trx, this.who.scope.organizationId, 'discount');
+  }
+
+  student(studentId: string): Promise<StudentIdentity | undefined> {
+    return findStudentIdentity(this.trx, this.who.scope, studentId);
+  }
+
+  async insert(input: NewDiscount): Promise<string> {
+    const row = await this.trx
+      .insertInto('student_discount')
+      .values({
+        organization_id: input.organizationId,
+        student_id: input.studentId,
+        kind: input.kind,
+        value: input.value,
+        ledger_account_id: input.ledgerAccountId,
+        reason: input.reason,
+        from_term_id: input.fromTermId,
+        to_term_id: input.toTermId,
+        status: input.autoApproved ? 'approved' : 'submitted',
+        created_by: input.userId,
+        approved_by: null,
+        approved_at: input.autoApproved ? new Date() : null,
+      })
+      .returning('id')
+      .executeTakeFirstOrThrow();
+    return row.id;
+  }
+
+  async lock(id: string): Promise<LockedDiscount | undefined> {
+    const { rows } = await sql<DiscountRow & { campus_id: string }>`
+      SELECT ${COLUMNS}, ${currentCampusSql('st')} AS campus_id ${JOINS}
+      WHERE d.id = ${id} AND ${visible(this.who.scope)}
+      FOR UPDATE OF d`.execute(this.trx);
+    const row = rows[0];
+    return (
+      row && {
+        id: row.id,
+        status: approvalStatusSchema.parse(row.status),
+        createdById: row.created_by,
+        kind: discountKindSchema.parse(row.kind),
+        value: Number(row.value),
+        student: toStudentIdentity({ ...row, id: row.student_id }),
+      }
+    );
+  }
+
+  approve(id: string): Promise<boolean> {
+    return this.decisions.approve(id);
+  }
+
+  reject(id: string, reason: string): Promise<boolean> {
+    return this.decisions.reject(id, reason);
+  }
+}
+
 @Injectable()
 export class KyselyDiscountRepository extends DiscountRepository {
-  constructor(@Inject(KYSELY_TOKEN) private readonly db: Database) {
+  constructor(
+    @Inject(KYSELY_TOKEN) private readonly db: Database,
+    private readonly activity: ActivityWriter
+  ) {
     super();
+  }
+
+  withTx<T>(
+    scope: AdjustmentScope,
+    userId: string,
+    work: (tx: DiscountTx) => Promise<T>
+  ): Promise<T> {
+    return this.db.transaction().execute((trx) =>
+      work(
+        new KyselyDiscountTx(trx, this.activity.within(trx), {
+          scope,
+          userId,
+        })
+      )
+    );
   }
 
   currency(organizationId: string): Promise<string> {
     return schoolCurrency(this.db, organizationId);
   }
 
-  approvalOn(organizationId: string): Promise<boolean> {
-    return isApprovalOn(this.db, organizationId, 'discount');
-  }
-
   async studentInScope(
     scope: AdjustmentScope,
     studentId: string
   ): Promise<boolean> {
-    const { rows } = await sql<{ id: string }>`
-      SELECT st.id FROM student st
-      WHERE st.id = ${studentId} AND st.organization_id = ${scope.organizationId}
-        AND ${inScope(currentCampusSql('st'), scope.campusScope)}`.execute(
-      this.db
-    );
-    return rows.length > 0;
+    return (await findStudentIdentity(this.db, scope, studentId)) !== undefined;
   }
 
   private async termWhere(
@@ -234,28 +330,6 @@ export class KyselyDiscountRepository extends DiscountRepository {
     return feeType === undefined ? 'not_fee_type' : 'ok';
   }
 
-  async insert(input: NewDiscount): Promise<string> {
-    const row = await this.db
-      .insertInto('student_discount')
-      .values({
-        organization_id: input.organizationId,
-        student_id: input.studentId,
-        kind: input.kind,
-        value: input.value,
-        ledger_account_id: input.ledgerAccountId,
-        reason: input.reason,
-        from_term_id: input.fromTermId,
-        to_term_id: input.toTermId,
-        status: input.autoApproved ? 'approved' : 'submitted',
-        created_by: input.userId,
-        approved_by: null,
-        approved_at: input.autoApproved ? new Date() : null,
-      })
-      .returning('id')
-      .executeTakeFirstOrThrow();
-    return row.id;
-  }
-
   async findById(
     scope: AdjustmentScope,
     id: string
@@ -302,30 +376,6 @@ export class KyselyDiscountRepository extends DiscountRepository {
       total: rows[0]?.total_rows ?? 0,
       waitingCount,
     };
-  }
-
-  approve(
-    scope: AdjustmentScope,
-    id: string,
-    userId: string
-  ): Promise<boolean> {
-    return this.decisions(scope, userId).approve(id);
-  }
-
-  reject(
-    scope: AdjustmentScope,
-    id: string,
-    decision: { userId: string; reason: string }
-  ): Promise<boolean> {
-    return this.decisions(scope, decision.userId).reject(id, decision.reason);
-  }
-
-  private decisions(scope: AdjustmentScope, userId: string) {
-    return decisionsFor(this.db, {
-      table: 'student_discount',
-      organizationId: scope.organizationId,
-      userId,
-    });
   }
 
   async end(

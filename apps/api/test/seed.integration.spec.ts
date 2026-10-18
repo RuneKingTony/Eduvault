@@ -92,7 +92,7 @@ test.describe('dev seed', () => {
       enrollment_placement: '68',
       guardian: '6',
       guardian_student: '8',
-      activity_event: '49',
+      activity_event: '53',
       announcement: '8',
       published_announcement: '4',
       pinned_announcement: '1',
