@@ -26,7 +26,7 @@ import { MaskedMoney } from './masked-money';
 import { SheetPending } from './sheet-pending';
 import { GO_LIVE_NOTE } from './store-text';
 
-export interface DeliveryItemTarget {
+interface DeliveryItemTarget {
   itemName: string;
   retired: boolean;
   campusId: string;
