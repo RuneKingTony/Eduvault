@@ -7,6 +7,7 @@ import {
   type BalancePageRecord,
   type GuardianChildren,
   type StudentHeader,
+  type TermStart,
 } from './student-account.repository';
 
 export class FakeStudentAccountRepository extends StudentAccountRepository {
@@ -28,6 +29,7 @@ export class FakeStudentAccountRepository extends StudentAccountRepository {
     left: 0,
     graduated: 0,
   };
+  terms: TermStart[] = [];
   currentTerm = true;
   names: string[] = [];
   scopes: AccountScope[] = [];
@@ -79,6 +81,10 @@ export class FakeStudentAccountRepository extends StudentAccountRepository {
     studentId: string
   ): Promise<MovementRecord[]> {
     return Promise.resolve(this.history.get(studentId) ?? []);
+  }
+
+  termWindows(): Promise<TermStart[]> {
+    return Promise.resolve(this.terms);
   }
 
   family(): Promise<StatementFamily> {

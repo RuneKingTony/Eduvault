@@ -8,6 +8,7 @@ import { FINANCE_PAGE_SIZE, FINANCE_PAGE_SIZE_MAX } from './finance';
 import { currencySchema, idSchema, paymentMethodSchema } from './schemas';
 import {
   statementRowStatusSchema,
+  statementTermFields,
   statementTotalsSchema,
 } from './student-accounts';
 
@@ -112,6 +113,7 @@ export type PortalAnnouncementList = z.infer<
 
 export const portalStatementQuerySchema = z.object({
   page: z.coerce.number().int().min(1).optional(),
+  termId: idSchema.optional(),
   pageSize: z.coerce
     .number()
     .int()
@@ -151,6 +153,7 @@ export const portalStatementSchema = z.object({
   page: z.number().int().min(1),
   pageSize: z.number().int().min(1),
   unpaid: z.array(portalStatementUnpaidSchema),
+  ...statementTermFields,
 });
 export type PortalStatement = z.infer<typeof portalStatementSchema>;
 

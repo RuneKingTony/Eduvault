@@ -1,3 +1,4 @@
+import { fmtDate } from './date';
 import { money } from './naira';
 
 export interface StatementTile {
@@ -81,6 +82,74 @@ export const entriesFooter = (
     credit: (amount) => ({ label: 'Extra paid', value: amount }),
     clear: (amount) => ({ label: 'Nothing owing', value: amount }),
   });
+
+export const BROUGHT_FORWARD_LABEL = 'Brought forward';
+export const BROUGHT_FORWARD_TIP =
+  'What the family already owed before this term.';
+
+interface StatementTermLike {
+  term: { fromOn: string; toOn: string | null } | null;
+  broughtForward: { amountMinor: number } | null;
+  closingMinor: number | null;
+}
+
+interface StatementBroughtForward {
+  date: string;
+  label: string;
+  tip: string;
+  amount: string;
+  tone: 'owe' | 'paid';
+}
+
+const broughtForwardAmount = (
+  amountMinor: number,
+  currency: string
+): Pick<StatementBroughtForward, 'amount' | 'tone'> => ({
+  amount: byBalance(amountMinor, currency, {
+    owing: (amount) => amount,
+    credit: (amount) => `${amount} credit`,
+    clear: (amount) => amount,
+  }),
+  tone: amountMinor > 0 ? 'owe' : 'paid',
+});
+
+const termFooter = (
+  closingMinor: number,
+  currency: string,
+  ended: boolean
+): StatementTile =>
+  ended
+    ? byBalance(closingMinor, currency, {
+        owing: (amount) => ({ label: 'Owing at end of term', value: amount }),
+        credit: (amount) => ({
+          label: 'Extra paid at end of term',
+          value: amount,
+        }),
+        clear: (amount) => ({
+          label: 'Nothing owing at end of term',
+          value: amount,
+        }),
+      })
+    : entriesFooter(closingMinor, currency);
+
+export function termStatementView(
+  statement: StatementTermLike & { totals: { balanceMinor: number } },
+  currency: string
+): { broughtForward?: StatementBroughtForward; footer: StatementTile } {
+  const { term, broughtForward, closingMinor } = statement;
+  if (term === null || broughtForward === null || closingMinor === null) {
+    return { footer: entriesFooter(statement.totals.balanceMinor, currency) };
+  }
+  return {
+    broughtForward: {
+      date: fmtDate(term.fromOn),
+      label: BROUGHT_FORWARD_LABEL,
+      tip: BROUGHT_FORWARD_TIP,
+      ...broughtForwardAmount(broughtForward.amountMinor, currency),
+    },
+    footer: termFooter(closingMinor, currency, term.toOn !== null),
+  };
+}
 
 export function creditCallout(
   creditMinor: number,

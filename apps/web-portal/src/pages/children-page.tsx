@@ -129,7 +129,7 @@ function ChildCards({
 function ChildStatement({ studentId }: { studentId: string }) {
   const [page, setPage] = useState<number | undefined>(undefined);
   const statement = useQuery(
-    portalStatementQueryOptions(useApi(), studentId, page)
+    portalStatementQueryOptions(useApi(), studentId, { page })
   );
   if (statement.data === undefined) {
     return statement.isPending ? (

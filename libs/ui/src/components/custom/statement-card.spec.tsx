@@ -136,4 +136,74 @@ describe('StatementCard', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
     expect(onPage).toHaveBeenCalledWith(2);
   });
+
+  describe('brought forward', () => {
+    const brought = {
+      date: '1 Sep 2026',
+      label: 'Brought forward',
+      tip: 'What the family already owed before this term.',
+      amount: '₦15,000',
+      tone: 'owe' as const,
+    };
+
+    it('starts the table with the row, its tip and amount, ahead of the entries', () => {
+      render(<StatementCard {...base} broughtForward={brought} />);
+      const rows = screen.getAllByRole('row');
+      expect(rows[1]).toHaveTextContent('Brought forward');
+      expect(rows[1]).toHaveTextContent(
+        'What the family already owed before this term.'
+      );
+      expect(rows[1]).toHaveTextContent('₦15,000');
+      expect(rows[2]).toHaveTextContent('Term fees, First term');
+    });
+
+    it('is left out when none is passed', () => {
+      render(<StatementCard {...base} />);
+      expect(screen.queryByText('Brought forward')).not.toBeInTheDocument();
+    });
+
+    it('shows on page 1 only', () => {
+      const onPage = vi.fn();
+      const { rerender } = render(
+        <StatementCard
+          {...base}
+          broughtForward={brought}
+          pager={{ page: 1, total: 24, pageSize: 10, onPage }}
+        />
+      );
+      expect(screen.getByText('Brought forward')).toBeInTheDocument();
+      rerender(
+        <StatementCard
+          {...base}
+          broughtForward={brought}
+          pager={{ page: 2, total: 24, pageSize: 10, onPage }}
+        />
+      );
+      expect(screen.queryByText('Brought forward')).not.toBeInTheDocument();
+    });
+
+    it('keeps the row and footer when the term has no entries', () => {
+      render(
+        <StatementCard
+          {...base}
+          rows={[]}
+          broughtForward={{ ...brought, amount: '₦0', tone: 'paid' }}
+        />
+      );
+      expect(screen.getByText('Brought forward')).toBeInTheDocument();
+      expect(screen.getByText('₦0')).toBeInTheDocument();
+      expect(screen.getByText('Owing now')).toBeInTheDocument();
+      expect(screen.queryByText('No entries yet')).not.toBeInTheDocument();
+    });
+
+    it('colours a credit in the paid tone', () => {
+      render(
+        <StatementCard
+          {...base}
+          broughtForward={{ ...brought, amount: '₦500 credit', tone: 'paid' }}
+        />
+      );
+      expect(screen.getByText('₦500 credit')).toHaveClass('text-success');
+    });
+  });
 });

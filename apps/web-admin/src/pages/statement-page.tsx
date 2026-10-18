@@ -24,8 +24,9 @@ import {
   ErrorMessage,
   NotFoundState,
   PageSkeleton,
+  TermSelect,
 } from '@eduvault/ui';
-import type { StatementSearch } from '../accounts-search';
+import { withTerm, type StatementSearch } from '../accounts-search';
 import {
   AccountsLink,
   FamilyViewButton,
@@ -127,7 +128,7 @@ function ChildStatement({ initial }: { initial: StudentStatement }) {
   const [page, setPage] = useState<number | undefined>();
   const api = useApi();
   const query = useQuery({
-    ...statementQueryOptions(api, initial.student.id, page),
+    ...statementQueryOptions(api, initial.student.id, { page }),
     ...(page === undefined ? { initialData: initial } : {}),
   });
   return <StatementCard statement={query.data ?? initial} onPage={setPage} />;
@@ -223,11 +224,15 @@ function FamilyView({
 function SingleStatement({
   studentId,
   data,
+  term,
+  onTerm,
   onPage,
   onRecord,
 }: {
   studentId: string;
   data: StudentStatement;
+  term: string | undefined;
+  onTerm: (term: string | undefined) => void;
   onPage: (page: number) => void;
   onRecord: () => void;
 }) {
@@ -245,6 +250,7 @@ function SingleStatement({
           />
         }
       />
+      <TermSelect terms={data.termOptions} value={term} onChange={onTerm} />
       <StatementCard statement={data} onPage={onPage} />
     </>
   );
@@ -261,7 +267,10 @@ export function StatementPage({
 }) {
   const [recording, setRecording] = useState(false);
   const statement = useQuery(
-    statementQueryOptions(useApi(), studentId, search.page)
+    statementQueryOptions(useApi(), studentId, {
+      page: search.page,
+      termId: search.term,
+    })
   );
   const canRecord = useCan('payment', 'record');
   if (statement.error instanceof ApiError && statement.error.status === 404) {
@@ -286,6 +295,10 @@ export function StatementPage({
         <SingleStatement
           studentId={studentId}
           data={data}
+          term={search.term}
+          onTerm={(term) => {
+            onSearchChange(withTerm(search, term));
+          }}
           onRecord={record}
           onPage={(page) => {
             onSearchChange({ ...search, page });

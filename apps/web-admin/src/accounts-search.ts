@@ -21,6 +21,7 @@ export function parseAccountsSearch(
 export interface StatementSearch {
   view?: 'family';
   page?: number;
+  term?: string;
 }
 
 export function parseStatementSearch(
@@ -29,5 +30,11 @@ export function parseStatementSearch(
   return {
     view: search['view'] === 'family' ? 'family' : undefined,
     page: pageOf(search['page']),
+    term: textOf(search['term']),
   };
 }
+
+export const withTerm = (
+  search: StatementSearch,
+  term: string | undefined
+): StatementSearch => ({ ...search, term, page: undefined });

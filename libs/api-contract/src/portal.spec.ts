@@ -182,6 +182,10 @@ const statement = {
   page: 1,
   pageSize: 10,
   unpaid: [{ number: 'INV-0001', outstandingMinor: 6_000_000 }],
+  term: null,
+  broughtForward: null,
+  closingMinor: null,
+  termOptions: [],
 };
 
 describe('the portal statement query', () => {
@@ -193,6 +197,14 @@ describe('the portal statement query', () => {
     );
     expect(
       portalStatementQuerySchema.safeParse({ pageSize: '51' }).success
+    ).toBe(false);
+  });
+
+  it('takes an optional term id and refuses anything that is not an id', () => {
+    expect(portalStatementQuerySchema.parse({ termId: id }).termId).toBe(id);
+    expect(portalStatementQuerySchema.parse({}).termId).toBeUndefined();
+    expect(
+      portalStatementQuerySchema.safeParse({ termId: 'nope' }).success
     ).toBe(false);
   });
 });
@@ -214,6 +226,25 @@ describe('the portal statement', () => {
     const rows = [{ ...statement.rows[0], status: 'void' }];
     expect(
       portalStatementSchema.safeParse({ ...statement, rows }).success
+    ).toBe(false);
+  });
+
+  it('accepts a chosen term with its brought forward, closing and options', () => {
+    const filled = {
+      ...statement,
+      term: {
+        id,
+        label: 'First term, 2026/2027',
+        fromOn: '2026-09-01',
+        toOn: '2026-12-18',
+      },
+      broughtForward: { amountMinor: 0 },
+      closingMinor: 6_000_000,
+      termOptions: [{ id, label: 'First term, 2026/2027' }],
+    };
+    expect(portalStatementSchema.parse(filled)).toEqual(filled);
+    expect(
+      portalStatementSchema.safeParse({ ...filled, closingMinor: 1.5 }).success
     ).toBe(false);
   });
 

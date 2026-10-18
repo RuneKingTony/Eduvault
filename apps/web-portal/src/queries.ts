@@ -64,14 +64,23 @@ export const portalAnnouncementListQueryOptions = (
 export const portalStatementQueryOptions = (
   api: Api,
   studentId: string,
-  page: number | undefined
+  { page, termId }: { page?: number; termId?: string } = {}
 ) =>
   queryOptions({
-    queryKey: [...PORTAL_KEY, 'statement', studentId, page],
+    queryKey: [
+      ...PORTAL_KEY,
+      'statement',
+      studentId,
+      termId ?? 'all',
+      page ?? 'last',
+    ],
     queryFn: () =>
       api.portal.statement({
         params: { studentId },
-        query: page === undefined ? {} : { page },
+        query: {
+          ...(page === undefined ? {} : { page }),
+          ...(termId === undefined ? {} : { termId }),
+        },
       }),
     placeholderData: keepPreviousData,
   });

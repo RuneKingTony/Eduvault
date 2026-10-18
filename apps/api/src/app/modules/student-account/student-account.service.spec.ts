@@ -489,3 +489,224 @@ describe('StudentAccountService.ownBalances', () => {
     expect((await service.ownBalances(familyOf([]), [])).balances.size).toBe(0);
   });
 });
+
+const signed = (rows: readonly { status: string; amountMinor: number }[]) =>
+  rows.reduce(
+    (sum, { status, amountMinor }) =>
+      sum +
+      (status === 'charged' || status === 'cancelled' || status === 'refunded'
+        ? amountMinor
+        : -amountMinor),
+    0
+  );
+
+describe('StudentAccountService term filter', () => {
+  const terms = [
+    { id: 'first', label: 'First term, 2025/2026', sinceDay: '2026-01-05' },
+    { id: 'second', label: 'Second term, 2025/2026', sinceDay: '2026-09-01' },
+  ];
+
+  const seed = () => {
+    const kit = setup();
+    kit.accounts.terms = terms;
+    kit.accounts.headers.set('s1', header('s1'));
+    kit.accounts.history.set('s1', [
+      movement({
+        kind: 'opening',
+        entryId: 'e1',
+        reference: 'OPEN',
+        effectiveOn: '2026-01-05',
+        debitMinor: 500,
+      }),
+      movement({
+        kind: 'invoice',
+        entryId: 'e2',
+        reference: 'CHG-1',
+        effectiveOn: '2026-01-10',
+        debitMinor: 3000,
+      }),
+      movement({
+        kind: 'payment',
+        entryId: 'e3',
+        reference: 'RCT-1',
+        effectiveOn: '2026-02-01',
+        creditMinor: 2000,
+      }),
+      movement({
+        kind: 'invoice',
+        entryId: 'e4',
+        reference: 'CHG-2',
+        effectiveOn: '2026-09-02',
+        debitMinor: 4000,
+      }),
+      movement({
+        kind: 'payment',
+        entryId: 'e5',
+        reference: 'RCT-2',
+        effectiveOn: '2026-09-20',
+        creditMinor: 1000,
+      }),
+    ]);
+    return kit;
+  };
+
+  it('reconciles the latest term’s brought forward and rows to the balance', async () => {
+    const { service } = seed();
+
+    const statement = await service.statement(everyone, 's1', {
+      pageSize: 50,
+      termId: 'second',
+    });
+
+    expect(statement.term).toEqual({
+      id: 'second',
+      label: 'Second term, 2025/2026',
+      fromOn: '2026-09-01',
+      toOn: null,
+    });
+    expect(statement.broughtForward).toEqual({ amountMinor: 1500 });
+    expect(statement.rows.map((row) => row.reference)).toEqual([
+      'CHG-2',
+      'RCT-2',
+    ]);
+    expect(statement.total).toBe(2);
+    expect(
+      (statement.broughtForward?.amountMinor ?? 0) + signed(statement.rows)
+    ).toBe(statement.totals.balanceMinor);
+    expect(statement.closingMinor).toBe(statement.totals.balanceMinor);
+  });
+
+  it('closes an earlier term on the next term’s brought forward', async () => {
+    const { service } = seed();
+
+    const first = await service.statement(everyone, 's1', {
+      pageSize: 50,
+      termId: 'first',
+    });
+    const second = await service.statement(everyone, 's1', {
+      pageSize: 50,
+      termId: 'second',
+    });
+
+    expect(first.term?.toOn).toBe('2026-08-31');
+    expect(first.broughtForward).toEqual({ amountMinor: 0 });
+    expect(first.closingMinor).toBe(second.broughtForward?.amountMinor);
+  });
+
+  it('keeps the totals and unpaid charges whole-account under a term', async () => {
+    const { service } = seed();
+
+    const whole = await service.statement(everyone, 's1', { pageSize: 50 });
+    const filtered = await service.statement(everyone, 's1', {
+      pageSize: 50,
+      termId: 'first',
+    });
+
+    expect(filtered.totals).toEqual(whole.totals);
+    expect(filtered.unpaid).toEqual(whole.unpaid);
+    expect(filtered.family).toEqual(whole.family);
+  });
+
+  it('paginates a term’s own rows and opens on its last page', async () => {
+    const { service } = seed();
+
+    const statement = await service.statement(everyone, 's1', {
+      pageSize: 1,
+      termId: 'second',
+    });
+
+    expect(statement).toMatchObject({ total: 2, page: 2 });
+    expect(statement.rows.map((row) => row.reference)).toEqual(['RCT-2']);
+  });
+
+  it('answers 404 for a term the school does not have', async () => {
+    const { service } = seed();
+
+    await expect(
+      service.statement(everyone, 's1', { pageSize: 50, termId: 'elsewhere' })
+    ).rejects.toThrow(new NotFoundException('Term not found'));
+  });
+
+  it('checks the student before the term', async () => {
+    const { service } = seed();
+
+    await expect(
+      service.statement(lekkiOnly, 'nobody', {
+        pageSize: 50,
+        termId: 'second',
+      })
+    ).rejects.toThrow(new NotFoundException('Student account not found'));
+    await expect(
+      service.ownStatement(familyOf(['mine']), 's1', {
+        pageSize: 50,
+        termId: 'elsewhere',
+      })
+    ).rejects.toThrow(new NotFoundException('Student account not found'));
+  });
+
+  it('gives a guardian the same 404 for a foreign term on their own child', async () => {
+    const { service } = seed();
+
+    await expect(
+      service.ownStatement(familyOf(['s1']), 's1', {
+        pageSize: 50,
+        termId: 'elsewhere',
+      })
+    ).rejects.toThrow(new NotFoundException('Term not found'));
+    const own = await service.ownStatement(familyOf(['s1']), 's1', {
+      pageSize: 50,
+      termId: 'second',
+    });
+    expect(own.broughtForward).toEqual({ amountMinor: 1500 });
+  });
+
+  it('leaves the term fields null and opens on the last page with no term', async () => {
+    const { service } = seed();
+
+    const statement = await service.statement(everyone, 's1', { pageSize: 2 });
+
+    expect(statement).toMatchObject({
+      term: null,
+      broughtForward: null,
+      closingMinor: null,
+      total: 5,
+      page: 3,
+    });
+    expect(statement.termOptions).toEqual([
+      { id: 'second', label: 'Second term, 2025/2026' },
+      { id: 'first', label: 'First term, 2025/2026' },
+    ]);
+  });
+
+  it('offers only the terms that have opened by today, newest first', async () => {
+    const { accounts, service } = seed();
+    accounts.terms = [
+      ...terms,
+      { id: 'third', label: 'Third term, 2025/2026', sinceDay: '2027-01-05' },
+    ];
+
+    const statement = await service.statement(everyone, 's1', { pageSize: 50 });
+
+    expect(statement.termOptions.map(({ id }) => id)).toEqual([
+      'second',
+      'first',
+    ]);
+  });
+
+  it('gives the family view no term filter', async () => {
+    const { accounts, service } = seed();
+    accounts.guardian = {
+      guardian: { id: 'g1', name: 'Ngozi Okeke' },
+      studentIds: ['s1'],
+    };
+
+    const family = await service.guardianStatement(everyone, 'g1');
+
+    expect(family.children[0]).toMatchObject({
+      term: null,
+      broughtForward: null,
+      closingMinor: null,
+    });
+    expect(family.children[0]?.total).toBe(5);
+  });
+});

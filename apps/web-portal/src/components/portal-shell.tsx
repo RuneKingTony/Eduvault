@@ -116,7 +116,7 @@ function useChildSwitcher(me: PortalMe) {
         onSelect={(child) => {
           void navigate({
             to: '.',
-            search: (previous) => ({ ...previous, child }),
+            search: (previous) => ({ ...previous, child, term: undefined }),
           });
         }}
       />

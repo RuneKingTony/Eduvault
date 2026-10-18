@@ -12,10 +12,12 @@ import { chargeFixture, prepare, sendRun } from './support/factories/billing';
 import {
   importOpening,
   ledgerAccountId,
+  moneyFingerprint,
   postEntry,
 } from './support/factories/finance';
 import { bankAccount, owes, recordCash } from './support/factories/payments';
 import { createStudent } from './support/factories/students';
+import { termOf } from './support/factories/terms';
 import {
   family,
   guardianOf,
@@ -374,6 +376,126 @@ test.describe('GET /portal/students/:studentId/statement', () => {
     await api(guardian)
       .get(`/portal/students/${ada.id}/statement?page=0`)
       .expect(400);
+  });
+});
+
+test.describe('GET /portal/students/:studentId/statement with a term', () => {
+  const YEAR = '2026/2027';
+  const OWING = new Set(['charged', 'cancelled', 'refunded']);
+  const signed = (rows: PortalStatement['rows']) =>
+    rows.reduce(
+      (sum, row) =>
+        sum + (OWING.has(row.status) ? row.amountMinor : -row.amountMinor),
+      0
+    );
+
+  test('shows a guardian the term’s rows with no references, the brought forward, and rows that reconcile to the balance', async ({
+    api,
+    app,
+    clock,
+    pool,
+    schools,
+  }) => {
+    clock.set('2026-10-07');
+    const { ada, guardianLogin } = await family(app, schools);
+    const { owner, orgA } = schools;
+    const fixture = await chargeFixture(app, api, owner);
+    await owes(app, owner, { studentId: ada.id, amountMinor: ADA_OPENING });
+    const { runId } = await prepare(api, owner, {
+      termId: fixture.firstTermId,
+      scope: 'school',
+    });
+    await sendRun(api, owner, runId ?? '');
+    const account = await bankAccount(app, owner);
+    await recordCash(api, owner, {
+      accountId: account.id,
+      paidOn: clock.today(),
+      allocations: [{ studentId: ada.id, amountMinor: 1_000_000 }],
+    });
+    const guardian = await signInAs(api, guardianLogin);
+    const terms = await Promise.all(
+      [1, 2, 3].map((sequence) => termOf(api, owner, { year: YEAR, sequence }))
+    );
+
+    const before = await moneyFingerprint(pool, orgA.id);
+    const whole = await statementOf(api, guardian, ada.id);
+    const [first, second, third] = await Promise.all(
+      terms.map((term) =>
+        statementAt(
+          api,
+          guardian,
+          `/portal/students/${ada.id}/statement?pageSize=50&termId=${term.id}`
+        )
+      )
+    );
+
+    expect(before.payment).not.toMatch(/^0:/);
+    expect(before.invoice_line).not.toMatch(/^0:/);
+    expect(before.journal_line).not.toMatch(/^0:/);
+    expect(await moneyFingerprint(pool, orgA.id)).toEqual(before);
+
+    expect(first!.broughtForward).toEqual({ amountMinor: ADA_OPENING });
+    expect(first!.rows.map((row) => row.status).toSorted(byText)).toEqual([
+      'charged',
+      'paid',
+    ]);
+    for (const row of first!.rows) {
+      expect(Object.keys(row).toSorted(byText)).toEqual([
+        'amountMinor',
+        'description',
+        'effectiveOn',
+        'status',
+      ]);
+    }
+    expect(first!.rows).not.toHaveLength(0);
+    expect(first!.closingMinor).toBe(
+      first!.broughtForward!.amountMinor + signed(first!.rows)
+    );
+    expect(first!.closingMinor).toBe(second!.broughtForward!.amountMinor);
+    expect(second!.closingMinor).toBe(third!.broughtForward!.amountMinor);
+    expect(third!.term!.toOn).toBeNull();
+    expect(third!.broughtForward!.amountMinor + signed(third!.rows)).toBe(
+      whole.totals.balanceMinor
+    );
+    for (const view of [first!, second!, third!]) {
+      expect(view.totals).toEqual(whole.totals);
+      expect(view.unpaid).toEqual(whole.unpaid);
+      expect(view.termOptions).toEqual(whole.termOptions);
+    }
+    expect(whole.termOptions.map((option) => option.id)).toEqual([
+      terms[0]!.id,
+    ]);
+    expect(whole).toMatchObject({
+      term: null,
+      broughtForward: null,
+      closingMinor: null,
+    });
+  });
+
+  test('answers 404 for the other school’s term and for a student the guardian is not linked to', async ({
+    api,
+    app,
+    schools,
+  }) => {
+    const { ada, guardianLogin } = await family(app, schools);
+    const { ownerB, owner, studentLekki } = schools;
+    await chargeFixture(app, api, owner);
+    const own = await termOf(api, owner, { year: YEAR, sequence: 1 });
+    const foreign = await termOf(api, ownerB, { year: YEAR, sequence: 1 });
+    const guardian = await signInAs(api, guardianLogin);
+
+    await api(guardian)
+      .get(`/portal/students/${ada.id}/statement?termId=${foreign.id}`)
+      .expect(404);
+    await api(guardian)
+      .get(`/portal/students/${studentLekki.id}/statement?termId=${own.id}`)
+      .expect(404);
+    await api(guardian)
+      .get(`/portal/students/${ada.id}/statement?termId=nope`)
+      .expect(400);
+    await api(guardian)
+      .get(`/portal/students/${ada.id}/statement?termId=${own.id}`)
+      .expect(200);
   });
 });
 

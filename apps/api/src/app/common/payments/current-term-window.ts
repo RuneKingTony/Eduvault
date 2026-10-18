@@ -1,6 +1,18 @@
 import { sql, type RawBuilder } from 'kysely';
 
-/** Payments can arrive before the term starts, so the window opens at the earliest issued invoice entry when that is sooner. */
+/** Payments can arrive before the term starts, so the window opens at the earliest issued invoice entry when sooner. Reads the `t` alias of `term`. */
+export function termSinceDaySql(organizationId: string): RawBuilder<unknown> {
+  return sql`
+    LEAST(t.starts_on, COALESCE((
+      SELECT min(je.effective_on)
+      FROM invoice i
+      JOIN journal_entry je ON je.id = i.journal_entry_id AND je.organization_id = i.organization_id
+      WHERE i.organization_id = ${organizationId}
+        AND i.term_id = t.id AND i.status = 'issued'
+        AND i.kind <> 'store'
+    ), t.starts_on))`;
+}
+
 export function currentTermWindowCte(
   organizationId: string
 ): RawBuilder<unknown> {
@@ -9,14 +21,7 @@ export function currentTermWindowCte(
       SELECT
         t.id AS term_id,
         t.ends_on,
-        LEAST(t.starts_on, COALESCE((
-          SELECT min(je.effective_on)
-          FROM invoice i
-          JOIN journal_entry je ON je.id = i.journal_entry_id AND je.organization_id = i.organization_id
-          WHERE i.organization_id = ${organizationId}
-            AND i.term_id = t.id AND i.status = 'issued'
-            AND i.kind <> 'store'
-        ), t.starts_on)) AS since_day
+        ${termSinceDaySql(organizationId)} AS since_day
       FROM term t
       WHERE t.organization_id = ${organizationId} AND t.is_current
       LIMIT 1

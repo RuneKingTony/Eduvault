@@ -82,8 +82,10 @@ async function renderAt(path: string, options: RenderOptions = {}) {
     held = access,
   } = options;
   const root = createRootRoute({
-    validateSearch: (search: Record<string, unknown>) =>
-      typeof search['child'] === 'string' ? { child: search['child'] } : {},
+    validateSearch: (search: Record<string, unknown>) => ({
+      ...(typeof search['child'] === 'string' && { child: search['child'] }),
+      ...(typeof search['term'] === 'string' && { term: search['term'] }),
+    }),
     component: () => <PortalShell me={me} access={held} />,
   });
   const child = (to: string, component: () => React.ReactNode) =>
@@ -183,6 +185,18 @@ describe('PortalShell on a desktop', () => {
     expect(
       within(screen.getByRole('banner')).getByRole('button', { name: 'Tobi' })
     ).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('clears the picked term when switching child', async () => {
+    const router = await renderAt('/children?child=ada&term=first-term');
+    expect(router.state.location.search).toEqual({
+      child: 'ada',
+      term: 'first-term',
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Tobi' }));
+    await waitFor(() => {
+      expect(router.state.location.search).toEqual({ child: 'tobi' });
+    });
   });
 
   it('falls back to the first child for an unlinked id', async () => {
