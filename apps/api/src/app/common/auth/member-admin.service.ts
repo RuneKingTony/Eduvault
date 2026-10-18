@@ -6,7 +6,7 @@ import { Kysely, PostgresDialect } from 'kysely';
 import type { Pool } from 'pg';
 import { MEMBER_ROLE } from '@eduvault/policy';
 import type { DB } from '../../../db/db-types';
-import { endClassTeaching } from '../db/end-class-teaching';
+import { endClassTeaching, type TeachingScope } from '../db/end-class-teaching';
 import { DB_TOKEN, type Database } from '../db/tokens';
 import { AccountService } from './account.service';
 import { withSchoolLock } from '../db/with-school-lock';
@@ -28,18 +28,32 @@ interface NewMember {
   campusIds: readonly string[];
 }
 
+export type TeachingEnd =
+  { kind: 'none' } | { kind: 'removedCampuses' } | TeachingScope;
+
 interface CampusChange {
   organizationId: string;
   userId: string;
   addCampusIds: readonly string[];
   removeCampusIds: readonly string[];
-  /** True when they stay eligible to teach on a campus they leave (`campus:readAll`). */
-  keepClassTeaching: boolean;
+  teachingEnd: TeachingEnd;
 }
 
 interface MemberChange extends CampusChange {
   memberId: string;
   roles: readonly string[];
+}
+
+function teachingScope(
+  end: TeachingEnd,
+  removedCampusIds: readonly string[]
+): TeachingScope | undefined {
+  if (end.kind === 'none') {
+    return undefined;
+  }
+  return end.kind === 'removedCampuses'
+    ? { kind: 'on', campusIds: removedCampusIds }
+    : end;
 }
 
 interface OwnershipHandover {
@@ -102,12 +116,10 @@ export class MemberAdminService {
         createdAt: new Date(),
         title,
       });
-      await this.moveCampuses(work, {
-        organizationId,
+      await this.moveCampuses(work.org, {
         userId,
         addCampusIds: campusIds,
         removeCampusIds: [],
-        keepClassTeaching: true,
       });
     });
   }
@@ -117,9 +129,9 @@ export class MemberAdminService {
     roles,
     ...change
   }: MemberChange): Promise<void> {
-    return this.inTransaction(async (work) => {
-      await work.org.updateMember(memberId, roles.join(','));
-      await this.moveCampuses(work, change);
+    return this.inTransaction(async ({ org, db }) => {
+      await org.updateMember(memberId, roles.join(','));
+      await this.moveAndEndTeaching({ org, db }, change);
     });
   }
 
@@ -131,7 +143,7 @@ export class MemberAdminService {
   }
 
   setCampuses(change: CampusChange): Promise<void> {
-    return this.inTransaction((work) => this.moveCampuses(work, change));
+    return this.inTransaction((work) => this.moveAndEndTeaching(work, change));
   }
 
   /** The user account stays. */
@@ -142,23 +154,34 @@ export class MemberAdminService {
     });
   }
 
-  private async moveCampuses(
+  private async moveAndEndTeaching(
     { org, db }: MemberWork,
-    change: CampusChange
+    { teachingEnd, organizationId, ...move }: CampusChange
   ): Promise<void> {
-    const { organizationId, userId, removeCampusIds } = change;
-    for (const teamId of change.addCampusIds) {
+    await this.moveCampuses(org, move);
+    const scope = teachingScope(teachingEnd, move.removeCampusIds);
+    if (scope !== undefined) {
+      await endClassTeaching(db, {
+        organizationId,
+        userId: move.userId,
+        scope,
+      });
+    }
+  }
+
+  private async moveCampuses(
+    org: OrgAdapter,
+    {
+      userId,
+      addCampusIds,
+      removeCampusIds,
+    }: Pick<CampusChange, 'userId' | 'addCampusIds' | 'removeCampusIds'>
+  ): Promise<void> {
+    for (const teamId of addCampusIds) {
       await org.findOrCreateTeamMember({ teamId, userId });
     }
     for (const teamId of removeCampusIds) {
       await org.removeTeamMember({ teamId, userId });
-    }
-    if (!change.keepClassTeaching) {
-      await endClassTeaching(db, {
-        organizationId,
-        userId,
-        campusIds: removeCampusIds,
-      });
     }
   }
 
