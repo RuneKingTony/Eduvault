@@ -3,6 +3,7 @@ import {
   ALREADY_DECIDED_MESSAGE,
   APPROVAL_KIND_LABELS,
   APPROVAL_KIND_PERMISSION,
+  APPROVAL_KIND_READ_PERMISSION,
   APPROVAL_KINDS,
   APPROVAL_RULE_BY_KIND,
   DECLINE_REASON_MESSAGE,
@@ -74,6 +75,18 @@ describe('approval copy', () => {
     expect(Object.keys(APPROVAL_KIND_PERMISSION)).toEqual([...APPROVAL_KINDS]);
     expect(APPROVAL_KIND_PERMISSION.leave).toBe('leave:approve');
     expect(APPROVAL_KIND_PERMISSION.discount).toBe('adjustment:approve');
+  });
+
+  it('names the read permission that lets a viewer see each money kind', () => {
+    expect(Object.keys(APPROVAL_KIND_READ_PERMISSION)).toEqual(
+      APPROVAL_KINDS.filter(isMoneyApproval)
+    );
+    for (const permission of Object.values(APPROVAL_KIND_READ_PERMISSION)) {
+      expect(permission).toMatch(/:read$/);
+    }
+    expect(APPROVAL_KIND_READ_PERMISSION.payment_void).toBe('adjustment:read');
+    expect(APPROVAL_KIND_READ_PERMISSION.store_write_off).toBe('store:read');
+    expect(Object.keys(APPROVAL_KIND_READ_PERMISSION)).not.toContain('leave');
   });
 });
 

@@ -438,6 +438,71 @@ describe('ApprovalsService leave rows', () => {
   });
 });
 
+const idsAndDecide = (items: { id: string; decide: string }[]) =>
+  items.map((item) => [item.id, item.decide]);
+
+describe('ApprovalsService other rows by read permission', () => {
+  const storeItem = waiting({
+    kind: 'store_write_off',
+    id: 'store-1',
+    details: 'Lekki stock count: Tie: 1 missing',
+    createdAt: '2026-10-16T10:00:00.000Z',
+  });
+  const withOthers = { ...page1, includeOthers: true };
+
+  it('keeps a store write-off from a leave approver who reads adjustments but not the store', async () => {
+    const service = serviceOver(provider(leaveItem, voidItem, storeItem));
+    const grace = org('grace', {
+      permissions: ['leave:approve', 'adjustment:read'],
+    });
+    const list = await service.list(grace, withOthers);
+    expect(idsAndDecide(list.items)).toEqual([
+      ['void-1', 'other'],
+      ['leave-1', 'yes'],
+    ]);
+    expect(list.othersCount).toBe(1);
+  });
+
+  it('shows the store write-off as someone else’s once the viewer also reads the store', async () => {
+    const service = serviceOver(provider(leaveItem, voidItem, storeItem));
+    const grace = org('grace', {
+      permissions: ['leave:approve', 'adjustment:read', 'store:read'],
+    });
+    const list = await service.list(grace, withOthers);
+    expect(idsAndDecide(list.items)).toEqual([
+      ['void-1', 'other'],
+      ['leave-1', 'yes'],
+      ['store-1', 'other'],
+    ]);
+    expect(list.othersCount).toBe(2);
+  });
+
+  it('shows the store write-off but not the void to a viewer who reads only the store', async () => {
+    const service = serviceOver(provider(leaveItem, voidItem, storeItem));
+    const grace = org('grace', {
+      permissions: ['leave:approve', 'store:read'],
+    });
+    const list = await service.list(grace, withOthers);
+    expect(idsAndDecide(list.items)).toEqual([
+      ['leave-1', 'yes'],
+      ['store-1', 'other'],
+    ]);
+    expect(list.othersCount).toBe(1);
+  });
+
+  it('still lets a super admin acting in the school decide both', async () => {
+    const service = serviceOver(provider(voidItem, storeItem));
+    const list = await service.list(
+      org('root', { approve: false, acting: true }),
+      page1
+    );
+    expect(idsAndDecide(list.items)).toEqual([
+      ['void-1', 'yes'],
+      ['store-1', 'yes'],
+    ]);
+  });
+});
+
 describe('ApprovalsService.summary', () => {
   it('counts what the viewer can decide, leaves their own out and rolls up to both nav items', async () => {
     const service = serviceOver(provider(voidItem, balanceItem, discountItem));
