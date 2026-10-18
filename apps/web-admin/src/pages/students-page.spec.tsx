@@ -654,3 +654,122 @@ describe('Record leaving on the Inactive tab', () => {
     ).not.toBeInTheDocument();
   });
 });
+
+describe('StudentsPage balance columns', () => {
+  const owing = studentRow({
+    id: 'st-owing',
+    firstName: 'Bola',
+    lastName: 'Owing',
+    balanceMinor: 500_000,
+    chargedThisTermMinor: 1_800_000,
+    paidThisTermMinor: 1_300_000,
+  });
+  const credit = studentRow({
+    id: 'st-credit',
+    firstName: 'Chidi',
+    lastName: 'Credit',
+    balanceMinor: -200_000,
+    chargedThisTermMinor: null,
+    paidThisTermMinor: null,
+  });
+  const clear = studentRow({
+    id: 'st-clear',
+    firstName: 'Dara',
+    lastName: 'Clear',
+    balanceMinor: 0,
+    chargedThisTermMinor: 1_800_000,
+    paidThisTermMinor: 1_800_000,
+  });
+  const finance = accessWith('student:read', 'invoice:read');
+  const money = (...rows: ReturnType<typeof studentRow>[]) =>
+    studentList(rows, { currency: 'NGN' });
+  const openTab = async (
+    tab: 'active' | 'new' | 'inactive' | 'left' | 'graduated',
+    rows = [owing, credit, clear]
+  ) => {
+    setup({
+      props: { search: { tab } },
+      list: money(...rows),
+      access: finance,
+    });
+    await screen.findByText('Bola Owing', { exact: false });
+  };
+
+  it('shows School fees on Active with owing, extra paid and Paid up', async () => {
+    await openTab('active');
+    expect(headers()).toContain('School fees');
+    expect(screen.getByText('₦5,000')).toBeInTheDocument();
+    expect(screen.getByText('₦2,000 extra paid')).toBeInTheDocument();
+    expect(screen.getByText('Paid up')).toBeInTheDocument();
+  });
+
+  it('puts School fees before Status', async () => {
+    await openTab('active');
+    const order = headers();
+    expect(order.indexOf('School fees')).toBeLessThan(order.indexOf('Status'));
+  });
+
+  it('shows Charged this term, Paid this term and Still owes on New intakes, with a dash for no current term', async () => {
+    await openTab('new');
+    expect(headers()).toEqual(
+      expect.arrayContaining([
+        'Charged this term',
+        'Paid this term',
+        'Still owes',
+      ])
+    );
+    expect(screen.getAllByText('₦18,000')).toHaveLength(3);
+    expect(screen.getByText('₦13,000')).toBeInTheDocument();
+    expect(screen.getAllByText('—')).toHaveLength(2);
+  });
+
+  it('shows Owes before the Record leaving column on Inactive', async () => {
+    await openTab('inactive');
+    const order = headers();
+    expect(order).toContain('Owes');
+    expect(order.indexOf('Owes')).toBeGreaterThan(order.indexOf('Status'));
+    expect(screen.getByText('₦5,000')).toBeInTheDocument();
+  });
+
+  it.each(['left', 'graduated'] as const)(
+    'shows Still owes on the %s tab',
+    async (tab) => {
+      await openTab(tab);
+      expect(headers()).toContain('Still owes');
+      expect(screen.getByText('₦5,000')).toBeInTheDocument();
+    }
+  );
+
+  it('shows a dash for a row without a balance', async () => {
+    await openTab('active', [owing, studentRow({ id: 'st-bare' })]);
+    expect(screen.getAllByText('—').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('JSS 2 Gold', { selector: 'td' })).toHaveLength(
+      2
+    );
+  });
+
+  it.each(['active', 'new', 'inactive', 'left', 'graduated'] as const)(
+    'has no balance column on the %s tab without finance read',
+    async (tab) => {
+      setup({
+        props: { search: { tab } },
+        list: money(owing),
+        access: accessWith('student:read'),
+      });
+      await screen.findByText('Bola Owing', { exact: false });
+      expect(headers()).not.toEqual(
+        expect.arrayContaining([expect.stringMatching(/fees|owes|term/i)])
+      );
+      expect(screen.queryByText('₦5,000')).not.toBeInTheDocument();
+    }
+  );
+
+  it('has no balance column when the list carries no currency', async () => {
+    setup({
+      list: studentList([owing]),
+      access: finance,
+    });
+    await screen.findByText('Bola Owing', { exact: false });
+    expect(headers()).not.toContain('School fees');
+  });
+});

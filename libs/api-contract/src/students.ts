@@ -4,7 +4,7 @@ import {
   guardianLinkSchema,
   loginCredentialSchema,
 } from './guardians';
-import { idSchema } from './schemas';
+import { currencySchema, idSchema } from './schemas';
 
 const dateSchema = z.iso.date();
 
@@ -98,6 +98,9 @@ export const studentRowSchema = z.object({
     .nullable(),
   graduatedSessionName: z.string().nullable(),
   payers: z.array(z.string()).optional(),
+  balanceMinor: z.number().int().optional(),
+  chargedThisTermMinor: z.number().int().nullable().optional(),
+  paidThisTermMinor: z.number().int().nullable().optional(),
 });
 export type StudentRow = z.infer<typeof studentRowSchema>;
 
@@ -115,6 +118,7 @@ export const studentListSchema = z.object({
   total: z.number().int().nonnegative(),
   counts: studentCountsSchema,
   startYear: z.object({ targetYearId: idSchema, name: z.string() }).nullable(),
+  currency: currencySchema.optional(),
 });
 export type StudentList = z.infer<typeof studentListSchema>;
 
@@ -154,6 +158,7 @@ export const studentDetailSchema = studentRowSchema.extend({
   canMoveForNextTerm: z.boolean(),
   canUndoLeaving: z.boolean(),
   guardians: z.array(guardianLinkSchema).optional(),
+  currency: currencySchema.optional(),
 });
 export type StudentDetail = z.infer<typeof studentDetailSchema>;
 

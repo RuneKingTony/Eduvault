@@ -1,6 +1,12 @@
 import { useState, type SubmitEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { CheckIcon, ClockIcon, Undo2Icon, UserXIcon } from 'lucide-react';
+import {
+  CheckIcon,
+  ClockIcon,
+  TriangleAlertIcon,
+  Undo2Icon,
+  UserXIcon,
+} from 'lucide-react';
 import {
   LEAVING_REASONS,
   type LeavingReason,
@@ -9,7 +15,7 @@ import {
   type StudentTab,
 } from '@eduvault/api-contract';
 import { useCan, usePermissions } from '@eduvault/auth-client';
-import { fmtDate } from '@eduvault/shared';
+import { fmtDate, money } from '@eduvault/shared';
 import {
   Alert,
   AlertDescription,
@@ -182,6 +188,26 @@ function ReasonSelect({ defaultValue }: { defaultValue: LeavingReason }) {
 const reasonOf = (value: string): LeavingReason =>
   LEAVING_REASONS.find((reason) => reason.code === value)?.code ?? 'other';
 
+function OwedWarning({ student }: { student: StudentDetail }) {
+  const { balanceMinor, currency } = student;
+  if (
+    balanceMinor === undefined ||
+    currency === undefined ||
+    balanceMinor <= 0
+  ) {
+    return null;
+  }
+  return (
+    <Alert>
+      <TriangleAlertIcon />
+      <AlertDescription>
+        {money(balanceMinor, currency)} is still owed. It stays in Who owes
+        under “owed by leavers”.
+      </AlertDescription>
+    </Alert>
+  );
+}
+
 export function LeaveDialog({
   student,
   onClose,
@@ -229,6 +255,7 @@ export function LeaveDialog({
             Shown on the student’s record and in recent activity.
           </p>
         </div>
+        <OwedWarning student={student} />
         <Footer
           submitLabel="Record leaving"
           icon={<UserXIcon />}

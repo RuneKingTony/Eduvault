@@ -13,14 +13,22 @@ import {
   type StudentList,
   type UpdateStudentInput,
 } from '@eduvault/api-contract';
-import { can } from '@eduvault/policy';
+import { FINANCE_READ_GATE, can, canAny } from '@eduvault/policy';
 import type { OrgContext } from '../../common/auth';
 import { CampusService } from '../campus/campus.service';
 import { GuardianService } from '../guardian/guardian.service';
-import { StudentRepository } from './student.repository';
+import {
+  StudentRepository,
+  type StudentDetailTarget,
+} from './student.repository';
 import { scopeOf, type StudentVisibility } from './visibility';
 
 const ALL_SCOPE: StudentVisibility = { campusScope: 'all', classScope: 'all' };
+
+const financeTarget = (ctx: OrgContext, id: string): StudentDetailTarget => ({
+  id,
+  withFinance: canAny(ctx.permissions, FINANCE_READ_GATE),
+});
 
 const notFound = () => new NotFoundException(STUDENT_NOT_FOUND_MESSAGE);
 
@@ -39,15 +47,15 @@ export class StudentService {
     if (query.campusId !== undefined) {
       await this.campuses.assertInScope(ctx, query.campusId);
     }
-    const result = await this.students.list(ctx.organizationId, scopeOf(ctx), {
+    return this.students.list(ctx.organizationId, scopeOf(ctx), {
       ...query,
       withGuardians: can(ctx.permissions, 'guardian', 'read'),
+      withFinance: canAny(ctx.permissions, FINANCE_READ_GATE),
     });
-    return result;
   }
 
   async get(ctx: OrgContext, id: string): Promise<StudentDetail> {
-    const detail = await this.read(ctx, scopeOf(ctx), id);
+    const detail = await this.read(ctx, scopeOf(ctx), financeTarget(ctx, id));
     if (!can(ctx.permissions, 'guardian', 'read')) {
       return detail;
     }
@@ -56,7 +64,7 @@ export class StudentService {
 
   /** The detail of a student the caller has just admitted, whatever their scope. */
   async getAdmitted(ctx: OrgContext, id: string): Promise<StudentDetail> {
-    const detail = await this.read(ctx, ALL_SCOPE, id);
+    const detail = await this.read(ctx, ALL_SCOPE, financeTarget(ctx, id));
     if (!can(ctx.permissions, 'guardian', 'read')) {
       return detail;
     }
@@ -71,7 +79,10 @@ export class StudentService {
     id: string,
     patch: UpdateStudentInput
   ): Promise<StudentDetail> {
-    const student = await this.read(ctx, scopeOf(ctx), id);
+    const student = await this.read(ctx, scopeOf(ctx), {
+      id,
+      withFinance: false,
+    });
     if (student.life === 'left' || student.life === 'graduated') {
       throw new ConflictException(
         `${student.firstName} ${student.lastName} is no longer on the roll.`
@@ -98,12 +109,12 @@ export class StudentService {
   private async read(
     ctx: OrgContext,
     scope: StudentVisibility,
-    id: string
+    target: StudentDetailTarget
   ): Promise<StudentDetail> {
     const detail = await this.students.findDetail(
       ctx.organizationId,
       scope,
-      id
+      target
     );
     if (detail === undefined) {
       throw notFound();

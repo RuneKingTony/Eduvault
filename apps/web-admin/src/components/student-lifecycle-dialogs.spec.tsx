@@ -148,6 +148,24 @@ describe('LeaveDialog', () => {
     );
   });
 
+  it('warns that the balance stays in Who owes when something is owed', () => {
+    setup(studentDetail({ balanceMinor: 500_000, currency: 'NGN' }));
+    expect(
+      screen.getByText(
+        '₦5,000 is still owed. It stays in Who owes under “owed by leavers”.'
+      )
+    ).toBeInTheDocument();
+  });
+
+  it.each([
+    ['nothing is owed', { balanceMinor: 0, currency: 'NGN' }],
+    ['the student is in credit', { balanceMinor: -100_000, currency: 'NGN' }],
+    ['the detail carries no balance', {}],
+  ])('shows no owed warning when %s', (_name, finance) => {
+    setup(studentDetail(finance));
+    expect(screen.queryByText(/is still owed/)).not.toBeInTheDocument();
+  });
+
   it('lists the six reasons', () => {
     setup();
     expect(

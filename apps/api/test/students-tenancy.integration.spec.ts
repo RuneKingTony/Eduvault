@@ -1,4 +1,5 @@
 import { expect } from './support/base-test';
+import { owes } from './support/factories/payments';
 import { assignClassTeacher } from './support/factories/classes';
 import { createStudent, ensureClass } from './support/factories/students';
 import { schoolsTest } from './support/two-schools';
@@ -301,5 +302,48 @@ test.describe('isolation', () => {
     await api(teacher)
       .get(`/students/${studentLekki.id}/guardians`)
       .expect(403);
+  });
+
+  test('case 3 and 4: a finance reader gets 404 for another campus’s student and no balance of theirs in the list', async ({
+    api,
+    app,
+    schools: { owner, lekkiOnly, studentLekki, studentIkeja },
+  }) => {
+    const IKEJA_OWED = 3_141_500;
+    await owes(app, owner, {
+      studentId: studentIkeja.id,
+      amountMinor: IKEJA_OWED,
+    });
+
+    const list = await api(lekkiOnly).get('/students').expect(200);
+    const hidden = await api(lekkiOnly)
+      .get(`/students/${studentIkeja.id}`)
+      .expect(404);
+
+    expect(list.body.items.map((row: { id: string }) => row.id)).toEqual([
+      studentLekki.id,
+    ]);
+    expect(list.body.items[0].balanceMinor).toBe(0);
+    expect(JSON.stringify(list.body)).not.toContain(String(IKEJA_OWED));
+    expect(hidden.body.message).toBe('Student not found');
+  });
+
+  test('case 1: another school’s finance reader gets no balance of this school’s student', async ({
+    api,
+    app,
+    schools: { owner, ownerB, studentLekki, studentB },
+  }) => {
+    await owes(app, owner, {
+      studentId: studentLekki.id,
+      amountMinor: 2_718_200,
+    });
+
+    const mine = await api(ownerB).get('/students').expect(200);
+    await api(ownerB).get(`/students/${studentLekki.id}`).expect(404);
+
+    expect(mine.body.items.map((row: { id: string }) => row.id)).toEqual([
+      studentB.id,
+    ]);
+    expect(mine.body.items[0].balanceMinor).toBe(0);
   });
 });

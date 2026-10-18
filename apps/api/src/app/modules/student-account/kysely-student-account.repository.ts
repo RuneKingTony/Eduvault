@@ -11,6 +11,10 @@ import {
 import { escapeLike } from '../../common/db/escape-like';
 import { KYSELY_TOKEN, type Database } from '../../common/db/tokens';
 import {
+  currentTermWindowCte,
+  termPaymentPredicate,
+} from '../../common/payments';
+import {
   receivableAccountIdSql,
   schoolCurrency,
   type KindMovement,
@@ -322,35 +326,14 @@ export class KyselyStudentAccountRepository extends StudentAccountRepository {
   ): Promise<{ minor: number; count: number }> {
     const { organizationId } = scope;
     const { rows } = await sql<{ received: string; payments: number }>`
-      WITH cur AS (
-        SELECT t.id, t.starts_on, t.ends_on FROM term t
-        WHERE t.organization_id = ${organizationId} AND t.is_current
-        LIMIT 1
-      ),
-      since AS (
-        SELECT LEAST(cur.starts_on, COALESCE((
-          SELECT min(je.effective_on)
-          FROM invoice i
-          JOIN journal_entry je ON je.id = i.journal_entry_id AND je.organization_id = i.organization_id
-          WHERE i.organization_id = ${organizationId}
-            AND i.term_id = cur.id AND i.status = 'issued'
-            AND i.kind <> 'store'
-        ), cur.starts_on)) AS day
-        FROM cur
-      )
+      WITH ${currentTermWindowCte(organizationId)}
       SELECT COALESCE(sum(pa.amount_minor), 0)::text AS received,
         count(DISTINCT p.id)::int AS payments
       FROM payment p
       JOIN payment_allocation pa ON pa.payment_id = p.id AND pa.organization_id = p.organization_id
       JOIN student st ON st.id = pa.student_id AND st.organization_id = pa.organization_id
       WHERE p.organization_id = ${organizationId}
-        AND p.status <> 'voided'
-        AND NOT EXISTS (
-          SELECT 1 FROM store_sale ss
-          WHERE ss.payment_id = p.id AND ss.organization_id = p.organization_id
-        )
-        AND p.paid_on >= (SELECT day FROM since)
-        AND p.paid_on <= (SELECT ends_on FROM cur)
+        AND ${termPaymentPredicate(sql`(SELECT since_day FROM term_window)`, sql`(SELECT ends_on FROM term_window)`)}
         AND ${inScope(currentCampusSql('st'), scope.campusScope)}`.execute(
       this.db
     );

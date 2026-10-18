@@ -302,5 +302,5 @@ The module stays `student`. Admission is a new handler on it, not a separate mod
 - M2.2: `school_setting.max_guardians` and `require_guardian`, the Admissions rules screen, and the `FileStore` with `/files` for guardian photos ([D-028](../technical-reference.md#decision-log)).
 - M2.3: classes (arms) on campuses.
 - [42-guardians](42-guardians.md), which ships in the same slice: the guardian picker and guardian creation.
-- M3.3 for the "Charge this student" toast action (hidden until then).
+- M3.3 for the "Charge this student" toast action, which shipped with M3.3 (EDU-35).
 - M2.8: the portal screens where these logins are used.

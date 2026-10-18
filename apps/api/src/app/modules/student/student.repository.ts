@@ -15,12 +15,19 @@ export interface StudentListParams {
   page: number;
   pageSize: number;
   withGuardians: boolean;
+  withFinance: boolean;
+}
+
+export interface StudentDetailTarget {
+  id: string;
+  withFinance: boolean;
 }
 
 export interface StudentListResult {
   items: StudentRow[];
   total: number;
   counts: StudentCounts;
+  currency?: string;
 }
 
 export abstract class StudentRepository {
@@ -35,7 +42,7 @@ export abstract class StudentRepository {
   abstract findDetail(
     organizationId: string,
     scope: StudentVisibility,
-    id: string
+    target: StudentDetailTarget
   ): Promise<StudentDetail | undefined>;
 
   abstract isVisible(
