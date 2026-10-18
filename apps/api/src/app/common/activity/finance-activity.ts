@@ -17,7 +17,8 @@ type FinanceSubject =
   | 'student_discount'
   | 'fee_line'
   | 'term'
-  | 'store_sale';
+  | 'store_sale'
+  | 'stock_count';
 
 export interface FinanceActor {
   organizationId: string;
@@ -71,6 +72,14 @@ export interface StoreSaleFacts {
   campusName: string;
   itemCount: number;
   totalMinor: number;
+}
+
+export interface StoreWriteOffFacts {
+  id: string;
+  number: string;
+  storeId: string;
+  campusId: string;
+  campusName: string;
 }
 
 export const financeActor = (
@@ -242,6 +251,58 @@ export function storeSaleRecordedActivity(
         studentId: sale.studentId,
         amountMinor: sale.totalMinor,
         items: sale.itemCount,
+      },
+    }),
+  ];
+}
+
+const writeOffValue = (actor: FinanceActor, netMinor: number): string => {
+  if (netMinor === 0) {
+    return 'no net value';
+  }
+  const amount = money(Math.abs(netMinor), actor.currency);
+  return netMinor > 0 ? `${amount} lost` : `${amount} found`;
+};
+
+export function storeWriteOffApprovedActivity(
+  actor: FinanceActor,
+  count: StoreWriteOffFacts,
+  write: { netMinor: number; differences: number; autoApproved: boolean }
+): ActivityInput[] {
+  return [
+    finance(actor, {
+      campusId: count.campusId,
+      kind: 'store_write_off.approved',
+      subject: { type: 'stock_count', id: count.id },
+      text: `Store write-off ${count.number} at the ${count.campusName} store: ${countOf(write.differences, 'item differs', 'items differ')}, ${writeOffValue(actor, write.netMinor)}, ${verdict(write.autoApproved)} by ${actor.name}.`,
+      data: {
+        countId: count.id,
+        number: count.number,
+        storeId: count.storeId,
+        differences: write.differences,
+        netMinor: write.netMinor,
+        autoApproved: write.autoApproved,
+      },
+    }),
+  ];
+}
+
+export function storeWriteOffDeclinedActivity(
+  actor: FinanceActor,
+  count: StoreWriteOffFacts,
+  declined: { differences: number; reason: string }
+): ActivityInput[] {
+  return [
+    finance(actor, {
+      campusId: count.campusId,
+      kind: 'store_write_off.declined',
+      subject: { type: 'stock_count', id: count.id },
+      text: `Store write-off ${count.number} at the ${count.campusName} store was declined: ${declined.reason}`,
+      data: {
+        countId: count.id,
+        number: count.number,
+        storeId: count.storeId,
+        differences: declined.differences,
       },
     }),
   ];

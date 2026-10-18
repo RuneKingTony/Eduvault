@@ -1,6 +1,7 @@
+import type { INestApplication } from '@nestjs/common';
 import type { Pool } from 'pg';
 import { FEE_SCHEDULE_KINDS } from '../src/app/common/activity';
-import { expect } from './support/base-test';
+import { expect, type Fixtures, type TestUser } from './support/base-test';
 import {
   askAdjustment,
   approveAdjustment,
@@ -24,7 +25,14 @@ import {
   owes,
   recordCash,
 } from './support/factories/payments';
-import { createItem, receive, sell } from './support/factories/store';
+import {
+  approveCount,
+  createItem,
+  declineCount,
+  receive,
+  sell,
+  submitCount,
+} from './support/factories/store';
 import { schoolsTest as test } from './support/two-schools';
 
 const SCHEDULE_KINDS: string[] = Object.values(FEE_SCHEDULE_KINDS);
@@ -43,6 +51,31 @@ const compare = (a: string, b: string) => a.localeCompare(b);
 
 const kindsAndCampuses = (rows: FinanceActivityRow[]) =>
   rows.map((row) => [row.kind, row.campus_id]);
+
+async function stockedShirt(
+  api: Fixtures['api'],
+  app: INestApplication,
+  who: { owner: TestUser; counter: TestUser; lekki: { id: string } }
+) {
+  const { owner, counter, lekki } = who;
+  const cash = await createMoneyAccount(app, owner, {
+    name: 'Lekki cash box',
+    kind: 'cash',
+    campusId: lekki.id,
+  });
+  const shirt = await createItem(api, owner);
+  await receive(api, owner, {
+    campusId: lekki.id,
+    accountId: cash.id,
+    lines: [{ itemId: shirt.id, quantity: 5, unitCostMinor: 350_000 }],
+  });
+  const counted = (countedQuantity: number) =>
+    submitCount(api, counter, {
+      campusId: lekki.id,
+      lines: [{ itemId: shirt.id, countedQuantity }],
+    });
+  return { shirt, counted };
+}
 
 const OWED = 18_000_000;
 const LEKKI_SHARE = 6_000_000;
@@ -605,6 +638,134 @@ test.describe('finance activity', () => {
     expect(await sold(lekkiOnly)).toHaveLength(1);
     expect(await sold(invoiceOnly)).toHaveLength(1);
     expect(await sold(paymentOnly)).toHaveLength(1);
+    expect(await financeTexts(api, ikejaReader)).toEqual([]);
+    expect(await financeTexts(api, storeOnly)).toEqual([]);
+    expect(await financeTexts(api, noPermission)).toEqual([]);
+    expect(await financeTexts(api, ownerB)).toEqual([]);
+  });
+
+  test('a store write-off writes a row when approved or declined, and none while it waits, when it matches or when decided twice', async ({
+    api,
+    app,
+    clock,
+    pool,
+    schools: { owner, orgA, lekki, lekkiOnly },
+  }) => {
+    clock.set('2026-10-07');
+    const { counted } = await stockedShirt(api, app, {
+      owner,
+      counter: lekkiOnly,
+      lekki,
+    });
+
+    const matched = await counted(5);
+    const approving = await counted(3);
+    expect(matched.status).toBe('matched');
+    expect(approving.status).toBe('submitted');
+    expect(await financeRows(pool, orgA.id)).toEqual([]);
+
+    await approveCount(api, owner, approving.id);
+    await api(owner).post(`/store/counts/${approving.id}/approve`).expect(409);
+    await api(owner)
+      .post(`/store/counts/${approving.id}/decline`)
+      .send({ reason: 'Too late' })
+      .expect(409);
+    await api(owner).post(`/store/counts/${matched.id}/approve`).expect(409);
+    expect(await financeRows(pool, orgA.id)).toHaveLength(1);
+
+    const declining = await counted(4);
+    await declineCount(api, owner, {
+      id: declining.id,
+      reason: 'Recount the shelf first',
+    });
+    await api(owner).post(`/store/counts/${declining.id}/approve`).expect(409);
+
+    const rows = await financeRows(pool, orgA.id);
+    expect(kindsAndCampuses(rows)).toEqual([
+      ['store_write_off.approved', lekki.id],
+      ['store_write_off.declined', lekki.id],
+    ]);
+    expect(rows[0]?.text).toMatch(
+      new RegExp(
+        String.raw`^Store write-off ${approving.number} at the Lekki store: 1 item differs, ₦7,000 lost, approved by .+\.$`
+      )
+    );
+    expect(rows[1]?.text).toBe(
+      `Store write-off ${declining.number} at the Lekki store was declined: Recount the shelf first`
+    );
+  });
+
+  test('a write-off made straight through (approval off) writes one applied row, and a matched count none', async ({
+    api,
+    app,
+    clock,
+    pool,
+    schools: { owner, orgA, lekki, lekkiOnly },
+  }) => {
+    clock.set('2026-10-07');
+    const { counted } = await stockedShirt(api, app, {
+      owner,
+      counter: lekkiOnly,
+      lekki,
+    });
+    await switchApproval(api, owner, { writeOff: false });
+
+    expect((await counted(5)).status).toBe('matched');
+    expect(await financeRows(pool, orgA.id)).toEqual([]);
+    const applied = await counted(6);
+
+    expect(applied.status).toBe('approved');
+    const rows = await financeRows(pool, orgA.id);
+    expect(kindsAndCampuses(rows)).toEqual([
+      ['store_write_off.approved', lekki.id],
+    ]);
+    expect(rows[0]?.text).toMatch(
+      new RegExp(
+        String.raw`^Store write-off ${applied.number} at the Lekki store: 1 item differs, ₦3,500 found, applied by .+\.$`
+      )
+    );
+  });
+
+  test('a store write-off’s row reaches a finance reader on that campus only, and no other campus, school or member', async ({
+    api,
+    app,
+    clock,
+    withPermissions,
+    schools: { owner, ownerB, orgA, lekki, ikeja, lekkiOnly, noPermission },
+  }) => {
+    clock.set('2026-10-07');
+    const { counted } = await stockedShirt(api, app, {
+      owner,
+      counter: lekkiOnly,
+      lekki,
+    });
+    const count = await counted(3);
+    await approveCount(api, owner, count.id);
+    const campuses = [lekki, ikeja];
+    const invoiceOnly = await withPermissions(orgA, ['invoice:read'], {
+      campuses: [lekki],
+    });
+    const paymentOnly = await withPermissions(orgA, ['payment:read'], {
+      campuses: [lekki],
+    });
+    const ikejaReader = await withPermissions(orgA, ['payment:read'], {
+      campuses: [ikeja],
+    });
+    const storeOnly = await withPermissions(
+      orgA,
+      ['store:read', 'store:count', 'adjustment:approve'],
+      { campuses }
+    );
+
+    const written = async (actor: typeof owner) =>
+      (await financeTexts(api, actor)).filter((text) =>
+        text.includes(`Store write-off ${count.number}`)
+      );
+
+    expect(await written(owner)).toHaveLength(1);
+    expect(await written(lekkiOnly)).toHaveLength(1);
+    expect(await written(invoiceOnly)).toHaveLength(1);
+    expect(await written(paymentOnly)).toHaveLength(1);
     expect(await financeTexts(api, ikejaReader)).toEqual([]);
     expect(await financeTexts(api, storeOnly)).toEqual([]);
     expect(await financeTexts(api, noPermission)).toEqual([]);
