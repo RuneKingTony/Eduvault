@@ -15,11 +15,7 @@ import type {
   ProofState,
 } from '../../common/payments';
 
-export type {
-  ExistingPayment,
-  InsertOutcome,
-  NewPayment,
-} from '../../common/payments';
+export type { ExistingPayment, InsertOutcome } from '../../common/payments';
 
 export interface NewRecordedPayment extends NewPayment {
   userName: string;
