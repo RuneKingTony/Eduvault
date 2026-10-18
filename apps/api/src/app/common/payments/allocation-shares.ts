@@ -18,23 +18,3 @@ export async function allocationShares(
     amountMinor: Number(row.amount_minor),
   }));
 }
-
-/** A cancellation closes out the campuses the receipt was recorded under, not where its students are now. */
-export async function recordedShares(
-  db: Kysely<DB>,
-  payment: { organizationId: string; paymentId: string }
-): Promise<CampusAmount[]> {
-  const { rows } = await sql<{ campus_id: string; amount_minor: string }>`
-    SELECT campus_id, data->>'amountMinor' AS amount_minor
-    FROM activity_event
-    WHERE organization_id = ${payment.organizationId}
-      AND kind = 'payment.recorded' AND subject_type = 'payment'
-      AND subject_id = ${payment.paymentId} AND campus_id IS NOT NULL
-    ORDER BY campus_id`.execute(db);
-  return rows.length === 0
-    ? allocationShares(db, payment)
-    : rows.map((row) => ({
-        campusId: row.campus_id,
-        amountMinor: Number(row.amount_minor),
-      }));
-}

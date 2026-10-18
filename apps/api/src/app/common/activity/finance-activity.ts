@@ -7,6 +7,13 @@ import { countOf, money } from '@eduvault/shared';
 import type { StudentIdentity } from '../students';
 import type { ActivityInput } from './activity-writer';
 
+type FinanceSubject =
+  | 'payment'
+  | 'payment_void'
+  | 'billing_run'
+  | 'adjustment'
+  | 'student_discount';
+
 export interface FinanceActor {
   organizationId: string;
   userId: string;
@@ -49,22 +56,22 @@ export interface DiscountFacts {
 }
 
 export const financeActor = (
-  ctx: {
-    organizationId: string;
-    user: { id: string; name: string };
-  },
+  who: Omit<FinanceActor, 'currency'>,
   currency: string
-): FinanceActor => ({
-  organizationId: ctx.organizationId,
-  userId: ctx.user.id,
-  name: ctx.user.name,
-  currency,
-});
+): FinanceActor => ({ ...who, currency });
 
 export const financeActorIn = async (
-  ctx: Parameters<typeof financeActor>[0],
+  ctx: { organizationId: string; user: { id: string; name: string } },
   tx: { currency(): Promise<string> }
-): Promise<FinanceActor> => financeActor(ctx, await tx.currency());
+): Promise<FinanceActor> =>
+  financeActor(
+    {
+      organizationId: ctx.organizationId,
+      userId: ctx.user.id,
+      name: ctx.user.name,
+    },
+    await tx.currency()
+  );
 
 export const studentFacts = (
   student: StudentIdentity
@@ -77,7 +84,7 @@ export const studentFacts = (
 interface RowFacts {
   campusId: string;
   kind: string;
-  subject: { type: string; id: string };
+  subject: { type: FinanceSubject; id: string };
   text: string;
   data: Record<string, unknown>;
 }
@@ -193,6 +200,7 @@ export function paymentCancellationDeclinedActivity(
   payment: PaymentFacts,
   declined: {
     voidId: string;
+    reason: string;
     allocations: readonly CampusAmount[];
   }
 ): ActivityInput[] {
@@ -201,7 +209,7 @@ export function paymentCancellationDeclinedActivity(
       campusId,
       kind: 'payment_void.declined',
       subject: { type: 'payment_void', id: declined.voidId },
-      text: `Cancelling payment ${payment.receiptNumber} was declined by ${actor.name}.`,
+      text: `Cancelling payment ${payment.receiptNumber} was declined: ${declined.reason}`,
       data: {
         voidId: declined.voidId,
         paymentId: payment.id,
@@ -237,14 +245,15 @@ export function adjustmentApprovedActivity(
 
 export function adjustmentDeclinedActivity(
   actor: FinanceActor,
-  adjustment: AdjustmentFacts
+  adjustment: AdjustmentFacts,
+  reason: string
 ): ActivityInput[] {
   return [
     finance(actor, {
       campusId: adjustment.campusId,
       kind: 'adjustment.declined',
       subject: { type: 'adjustment', id: adjustment.id },
-      text: `${ADJUSTMENT_KIND_LABELS[adjustment.kind]} ${adjustment.number} for ${adjustment.studentName} was declined by ${actor.name}.`,
+      text: `${ADJUSTMENT_KIND_LABELS[adjustment.kind]} ${adjustment.number} for ${adjustment.studentName} was declined: ${reason}`,
       data: {
         adjustmentId: adjustment.id,
         number: adjustment.number,
@@ -285,14 +294,15 @@ export function discountApprovedActivity(
 
 export function discountDeclinedActivity(
   actor: FinanceActor,
-  discount: DiscountFacts
+  discount: DiscountFacts,
+  reason: string
 ): ActivityInput[] {
   return [
     finance(actor, {
       campusId: discount.campusId,
       kind: 'discount.declined',
       subject: { type: 'student_discount', id: discount.id },
-      text: `Discount for ${discount.studentName} was declined by ${actor.name}.`,
+      text: `Discount for ${discount.studentName} was declined: ${reason}`,
       data: {
         discountId: discount.id,
         studentId: discount.studentId,

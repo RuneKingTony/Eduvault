@@ -27,7 +27,7 @@ import {
   schoolCurrency,
   type LedgerLine,
 } from '../../common/ledger';
-import { recordedShares } from '../../common/payments';
+import { allocationShares } from '../../common/payments';
 import {
   allAllocationsInScopeSql,
   anyAllocationInScopeSql,
@@ -246,7 +246,7 @@ class KyselyVoidTx implements PaymentVoidTx {
   }
 
   allocationShares(paymentId: string): Promise<CampusAmount[]> {
-    return recordedShares(this.trx, {
+    return allocationShares(this.trx, {
       organizationId: this.organizationId,
       paymentId,
     });

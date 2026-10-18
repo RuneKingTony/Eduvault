@@ -307,10 +307,11 @@ export class AdjustmentService {
             (await tx.reject(id, declineReason));
           if (changed) {
             await tx.activity.recordMany(
-              adjustmentDeclinedActivity(await financeActorIn(ctx, tx), {
-                ...found,
-                ...studentFacts(found.student),
-              })
+              adjustmentDeclinedActivity(
+                await financeActorIn(ctx, tx),
+                { ...found, ...studentFacts(found.student) },
+                declineReason
+              )
             );
           }
           return changed;

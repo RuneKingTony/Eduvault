@@ -195,10 +195,9 @@ test.describe('finance activity', () => {
     );
     expect(rows[1]?.text).toMatch(
       new RegExp(
-        String.raw`^Cancelling payment ${second.receiptNumber} was declined by .+\.$`
+        String.raw`^Cancelling payment ${second.receiptNumber} was declined: Parent confirmed it is right$`
       )
     );
-    expect(rows[1]?.text).not.toContain('Parent confirmed it is right');
   });
 
   test('a cancellation made straight through (approval off) writes one row', async ({
@@ -222,32 +221,6 @@ test.describe('finance activity', () => {
     );
     expect(kindsAndCampuses(rows)).toEqual([['payment.cancelled', lekki.id]]);
     expect(rows[0]?.text).toMatch(/was cancelled by .+\.$/);
-  });
-
-  test('a cancellation follows the campus the payment was recorded under after the student moves', async ({
-    api,
-    app,
-    pool,
-    schools: { owner, orgA, lekki, ikeja, studentLekki },
-  }) => {
-    await switchApproval(api, owner, { paymentVoid: false });
-    const account = await bankAccount(app, owner);
-    await owes(app, owner, { studentId: studentLekki.id, amountMinor: OWED });
-    const receipt = await recordCash(api, owner, {
-      accountId: account.id,
-      allocations: [{ studentId: studentLekki.id, amountMinor: LEKKI_SHARE }],
-    });
-    await pool.query('UPDATE student SET campus_id = $2 WHERE id = $1', [
-      studentLekki.id,
-      ikeja.id,
-    ]);
-
-    await askVoid(api, owner, receipt.id);
-
-    expect(kindsAndCampuses(await financeRows(pool, orgA.id))).toEqual([
-      ['payment.cancelled', lekki.id],
-      ['payment.recorded', lekki.id],
-    ]);
   });
 
   test('an adjustment writes a row when approved or declined, and none while it waits', async ({
@@ -289,10 +262,9 @@ test.describe('finance activity', () => {
     );
     expect(rows[1]?.text).toMatch(
       new RegExp(
-        String.raw`^Reduce a fee ${declining.number} for .+ was declined by .+\.$`
+        String.raw`^Reduce a fee ${declining.number} for .+ was declined: Not agreed with the owner$`
       )
     );
-    expect(rows[1]?.text).not.toContain('Not agreed with the owner');
   });
 
   test('a discount writes a row when approved or declined, and none while it waits', async ({
@@ -331,8 +303,9 @@ test.describe('finance activity', () => {
       ['discount.declined', lekki.id],
     ]);
     expect(rows[0]?.text).toMatch(/^Discount for .+ \(10%\) approved by .+\.$/);
-    expect(rows[1]?.text).toMatch(/^Discount for .+ was declined by .+\.$/);
-    expect(rows[1]?.text).not.toContain('Not agreed with the owner');
+    expect(rows[1]?.text).toMatch(
+      /^Discount for .+ was declined: Not agreed with the owner$/
+    );
   });
 
   test('a discount made straight through (approval off) writes one row', async ({
@@ -369,8 +342,10 @@ test.describe('finance activity', () => {
       lekkiOnly,
       noPermission,
       orgA,
+      orgB,
       studentLekki,
       studentIkeja,
+      studentB,
     },
   }) => {
     const account = await bankAccount(app, owner);
@@ -385,6 +360,13 @@ test.describe('finance activity', () => {
       allocations: [{ studentId: studentIkeja.id, amountMinor: IKEJA_SHARE }],
     });
     expect(await financeRows(pool, orgA.id)).toHaveLength(2);
+    const accountB = await bankAccount(app, ownerB);
+    await owes(app, ownerB, { studentId: studentB.id, amountMinor: OWED });
+    await recordCash(api, ownerB, {
+      accountId: accountB.id,
+      allocations: [{ studentId: studentB.id, amountMinor: LEKKI_SHARE }],
+    });
+    expect(await financeRows(pool, orgB.id)).toHaveLength(1);
 
     const ownerSees = await financeTexts(api, owner);
     const lekkiSees = await financeTexts(api, lekkiOnly);
@@ -394,10 +376,10 @@ test.describe('finance activity', () => {
     expect(lekkiSees[0]).toContain(lekkiReceipt.receiptNumber);
     expect(lekkiSees.join(' ')).not.toContain(ikejaReceipt.receiptNumber);
     expect(await financeTexts(api, noPermission)).toEqual([]);
-    expect(await financeTexts(api, ownerB)).toEqual([]);
+    expect(await financeTexts(api, ownerB)).toHaveLength(1);
   });
 
-  test('a custom role sees only the rows of the finance read it holds', async ({
+  test('either finance read opens every finance row, and no other permission does', async ({
     api,
     app,
     pool,
@@ -441,21 +423,18 @@ test.describe('finance activity', () => {
     const paymentOnly = await withPermissions(orgA, ['payment:read'], {
       campuses,
     });
-
-    const adjustmentOnly = await withPermissions(orgA, ['adjustment:read'], {
-      campuses,
-    });
+    const closed = await withPermissions(
+      orgA,
+      ['adjustment:read', 'feeLine:read', 'schoolAccount:read'],
+      { campuses }
+    );
     const invoiceSees = await financeTexts(api, invoiceOnly);
     const paymentSees = await financeTexts(api, paymentOnly);
 
-    expect(invoiceSees).toHaveLength(2);
-    expect(invoiceSees.every((text) => text.includes(' sent round '))).toBe(
-      true
-    );
-    expect(paymentSees).toHaveLength(1);
-    expect(paymentSees[0]).toContain(receipt.receiptNumber);
-    const adjustmentSees = await financeTexts(api, adjustmentOnly);
-    expect(adjustmentSees).toHaveLength(1);
-    expect(adjustmentSees[0]).toContain(credit.adjustment.number);
+    expect(invoiceSees).toHaveLength(4);
+    expect(paymentSees).toEqual(invoiceSees);
+    expect(invoiceSees.join(' ')).toContain(receipt.receiptNumber);
+    expect(invoiceSees.join(' ')).toContain(credit.adjustment.number);
+    expect(await financeTexts(api, closed)).toEqual([]);
   });
 });

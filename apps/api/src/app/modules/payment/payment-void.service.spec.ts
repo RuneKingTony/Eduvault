@@ -512,7 +512,7 @@ describe('PaymentVoidService.decline', () => {
         actorUserId: 'grace',
         subjectType: 'payment_void',
         subjectId: id,
-        text: 'Cancelling payment RCT-2026-00098 was declined by grace.',
+        text: 'Cancelling payment RCT-2026-00098 was declined: Not agreed',
         data: {
           voidId: id,
           paymentId: PAYMENT,

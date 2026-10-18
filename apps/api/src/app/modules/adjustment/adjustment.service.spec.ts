@@ -529,7 +529,7 @@ describe('AdjustmentService.decline', () => {
         actorUserId: 'grace',
         subjectType: 'adjustment',
         subjectId: adjustment.id,
-        text: 'Reduce a fee ADJ-2026-0001 for Ada Obi was declined by grace.',
+        text: 'Reduce a fee ADJ-2026-0001 for Ada Obi was declined: Not agreed',
         data: {
           adjustmentId: adjustment.id,
           number: 'ADJ-2026-0001',

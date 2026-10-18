@@ -243,7 +243,7 @@ describe('DiscountService.approve and decline', () => {
         actorUserId: 'grace',
         subjectType: 'student_discount',
         subjectId: discount.id,
-        text: 'Discount for Halima Bello was declined by grace.',
+        text: 'Discount for Halima Bello was declined: Not agreed',
         data: {
           discountId: discount.id,
           studentId: HALIMA,

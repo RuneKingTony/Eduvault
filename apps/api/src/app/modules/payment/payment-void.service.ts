@@ -172,6 +172,7 @@ export class PaymentVoidService {
             await this.recordDeclined(tx, ctx, {
               payment: found.payment,
               voidId: id,
+              reason: declineReason,
             });
           }
           return changed;
@@ -212,7 +213,7 @@ export class PaymentVoidService {
   private async recordDeclined(
     tx: PaymentVoidTx,
     ctx: OrgContext,
-    declined: { payment: VoidablePayment; voidId: string }
+    declined: { payment: VoidablePayment; voidId: string; reason: string }
   ): Promise<void> {
     await tx.activity.recordMany(
       paymentCancellationDeclinedActivity(
@@ -220,6 +221,7 @@ export class PaymentVoidService {
         declined.payment,
         {
           voidId: declined.voidId,
+          reason: declined.reason,
           allocations: await tx.allocationShares(declined.payment.id),
         }
       )

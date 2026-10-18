@@ -9,9 +9,6 @@ const access = (...permissions: Permission[]) => {
   return { pillars, foundationSubjects };
 };
 
-const finance = (...permissions: Permission[]) =>
-  activityAccess(toPermissionMap(permissions), 'viewer');
-
 describe('activityAccess', () => {
   it('shows platform rows only to a member with no permission', () => {
     expect(access()).toEqual({ pillars: ['platform'], foundationSubjects: [] });
@@ -49,44 +46,25 @@ describe('activityAccess', () => {
     });
   });
 
-  it('opens round rows with invoice:read alone', () => {
-    expect(finance('invoice:read').pillars).toEqual(['platform', 'finance']);
-    expect(finance('invoice:read').financeSubjects).toEqual(['billing_run']);
+  it('opens finance with invoice:read alone', () => {
+    expect(access('invoice:read')).toEqual({
+      pillars: ['platform', 'finance'],
+      foundationSubjects: [],
+    });
   });
 
-  it('opens payment and cancellation rows with payment:read alone', () => {
-    expect(finance('payment:read').pillars).toEqual(['platform', 'finance']);
-    expect(finance('payment:read').financeSubjects).toEqual([
-      'payment',
-      'payment_void',
-    ]);
+  it('opens finance with payment:read alone', () => {
+    expect(access('payment:read')).toEqual({
+      pillars: ['platform', 'finance'],
+      foundationSubjects: [],
+    });
   });
 
-  it('opens adjustment and discount rows with adjustment:read alone', () => {
-    expect(finance('adjustment:read').pillars).toEqual(['platform', 'finance']);
-    expect(finance('adjustment:read').financeSubjects).toEqual([
-      'adjustment',
-      'student_discount',
-    ]);
-  });
-
-  it('opens every finance subject with all three read permissions', () => {
-    expect(
-      finance('invoice:read', 'payment:read', 'adjustment:read').financeSubjects
-    ).toEqual([
-      'payment',
-      'payment_void',
-      'billing_run',
-      'adjustment',
-      'student_discount',
-    ]);
-  });
-
-  it('keeps finance closed for finance permissions that read none of its records', () => {
+  it('keeps finance closed for feeLine:read, schoolAccount:read and adjustment:read', () => {
     const closed = access(
       'feeLine:read',
       'schoolAccount:read',
-      'adjustment:create',
+      'adjustment:read',
       'student:read',
       'session:read',
       'member:read'

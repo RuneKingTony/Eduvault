@@ -743,7 +743,8 @@ export class KyselyBillingRepository extends BillingRepository {
           financeActor(
             {
               organizationId: input.scope.organizationId,
-              user: { id: input.userId, name: input.userName },
+              userId: input.userId,
+              name: input.userName,
             },
             currency
           ),

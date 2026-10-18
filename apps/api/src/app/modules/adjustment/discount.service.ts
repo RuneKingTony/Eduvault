@@ -74,43 +74,47 @@ export class DiscountService {
     }
     await this.checkFeeType(ctx.organizationId, input.ledgerAccountId);
     await this.checkTerms(ctx.organizationId, input);
-    const made = await this.discounts.withTx(scope, ctx.user.id, async (tx) => {
-      const student = await tx.student(input.studentId);
-      if (student === undefined) {
-        throw new NotFoundException(ADJUSTMENT_STUDENT_NOT_FOUND_MESSAGE);
+    const outcome = await this.discounts.withTx(
+      scope,
+      ctx.user.id,
+      async (tx) => {
+        const student = await tx.student(input.studentId);
+        if (student === undefined) {
+          throw new NotFoundException(ADJUSTMENT_STUDENT_NOT_FOUND_MESSAGE);
+        }
+        const autoApproved = !(await tx.approvalOn());
+        const id = await tx.insert({
+          organizationId: ctx.organizationId,
+          userId: ctx.user.id,
+          studentId: input.studentId,
+          kind: input.kind,
+          value: input.value,
+          ledgerAccountId: input.ledgerAccountId,
+          fromTermId: input.fromTermId,
+          toTermId: input.toTermId ?? null,
+          reason: input.reason,
+          autoApproved,
+        });
+        if (autoApproved) {
+          await tx.activity.recordMany(
+            discountApprovedActivity(
+              await financeActorIn(ctx, tx),
+              {
+                id,
+                kind: input.kind,
+                value: input.value,
+                ...studentFacts(student),
+              },
+              true
+            )
+          );
+        }
+        return { id, autoApproved };
       }
-      const autoApproved = !(await tx.approvalOn());
-      const created = await tx.insert({
-        organizationId: ctx.organizationId,
-        userId: ctx.user.id,
-        studentId: input.studentId,
-        kind: input.kind,
-        value: input.value,
-        ledgerAccountId: input.ledgerAccountId,
-        fromTermId: input.fromTermId,
-        toTermId: input.toTermId ?? null,
-        reason: input.reason,
-        autoApproved,
-      });
-      if (autoApproved) {
-        await tx.activity.recordMany(
-          discountApprovedActivity(
-            await financeActorIn(ctx, tx),
-            {
-              id: created,
-              kind: input.kind,
-              value: input.value,
-              ...studentFacts(student),
-            },
-            true
-          )
-        );
-      }
-      return { id: created, autoApproved };
-    });
+    );
     return {
-      discount: await this.item(scope, made.id),
-      autoApproved: made.autoApproved,
+      discount: await this.item(scope, outcome.id),
+      autoApproved: outcome.autoApproved,
     };
   }
 
@@ -159,10 +163,11 @@ export class DiscountService {
           const changed = await tx.reject(id, declineReason);
           if (changed) {
             await tx.activity.recordMany(
-              discountDeclinedActivity(await financeActorIn(ctx, tx), {
-                ...found,
-                ...studentFacts(found.student),
-              })
+              discountDeclinedActivity(
+                await financeActorIn(ctx, tx),
+                { ...found, ...studentFacts(found.student) },
+                declineReason
+              )
             );
           }
           return changed;

@@ -192,10 +192,11 @@ describe('paymentCancelledActivity', () => {
 });
 
 describe('paymentCancellationDeclinedActivity', () => {
-  it('records the decline without the reason', () => {
+  it('records the decline with its reason', () => {
     expect(
       paymentCancellationDeclinedActivity(actor, payment, {
         voidId: 'void-1',
+        reason: 'Parent confirmed it is right',
         allocations: [{ campusId: LEKKI, amountMinor: 2_000_000 }],
       })
     ).toEqual([
@@ -207,7 +208,7 @@ describe('paymentCancellationDeclinedActivity', () => {
         actorUserId: 'user-1',
         subjectType: 'payment_void',
         subjectId: 'void-1',
-        text: 'Cancelling payment RCT-2026-0012 was declined by Tunde Bakare.',
+        text: 'Cancelling payment RCT-2026-0012 was declined: Parent confirmed it is right',
         data: {
           voidId: 'void-1',
           paymentId: 'payment-1',
@@ -264,26 +265,28 @@ describe('adjustment activity', () => {
     });
   });
 
-  it('records a decline without the reason', () => {
-    expect(adjustmentDeclinedActivity(actor, adjustment)).toEqual([
-      {
-        organizationId: 'org-1',
-        campusId: LEKKI,
-        pillar: 'finance',
-        kind: 'adjustment.declined',
-        actorUserId: 'user-1',
-        subjectType: 'adjustment',
-        subjectId: 'adj-1',
-        text: 'Reduce a fee ADJ-2026-0003 for Bola Ade was declined by Tunde Bakare.',
-        data: {
-          adjustmentId: 'adj-1',
-          number: 'ADJ-2026-0003',
-          adjustmentKind: 'credit_note',
-          studentId: 'student-1',
-          amountMinor: 1_200_000,
+  it('records a decline with its reason', () => {
+    expect(adjustmentDeclinedActivity(actor, adjustment, 'Not agreed')).toEqual(
+      [
+        {
+          organizationId: 'org-1',
+          campusId: LEKKI,
+          pillar: 'finance',
+          kind: 'adjustment.declined',
+          actorUserId: 'user-1',
+          subjectType: 'adjustment',
+          subjectId: 'adj-1',
+          text: 'Reduce a fee ADJ-2026-0003 for Bola Ade was declined: Not agreed',
+          data: {
+            adjustmentId: 'adj-1',
+            number: 'ADJ-2026-0003',
+            adjustmentKind: 'credit_note',
+            studentId: 'student-1',
+            amountMinor: 1_200_000,
+          },
         },
-      },
-    ]);
+      ]
+    );
   });
 });
 
@@ -322,8 +325,8 @@ describe('discount activity', () => {
     });
   });
 
-  it('records a decline without the reason', () => {
-    expect(discountDeclinedActivity(actor, discount)).toEqual([
+  it('records a decline with its reason', () => {
+    expect(discountDeclinedActivity(actor, discount, 'Not agreed')).toEqual([
       {
         organizationId: 'org-1',
         campusId: IKEJA,
@@ -332,7 +335,7 @@ describe('discount activity', () => {
         actorUserId: 'user-1',
         subjectType: 'student_discount',
         subjectId: 'disc-1',
-        text: 'Discount for Chika Obi was declined by Tunde Bakare.',
+        text: 'Discount for Chika Obi was declined: Not agreed',
         data: {
           discountId: 'disc-1',
           studentId: 'student-2',

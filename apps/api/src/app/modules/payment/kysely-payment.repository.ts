@@ -219,7 +219,8 @@ export class KyselyPaymentRepository extends PaymentRepository {
         financeActor(
           {
             organizationId: input.organizationId,
-            user: { id: input.userId, name: input.userName },
+            userId: input.userId,
+            name: input.userName,
           },
           currency
         ),
