@@ -49,11 +49,23 @@ export interface StatementCardProps {
   emptyText: string;
 }
 
-function Tile({ label, value }: StatementCardTile) {
+function MoneyTile({ label, value }: StatementCardTile) {
   return (
     <div className="flex flex-col rounded-lg border p-3">
       <span className="text-xs text-muted-foreground">{label}</span>
       <span className="text-lg font-semibold tabular-nums">{value}</span>
+    </div>
+  );
+}
+
+export const MONEY_TILES_CLASS = 'grid gap-3 sm:grid-cols-2 lg:grid-cols-4';
+
+export function MoneyTiles({ tiles }: { tiles: readonly StatementCardTile[] }) {
+  return (
+    <div className={MONEY_TILES_CLASS}>
+      {tiles.map((tile) => (
+        <MoneyTile key={tile.label} {...tile} />
+      ))}
     </div>
   );
 }
@@ -178,11 +190,7 @@ export function StatementCard({
       </CardHeader>
       <CardContent className="flex flex-col gap-4 px-0">
         <div className="flex flex-col gap-4 px-6">
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {tiles.map((tile) => (
-              <Tile key={tile.label} {...tile} />
-            ))}
-          </div>
+          <MoneyTiles tiles={tiles} />
           {callout === undefined ? null : <Callout callout={callout} />}
         </div>
         {rows.length === 0 ? (

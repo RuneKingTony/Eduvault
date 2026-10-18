@@ -14,7 +14,8 @@ import {
   type StudentDetail,
   type StudentTab,
 } from '@eduvault/api-contract';
-import { Can, useCan } from '@eduvault/auth-client';
+import { Can, useCanAny } from '@eduvault/auth-client';
+import { FINANCE_READ_GATE, type Gate } from '@eduvault/policy';
 import { fmtDate } from '@eduvault/shared';
 import {
   Badge,
@@ -47,9 +48,12 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
 } from '@eduvault/ui';
 import { useApi } from '../api';
-import { OptionalFeesCard } from '../components/fees/optional-fees-card';
 import { AddGuardianButton, GuardianLines } from '../components/guardian-lines';
 import type { GuardianAction } from '../components/guardian-actions';
 import { GuardianDialogs } from '../components/guardian-dialogs';
@@ -57,6 +61,7 @@ import { LoginsDialog } from '../components/logins-dialog';
 import { useBackInSchool } from '../components/student-actions';
 import { LifecycleCallout } from '../components/student-callout';
 import { StatusBadges, nameOf } from '../components/student-bits';
+import { StudentFeesTab } from '../components/student-fees-tab';
 import {
   StudentLifecycleDialog,
   type LifecycleDialog,
@@ -74,10 +79,19 @@ interface StudentPageProps {
   schoolName: string;
   logins?: LoginCredential[];
   initialDialog?: LifecycleDialog;
+  tab?: PageTab;
+  onTabChange: (tab: PageTab | undefined) => void;
   onDialogClosed?: () => void;
   onOpenTab: (tab: StudentTab) => void;
   onBack: () => void;
 }
+
+type PageTab = 'fees';
+
+const FEES_TAB_GATE = [
+  ...FINANCE_READ_GATE,
+  'feeLine:read',
+] as const satisfies Gate;
 
 interface Issued {
   logins: LoginCredential[];
@@ -386,6 +400,8 @@ interface BodyProps {
   student: StudentDetail;
   schoolName: string;
   initialDialog?: LifecycleDialog;
+  tab?: PageTab;
+  onTabChange: (tab: PageTab | undefined) => void;
   onDialogClosed?: () => void;
   onOpenTab: (tab: StudentTab) => void;
   onBack: () => void;
@@ -442,11 +458,64 @@ function DetailDialog({
   return null;
 }
 
+function Overview({
+  student,
+  onDetailAction,
+  onGuardianAction,
+}: {
+  student: StudentDetail;
+  onDetailAction: (action: DetailAction) => void;
+  onGuardianAction: (action: GuardianAction) => void;
+}) {
+  return (
+    <div className="grid gap-4 md:grid-cols-2">
+      <ProfileCard student={student} onAction={onDetailAction} />
+      <Can permission="guardian:read">
+        <GuardiansCard student={student} onAction={onGuardianAction} />
+      </Can>
+      <HistoryCard student={student} />
+    </div>
+  );
+}
+
+function StudentTabs({
+  student,
+  tab,
+  onTabChange,
+  overview,
+}: {
+  student: StudentDetail;
+  tab?: PageTab;
+  onTabChange: (tab: PageTab | undefined) => void;
+  overview: ReactNode;
+}) {
+  const canSeeFees = useCanAny(FEES_TAB_GATE);
+  if (!canSeeFees) {
+    return <>{overview}</>;
+  }
+  return (
+    <Tabs
+      value={tab ?? 'overview'}
+      onValueChange={(next) => {
+        onTabChange(next === 'fees' ? 'fees' : undefined);
+      }}
+    >
+      <TabsList>
+        <TabsTrigger value="overview">Overview</TabsTrigger>
+        <TabsTrigger value="fees">Fees</TabsTrigger>
+      </TabsList>
+      <TabsContent value="overview">{overview}</TabsContent>
+      <TabsContent value="fees">
+        <StudentFeesTab studentId={student.id} firstName={student.firstName} />
+      </TabsContent>
+    </Tabs>
+  );
+}
+
 function StudentBody(props: BodyProps) {
   const { student } = props;
   const [action, setAction] = useState<GuardianAction | null>(null);
   const [detailAction, setDetailAction] = useState<DetailAction | null>(null);
-  const canReadGuardians = useCan('guardian', 'read');
   const lifecycle = useLifecycle(props);
   return (
     <section className="flex flex-col gap-4">
@@ -463,21 +532,18 @@ function StudentBody(props: BodyProps) {
           lifecycle.open('leave');
         }}
       />
-      <div className="grid gap-4 md:grid-cols-2">
-        <ProfileCard student={student} onAction={setDetailAction} />
-        {canReadGuardians ? (
-          <Can permission="guardian:read">
-            <GuardiansCard student={student} onAction={setAction} />
-          </Can>
-        ) : null}
-        <Can permission="feeLine:read">
-          <OptionalFeesCard
-            studentId={student.id}
-            firstName={student.firstName}
+      <StudentTabs
+        student={student}
+        tab={props.tab}
+        onTabChange={props.onTabChange}
+        overview={
+          <Overview
+            student={student}
+            onDetailAction={setDetailAction}
+            onGuardianAction={setAction}
           />
-        </Can>
-        <HistoryCard student={student} />
-      </div>
+        }
+      />
       <GuardianDialogs
         action={action}
         schoolName={props.schoolName}
@@ -541,6 +607,8 @@ export function StudentPage(props: StudentPageProps) {
         student={student.data}
         schoolName={props.schoolName}
         initialDialog={props.initialDialog}
+        tab={props.tab}
+        onTabChange={props.onTabChange}
         onDialogClosed={props.onDialogClosed}
         onOpenTab={props.onOpenTab}
         onBack={props.onBack}

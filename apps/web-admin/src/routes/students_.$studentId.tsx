@@ -52,7 +52,7 @@ function StudentRoute() {
 function StudentRouteBody({ studentId }: { studentId: string }) {
   const navigate = Route.useNavigate();
   const router = useRouter();
-  const { dialog } = Route.useSearch();
+  const { dialog, tab: pageTab } = Route.useSearch();
   const state = useLocation({ select: (location) => location.state });
   const { schoolName } = useSchool(useAuthClient());
   const [logins] = useState(() => loginsOf(state));
@@ -69,8 +69,18 @@ function StudentRouteBody({ studentId }: { studentId: string }) {
       schoolName={schoolName}
       logins={logins ?? undefined}
       initialDialog={dialog}
+      tab={pageTab}
+      onTabChange={(next) => {
+        void navigate({
+          search: (previous) => ({ ...previous, tab: next }),
+          replace: true,
+        });
+      }}
       onDialogClosed={() => {
-        void navigate({ search: {}, replace: true });
+        void navigate({
+          search: (previous) => ({ ...previous, dialog: undefined }),
+          replace: true,
+        });
       }}
       onOpenTab={(tab) => {
         void navigate({ to: '/students', search: { tab } });

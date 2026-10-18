@@ -1,4 +1,9 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  useMutation,
+  useQueryClient,
+  type UseQueryResult,
+} from '@tanstack/react-query';
+import type { FeeOption } from '@eduvault/api-contract';
 import { useCan } from '@eduvault/auth-client';
 import {
   Card,
@@ -13,7 +18,7 @@ import {
   toast,
 } from '@eduvault/ui';
 import { useApi } from '../../api';
-import { feeOptionsQueryOptions, invalidateFees } from '../../queries';
+import { invalidateFees } from '../../queries';
 import { optionToast } from './fee-text';
 
 function useToggle(studentId: string, firstName: string) {
@@ -42,11 +47,12 @@ function useToggle(studentId: string, firstName: string) {
 export function OptionalFeesCard({
   studentId,
   firstName,
+  options,
 }: {
   studentId: string;
   firstName: string;
+  options: UseQueryResult<FeeOption[]>;
 }) {
-  const options = useQuery(feeOptionsQueryOptions(useApi(), studentId));
   const canChange = useCan('feeLine', 'update');
   const toggle = useToggle(studentId, firstName);
   if (options.data?.length === 0) {

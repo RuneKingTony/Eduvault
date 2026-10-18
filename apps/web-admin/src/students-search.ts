@@ -31,11 +31,15 @@ export function parseStudentsSearch(
 }
 
 interface StudentSearch {
+  tab?: 'fees';
   dialog?: 'leave';
 }
 
 export function parseStudentSearch(
   search: Record<string, unknown>
 ): StudentSearch {
-  return { dialog: search['dialog'] === 'leave' ? 'leave' : undefined };
+  return {
+    tab: search['tab'] === 'fees' ? 'fees' : undefined,
+    dialog: search['dialog'] === 'leave' ? 'leave' : undefined,
+  };
 }
