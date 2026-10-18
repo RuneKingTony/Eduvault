@@ -234,6 +234,18 @@ describe('LifecycleService.leave', () => {
     );
   });
 
+  it('writes the leaving to the foundation pillar with no money in it', async () => {
+    const { service, tx } = setup();
+    await service.leave(ctx, 'st-1', input);
+    const activity = tx.activities[0];
+    expect(activity?.pillar).toBe('foundation');
+    expect(activity?.data).toEqual({
+      reason: 'relocated',
+      lastDay: '2026-10-02',
+    });
+    expect(activity?.text).not.toMatch(/[\d₦$]|NGN|Balance|Who owes/);
+  });
+
   it('refuses a last day after today with 400', async () => {
     const { service, tx } = setup();
     await expect(
