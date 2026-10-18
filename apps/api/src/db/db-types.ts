@@ -281,6 +281,8 @@ export interface Invoice {
   kind: string;
   number: string | null;
   organization_id: string;
+  reference: string | null;
+  request_hash: string | null;
   status: Generated<string>;
   student_id: string;
   term_id: string;

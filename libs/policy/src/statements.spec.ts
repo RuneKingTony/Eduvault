@@ -58,6 +58,7 @@ describe('statements', () => {
     expect(ALL_PERMISSIONS).toEqual(
       expect.arrayContaining([
         'invoice:bill',
+        'invoice:charge',
         'invoice:read',
         'invoice:readOwn',
       ])
@@ -65,6 +66,9 @@ describe('statements', () => {
     expect(SENSITIVE.some((p) => p.startsWith('invoice'))).toBe(false);
     expect(permLabel('invoice:bill')).toBe('Charges: bill');
     expect(PERM_HELP['invoice:bill']).toBeDefined();
+    expect(PERM_HELP['invoice:charge']).toBe(
+      "Adds one-off charges to a student's account, on the campuses they see."
+    );
     expect(PERM_HELP['invoice:read']).toBeDefined();
     expect(PERM_HELP['invoice:readOwn']).toBeDefined();
   });

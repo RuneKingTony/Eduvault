@@ -11,6 +11,7 @@ export interface InvoicesSearch {
   kind?: InvoiceKind;
   status?: InvoiceStatus;
   page?: number;
+  new?: 1;
 }
 
 export function parseInvoicesSearch(
@@ -21,5 +22,6 @@ export function parseInvoicesSearch(
     kind: oneOf(INVOICE_KINDS, search['kind']),
     status: oneOf(INVOICE_STATUSES, search['status']),
     page: pageOf(search['page']),
+    new: textOf(search['new']) === '1' ? 1 : undefined,
   };
 }

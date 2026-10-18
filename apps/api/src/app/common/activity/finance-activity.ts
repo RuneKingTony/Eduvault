@@ -18,7 +18,8 @@ type FinanceSubject =
   | 'fee_line'
   | 'term'
   | 'store_sale'
-  | 'stock_count';
+  | 'stock_count'
+  | 'invoice';
 
 export interface FinanceActor {
   organizationId: string;
@@ -71,6 +72,15 @@ export interface StoreSaleFacts {
   campusId: string;
   campusName: string;
   itemCount: number;
+  totalMinor: number;
+}
+
+export interface OneOffChargeFacts {
+  id: string;
+  number: string;
+  studentId: string;
+  studentName: string;
+  campusId: string;
   totalMinor: number;
 }
 
@@ -255,6 +265,24 @@ export function storeSaleRecordedActivity(
     }),
   ];
 }
+
+export const oneOffChargeActivity = (
+  actor: FinanceActor,
+  charge: OneOffChargeFacts
+): ActivityInput[] => [
+  finance(actor, {
+    campusId: charge.campusId,
+    kind: 'charge.adhoc',
+    subject: { type: 'invoice', id: charge.id },
+    text: `Charged ${charge.studentName} ${money(charge.totalMinor, actor.currency)} (${charge.number})`,
+    data: {
+      invoiceId: charge.id,
+      number: charge.number,
+      studentId: charge.studentId,
+      amountMinor: charge.totalMinor,
+    },
+  }),
+];
 
 const writeOffValue = (actor: FinanceActor, netMinor: number): string => {
   if (netMinor === 0) {

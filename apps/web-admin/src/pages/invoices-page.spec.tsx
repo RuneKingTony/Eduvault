@@ -1,6 +1,8 @@
 import { fireEvent, screen, within } from '@testing-library/react';
 import { ApiError } from '@eduvault/api-contract';
 import { billingApi, invoiceSummary, renderBilling } from '../test-billing';
+import { currentCalendar } from '../test-calendar';
+import { studentList, studentRow } from '../test-students';
 import { ownerAccess, starterAccess } from '../test-utils';
 import { InvoicesPage } from './invoices-page';
 
@@ -152,5 +154,68 @@ describe('InvoicesPage', () => {
     setup(billingApi(), {}, starterAccess('administrator'));
     const tabs = await screen.findByRole('navigation', { name: 'Fees' });
     expect(within(tabs).getByRole('link', { name: 'Charges' })).toBeVisible();
+  });
+
+  describe('New charge', () => {
+    it('describes the page with term fees, store purchases and one-off charges', async () => {
+      setup();
+      expect(
+        await screen.findByText(
+          'Everything students have been charged: term fees, store purchases and one-off charges.'
+        )
+      ).toBeVisible();
+    });
+
+    it('is shown to a member who can charge and puts new=1 in the address', async () => {
+      const { onSearchChange } = setup(billingApi(), { q: 'ada' });
+      fireEvent.click(
+        await screen.findByRole('button', { name: 'New charge' })
+      );
+      expect(onSearchChange).toHaveBeenLastCalledWith({ q: 'ada', new: 1 });
+    });
+
+    it('is shown to the bursar', async () => {
+      setup(billingApi(), {}, starterAccess('bursar'));
+      expect(
+        await screen.findByRole('button', { name: 'New charge' })
+      ).toBeVisible();
+    });
+
+    it.each(['administrator', 'principal'])(
+      'is hidden from the %s, who only read charges',
+      async (slug) => {
+        setup(billingApi(), {}, starterAccess(slug));
+        await screen.findByText('Ada Okeke');
+        expect(
+          screen.queryByRole('button', { name: 'New charge' })
+        ).not.toBeInTheDocument();
+      }
+    );
+
+    it('does not open the sheet for a reader, even with new=1 in the address', async () => {
+      setup(billingApi(), { new: 1 }, starterAccess('principal'));
+      await screen.findByText('Ada Okeke');
+      expect(
+        screen.queryByRole('heading', { name: 'New charge' })
+      ).not.toBeInTheDocument();
+    });
+
+    it('opens the sheet when the address has new=1', async () => {
+      const api = {
+        ...billingApi(),
+        calendar: { current: vi.fn().mockResolvedValue(currentCalendar()) },
+        students: {
+          list: vi.fn().mockResolvedValue(studentList([studentRow()])),
+          get: vi.fn().mockResolvedValue(studentRow()),
+        },
+      };
+      setup(api, { new: 1 });
+      expect(
+        await screen.findByRole('heading', { name: 'New charge' })
+      ).toBeVisible();
+      expect(await screen.findByLabelText('Term')).toHaveValue(
+        'First term, 2026/2027'
+      );
+    });
   });
 });

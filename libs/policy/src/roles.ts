@@ -91,6 +91,7 @@ export const STARTER_ROLES: readonly StarterRole[] = [
       'feeLine:update',
       'feeLine:retire',
       'invoice:bill',
+      'invoice:charge',
       'invoice:read',
       'payment:record',
       'payment:read',

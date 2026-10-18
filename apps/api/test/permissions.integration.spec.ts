@@ -366,7 +366,7 @@ test.describe('/me/permissions', () => {
       guardian: ['read'],
       enrollment: ['read'],
       feeLine: ['create', 'read', 'update', 'retire'],
-      invoice: ['bill', 'read'],
+      invoice: ['bill', 'charge', 'read'],
       payment: ['record', 'read', 'void'],
       adjustment: ['read', 'create'],
       moneyAccount: ['read'],

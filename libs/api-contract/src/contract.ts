@@ -142,6 +142,8 @@ import {
   updateGuardianLinkSchema,
 } from './guardians';
 import {
+  createOneOffChargeSchema,
+  createdChargeSchema,
   invoiceListQuerySchema,
   invoiceListSchema,
   invoiceSchema,
@@ -1006,6 +1008,12 @@ export const contract = defineContract({
       path: '/invoices/:id',
       params: idParamsSchema,
       response: invoiceSchema,
+    }),
+    create: defineRoute({
+      method: 'POST',
+      path: '/invoices',
+      body: createOneOffChargeSchema,
+      response: createdChargeSchema,
     }),
   },
   payments: {

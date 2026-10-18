@@ -4,14 +4,40 @@ import {
   FINANCE_PAGE_SIZE_MAX,
   journalLineSchema,
 } from './finance';
-import { currencySchema, idSchema } from './schemas';
+import { currencySchema, datedReference, idSchema } from './schemas';
 
 export const INVOICE_KINDS = ['term', 'adhoc', 'store'] as const;
 export const INVOICE_STATUSES = ['draft', 'issued', 'cancelled'] as const;
 export const INVOICE_SEARCH_MAX = 120;
 
+export const INVOICE_CHARGE_REFERENCE_MAX = 80;
+export const INVOICE_CHARGE_LINES_MAX = 20;
+export const INVOICE_CHARGE_DESCRIPTION_MAX = 300;
+export const INVOICE_CHARGE_AMOUNT_MAX_MINOR = 1_000_000_000_000;
+
 export const INVOICE_NOT_FOUND_MESSAGE = 'Charge not found';
 export const INVOICE_STUDENT_NOT_FOUND_MESSAGE = 'Student not found';
+export const INVOICE_STUDENT_NOT_ON_ROLL_MESSAGE =
+  'Only students on the roll can be charged.';
+export const INVOICE_NO_TERM_MESSAGE =
+  'There is no current term. Set one before adding a charge.';
+export const INVOICE_REFERENCE_TAKEN_MESSAGE =
+  'That reference is already used by another record.';
+export const INVOICE_CHARGE_REPLAYED_MESSAGE = 'This charge was already added.';
+export const INVOICE_CHARGE_REFERENCE_REQUIRED_MESSAGE = 'Enter a reference.';
+export const INVOICE_CHARGE_DESCRIPTION_REQUIRED_MESSAGE =
+  'Describe the charge.';
+export const INVOICE_CHARGE_DESCRIPTION_MAX_MESSAGE = `Keep the description under ${INVOICE_CHARGE_DESCRIPTION_MAX} characters.`;
+export const INVOICE_CHARGE_AMOUNT_MESSAGE = 'Enter an amount above zero.';
+export const INVOICE_CHARGE_LINES_REQUIRED_MESSAGE = 'Add at least one line.';
+export const INVOICE_CHARGE_LINES_MAX_MESSAGE = `A charge has at most ${INVOICE_CHARGE_LINES_MAX} lines.`;
+export const invoiceReferenceUsedMessage = (
+  reference: string,
+  number: string
+): string => `Reference ${reference} is already used by ${number}.`;
+
+export const oneOffChargeReference = (date: string, uuid: string): string =>
+  datedReference('ONEOFF', date, uuid);
 
 export const invoiceKindSchema = z.enum(INVOICE_KINDS);
 export type InvoiceKind = z.infer<typeof invoiceKindSchema>;
@@ -131,3 +157,40 @@ export const invoiceSchema = z.object({
     .nullable(),
 });
 export type Invoice = z.infer<typeof invoiceSchema>;
+
+const chargeText = (max: number, required: string, tooLong: string) =>
+  z.string({ error: required }).trim().min(1, required).max(max, tooLong);
+
+export const oneOffChargeLineSchema = z.object({
+  feeTypeId: idSchema,
+  description: chargeText(
+    INVOICE_CHARGE_DESCRIPTION_MAX,
+    INVOICE_CHARGE_DESCRIPTION_REQUIRED_MESSAGE,
+    INVOICE_CHARGE_DESCRIPTION_MAX_MESSAGE
+  ),
+  amountMinor: z
+    .number({ error: INVOICE_CHARGE_AMOUNT_MESSAGE })
+    .int(INVOICE_CHARGE_AMOUNT_MESSAGE)
+    .positive(INVOICE_CHARGE_AMOUNT_MESSAGE)
+    .max(INVOICE_CHARGE_AMOUNT_MAX_MINOR, INVOICE_CHARGE_AMOUNT_MESSAGE),
+});
+export type OneOffChargeLine = z.infer<typeof oneOffChargeLineSchema>;
+
+export const createOneOffChargeSchema = z.object({
+  studentId: idSchema,
+  reference: chargeText(
+    INVOICE_CHARGE_REFERENCE_MAX,
+    INVOICE_CHARGE_REFERENCE_REQUIRED_MESSAGE,
+    `Use ${INVOICE_CHARGE_REFERENCE_MAX} characters or fewer.`
+  ),
+  lines: z
+    .array(oneOffChargeLineSchema)
+    .min(1, INVOICE_CHARGE_LINES_REQUIRED_MESSAGE)
+    .max(INVOICE_CHARGE_LINES_MAX, INVOICE_CHARGE_LINES_MAX_MESSAGE),
+});
+export type CreateOneOffCharge = z.infer<typeof createOneOffChargeSchema>;
+
+export const createdChargeSchema = invoiceSchema.extend({
+  replayed: z.boolean(),
+});
+export type CreatedCharge = z.infer<typeof createdChargeSchema>;

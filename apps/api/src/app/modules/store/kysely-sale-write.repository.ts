@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { sql, type Kysely } from 'kysely';
+import type { Kysely } from 'kysely';
 import {
   FEES_RECEIVABLE_SYSTEM_KEY,
   STORE_COST_SYSTEM_KEY,
@@ -22,6 +22,11 @@ import {
   formatDocumentNumber,
 } from '../../common/documents';
 import {
+  ChargeAlreadyPosted,
+  insertDraftCharge,
+  sendCharge,
+} from '../../common/fees';
+import {
   schoolCurrency,
   systemAccountId,
   type LedgerPoster,
@@ -32,7 +37,7 @@ import { findSaleStudent } from './kysely-sale-read.repository';
 import { lockStock } from './kysely-stock-lock.repository';
 import { priceSale, type PricedLine } from './sale-pricing';
 import {
-  saleChargePosting,
+  saleChargeMemo,
   saleCostPosting,
   saleLineDescription,
 } from './sale-posting';
@@ -66,6 +71,9 @@ interface SaleRun {
   saleId: string;
   invoiceId: string;
   saleNumber: string;
+}
+
+interface ChargedSale extends SaleRun {
   chargeNumber: string;
 }
 
@@ -112,87 +120,61 @@ async function postOnce(
   return entry.id;
 }
 
-async function insertDraftCharge(
-  trx: Kysely<DB>,
-  run: SaleRun,
-  salesAccountId: string
-): Promise<void> {
-  const { input, invoiceId } = run;
-  await trx
-    .insertInto('invoice')
-    .values({
-      id: invoiceId,
-      organization_id: input.organizationId,
-      student_id: input.student.id,
-      term_id: input.termId,
-      campus_id: input.store.campusId,
-      kind: 'store',
-      status: 'draft',
-      created_by: input.userId,
-    })
-    .execute();
-  await trx
-    .insertInto('invoice_line')
-    .values(
-      run.lines.map((line) => ({
-        organization_id: input.organizationId,
-        invoice_id: invoiceId,
-        ledger_account_id: salesAccountId,
-        description: saleLineDescription(line.displayName, line.quantity),
-        amount_minor: String(line.amountMinor),
-      }))
-    )
-    .execute();
-}
-
 async function issueCharge(
   trx: Kysely<DB>,
   poster: LedgerPoster,
   run: SaleRun
-): Promise<void> {
+): Promise<string> {
   const { input } = run;
   const { organizationId } = input;
   const [receivableId, salesAccountId] = await Promise.all([
     systemAccountId(trx, organizationId, FEES_RECEIVABLE_SYSTEM_KEY),
     systemAccountId(trx, organizationId, STORE_SALES_SYSTEM_KEY),
   ]);
-  await insertDraftCharge(trx, run, salesAccountId);
-  const entryId = await postOnce(
-    trx,
-    poster,
-    saleChargePosting({
-      organizationId,
+  await insertDraftCharge(trx, {
+    id: run.invoiceId,
+    organizationId,
+    studentId: input.student.id,
+    termId: input.termId,
+    campusId: input.store.campusId,
+    kind: 'store',
+    createdBy: input.userId,
+    lines: run.lines.map((line) => ({
+      ledgerAccountId: salesAccountId,
+      description: saleLineDescription(line.displayName, line.quantity),
+      amountMinor: line.amountMinor,
+    })),
+  });
+  try {
+    const sent = await sendCharge(trx, poster, {
       invoiceId: run.invoiceId,
-      chargeNumber: run.chargeNumber,
-      effectiveOn: input.today,
-      postedBy: input.userId,
-      campusId: input.store.campusId,
+      organizationId,
       studentId: input.student.id,
-      studentName: input.student.name,
+      campusId: input.store.campusId,
       receivableId,
-      salesAccountId,
-      lines: run.lines,
-    })
-  );
-  await trx
-    .updateTable('invoice')
-    .set({
-      status: 'issued',
-      number: run.chargeNumber,
-      issued_at: sql<Date>`now()`,
-      issued_by: input.userId,
-      journal_entry_id: entryId,
-    })
-    .where('id', '=', run.invoiceId)
-    .where('organization_id', '=', organizationId)
-    .where('status', '=', 'draft')
-    .execute();
+      journalKind: 'store',
+      memo: saleChargeMemo(input.student.name),
+      lines: run.lines.map((line) => ({
+        ledgerAccountId: salesAccountId,
+        amountMinor: line.amountMinor,
+      })),
+      today: input.today,
+      actorId: input.userId,
+      year: input.year,
+    });
+    return sent.number;
+  } catch (error) {
+    if (error instanceof ChargeAlreadyPosted) {
+      throw new SaleAbort({ status: 'posting_clash' });
+    }
+    throw error;
+  }
 }
 
 async function postCost(
   trx: Kysely<DB>,
   poster: LedgerPoster,
-  run: SaleRun
+  run: ChargedSale
 ): Promise<void> {
   const { input } = run;
   const { organizationId } = input;
@@ -351,25 +333,14 @@ function saleFacts(run: SaleRun, payment: TakenPayment): StoreSaleFacts {
   };
 }
 
-async function numbersFor(
-  trx: Kysely<DB>,
-  input: NewSale
-): Promise<Pick<SaleRun, 'saleNumber' | 'chargeNumber'>> {
+async function saleNumberFor(trx: Kysely<DB>, input: NewSale): Promise<string> {
   const { organizationId, year } = input;
   const issued = await allocateDocumentNumber(trx, {
     organizationId,
     kind: 'store_sale',
     year,
   });
-  const charged = await allocateDocumentNumber(trx, {
-    organizationId,
-    kind: 'invoice',
-    year,
-  });
-  return {
-    saleNumber: formatDocumentNumber('store_sale', year, issued),
-    chargeNumber: formatDocumentNumber('invoice', year, charged),
-  };
+  return formatDocumentNumber('store_sale', year, issued);
 }
 
 async function stillSellable(
@@ -431,10 +402,10 @@ async function recordIn(
     costMinor: pricing.costMinor,
     saleId: randomUUID(),
     invoiceId: randomUUID(),
-    ...(await numbersFor(trx, input)),
+    saleNumber: await saleNumberFor(trx, input),
   };
-  await issueCharge(trx, poster, run);
-  await postCost(trx, poster, run);
+  const chargeNumber = await issueCharge(trx, poster, run);
+  await postCost(trx, poster, { ...run, chargeNumber });
   const payment = await takePayment(trx, poster, run);
   await insertRows(trx, run, payment.id);
   await activity.recordMany(

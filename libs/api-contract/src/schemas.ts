@@ -19,6 +19,18 @@ import {
 import { z } from 'zod';
 
 export const idSchema = z.uuid();
+
+const REFERENCE_SUFFIX_LENGTH = 8;
+
+export const datedReference = (
+  prefix: string,
+  date: string,
+  uuid: string
+): string =>
+  `${prefix}-${date.replaceAll('-', '')}-${uuid
+    .replaceAll('-', '')
+    .slice(0, REFERENCE_SUFFIX_LENGTH)
+    .toUpperCase()}`;
 export const memberRefSchema = z.object({
   id: idSchema.nullable(),
   name: z.string(),

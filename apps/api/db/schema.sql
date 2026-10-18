@@ -117,6 +117,8 @@ BEGIN
     OR NEW.campus_id IS DISTINCT FROM OLD.campus_id
     OR NEW.billing_run_id IS DISTINCT FROM OLD.billing_run_id
     OR NEW.kind IS DISTINCT FROM OLD.kind
+    OR NEW.reference IS DISTINCT FROM OLD.reference
+    OR NEW.request_hash IS DISTINCT FROM OLD.request_hash
     OR NEW.created_by IS DISTINCT FROM OLD.created_by
     OR NEW.created_at IS DISTINCT FROM OLD.created_at
   THEN
@@ -907,9 +909,13 @@ CREATE TABLE public.invoice (
     issued_at timestamp with time zone,
     issued_by text,
     journal_entry_id uuid,
+    reference text,
+    request_hash text,
+    CONSTRAINT invoice_adhoc_reference CHECK (((kind = 'adhoc'::text) = ((reference IS NOT NULL) AND (request_hash IS NOT NULL)))),
     CONSTRAINT invoice_issued_columns CHECK ((((status = 'issued'::text) AND (number IS NOT NULL) AND (issued_at IS NOT NULL) AND (journal_entry_id IS NOT NULL)) OR ((status <> 'issued'::text) AND (number IS NULL) AND (issued_at IS NULL) AND (journal_entry_id IS NULL)))),
     CONSTRAINT invoice_kind_check CHECK ((kind = ANY (ARRAY['term'::text, 'store'::text, 'adhoc'::text]))),
     CONSTRAINT invoice_number_check CHECK ((char_length(btrim(number)) > 0)),
+    CONSTRAINT invoice_reference_check CHECK (((char_length(btrim(reference)) >= 1) AND (char_length(btrim(reference)) <= 80))),
     CONSTRAINT invoice_status_check CHECK ((status = ANY (ARRAY['draft'::text, 'issued'::text, 'cancelled'::text]))),
     CONSTRAINT invoice_term_in_round CHECK (((kind <> 'term'::text) OR (billing_run_id IS NOT NULL)))
 );
@@ -2979,6 +2985,12 @@ CREATE INDEX invoice_line_fee_line_idx ON public.invoice_line USING btree (organ
 CREATE INDEX invoice_line_invoice_idx ON public.invoice_line USING btree (organization_id, invoice_id);
 
 --
+-- Name: invoice_reference_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX invoice_reference_key ON public.invoice USING btree (organization_id, reference) WHERE (reference IS NOT NULL);
+
+--
 -- Name: invoice_run_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4985,4 +4997,5 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20261017100000'),
     ('20261017110000'),
     ('20261017110100'),
-    ('20261018090000');
+    ('20261018090000'),
+    ('20261018100000');

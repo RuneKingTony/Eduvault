@@ -1,6 +1,6 @@
 import { assertBalancedLines } from '../../common/ledger';
 import {
-  saleChargePosting,
+  saleChargeMemo,
   saleCostPosting,
   saleCostReference,
   saleLineDescription,
@@ -15,39 +15,9 @@ const shared = {
   campusId: 'lekki',
 };
 
-describe('saleChargePosting', () => {
-  const posting = saleChargePosting({
-    ...shared,
-    studentId: 'ada',
-    studentName: 'Ada Obi',
-    receivableId: 'owed-1100',
-    salesAccountId: 'sales-4500',
-    lines: [{ amountMinor: 650_000 }, { amountMinor: 450_000 }],
-  });
-
-  it('posts a store entry under the charge number, owed by the student', () => {
-    expect(posting.kind).toBe('store');
-    expect(posting.reference).toBe('CHG-2026-00007');
-    expect(posting.sourceId).toBe('invoice');
-    expect(posting.memo).toBe('Store purchase · Ada Obi');
-  });
-
-  it('debits what the student owes and credits store sales, balanced', () => {
-    assertBalancedLines(posting.lines);
-    const debits = posting.lines.filter((line) => line.debitMinor > 0);
-    expect(debits.map((line) => line.ledgerAccountId)).toEqual([
-      'owed-1100',
-      'owed-1100',
-    ]);
-    expect(
-      posting.lines
-        .filter((line) => line.creditMinor > 0)
-        .every((line) => line.ledgerAccountId === 'sales-4500')
-    ).toBe(true);
-  });
-
-  it('puts the store’s campus on every line', () => {
-    expect(posting.lines.every((line) => line.campusId === 'lekki')).toBe(true);
+describe('saleChargeMemo', () => {
+  it('names the student on the charge’s journal entry', () => {
+    expect(saleChargeMemo('Ada Obi')).toBe('Store purchase · Ada Obi');
   });
 });
 

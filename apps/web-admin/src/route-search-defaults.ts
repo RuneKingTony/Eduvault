@@ -27,6 +27,7 @@ export const SEARCH_DEFAULTS = {
     kind: undefined,
     status: undefined,
     page: undefined,
+    new: undefined,
   },
   '/finance/payments': {
     q: undefined,

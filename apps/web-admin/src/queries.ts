@@ -749,6 +749,17 @@ const PAYMENTS_KEY = ['payments'] as const;
 const BALANCES_KEY = ['balances'] as const;
 const STATEMENTS_KEY = ['statements'] as const;
 
+export async function invalidateCharges(
+  queryClient: QueryClient
+): Promise<void> {
+  await Promise.all([
+    invalidateBilling(queryClient),
+    queryClient.invalidateQueries({ queryKey: BALANCES_KEY }),
+    queryClient.invalidateQueries({ queryKey: STATEMENTS_KEY }),
+    queryClient.invalidateQueries({ queryKey: [...DASHBOARD_KEY, 'money'] }),
+  ]);
+}
+
 interface PaymentFilters {
   q?: string;
   status?: PaymentStatus;
