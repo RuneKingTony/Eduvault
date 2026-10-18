@@ -123,17 +123,32 @@ function sumByCampus(rows: readonly CampusAmount[]): CampusTotal[] {
 const verdict = (autoApproved: boolean): string =>
   autoApproved ? 'applied' : 'approved';
 
-export function roundSentActivity(
-  actor: FinanceActor,
-  round: { id: string; number: string },
-  charges: readonly CampusAmount[]
-): ActivityInput[] {
-  return sumByCampus(charges).map(({ campusId, amountMinor, count }) =>
+interface RoundRef {
+  id: string;
+  number: string;
+}
+
+interface RoundActivity {
+  kind: 'round.sent' | 'round.cancelled';
+  actor: FinanceActor;
+  round: RoundRef;
+  charges: readonly CampusAmount[];
+  text: (count: number, total: string) => string;
+}
+
+const roundActivity = ({
+  kind,
+  actor,
+  round,
+  charges,
+  text,
+}: RoundActivity): ActivityInput[] =>
+  sumByCampus(charges).map(({ campusId, amountMinor, count }) =>
     finance(actor, {
       campusId,
-      kind: 'round.sent',
+      kind,
       subject: { type: 'billing_run', id: round.id },
-      text: `${actor.name} sent round ${round.number}: ${countOf(count, 'charge', 'charges')}, ${money(amountMinor, actor.currency)}.`,
+      text: text(count, money(amountMinor, actor.currency)),
       data: {
         runId: round.id,
         number: round.number,
@@ -142,7 +157,34 @@ export function roundSentActivity(
       },
     })
   );
-}
+
+export const roundSentActivity = (
+  actor: FinanceActor,
+  round: RoundRef,
+  charges: readonly CampusAmount[]
+): ActivityInput[] =>
+  roundActivity({
+    kind: 'round.sent',
+    actor,
+    round,
+    charges,
+    text: (count, total) =>
+      `${actor.name} sent round ${round.number}: ${countOf(count, 'charge', 'charges')}, ${total}.`,
+  });
+
+export const roundCancelledActivity = (
+  actor: FinanceActor,
+  round: RoundRef,
+  charges: readonly CampusAmount[]
+): ActivityInput[] =>
+  roundActivity({
+    kind: 'round.cancelled',
+    actor,
+    round,
+    charges,
+    text: (count, total) =>
+      `${actor.name} cancelled round ${round.number} before it was sent: ${countOf(count, 'prepared charge', 'prepared charges')}, ${total}.`,
+  });
 
 export function paymentRecordedActivity(
   actor: FinanceActor,
@@ -291,6 +333,28 @@ export function discountApprovedActivity(
         discountKind: discount.kind,
         value: discount.value,
         autoApproved,
+      },
+    }),
+  ];
+}
+
+export function discountEndedActivity(
+  actor: FinanceActor,
+  discount: DiscountFacts,
+  lastTerm: { id: string; label: string }
+): ActivityInput[] {
+  return [
+    finance(actor, {
+      campusId: discount.campusId,
+      kind: 'discount.ended',
+      subject: { type: 'student_discount', id: discount.id },
+      text: `Discount for ${discount.studentName} (${discountValue(actor, discount)}) ended by ${actor.name} after ${lastTerm.label}.`,
+      data: {
+        discountId: discount.id,
+        studentId: discount.studentId,
+        discountKind: discount.kind,
+        value: discount.value,
+        lastTermId: lastTerm.id,
       },
     }),
   ];

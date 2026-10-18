@@ -359,9 +359,60 @@ describe('DiscountService.end', () => {
 
   it('answers 409 when the conditional update changes no row', async () => {
     const { repo, service, id } = await approved();
-    repo.stored[0]!.status = 'rejected';
+    repo.endChanges = false;
+    repo.recorded = [];
     const error = await rejected(service.end(chika, id, { lastTermId: 't2' }));
     expect(error).toBeInstanceOf(ConflictException);
+    expect(repo.recorded).toEqual([]);
+  });
+
+  it('records one discount.ended row on the student’s campus', async () => {
+    const { repo, service, id } = await approved();
+    repo.recorded = [];
+    await service.end(chika, id, { lastTermId: 't2' });
+    expect(repo.recorded).toEqual([
+      {
+        organizationId: 'school-a',
+        campusId: 'lekki',
+        pillar: 'finance',
+        kind: 'discount.ended',
+        actorUserId: 'chika',
+        subjectType: 'student_discount',
+        subjectId: id,
+        text: 'Discount for Halima Bello (50%) ended by chika after Term 2, 2026/2027.',
+        data: {
+          discountId: id,
+          studentId: HALIMA,
+          discountKind: 'percent',
+          value: 50,
+          lastTermId: 't2',
+        },
+      },
+    ]);
+  });
+
+  it('records nothing and returns the discount when it already ends at that term', async () => {
+    const { repo, service, id } = await approved();
+    await service.end(chika, id, { lastTermId: 't2' });
+    repo.recorded = [];
+    const again = await service.end(chika, id, { lastTermId: 't2' });
+    expect(again).toMatchObject({ id, toTerm: { id: 't2' } });
+    expect(repo.recorded).toEqual([]);
+  });
+
+  it('records a row when an earlier last term replaces the one it ended at', async () => {
+    const { repo, service, id } = await approved();
+    await service.end(chika, id, { lastTermId: 't2' });
+    repo.recorded = [];
+    await service.end(chika, id, { lastTermId: 't1' });
+    expect(repo.recorded).toHaveLength(1);
+  });
+
+  it('records nothing when the discount is not approved', async () => {
+    const { repo, service } = setup();
+    const { discount } = await service.create(chika, scholarship());
+    await rejected(service.end(chika, discount.id, { lastTermId: 't2' }));
+    expect(repo.recorded).toEqual([]);
   });
 });
 

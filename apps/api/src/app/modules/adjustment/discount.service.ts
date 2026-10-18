@@ -22,6 +22,7 @@ import {
 import {
   discountApprovedActivity,
   discountDeclinedActivity,
+  discountEndedActivity,
   financeActorIn,
   studentFacts,
 } from '../../common/activity';
@@ -202,13 +203,29 @@ export class DiscountService {
     if (problem !== undefined) {
       throw new BadRequestException(problem);
     }
-    const ended = await this.discounts.end(scope, id, {
-      userId: ctx.user.id,
-      lastTermId: input.lastTermId,
+    await this.discounts.withTx(scope, ctx.user.id, async (tx) => {
+      const locked = await tx.lock(id);
+      if (locked === undefined) {
+        throw notFound();
+      }
+      if (locked.ended && locked.toTermId === input.lastTermId) {
+        return;
+      }
+      const ended = await tx.end(id, {
+        userId: ctx.user.id,
+        lastTermId: input.lastTermId,
+      });
+      if (!ended) {
+        throw new ConflictException(DISCOUNT_NOT_APPROVED_MESSAGE);
+      }
+      await tx.activity.recordMany(
+        discountEndedActivity(
+          await financeActorIn(ctx, tx),
+          { ...locked, ...studentFacts(locked.student) },
+          { id: last.id, label: last.name }
+        )
+      );
     });
-    if (!ended) {
-      throw new ConflictException(DISCOUNT_NOT_APPROVED_MESSAGE);
-    }
     return this.item(scope, id);
   }
 

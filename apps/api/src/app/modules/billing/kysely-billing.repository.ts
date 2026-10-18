@@ -14,8 +14,10 @@ import { INACTIVE_AFTER_DAYS } from '@eduvault/shared';
 import {
   ActivityWriter,
   financeActor,
+  roundCancelledActivity,
   roundSentActivity,
   type CampusAmount,
+  type FinanceActor,
 } from '../../common/activity';
 import { chunks, day, iso } from '../../common/db/rows';
 import { KYSELY_TOKEN, type Database } from '../../common/db/tokens';
@@ -130,6 +132,9 @@ interface RoundRow {
   skipped: number;
   candidates: CandidateRow[] | null;
 }
+
+const lineTotal = (lines: readonly LedgerChargeLine[]): number =>
+  lines.reduce((sum, line) => sum + line.amountMinor, 0);
 
 const toCandidate = (row: CandidateRow): RoundCandidate => ({
   studentId: row.id,
@@ -737,21 +742,15 @@ export class KyselyBillingRepository extends BillingRepository {
         return checked.outcome;
       }
       const sent = await this.sendDrafts(trx, input);
-      const currency = await schoolCurrency(trx, input.scope.organizationId);
-      await this.activity.within(trx).recordMany(
-        roundSentActivity(
-          financeActor(
-            {
-              organizationId: input.scope.organizationId,
-              userId: input.userId,
-              name: input.userName,
-            },
-            currency
-          ),
-          { id: input.runId, number: checked.number },
-          sent
-        )
-      );
+      await this.activity
+        .within(trx)
+        .recordMany(
+          roundSentActivity(
+            await this.runActor(trx, input),
+            { id: input.runId, number: checked.number },
+            sent
+          )
+        );
       await trx
         .updateTable('billing_run')
         .set({
@@ -773,6 +772,7 @@ export class KyselyBillingRepository extends BillingRepository {
         return checked.outcome;
       }
       const { organizationId } = input.scope;
+      const charges = await this.draftCharges(trx, organizationId, input.runId);
       await trx
         .updateTable('invoice')
         .set({ status: 'cancelled' })
@@ -790,8 +790,79 @@ export class KyselyBillingRepository extends BillingRepository {
         .where('id', '=', input.runId)
         .where('organization_id', '=', organizationId)
         .execute();
+      await this.activity
+        .within(trx)
+        .recordMany(
+          roundCancelledActivity(
+            await this.runActor(trx, input),
+            { id: input.runId, number: checked.number },
+            charges
+          )
+        );
       return { status: 'done' };
     });
+  }
+
+  private async draftCharges(
+    trx: Kysely<DB>,
+    organizationId: string,
+    runId: string
+  ): Promise<CampusAmount[]> {
+    const { drafts, linesByInvoice } = await this.draftsOf(
+      trx,
+      organizationId,
+      runId
+    );
+    return drafts.map((row) => ({
+      campusId: row.campus_id,
+      amountMinor: lineTotal(linesByInvoice.get(row.id) ?? []),
+    }));
+  }
+
+  private async draftsOf(
+    trx: Kysely<DB>,
+    organizationId: string,
+    runId: string
+  ) {
+    const drafts = await trx
+      .selectFrom('invoice as i')
+      .innerJoin('student as st', (join) =>
+        join
+          .onRef('st.id', '=', 'i.student_id')
+          .onRef('st.organization_id', '=', 'i.organization_id')
+      )
+      .select([
+        'i.id',
+        'i.student_id',
+        'i.campus_id',
+        'st.first_name',
+        'st.last_name',
+        'st.admission_number',
+      ])
+      .where('i.organization_id', '=', organizationId)
+      .where('i.billing_run_id', '=', runId)
+      .where('i.status', '=', 'draft')
+      .execute();
+    const linesByInvoice = await this.draftLines(
+      trx,
+      organizationId,
+      drafts.map((row) => row.id)
+    );
+    return { drafts, linesByInvoice };
+  }
+
+  private async runActor(
+    trx: Kysely<DB>,
+    input: RunAction
+  ): Promise<FinanceActor> {
+    return financeActor(
+      {
+        organizationId: input.scope.organizationId,
+        userId: input.userId,
+        name: input.userName,
+      },
+      await schoolCurrency(trx, input.scope.organizationId)
+    );
   }
 
   private async refuseRun(
@@ -841,29 +912,10 @@ export class KyselyBillingRepository extends BillingRepository {
       organizationId,
       FEES_RECEIVABLE_SYSTEM_KEY
     );
-    const drafts = await trx
-      .selectFrom('invoice as i')
-      .innerJoin('student as st', (join) =>
-        join
-          .onRef('st.id', '=', 'i.student_id')
-          .onRef('st.organization_id', '=', 'i.organization_id')
-      )
-      .select([
-        'i.id',
-        'i.student_id',
-        'i.campus_id',
-        'st.first_name',
-        'st.last_name',
-        'st.admission_number',
-      ])
-      .where('i.organization_id', '=', organizationId)
-      .where('i.billing_run_id', '=', input.runId)
-      .where('i.status', '=', 'draft')
-      .execute();
-    const linesByInvoice = await this.draftLines(
+    const { drafts, linesByInvoice } = await this.draftsOf(
       trx,
       organizationId,
-      drafts.map((row) => row.id)
+      input.runId
     );
     const sent: CampusAmount[] = [];
     for (const draft of sendOrder(
@@ -878,7 +930,7 @@ export class KyselyBillingRepository extends BillingRepository {
       await this.sendOne(trx, { input, receivableId, draft, lines });
       sent.push({
         campusId: draft.campus_id,
-        amountMinor: lines.reduce((sum, line) => sum + line.amountMinor, 0),
+        amountMinor: lineTotal(lines),
       });
     }
     return sent;
