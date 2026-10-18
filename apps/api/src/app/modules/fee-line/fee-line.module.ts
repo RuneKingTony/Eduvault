@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ActivityModule } from '../../common/activity';
 import { EduvaultAuthModule } from '../../common/auth';
 import { CampusModule } from '../campus/campus.module';
 import { FeeGridService } from './fee-grid.service';
@@ -21,7 +22,7 @@ import { KyselyFeeStudentRepository } from './kysely-fee-student.repository';
 import { KyselyFeeTypeRepository } from './kysely-fee-type.repository';
 
 @Module({
-  imports: [EduvaultAuthModule, CampusModule],
+  imports: [EduvaultAuthModule, CampusModule, ActivityModule],
   controllers: [FeeLineController, FeeTypeController, FeeOptionController],
   providers: [
     FeeLineService,

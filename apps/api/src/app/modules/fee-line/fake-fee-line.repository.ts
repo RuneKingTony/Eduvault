@@ -4,19 +4,24 @@ import type {
   FeeSetup,
   FeeType,
 } from '@eduvault/api-contract';
+import type { ActivityInput } from '../../common/activity';
 import { canSeeCampus } from '../../common/campus-scope';
 import {
   FeeLineRepository,
   FeeOptionRepository,
   FeeStudentRepository,
   FeeTypeRepository,
+  type AmountActivity,
+  type AmountChange,
   type ChargeFacts,
+  type CopyActivity,
   type CopyFeeLines,
   type CopyOutcome,
   type FeeLineOutcome,
   type FeeScope,
   type FeeTypeOutcome,
   type LevelRef,
+  type LineActivity,
   type NewFeeLine,
   type OptionChange,
   type StudentFeeContext,
@@ -27,10 +32,12 @@ export class FakeFeeLineRepository extends FeeLineRepository {
   rows: FeeLine[] = [];
   terms = new Map<string, TermRef>();
   levels = new Map<string, LevelRef>();
+  campusNames = new Map<string, string>();
   feeTypes = new Map<string, FeeType>();
   otherAccounts = new Set<string>();
   created: NewFeeLine[] = [];
   copies: CopyFeeLines[] = [];
+  recorded: ActivityInput[] = [];
   duplicate = false;
   setupResult: FeeSetup = { terms: [], levels: [] };
 
@@ -61,7 +68,8 @@ export class FakeFeeLineRepository extends FeeLineRepository {
   }
 
   findById(scope: FeeScope, id: string): Promise<FeeLine | undefined> {
-    return Promise.resolve(this.visible(scope).find((row) => row.id === id));
+    const row = this.visible(scope).find((candidate) => candidate.id === id);
+    return Promise.resolve(row && { ...row });
   }
 
   findTerm(
@@ -86,7 +94,7 @@ export class FakeFeeLineRepository extends FeeLineRepository {
     return Promise.resolve(this.live(termId).length);
   }
 
-  copyLines(input: CopyFeeLines): Promise<CopyOutcome> {
+  copyLines(input: CopyFeeLines, activity: CopyActivity): Promise<CopyOutcome> {
     this.copies.push(input);
     if (this.live(input.toTermId).length > 0) {
       return Promise.resolve({ status: 'not_empty' });
@@ -102,6 +110,13 @@ export class FakeFeeLineRepository extends FeeLineRepository {
         termId: input.toTermId,
         createdAt: '2026-10-15T00:00:00.000Z',
       }))
+    );
+    const shares = new Map<string | null, number>();
+    for (const row of source) {
+      shares.set(row.campusId, (shares.get(row.campusId) ?? 0) + 1);
+    }
+    this.recorded.push(
+      ...activity([...shares].map(([campusId, count]) => ({ campusId, count })))
     );
     return Promise.resolve({ status: 'copied', copied: source.length });
   }
@@ -132,7 +147,7 @@ export class FakeFeeLineRepository extends FeeLineRepository {
     return Promise.resolve(this.setupResult);
   }
 
-  create(input: NewFeeLine): Promise<FeeLineOutcome> {
+  create(input: NewFeeLine, activity: LineActivity): Promise<FeeLineOutcome> {
     this.created.push(input);
     if (this.duplicate) {
       return Promise.resolve({ status: 'duplicate' });
@@ -147,7 +162,10 @@ export class FakeFeeLineRepository extends FeeLineRepository {
       feeTypeCode: 4010,
       feeTypeName: this.feeTypes.get(input.feeTypeId)?.name ?? '',
       campusId: input.campusId,
-      campusName: null,
+      campusName:
+        input.campusId === null
+          ? null
+          : (this.campusNames.get(input.campusId) ?? null),
       name: input.name,
       amountMinor: input.amountMinor,
       appliesTo: input.appliesTo,
@@ -156,13 +174,13 @@ export class FakeFeeLineRepository extends FeeLineRepository {
       createdAt: '2026-10-01T00:00:00.000Z',
     };
     this.rows.push(line);
+    this.recorded.push(...activity(line));
     return Promise.resolve({ status: 'saved', line });
   }
 
   updateAmount(
-    _organizationId: string,
-    id: string,
-    amountMinor: number
+    { id, amountMinor }: AmountChange,
+    activity: AmountActivity
   ): Promise<FeeLine | undefined> {
     const row = this.rows.find(
       (candidate) => candidate.id === id && candidate.retiredAt === null
@@ -170,11 +188,20 @@ export class FakeFeeLineRepository extends FeeLineRepository {
     if (row === undefined) {
       return Promise.resolve(undefined);
     }
+    const previousAmountMinor = row.amountMinor;
+    if (previousAmountMinor === amountMinor) {
+      return Promise.resolve({ ...row });
+    }
     row.amountMinor = amountMinor;
+    this.recorded.push(...activity(row, previousAmountMinor));
     return Promise.resolve(row);
   }
 
-  retire(_organizationId: string, id: string): Promise<FeeLine | undefined> {
+  retire(
+    _organizationId: string,
+    id: string,
+    activity: LineActivity
+  ): Promise<FeeLine | undefined> {
     const row = this.rows.find(
       (candidate) => candidate.id === id && candidate.retiredAt === null
     );
@@ -182,6 +209,7 @@ export class FakeFeeLineRepository extends FeeLineRepository {
       return Promise.resolve(undefined);
     }
     row.retiredAt = '2026-10-05T00:00:00.000Z';
+    this.recorded.push(...activity(row));
     return Promise.resolve(row);
   }
 }

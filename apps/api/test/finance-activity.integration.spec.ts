@@ -1,6 +1,6 @@
 import type { Pool } from 'pg';
-import type { ActivityPage } from '@eduvault/api-contract';
-import { expect, type Fixtures, type TestUser } from './support/base-test';
+import { FEE_SCHEDULE_KINDS } from '../src/app/common/activity';
+import { expect } from './support/base-test';
 import {
   askAdjustment,
   approveAdjustment,
@@ -11,7 +11,7 @@ import {
   switchApproval,
 } from './support/factories/approvals';
 import { chargeFixture, prepare, sendRun } from './support/factories/billing';
-import { ledgerAccountId } from './support/factories/finance';
+import { financeTexts, ledgerAccountId } from './support/factories/finance';
 import {
   bankAccount,
   cashBody,
@@ -20,40 +20,38 @@ import {
 } from './support/factories/payments';
 import { schoolsTest as test } from './support/two-schools';
 
-type Api = Fixtures['api'];
-
 interface FinanceRow {
   kind: string;
   campus_id: string | null;
   text: string;
 }
 
-const financeRows = async (
+const SCHEDULE_KINDS = Object.values(FEE_SCHEDULE_KINDS);
+
+const queryRows = async (
   pool: Pool,
-  organizationId: string
+  organizationId: string,
+  kindTest: 'kind = ANY($2)' | 'kind <> ALL($2)'
 ): Promise<FinanceRow[]> =>
   (
     await pool.query<FinanceRow>(
       `SELECT kind, campus_id, text FROM activity_event
-       WHERE organization_id = $1 AND pillar = 'finance'
+       WHERE organization_id = $1 AND pillar = 'finance' AND ${kindTest}
        ORDER BY kind, campus_id`,
-      [organizationId]
+      [organizationId, SCHEDULE_KINDS]
     )
   ).rows;
+
+const financeRows = (pool: Pool, organizationId: string) =>
+  queryRows(pool, organizationId, 'kind <> ALL($2)');
+
+const feeScheduleRows = (pool: Pool, organizationId: string) =>
+  queryRows(pool, organizationId, 'kind = ANY($2)');
 
 const compare = (a: string, b: string) => a.localeCompare(b);
 
 const kindsAndCampuses = (rows: FinanceRow[]) =>
   rows.map((row) => [row.kind, row.campus_id]);
-
-const financeTexts = async (api: Api, actor: TestUser): Promise<string[]> => {
-  const page = (await api(actor).get('/activity?page=1').expect(200))
-    .body as ActivityPage;
-  return page.items
-    .filter((item) => item.pillar === 'finance')
-    .map((item) => item.text)
-    .toSorted((a, b) => a.localeCompare(b));
-};
 
 const OWED = 18_000_000;
 const LEKKI_SHARE = 6_000_000;
@@ -416,6 +414,10 @@ test.describe('finance activity', () => {
       'round.sent',
     ]);
 
+    expect(
+      (await feeScheduleRows(pool, orgA.id)).map((row) => row.kind)
+    ).toEqual(['fee_line.created', 'fee_line.created', 'fee_line.created']);
+
     const campuses = [lekki, ikeja];
     const invoiceOnly = await withPermissions(orgA, ['invoice:read'], {
       campuses,
@@ -431,7 +433,7 @@ test.describe('finance activity', () => {
     const invoiceSees = await financeTexts(api, invoiceOnly);
     const paymentSees = await financeTexts(api, paymentOnly);
 
-    expect(invoiceSees).toHaveLength(4);
+    expect(invoiceSees).toHaveLength(7);
     expect(paymentSees).toEqual(invoiceSees);
     expect(invoiceSees.join(' ')).toContain(receipt.receiptNumber);
     expect(invoiceSees.join(' ')).toContain(credit.adjustment.number);

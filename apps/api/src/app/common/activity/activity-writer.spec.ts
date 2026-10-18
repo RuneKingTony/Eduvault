@@ -8,6 +8,7 @@ import {
 } from 'kysely';
 import type { DB } from '../../../db/db-types';
 import { ActivityWriter, type ActivityInput } from './activity-writer';
+import { FEE_SCHEDULE_KINDS } from './fee-schedule-kinds';
 
 const run = async (...inputs: ActivityInput[]) => {
   const compiled: CompiledQuery[] = [];
@@ -46,7 +47,37 @@ describe('ActivityWriter', () => {
 
   it('refuses a finance row without a campus', async () => {
     await expect(
-      run({ ...base, pillar: 'finance', campusId: null })
+      run({
+        ...base,
+        pillar: 'finance',
+        campusId: null,
+        kind: 'payment.recorded',
+      })
+    ).rejects.toThrow('A finance activity row needs a campus');
+  });
+
+  it.each(Object.values(FEE_SCHEDULE_KINDS))(
+    'accepts a school-wide finance row of kind %s',
+    async (kind) => {
+      const queries = await run({
+        ...base,
+        pillar: 'finance',
+        campusId: null,
+        kind,
+      });
+      expect(queries).toHaveLength(1);
+    }
+  );
+
+  it('refuses a school-wide finance row of a fee-line subject with a money kind', async () => {
+    await expect(
+      run({
+        ...base,
+        pillar: 'finance',
+        campusId: null,
+        kind: 'payment.recorded',
+        subjectType: 'fee_line',
+      })
     ).rejects.toThrow('A finance activity row needs a campus');
   });
 

@@ -30,6 +30,14 @@ import {
   type FeeSetup,
   type UpdateFeeLineInput,
 } from '@eduvault/api-contract';
+import {
+  feeLineAmountChangedActivity,
+  feeLineCreatedActivity,
+  feeLineRetiredActivity,
+  feeLinesCopiedActivity,
+  financeActorIn,
+  type FinanceActor,
+} from '../../common/activity';
 import type { OrgContext } from '../../common/auth';
 import { Clock, schoolToday } from '../../common/clock';
 import { CampusService } from '../campus/campus.service';
@@ -102,12 +110,24 @@ export class FeeLineService {
     if ((await this.lines.liveLineCount(ctx.organizationId, source.id)) === 0) {
       throw new BadRequestException(feeCopyEmptySourceMessage(sourceLabel));
     }
-    const outcome = await this.lines.copyLines({
-      organizationId: ctx.organizationId,
-      userId: ctx.user.id,
-      fromTermId: source.id,
-      toTermId: target.id,
-    });
+    const actor = await this.actorOf(ctx);
+    const outcome = await this.lines.copyLines(
+      {
+        organizationId: ctx.organizationId,
+        userId: ctx.user.id,
+        fromTermId: source.id,
+        toTermId: target.id,
+      },
+      (copied) =>
+        feeLinesCopiedActivity(
+          actor,
+          {
+            from: { id: source.id, label: sourceLabel },
+            to: { id: target.id, label: feeTermLabel(target) },
+          },
+          copied
+        )
+    );
     if (outcome.status === 'source_empty') {
       throw new BadRequestException(feeCopyEmptySourceMessage(sourceLabel));
     }
@@ -139,18 +159,22 @@ export class FeeLineService {
       throw await this.feeTypeRefusal(ctx, input.feeTypeId);
     }
     this.assertTermOpen(ctx, term);
-    const outcome = await this.lines.create({
-      organizationId: ctx.organizationId,
-      userId: ctx.user.id,
-      termId: input.termId,
-      classLevelId: input.classLevelId,
-      feeTypeId: input.feeTypeId,
-      campusId,
-      name: input.name,
-      amountMinor: input.amountMinor,
-      appliesTo: input.appliesTo ?? 'all',
-      isOptional: input.isOptional ?? false,
-    });
+    const { actor, termLabel } = await this.activityFactsOf(ctx, term);
+    const outcome = await this.lines.create(
+      {
+        organizationId: ctx.organizationId,
+        userId: ctx.user.id,
+        termId: input.termId,
+        classLevelId: input.classLevelId,
+        feeTypeId: input.feeTypeId,
+        campusId,
+        name: input.name,
+        amountMinor: input.amountMinor,
+        appliesTo: input.appliesTo ?? 'all',
+        isOptional: input.isOptional ?? false,
+      },
+      (line) => feeLineCreatedActivity(actor, line, termLabel)
+    );
     if (outcome.status === 'duplicate') {
       throw new ConflictException(
         feeLineDuplicateMessage({
@@ -169,11 +193,19 @@ export class FeeLineService {
     input: UpdateFeeLineInput
   ): Promise<FeeLine> {
     const line = await this.writable(ctx, id, FEE_LINE_RETIRED_MESSAGE);
-    await this.assertLineTermOpen(ctx, line);
+    const term = await this.assertLineTermOpen(ctx, line);
+    const { actor, termLabel } = await this.activityFactsOf(ctx, term);
     const updated = await this.lines.updateAmount(
-      ctx.organizationId,
-      id,
-      input.amountMinor
+      {
+        organizationId: ctx.organizationId,
+        id,
+        amountMinor: input.amountMinor,
+      },
+      (changed, previousAmountMinor) =>
+        feeLineAmountChangedActivity(actor, changed, {
+          previousAmountMinor,
+          termLabel,
+        })
     );
     if (updated === undefined) {
       throw new ConflictException(FEE_LINE_RETIRED_MESSAGE);
@@ -183,8 +215,11 @@ export class FeeLineService {
 
   async retire(ctx: OrgContext, id: string): Promise<FeeLine> {
     const line = await this.writable(ctx, id, FEE_LINE_ALREADY_RETIRED_MESSAGE);
-    await this.assertLineTermOpen(ctx, line);
-    const retired = await this.lines.retire(ctx.organizationId, id);
+    const term = await this.assertLineTermOpen(ctx, line);
+    const { actor, termLabel } = await this.activityFactsOf(ctx, term);
+    const retired = await this.lines.retire(ctx.organizationId, id, (gone) =>
+      feeLineRetiredActivity(actor, gone, termLabel)
+    );
     if (retired === undefined) {
       throw new ConflictException(FEE_LINE_ALREADY_RETIRED_MESSAGE);
     }
@@ -224,8 +259,26 @@ export class FeeLineService {
     return term;
   }
 
-  private async assertLineTermOpen(ctx: OrgContext, line: FeeLine) {
-    this.assertTermOpen(ctx, await this.requireTerm(ctx, line.termId));
+  private async assertLineTermOpen(
+    ctx: OrgContext,
+    line: FeeLine
+  ): Promise<TermRef> {
+    const term = await this.requireTerm(ctx, line.termId);
+    this.assertTermOpen(ctx, term);
+    return term;
+  }
+
+  private async activityFactsOf(
+    ctx: OrgContext,
+    term: TermRef
+  ): Promise<{ actor: FinanceActor; termLabel: string }> {
+    return { actor: await this.actorOf(ctx), termLabel: feeTermLabel(term) };
+  }
+
+  private actorOf(ctx: OrgContext): Promise<FinanceActor> {
+    return financeActorIn(ctx, {
+      currency: () => this.lines.currency(ctx.organizationId),
+    });
   }
 
   private assertTermOpen(ctx: OrgContext, term: TermRef): void {

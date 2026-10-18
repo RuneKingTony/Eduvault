@@ -6,6 +6,7 @@ import {
   type FeeSetup,
   type FeeType,
 } from '@eduvault/api-contract';
+import { ActivityWriter, type CopiedShare } from '../../common/activity';
 import { inCampusScope } from '../../common/db/in-campus-scope';
 import { iso } from '../../common/db/rows';
 import { KYSELY_TOKEN, type Database } from '../../common/db/tokens';
@@ -13,11 +14,15 @@ import { uniqueViolation } from '../../common/db/unique-violation';
 import { feeTypeQuery, schoolCurrency } from '../../common/ledger';
 import {
   FeeLineRepository,
+  type AmountActivity,
+  type AmountChange,
+  type CopyActivity,
   type CopyFeeLines,
   type CopyOutcome,
   type FeeLineOutcome,
   type FeeScope,
   type LevelRef,
+  type LineActivity,
   type NewFeeLine,
   type TermRef,
 } from './fee-line.repository';
@@ -82,12 +87,15 @@ const toTerm = (row: TermRow): TermRef => ({
 
 @Injectable()
 export class KyselyFeeLineRepository extends FeeLineRepository {
-  constructor(@Inject(KYSELY_TOKEN) private readonly db: Database) {
+  constructor(
+    @Inject(KYSELY_TOKEN) private readonly db: Database,
+    private readonly activity: ActivityWriter
+  ) {
     super();
   }
 
-  private lines() {
-    return this.db
+  private lines(db: Database = this.db) {
+    return db
       .selectFrom('fee_line')
       .innerJoin('class_level', (join) =>
         join
@@ -228,7 +236,10 @@ export class KyselyFeeLineRepository extends FeeLineRepository {
     return Number(row.count);
   }
 
-  async copyLines(input: CopyFeeLines): Promise<CopyOutcome> {
+  async copyLines(
+    input: CopyFeeLines,
+    activity: CopyActivity
+  ): Promise<CopyOutcome> {
     try {
       return await this.db.transaction().execute(async (trx) => {
         const existing = await trx
@@ -242,44 +253,15 @@ export class KyselyFeeLineRepository extends FeeLineRepository {
         if (existing !== undefined) {
           return { status: 'not_empty' };
         }
-        const result = await trx
-          .insertInto('fee_line')
-          .columns([
-            'organization_id',
-            'term_id',
-            'class_level_id',
-            'ledger_account_id',
-            'campus_id',
-            'name',
-            'amount_minor',
-            'applies_to',
-            'is_optional',
-            'created_by',
-          ])
-          .expression((eb) =>
-            eb
-              .selectFrom('fee_line')
-              .select([
-                'organization_id',
-                eb.val(input.toTermId).as('term_id'),
-                'class_level_id',
-                'ledger_account_id',
-                'campus_id',
-                'name',
-                'amount_minor',
-                'applies_to',
-                'is_optional',
-                eb.val(input.userId).as('created_by'),
-              ])
-              .where('organization_id', '=', input.organizationId)
-              .where('term_id', '=', input.fromTermId)
-              .where('retired_at', 'is', null)
-          )
-          .executeTakeFirstOrThrow();
-        const copied = Number(result.numInsertedOrUpdatedRows ?? 0n);
-        return copied === 0
-          ? { status: 'source_empty' }
-          : { status: 'copied', copied };
+        const copied = await this.copyInto(trx, input);
+        if (copied.length === 0) {
+          return { status: 'source_empty' };
+        }
+        await this.activity.within(trx).recordMany(activity(copied));
+        return {
+          status: 'copied',
+          copied: copied.reduce((total, share) => total + share.count, 0),
+        };
       });
     } catch (error) {
       if (uniqueViolation(error) === LIVE_LINE_KEY) {
@@ -287,6 +269,52 @@ export class KyselyFeeLineRepository extends FeeLineRepository {
       }
       throw error;
     }
+  }
+
+  private async copyInto(
+    trx: Database,
+    input: CopyFeeLines
+  ): Promise<CopiedShare[]> {
+    const inserted = await trx
+      .insertInto('fee_line')
+      .columns([
+        'organization_id',
+        'term_id',
+        'class_level_id',
+        'ledger_account_id',
+        'campus_id',
+        'name',
+        'amount_minor',
+        'applies_to',
+        'is_optional',
+        'created_by',
+      ])
+      .expression((eb) =>
+        eb
+          .selectFrom('fee_line')
+          .select([
+            'organization_id',
+            eb.val(input.toTermId).as('term_id'),
+            'class_level_id',
+            'ledger_account_id',
+            'campus_id',
+            'name',
+            'amount_minor',
+            'applies_to',
+            'is_optional',
+            eb.val(input.userId).as('created_by'),
+          ])
+          .where('organization_id', '=', input.organizationId)
+          .where('term_id', '=', input.fromTermId)
+          .where('retired_at', 'is', null)
+      )
+      .returning('campus_id')
+      .execute();
+    const counts = new Map<string | null, number>();
+    for (const { campus_id: campusId } of inserted) {
+      counts.set(campusId, (counts.get(campusId) ?? 0) + 1);
+    }
+    return [...counts].map(([campusId, count]) => ({ campusId, count }));
   }
 
   currency(organizationId: string): Promise<string> {
@@ -371,29 +399,35 @@ export class KyselyFeeLineRepository extends FeeLineRepository {
       .executeTakeFirst();
   }
 
-  async create(input: NewFeeLine): Promise<FeeLineOutcome> {
+  async create(
+    input: NewFeeLine,
+    activity: LineActivity
+  ): Promise<FeeLineOutcome> {
     try {
-      const inserted = await this.db
-        .insertInto('fee_line')
-        .values({
-          organization_id: input.organizationId,
-          term_id: input.termId,
-          class_level_id: input.classLevelId,
-          ledger_account_id: input.feeTypeId,
-          campus_id: input.campusId,
-          name: input.name,
-          amount_minor: String(input.amountMinor),
-          applies_to: input.appliesTo,
-          is_optional: input.isOptional,
-          created_by: input.userId,
-        })
-        .returning('id')
-        .executeTakeFirstOrThrow();
-      const row = await this.lines()
-        .where('fee_line.id', '=', inserted.id)
-        .where('fee_line.organization_id', '=', input.organizationId)
-        .executeTakeFirstOrThrow();
-      return { status: 'saved', line: toLine(row) };
+      return await this.db.transaction().execute(async (trx) => {
+        const inserted = await trx
+          .insertInto('fee_line')
+          .values({
+            organization_id: input.organizationId,
+            term_id: input.termId,
+            class_level_id: input.classLevelId,
+            ledger_account_id: input.feeTypeId,
+            campus_id: input.campusId,
+            name: input.name,
+            amount_minor: String(input.amountMinor),
+            applies_to: input.appliesTo,
+            is_optional: input.isOptional,
+            created_by: input.userId,
+          })
+          .returning('id')
+          .executeTakeFirstOrThrow();
+        const line = await this.recordedLine(
+          trx,
+          { organizationId: input.organizationId, id: inserted.id },
+          activity
+        );
+        return { status: 'saved', line };
+      });
     } catch (error) {
       if (uniqueViolation(error) === LIVE_LINE_KEY) {
         return { status: 'duplicate' };
@@ -402,39 +436,91 @@ export class KyselyFeeLineRepository extends FeeLineRepository {
     }
   }
 
-  async updateAmount(
+  updateAmount(
+    change: AmountChange,
+    activity: AmountActivity
+  ): Promise<FeeLine | undefined> {
+    return this.db.transaction().execute(async (trx) => {
+      const current = await trx
+        .selectFrom('fee_line')
+        .select('amount_minor')
+        .where('organization_id', '=', change.organizationId)
+        .where('id', '=', change.id)
+        .where('retired_at', 'is', null)
+        .forUpdate()
+        .executeTakeFirst();
+      return (
+        current &&
+        this.changeAmount(
+          trx,
+          { ...change, previousAmountMinor: Number(current.amount_minor) },
+          activity
+        )
+      );
+    });
+  }
+
+  private async changeAmount(
+    trx: Database,
+    change: AmountChange & { previousAmountMinor: number },
+    activity: AmountActivity
+  ): Promise<FeeLine> {
+    const { previousAmountMinor } = change;
+    const ref = { organizationId: change.organizationId, id: change.id };
+    if (previousAmountMinor === change.amountMinor) {
+      return this.reload(trx, ref.organizationId, ref.id);
+    }
+    await trx
+      .updateTable('fee_line')
+      .set({
+        amount_minor: String(change.amountMinor),
+        updated_at: sql<Date>`now()`,
+      })
+      .where('organization_id', '=', ref.organizationId)
+      .where('id', '=', ref.id)
+      .execute();
+    return this.recordedLine(trx, ref, (line) =>
+      activity(line, previousAmountMinor)
+    );
+  }
+
+  retire(
     organizationId: string,
     id: string,
-    amountMinor: number
+    activity: LineActivity
   ): Promise<FeeLine | undefined> {
-    const changed = await this.db
-      .updateTable('fee_line')
-      .set({ amount_minor: String(amountMinor), updated_at: sql<Date>`now()` })
-      .where('organization_id', '=', organizationId)
-      .where('id', '=', id)
-      .where('retired_at', 'is', null)
-      .returning('id')
-      .executeTakeFirst();
-    return changed && this.reload(organizationId, changed.id);
+    return this.db.transaction().execute(async (trx) => {
+      const changed = await trx
+        .updateTable('fee_line')
+        .set({ retired_at: sql<Date>`now()` })
+        .where('organization_id', '=', organizationId)
+        .where('id', '=', id)
+        .where('retired_at', 'is', null)
+        .returning('id')
+        .executeTakeFirst();
+      return (
+        changed &&
+        this.recordedLine(trx, { organizationId, id: changed.id }, activity)
+      );
+    });
   }
 
-  async retire(
+  private async recordedLine(
+    trx: Database,
+    ref: { organizationId: string; id: string },
+    activity: LineActivity
+  ): Promise<FeeLine> {
+    const line = await this.reload(trx, ref.organizationId, ref.id);
+    await this.activity.within(trx).recordMany(activity(line));
+    return line;
+  }
+
+  private async reload(
+    db: Database,
     organizationId: string,
     id: string
-  ): Promise<FeeLine | undefined> {
-    const changed = await this.db
-      .updateTable('fee_line')
-      .set({ retired_at: sql<Date>`now()` })
-      .where('organization_id', '=', organizationId)
-      .where('id', '=', id)
-      .where('retired_at', 'is', null)
-      .returning('id')
-      .executeTakeFirst();
-    return changed && this.reload(organizationId, changed.id);
-  }
-
-  private async reload(organizationId: string, id: string): Promise<FeeLine> {
-    const row = await this.lines()
+  ): Promise<FeeLine> {
+    const row = await this.lines(db)
       .where('fee_line.organization_id', '=', organizationId)
       .where('fee_line.id', '=', id)
       .executeTakeFirstOrThrow();

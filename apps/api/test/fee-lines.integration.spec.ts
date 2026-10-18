@@ -20,6 +20,7 @@ import {
   type FeeSetup,
   type FeeType,
 } from '@eduvault/api-contract';
+import { FeeLineRepository } from '../src/app/modules/fee-line/fee-line.repository';
 import {
   acting,
   expect,
@@ -28,7 +29,7 @@ import {
 } from './support/base-test';
 import { createSchoolYear, YEAR_2027 } from './support/factories/calendar';
 import { createFeeLine, feeFixture } from './support/factories/fees';
-import { ledgerAccountId } from './support/factories/finance';
+import { financeTexts, ledgerAccountId } from './support/factories/finance';
 import { makeCurrent, termOf } from './support/factories/terms';
 import { bareSchoolsTest, schoolsTest as test } from './support/two-schools';
 
@@ -68,6 +69,31 @@ const insertRaw = (
       values.amountMinor ?? 100,
     ]
   );
+
+interface ScheduleRow {
+  kind: string;
+  pillar: string;
+  campus_id: string | null;
+  organization_id: string;
+  subject_type: string;
+  subject_id: string;
+  text: string;
+  data: Record<string, unknown>;
+}
+
+const scheduleRows = async (
+  pool: Pool,
+  organizationId: string
+): Promise<ScheduleRow[]> =>
+  (
+    await pool.query<ScheduleRow>(
+      `SELECT kind, pillar, campus_id, organization_id, subject_type, subject_id, text, data
+       FROM activity_event
+       WHERE organization_id = $1 AND subject_type IN ('fee_line', 'term')
+       ORDER BY occurred_at, id`,
+      [organizationId]
+    )
+  ).rows;
 
 const tuitionBody = (
   fixture: {
@@ -782,6 +808,484 @@ test.describe('fee lines', () => {
         .send(tuitionBody(fixture, { campusId: ikeja.id }))
         .expect(404);
       await api(lekkiOnly).post(`/fee-lines/${own.body.id}/retire`).expect(201);
+    });
+  });
+
+  test.describe('activity', () => {
+    test('create, amount change and retire each write one finance row in the line’s campus', async ({
+      api,
+      app,
+      pool,
+      schools: { owner, orgA, lekki },
+    }) => {
+      const fixture = await feeFixture(app, api, owner);
+      const everyCampus = await api(owner)
+        .post('/fee-lines')
+        .send(tuitionBody(fixture))
+        .expect(201);
+      const campusLine = await api(owner)
+        .post('/fee-lines')
+        .send(
+          tuitionBody(fixture, {
+            campusId: lekki.id,
+            name: 'Lekki tuition',
+            amountMinor: 17_000_000,
+          })
+        )
+        .expect(201);
+      await api(owner)
+        .patch(`/fee-lines/${campusLine.body.id}`)
+        .send({ amountMinor: 17_500_000 })
+        .expect(200);
+      await api(owner)
+        .post(`/fee-lines/${everyCampus.body.id}/retire`)
+        .expect(201);
+
+      const rows = await scheduleRows(pool, orgA.id);
+      expect(
+        rows.map((row) => [row.kind, row.campus_id, row.subject_id])
+      ).toEqual([
+        ['fee_line.created', null, everyCampus.body.id],
+        ['fee_line.created', lekki.id, campusLine.body.id],
+        ['fee_line.amount_changed', lekki.id, campusLine.body.id],
+        ['fee_line.retired', null, everyCampus.body.id],
+      ]);
+      for (const row of rows) {
+        expect(row).toMatchObject({
+          pillar: 'finance',
+          organization_id: orgA.id,
+          subject_type: 'fee_line',
+        });
+      }
+      expect(rows.map((row) => row.data)).toEqual([
+        {
+          feeLineId: everyCampus.body.id,
+          termId: fixture.termId,
+          classLevelId: fixture.levelId('JSS2'),
+          feeTypeId: fixture.feeTypeId('Tuition'),
+          amountMinor: 18_000_000,
+          appliesTo: 'all',
+          isOptional: false,
+        },
+        {
+          feeLineId: campusLine.body.id,
+          termId: fixture.termId,
+          classLevelId: fixture.levelId('JSS2'),
+          feeTypeId: fixture.feeTypeId('Tuition'),
+          amountMinor: 17_000_000,
+          appliesTo: 'all',
+          isOptional: false,
+        },
+        {
+          feeLineId: campusLine.body.id,
+          termId: fixture.termId,
+          previousAmountMinor: 17_000_000,
+          amountMinor: 17_500_000,
+        },
+        {
+          feeLineId: everyCampus.body.id,
+          termId: fixture.termId,
+          amountMinor: 18_000_000,
+        },
+      ]);
+      const term = feeTermLabel(
+        (await api(owner).get('/fee-lines/setup').expect(200)).body.terms.find(
+          (candidate: { id: string }) => candidate.id === fixture.termId
+        )
+      );
+      expect(rows.map((row) => row.text)).toEqual([
+        expect.stringMatching(
+          new RegExp(
+            String.raw`^.+ added Tuition \(Tuition\) for JSS 2, every campus, ${term}: ₦180,000\.$`
+          )
+        ),
+        expect.stringContaining(`for JSS 2, Lekki, ${term}: ₦170,000.`),
+        expect.stringContaining(
+          `changed Lekki tuition for JSS 2, Lekki, ${term} from ₦170,000 to ₦175,000.`
+        ),
+        expect.stringContaining(
+          `retired Tuition for JSS 2, every campus, ${term} (₦180,000).`
+        ),
+      ]);
+    });
+
+    test('a duplicate, a same-amount update and every refused write add no row', async ({
+      api,
+      app,
+      clock,
+      pool,
+      schools: { owner, orgA, lekkiOnly, ikeja },
+    }) => {
+      const fixture = await feeFixture(app, api, owner);
+      const line = await api(owner)
+        .post('/fee-lines')
+        .send(tuitionBody(fixture))
+        .expect(201);
+      const ikejaLine = await api(owner)
+        .post('/fee-lines')
+        .send(tuitionBody(fixture, { campusId: ikeja.id }))
+        .expect(201);
+      const written = (await scheduleRows(pool, orgA.id)).length;
+      expect(written).toBe(2);
+
+      await api(owner)
+        .post('/fee-lines')
+        .send(tuitionBody(fixture, { amountMinor: 1 }))
+        .expect(409);
+      await api(owner)
+        .patch(`/fee-lines/${line.body.id}`)
+        .send({ amountMinor: 18_000_000 })
+        .expect(200);
+      await api(owner)
+        .patch(`/fee-lines/${line.body.id}`)
+        .send({ amountMinor: 0 })
+        .expect(400);
+      await api(lekkiOnly)
+        .patch(`/fee-lines/${line.body.id}`)
+        .send({ amountMinor: 2 })
+        .expect(403);
+      await api(lekkiOnly)
+        .post(`/fee-lines/${line.body.id}/retire`)
+        .expect(403);
+      await api(lekkiOnly)
+        .patch(`/fee-lines/${ikejaLine.body.id}`)
+        .send({ amountMinor: 2 })
+        .expect(404);
+      await api(lekkiOnly)
+        .post(`/fee-lines/${ikejaLine.body.id}/retire`)
+        .expect(404);
+      expect(await scheduleRows(pool, orgA.id)).toHaveLength(written);
+
+      await api(owner).post(`/fee-lines/${line.body.id}/retire`).expect(201);
+      await api(owner).post(`/fee-lines/${line.body.id}/retire`).expect(409);
+      await api(owner)
+        .patch(`/fee-lines/${line.body.id}`)
+        .send({ amountMinor: 3000 })
+        .expect(409);
+      expect(await scheduleRows(pool, orgA.id)).toHaveLength(written + 1);
+
+      clock.set('2028-01-10');
+      await api(owner)
+        .patch(`/fee-lines/${ikejaLine.body.id}`)
+        .send({ amountMinor: 2 })
+        .expect(400);
+      await api(owner)
+        .post(`/fee-lines/${ikejaLine.body.id}/retire`)
+        .expect(400);
+      expect(await scheduleRows(pool, orgA.id)).toHaveLength(written + 1);
+    });
+
+    test('a copy writes one row per campus share about the target term, and a refused copy writes none', async ({
+      api,
+      app,
+      pool,
+      schools: { owner, orgA, lekki },
+    }) => {
+      const { third, next } = await copyScenario(app, api, { owner, lekki });
+      const copyRows = async () =>
+        (await scheduleRows(pool, orgA.id)).filter(
+          (row) => row.kind === 'fee_lines.copied'
+        );
+      await api(owner)
+        .post('/fee-lines/copy')
+        .send({ termId: next.id })
+        .expect(201);
+      await api(owner)
+        .post('/fee-lines/copy')
+        .send({ termId: next.id })
+        .expect(409);
+
+      const rows = await copyRows();
+      for (const row of rows) {
+        expect(row).toMatchObject({
+          pillar: 'finance',
+          organization_id: orgA.id,
+          subject_type: 'term',
+          subject_id: next.id,
+        });
+      }
+      expect(rows).toHaveLength(2);
+      expect(rows.map((row) => [row.campus_id, row.data, row.text])).toEqual(
+        expect.arrayContaining([
+          [
+            null,
+            { fromTermId: third.id, toTermId: next.id, copied: 3 },
+            expect.stringMatching(
+              /^.+ copied 3 fee lines from Third term, 2026\/2027 to First term, 2027\/2028 \(for every campus\)\.$/
+            ),
+          ],
+          [
+            lekki.id,
+            { fromTermId: third.id, toTermId: next.id, copied: 1 },
+            expect.stringMatching(
+              /^.+ copied 1 fee line from Third term, 2026\/2027 to First term, 2027\/2028 \(for this campus\)\.$/
+            ),
+          ],
+        ])
+      );
+    });
+
+    test('a campus-scoped finance reader sees only their campus’s share of a copy', async ({
+      api,
+      app,
+      schools: { owner, lekkiOnly, lekki, ikeja },
+    }) => {
+      const { next, inThird } = await copyScenario(app, api, { owner, lekki });
+      const as = { app, actor: owner };
+      await createFeeLine(as, inThird, {
+        name: 'Ikeja tuition',
+        campusId: ikeja.id,
+        amountMinor: 16_500_000,
+      });
+      await createFeeLine(as, inThird, {
+        name: 'Ikeja JSS1 tuition',
+        level: 'JSS1',
+        campusId: ikeja.id,
+        amountMinor: 15_000_000,
+      });
+      await api(owner)
+        .post('/fee-lines/copy')
+        .send({ termId: next.id })
+        .expect(201);
+
+      const seen = (await financeTexts(api, lekkiOnly)).filter((text) =>
+        text.includes(' copied ')
+      );
+      expect(seen).toHaveLength(2);
+      expect(seen.join(' ')).toContain('copied 3 fee lines');
+      expect(seen.join(' ')).toContain('copied 1 fee line from');
+      expect(seen.join(' ')).not.toContain('copied 2 fee lines');
+      expect(
+        (await financeTexts(api, owner)).filter((text) =>
+          text.includes(' copied ')
+        )
+      ).toHaveLength(3);
+    });
+
+    test('a copy from an empty source writes no row', async ({
+      api,
+      app,
+      pool,
+      schools: { owner, orgA, lekki },
+    }) => {
+      const { third, next } = await copyScenario(app, api, { owner, lekki });
+      await pool.query(
+        'UPDATE fee_line SET retired_at = now() WHERE term_id = $1',
+        [third.id]
+      );
+      await api(owner)
+        .post('/fee-lines/copy')
+        .send({ termId: next.id })
+        .expect(400);
+      expect(
+        (await scheduleRows(pool, orgA.id)).filter(
+          (row) => row.kind === 'fee_lines.copied'
+        )
+      ).toEqual([]);
+    });
+
+    test('two concurrent amount edits chain their previous amounts', async ({
+      api,
+      app,
+      pool,
+      schools: { owner, orgA },
+    }) => {
+      const fixture = await feeFixture(app, api, owner);
+      const line = await createFeeLine({ app, actor: owner }, fixture, {
+        name: 'Tuition',
+        amountMinor: 18_000_000,
+      });
+      await Promise.all(
+        [19_000_000, 20_000_000].map((amountMinor) =>
+          api(owner)
+            .patch(`/fee-lines/${line.id}`)
+            .send({ amountMinor })
+            .expect(200)
+        )
+      );
+      const changes = (await scheduleRows(pool, orgA.id)).filter(
+        (row) => row.kind === 'fee_line.amount_changed'
+      );
+      expect(changes).toHaveLength(2);
+      const [first, second] = changes.map((row) => ({
+        from: row.data['previousAmountMinor'],
+        to: row.data['amountMinor'],
+      }));
+      expect(first?.from).toBe(18_000_000);
+      expect(second?.from).toBe(first?.to);
+      const { rows } = await pool.query<{ amount_minor: string }>(
+        'SELECT amount_minor FROM fee_line WHERE id = $1',
+        [line.id]
+      );
+      expect(Number(rows[0]?.amount_minor)).toBe(second?.to);
+    });
+
+    test('a write whose activity row cannot be saved rolls back', async ({
+      api,
+      app,
+      pool,
+      schools: { owner, orgA },
+    }) => {
+      const fixture = await feeFixture(app, api, owner);
+      const line = await createFeeLine({ app, actor: owner }, fixture, {
+        name: 'Tuition',
+        amountMinor: 18_000_000,
+      });
+      const repository = app.get(FeeLineRepository, { strict: false });
+      const refused = (found: FeeLine) => [
+        {
+          organizationId: orgA.id,
+          campusId: found.campusId,
+          pillar: 'finance' as const,
+          kind: 'fee_line.created',
+          actorUserId: 'unused',
+          subjectType: 'fee_line',
+          subjectId: found.id,
+          text: 'refused',
+          data: { token: 'x' },
+        },
+      ];
+      const rowCount = async (table: 'fee_line' | 'activity_event') =>
+        Number(
+          (
+            await pool.query<{ count: string }>(
+              `SELECT count(*) FROM ${table} WHERE organization_id = $1`,
+              [orgA.id]
+            )
+          ).rows[0]?.count
+        );
+      const before = {
+        lines: await rowCount('fee_line'),
+        activity: await rowCount('activity_event'),
+      };
+
+      await expect(
+        repository.create(
+          {
+            organizationId: orgA.id,
+            userId: owner.id,
+            termId: fixture.termId,
+            classLevelId: fixture.levelId('JSS2'),
+            feeTypeId: fixture.feeTypeId('PTA fee'),
+            campusId: null,
+            name: 'PTA',
+            amountMinor: 1,
+            appliesTo: 'all',
+            isOptional: false,
+          },
+          refused
+        )
+      ).rejects.toThrow('secret');
+      await expect(
+        repository.updateAmount(
+          { organizationId: orgA.id, id: line.id, amountMinor: 2 },
+          refused
+        )
+      ).rejects.toThrow('secret');
+      await expect(
+        repository.retire(orgA.id, line.id, refused)
+      ).rejects.toThrow('secret');
+
+      expect(await rowCount('fee_line')).toBe(before.lines);
+      expect(await rowCount('activity_event')).toBe(before.activity);
+      const { rows } = await pool.query<{
+        amount_minor: string;
+        retired_at: Date | null;
+      }>('SELECT amount_minor, retired_at FROM fee_line WHERE id = $1', [
+        line.id,
+      ]);
+      expect(Number(rows[0]?.amount_minor)).toBe(18_000_000);
+      expect(rows[0]?.retired_at).toBeNull();
+    });
+
+    test('a copy whose activity row cannot be saved leaves the target term empty', async ({
+      api,
+      app,
+      pool,
+      schools: { owner, orgA, lekki },
+    }) => {
+      const { third, next } = await copyScenario(app, api, { owner, lekki });
+      const repository = app.get(FeeLineRepository, { strict: false });
+      const activityBefore = await scheduleRows(pool, orgA.id);
+
+      await expect(
+        repository.copyLines(
+          {
+            organizationId: orgA.id,
+            userId: owner.id,
+            fromTermId: third.id,
+            toTermId: next.id,
+          },
+          (shares) =>
+            shares.map(({ campusId }) => ({
+              organizationId: orgA.id,
+              campusId,
+              pillar: 'finance' as const,
+              kind: 'fee_lines.copied',
+              actorUserId: owner.id,
+              subjectType: 'term',
+              subjectId: next.id,
+              text: 'refused',
+              data: { token: 'x' },
+            }))
+        )
+      ).rejects.toThrow('secret');
+
+      const target = (
+        await api(owner).get(`/fee-lines?termId=${next.id}`).expect(200)
+      ).body as FeeLine[];
+      expect(target).toEqual([]);
+      expect(await scheduleRows(pool, orgA.id)).toHaveLength(
+        activityBefore.length
+      );
+    });
+
+    test('fee-line rows stay out of another school’s feed and respect campus scope and finance read', async ({
+      api,
+      app,
+      schools: { owner, ownerB, lekkiOnly, noPermission, lekki, ikeja },
+    }) => {
+      const fixture = await feeFixture(app, api, owner);
+      const as = { app, actor: owner };
+      await createFeeLine(as, fixture, {
+        name: 'Every campus tuition',
+        amountMinor: 18_000_000,
+      });
+      await createFeeLine(as, fixture, {
+        name: 'Lekki tuition',
+        campusId: lekki.id,
+        amountMinor: 17_000_000,
+      });
+      await createFeeLine(as, fixture, {
+        name: 'Ikeja tuition',
+        campusId: ikeja.id,
+        amountMinor: 16_500_000,
+      });
+
+      expect(await financeTexts(api, owner)).toHaveLength(3);
+      expect(await financeTexts(api, ownerB)).toEqual([]);
+      const lekkiSees = (await financeTexts(api, lekkiOnly)).join(' ');
+      expect(lekkiSees).toContain('Every campus tuition');
+      expect(lekkiSees).toContain('Lekki tuition');
+      expect(lekkiSees).not.toContain('Ikeja tuition');
+      expect(await financeTexts(api, noPermission)).toEqual([]);
+    });
+
+    test('a member holding only feeLine:read sees no fee-line row', async ({
+      api,
+      app,
+      withPermissions,
+      schools: { owner, orgA, lekki, ikeja },
+    }) => {
+      const fixture = await feeFixture(app, api, owner);
+      await createFeeLine({ app, actor: owner }, fixture, {
+        name: 'Tuition',
+        amountMinor: 18_000_000,
+      });
+      const reader = await withPermissions(orgA, ['feeLine:read'], {
+        campuses: [lekki, ikeja],
+      });
+      expect(await financeTexts(api, reader)).toEqual([]);
     });
   });
 
@@ -1655,6 +2159,7 @@ test.describe('fee lines', () => {
     test('answers 409 to the second of two concurrent copies and saves one set of lines', async ({
       api,
       app,
+      pool,
       schools: { owner, lekki },
     }) => {
       const { next } = await copyScenario(app, api, { owner, lekki });
@@ -1672,6 +2177,11 @@ test.describe('fee lines', () => {
         await api(owner).get(`/fee-lines?termId=${next.id}`).expect(200)
       ).body as FeeLine[];
       expect(target).toHaveLength(4);
+      const { rows } = await pool.query(
+        `SELECT campus_id FROM activity_event WHERE kind = 'fee_lines.copied' AND subject_id = $1`,
+        [next.id]
+      );
+      expect(rows).toHaveLength(2);
     });
   });
 });

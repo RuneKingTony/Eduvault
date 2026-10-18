@@ -1,8 +1,14 @@
+import type { FeeLine } from '@eduvault/api-contract';
+import { money } from '@eduvault/shared';
 import {
   adjustmentApprovedActivity,
   adjustmentDeclinedActivity,
   discountApprovedActivity,
   discountDeclinedActivity,
+  feeLineAmountChangedActivity,
+  feeLineCreatedActivity,
+  feeLineRetiredActivity,
+  feeLinesCopiedActivity,
   paymentCancellationDeclinedActivity,
   paymentCancelledActivity,
   paymentRecordedActivity,
@@ -344,5 +350,216 @@ describe('discount activity', () => {
         },
       },
     ]);
+  });
+});
+
+const lekkiLine: FeeLine = {
+  id: 'line-1',
+  termId: 'term-1',
+  classLevelId: 'level-1',
+  levelName: 'JSS 1',
+  levelSequence: 7,
+  feeTypeId: 'type-1',
+  feeTypeCode: 4010,
+  feeTypeName: 'Tuition',
+  campusId: LEKKI,
+  campusName: 'Lekki',
+  name: 'JSS 1 Tuition',
+  amountMinor: 17_000_000,
+  appliesTo: 'all',
+  isOptional: false,
+  retiredAt: null,
+  createdAt: '2026-09-01T00:00:00.000Z',
+};
+
+const everyCampusLine: FeeLine = {
+  ...lekkiLine,
+  id: 'line-2',
+  campusId: null,
+  campusName: null,
+};
+
+const termLabel = 'First term, 2026/2027';
+
+describe('feeLineCreatedActivity', () => {
+  it('writes one finance row for the line’s campus', () => {
+    expect(feeLineCreatedActivity(actor, lekkiLine, termLabel)).toEqual([
+      {
+        organizationId: 'org-1',
+        campusId: LEKKI,
+        pillar: 'finance',
+        kind: 'fee_line.created',
+        actorUserId: 'user-1',
+        subjectType: 'fee_line',
+        subjectId: 'line-1',
+        text: 'Tunde Bakare added JSS 1 Tuition (Tuition) for JSS 1, Lekki, First term, 2026/2027: ₦170,000.',
+        data: {
+          feeLineId: 'line-1',
+          termId: 'term-1',
+          classLevelId: 'level-1',
+          feeTypeId: 'type-1',
+          amountMinor: 17_000_000,
+          appliesTo: 'all',
+          isOptional: false,
+        },
+      },
+    ]);
+  });
+
+  it('keeps a null campus and says every campus for a school-wide line', () => {
+    const [row] = feeLineCreatedActivity(actor, everyCampusLine, termLabel);
+    expect(row?.campusId).toBeNull();
+    expect(row?.pillar).toBe('finance');
+    expect(row?.text).toContain('for JSS 1, every campus, First term');
+  });
+
+  it('writes the amount in the school currency', () => {
+    const [row] = feeLineCreatedActivity(
+      { ...actor, currency: 'USD' },
+      lekkiLine,
+      termLabel
+    );
+    expect(row?.text).toBe(
+      `Tunde Bakare added JSS 1 Tuition (Tuition) for JSS 1, Lekki, First term, 2026/2027: ${money(17_000_000, 'USD')}.`
+    );
+    expect(row?.text).not.toContain('₦');
+  });
+});
+
+describe('feeLineAmountChangedActivity', () => {
+  it('names the old and new amount on the line’s campus', () => {
+    expect(
+      feeLineAmountChangedActivity(
+        actor,
+        { ...lekkiLine, amountMinor: 18_000_000 },
+        { previousAmountMinor: 17_000_000, termLabel }
+      )
+    ).toEqual([
+      {
+        organizationId: 'org-1',
+        campusId: LEKKI,
+        pillar: 'finance',
+        kind: 'fee_line.amount_changed',
+        actorUserId: 'user-1',
+        subjectType: 'fee_line',
+        subjectId: 'line-1',
+        text: 'Tunde Bakare changed JSS 1 Tuition for JSS 1, Lekki, First term, 2026/2027 from ₦170,000 to ₦180,000.',
+        data: {
+          feeLineId: 'line-1',
+          termId: 'term-1',
+          previousAmountMinor: 17_000_000,
+          amountMinor: 18_000_000,
+        },
+      },
+    ]);
+  });
+
+  it('uses a null campus for a school-wide line, in another currency', () => {
+    const [row] = feeLineAmountChangedActivity(
+      { ...actor, currency: 'USD' },
+      { ...everyCampusLine, amountMinor: 20_000 },
+      { previousAmountMinor: 10_000, termLabel }
+    );
+    expect(row?.campusId).toBeNull();
+    expect(row?.text).toBe(
+      `Tunde Bakare changed JSS 1 Tuition for JSS 1, every campus, First term, 2026/2027 from ${money(10_000, 'USD')} to ${money(20_000, 'USD')}.`
+    );
+  });
+});
+
+describe('feeLineRetiredActivity', () => {
+  it('names the retired amount on the line’s campus', () => {
+    expect(feeLineRetiredActivity(actor, lekkiLine, termLabel)).toEqual([
+      {
+        organizationId: 'org-1',
+        campusId: LEKKI,
+        pillar: 'finance',
+        kind: 'fee_line.retired',
+        actorUserId: 'user-1',
+        subjectType: 'fee_line',
+        subjectId: 'line-1',
+        text: 'Tunde Bakare retired JSS 1 Tuition for JSS 1, Lekki, First term, 2026/2027 (₦170,000).',
+        data: {
+          feeLineId: 'line-1',
+          termId: 'term-1',
+          amountMinor: 17_000_000,
+        },
+      },
+    ]);
+  });
+
+  it('uses a null campus for a school-wide line, in another currency', () => {
+    const [row] = feeLineRetiredActivity(
+      { ...actor, currency: 'USD' },
+      everyCampusLine,
+      termLabel
+    );
+    expect(row?.campusId).toBeNull();
+    expect(row?.text).toContain(
+      `every campus, First term, 2026/2027 (${money(17_000_000, 'USD')}).`
+    );
+  });
+});
+
+describe('feeLinesCopiedActivity', () => {
+  const terms = {
+    from: { id: 'term-1', label: 'First term, 2026/2027' },
+    to: { id: 'term-2', label: 'Second term, 2026/2027' },
+  };
+
+  it('writes one row about the target term when every copied line is every-campus', () => {
+    expect(
+      feeLinesCopiedActivity(actor, terms, [{ campusId: null, count: 12 }])
+    ).toEqual([
+      {
+        organizationId: 'org-1',
+        campusId: null,
+        pillar: 'finance',
+        kind: 'fee_lines.copied',
+        actorUserId: 'user-1',
+        subjectType: 'term',
+        subjectId: 'term-2',
+        text: 'Tunde Bakare copied 12 fee lines from First term, 2026/2027 to Second term, 2026/2027.',
+        data: { fromTermId: 'term-1', toTermId: 'term-2', copied: 12 },
+      },
+    ]);
+  });
+
+  it('says "1 fee line" for a single copied line', () => {
+    const [row] = feeLinesCopiedActivity(actor, terms, [
+      { campusId: LEKKI, count: 1 },
+    ]);
+    expect(row?.text).toContain('copied 1 fee line from');
+  });
+
+  it('writes one row per campus with that campus’s own count', () => {
+    const rows = feeLinesCopiedActivity(actor, terms, [
+      { campusId: null, count: 3 },
+      { campusId: LEKKI, count: 2 },
+      { campusId: IKEJA, count: 1 },
+    ]);
+    expect(
+      rows.map((row) => [row.campusId, row.data?.['copied'], row.text])
+    ).toEqual([
+      [
+        null,
+        3,
+        'Tunde Bakare copied 3 fee lines from First term, 2026/2027 to Second term, 2026/2027 (for every campus).',
+      ],
+      [
+        LEKKI,
+        2,
+        'Tunde Bakare copied 2 fee lines from First term, 2026/2027 to Second term, 2026/2027 (for this campus).',
+      ],
+      [
+        IKEJA,
+        1,
+        'Tunde Bakare copied 1 fee line from First term, 2026/2027 to Second term, 2026/2027 (for this campus).',
+      ],
+    ]);
+  });
+
+  it('writes nothing when no line was copied', () => {
+    expect(feeLinesCopiedActivity(actor, terms, [])).toEqual([]);
   });
 });
