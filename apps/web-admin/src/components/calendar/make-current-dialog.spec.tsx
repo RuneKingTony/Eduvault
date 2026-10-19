@@ -1,5 +1,5 @@
 import { fireEvent, screen } from '@testing-library/react';
-import { fakeAccess, renderWithApi } from '../../test-utils';
+import { fakeAccess, renderWithApi, seedFeeSetup } from '../../test-utils';
 import { currentCalendar, currentYear, nextYear } from '../../test-calendar';
 import { findTerm } from './calendar-text';
 import { MakeCurrentDialog } from './make-current-dialog';
@@ -16,7 +16,7 @@ function setup(
   }
   const onOpenChange = vi.fn();
   const onStartYear = vi.fn();
-  renderWithApi(
+  const { queryClient } = renderWithApi(
     <MakeCurrentDialog
       target={target}
       current={currentCalendar()}
@@ -30,7 +30,7 @@ function setup(
     },
     access
   );
-  return { makeCurrent, onOpenChange, onStartYear };
+  return { makeCurrent, onOpenChange, onStartYear, queryClient };
 }
 
 describe('MakeCurrentDialog', () => {
@@ -95,6 +95,17 @@ describe('MakeCurrentDialog', () => {
     await vi.waitFor(() => {
       expect(makeCurrent).toHaveBeenCalledWith({ params: { id: 't4' } });
       expect(onOpenChange).toHaveBeenCalledWith(false);
+    });
+  });
+
+  it('drops the cached fee setup', async () => {
+    const { queryClient } = setup(357);
+    const { key } = seedFeeSetup(queryClient);
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Make current anyway' })
+    );
+    await vi.waitFor(() => {
+      expect(queryClient.getQueryData(key)).toBeUndefined();
     });
   });
 

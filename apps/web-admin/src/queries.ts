@@ -668,6 +668,16 @@ export async function invalidateFees(queryClient: QueryClient): Promise<void> {
   await queryClient.invalidateQueries({ queryKey: FEES_KEY });
 }
 
+async function resetFees(queryClient: QueryClient): Promise<void> {
+  await queryClient.resetQueries({ queryKey: FEES_KEY });
+}
+
+export async function refreshForCurrentTerm(
+  queryClient: QueryClient
+): Promise<void> {
+  await Promise.all([invalidateCalendar(queryClient), resetFees(queryClient)]);
+}
+
 const BILLING_KEY = ['billing'] as const;
 const INVOICES_KEY = ['invoices'] as const;
 
