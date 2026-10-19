@@ -18,7 +18,6 @@ import {
   isApprovalOn,
   type WaitingApproval,
 } from '../../common/approvals';
-import { inCampusScope } from '../../common/db/in-campus-scope';
 import { KYSELY_TOKEN, type Database } from '../../common/db/tokens';
 import {
   allocateDocumentNumber,
@@ -30,6 +29,10 @@ import {
   schoolCurrency,
   systemAccountId,
 } from '../../common/ledger';
+import {
+  usableMoneyAccount,
+  type UsableMoneyAccount,
+} from '../../common/money-accounts';
 import {
   currentCampusSql,
   inScope,
@@ -47,7 +50,6 @@ import {
   type CreditAccountCheck,
   type MoneyAccountPosting,
   type NewAdjustment,
-  type RefundAccountCheck,
   type SentChargeCheck,
   type StudentFacts,
   type SystemAccounts,
@@ -202,33 +204,8 @@ class KyselyAdjustmentTx implements AdjustmentTx {
       : { status: 'not_allowed' };
   }
 
-  async refundAccount(moneyAccountId: string): Promise<RefundAccountCheck> {
-    const row = await this.trx
-      .selectFrom('money_account')
-      .select(['ledger_account_id', 'campus_id', 'kind', 'retired_at'])
-      .where('organization_id', '=', this.organizationId)
-      .where('id', '=', moneyAccountId)
-      .where((eb) =>
-        inCampusScope(eb, 'money_account.campus_id', {
-          scope: this.who.scope.campusScope,
-          nullMeans: 'all',
-        })
-      )
-      .executeTakeFirst();
-    if (row === undefined) {
-      return { status: 'missing' };
-    }
-    if (row.kind === 'gateway') {
-      return { status: 'gateway' };
-    }
-    if (row.retired_at !== null) {
-      return { status: 'retired' };
-    }
-    return {
-      status: 'ok',
-      ledgerAccountId: row.ledger_account_id,
-      campusId: row.campus_id,
-    };
+  refundAccount(moneyAccountId: string): Promise<UsableMoneyAccount> {
+    return usableMoneyAccount(this.trx, this.who.scope, moneyAccountId);
   }
 
   async moneyAccountPosting(

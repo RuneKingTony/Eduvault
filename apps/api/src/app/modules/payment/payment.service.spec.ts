@@ -21,6 +21,7 @@ import {
 } from '@eduvault/api-contract';
 import type { OrgContext } from '../../common/auth';
 import { Clock } from '../../common/clock';
+import type { UsableMoneyAccount } from '../../common/money-accounts';
 import type { MoneyAccountService } from '../money-account/money-account.service';
 import { paymentRequestHash, type ProofState } from '../../common/payments';
 import {
@@ -30,7 +31,6 @@ import {
   type NewRecordedPayment,
   type PaymentPage,
   type PaymentScope,
-  type RecordingAccount,
   type RecordingPeople,
 } from './payment.repository';
 import { PaymentService } from './payment.service';
@@ -91,7 +91,7 @@ class FakePayments extends PaymentRepository {
   raced: ExistingPayment | undefined;
   lookups = 0;
   visible: Omit<Payment, 'currency'> | undefined = stored();
-  account: RecordingAccount = {
+  account: UsableMoneyAccount = {
     status: 'ok',
     ledgerAccountId: 'ledger-1',
     campusId: null,
