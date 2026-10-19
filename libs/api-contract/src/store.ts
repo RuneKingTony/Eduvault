@@ -6,9 +6,11 @@ import {
   type MoneyAccountKind,
 } from './finance';
 import {
+  RESERVED_REFERENCE_MESSAGE,
   datedReference,
   idSchema,
   memberRefSchema,
+  notReservedReference,
   paymentMethodSchema,
   paymentMethodsSchema,
   paymentMethodWord,
@@ -493,7 +495,7 @@ export const recordSaleSchema = z
     reference: requiredText(
       DELIVERY_REFERENCE_MAX,
       DELIVERY_REFERENCE_REQUIRED_MESSAGE
-    ),
+    ).refine(notReservedReference, RESERVED_REFERENCE_MESSAGE),
     studentId: idSchema,
     method: paymentMethodSchema,
     moneyAccountId: idSchema.optional(),

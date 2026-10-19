@@ -32,6 +32,15 @@ export interface PostResult {
   replayed: boolean;
 }
 
+/** Thrown where one posting must happen exactly once and its reference already heads another entry. */
+export class ReferenceClashError extends Error {
+  override readonly name = 'ReferenceClashError';
+
+  constructor(readonly reference: string) {
+    super(`Journal reference ${reference} is already used by another entry.`);
+  }
+}
+
 export class UnbalancedEntryError extends Error {
   override readonly name = 'UnbalancedEntryError';
 }

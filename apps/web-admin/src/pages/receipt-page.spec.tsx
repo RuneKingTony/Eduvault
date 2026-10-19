@@ -133,6 +133,11 @@ describe('ReceiptPage', () => {
     );
   });
 
+  it('dates the receipt by the Lagos day it was recorded, not the UTC one', async () => {
+    setup({ payment: payment({ recordedAt: '2026-10-06T23:30:00.000Z' }) });
+    expect(await screen.findByText('Recorded 7 Oct 2026')).toBeVisible();
+  });
+
   it('shows the store sale a receipt belongs to, linked to Items sold, and a POS slip', async () => {
     setup({
       payment: payment({

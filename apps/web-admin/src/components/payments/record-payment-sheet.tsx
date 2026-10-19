@@ -1,8 +1,12 @@
-import { useState, type SubmitEvent } from 'react';
+import { useRef, useState, type SubmitEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { CheckIcon } from 'lucide-react';
-import type { RecordedPayment, RecordingOptions } from '@eduvault/api-contract';
+import type {
+  PaymentMethod,
+  RecordedPayment,
+  RecordingOptions,
+} from '@eduvault/api-contract';
 import { generatePaymentReference, money } from '@eduvault/shared';
 import {
   Button,
@@ -40,6 +44,8 @@ import {
   initialState,
   toRequest,
   validate,
+  accountsFor,
+  withAccount,
   withAmount,
   withMethod,
   withPayer,
@@ -164,10 +170,13 @@ function useSheetState(options: RecordingOptions, prefill: Prefill) {
     },
     method: (method) => {
       setState((current) =>
-        withMethod(
-          current,
-          method,
-          generatePaymentReference(method, options.today)
+        withAccount(
+          withMethod(
+            current,
+            method,
+            generatePaymentReference(method, options.today)
+          ),
+          options.accounts
         )
       );
     },
@@ -176,6 +185,19 @@ function useSheetState(options: RecordingOptions, prefill: Prefill) {
     },
   };
   return { state, act };
+}
+
+function accountNotice(
+  options: RecordingOptions,
+  method: PaymentMethod
+): string | undefined {
+  if (options.accounts.length === 0) {
+    return 'Add a bank, POS or cash account before recording payments.';
+  }
+  if (accountsFor(options.accounts, method).length === 0) {
+    return 'No account takes this payment method. Add one in Accounts first.';
+  }
+  return undefined;
 }
 
 function SheetFields({
@@ -198,13 +220,7 @@ function SheetFields({
       <SplitCard {...fields} />
       <ReferencesDisclosure state={state} errors={errors} act={act} />
       <ErrorMessage error={failure} />
-      <FieldError
-        message={
-          options.accounts.length === 0
-            ? 'Add a bank, POS or cash account before recording payments.'
-            : undefined
-        }
-      />
+      <FieldError message={accountNotice(options, state.method)} />
     </>
   );
 }
@@ -241,25 +257,30 @@ function SheetForm({
   onClose: () => void;
 }) {
   const { state, act } = useSheetState(options, prefill);
-  const [errors, setErrors] = useState<SheetErrors>({});
+  const [submitted, setSubmitted] = useState(false);
   const [file, setFile] = useState<File | undefined>();
   const [uploaded, setUploaded] = useState<UploadedProof>();
+  const sending = useRef(false);
   const record = useRecord(stay, {
     onClose,
-    onUploaded: (stored, id) => {
-      setUploaded({ file: stored, id });
-    },
+    onUploaded: (stored, id) => setUploaded({ file: stored, id }),
     uploaded,
     options,
   });
+  const proof = { file, uploaded: uploaded !== undefined };
+  const errors: SheetErrors = submitted ? validate(state, proof) : {};
 
   function submit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
-    const found = validate(state, { file, uploaded: uploaded !== undefined });
-    setErrors(found);
-    if (Object.keys(found).length === 0) {
-      record.mutate({ state, file: file ?? uploaded?.file });
+    setSubmitted(true);
+    if (sending.current || Object.keys(validate(state, proof)).length > 0) {
+      return;
     }
+    sending.current = true;
+    record.mutate(
+      { state, file: file ?? uploaded?.file },
+      { onSettled: () => (sending.current = false) }
+    );
   }
 
   return (
@@ -278,7 +299,10 @@ function SheetForm({
       </form>
       <SheetActionsFooter
         onClose={onClose}
-        disabled={record.isPending || options.accounts.length === 0}
+        disabled={
+          record.isPending ||
+          accountsFor(options.accounts, state.method).length === 0
+        }
       />
     </>
   );

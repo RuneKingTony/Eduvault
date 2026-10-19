@@ -3,11 +3,30 @@ import { emailOf, personas, SEED_PASSWORD } from '../scripts/seed/members';
 import { visibleStudents } from '../scripts/seed/seed-check';
 import { baseTest as test, expect } from './support/base-test';
 
+const NOW = new Date('2026-10-20T10:00:00Z');
+const SEED_TODAY = '2026-10-14';
+
+test.afterEach(() => {
+  vi.useRealTimers();
+});
+
 test.describe('dev seed', () => {
+  test('passes its check a year after the seed date, however late it runs', async ({
+    app,
+  }) => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2027-10-20T10:00:00Z'));
+
+    const result = await runSeed(app, { log: () => undefined, now: NOW });
+
+    expect(result).toEqual({ seeded: true, failures: [] });
+  });
+
   test('seeds the three schools, passes its check and is idempotent', async ({
     app,
     api,
     pool,
+    clock,
   }) => {
     const lines: string[] = [];
     const log = (line: string) => lines.push(line);
@@ -64,12 +83,10 @@ test.describe('dev seed', () => {
       return rows[0];
     };
 
-    const first = await runSeed(app, {
-      log,
-      now: new Date('2026-10-20T10:00:00Z'),
-    });
+    const first = await runSeed(app, { log, now: NOW });
     expect(first).toEqual({ seeded: true, failures: [] });
-    expect(lines.join('\n')).toContain('seed "today" is 2026-10-14');
+    expect(lines.join('\n')).toContain(`seed "today" is ${SEED_TODAY}`);
+    clock.set(SEED_TODAY);
     expect(await counts()).toEqual({
       organization: '3',
       team: '6',

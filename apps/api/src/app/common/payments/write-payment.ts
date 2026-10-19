@@ -99,7 +99,7 @@ async function postEntry(
     ),
     systemAccountId(trx, organizationId, FEES_RECEIVABLE_SYSTEM_KEY),
   ]);
-  const { entry } = await poster.post(trx, {
+  const entry = await poster.postOnce(trx, {
     organizationId,
     reference: input.reference,
     kind: 'payment',

@@ -6,8 +6,10 @@ import {
   PAYMENT_PROOF_TYPE_MESSAGE,
   PAYMENT_REFERENCE_REQUIRED_MESSAGE,
   paymentSplitMismatchMessage,
+  accountTakesMethod,
   type PaymentMethod,
   type PaymentMethods,
+  type RecordingMoneyAccount,
   type RecordPaymentInput,
   type RecordingChild,
   type RecordingOptions,
@@ -138,7 +140,7 @@ export function initialState(
     payerName: '',
     ...prefilled(childrenFor(options, who)),
     paidOn: options.today,
-    accountId: options.accounts[0]?.id ?? '',
+    accountId: accountsFor(options.accounts, method)[0]?.id ?? '',
     method,
     providerReference: '',
     reference: generatePaymentReference(method, options.today, random),
@@ -191,6 +193,13 @@ export function withShare(
   return { ...state, shares: { ...state.shares, [studentId]: text } };
 }
 
+export function accountsFor(
+  accounts: readonly RecordingMoneyAccount[],
+  method: PaymentMethod
+): RecordingMoneyAccount[] {
+  return accounts.filter((account) => accountTakesMethod(account.kind, method));
+}
+
 export function withMethod(
   state: SheetState,
   method: PaymentMethod,
@@ -201,6 +210,17 @@ export function withMethod(
     method,
     reference: state.referenceTouched ? state.reference : fresh,
   };
+}
+
+export function withAccount(
+  state: SheetState,
+  accounts: readonly RecordingMoneyAccount[]
+): SheetState {
+  const usable = accountsFor(accounts, state.method);
+  if (usable.some((account) => account.id === state.accountId)) {
+    return state;
+  }
+  return { ...state, accountId: usable[0]?.id ?? '' };
 }
 
 export const splitTotal = (state: SheetState): number =>

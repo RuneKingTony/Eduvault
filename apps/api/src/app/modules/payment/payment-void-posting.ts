@@ -1,9 +1,10 @@
+import { SYSTEM_REFERENCE_PREFIXES } from '@eduvault/shared';
 import type { LedgerLine } from '../../common/ledger';
 
 const VOID_MEMO_MAX = 500;
 
 export const voidReference = (paymentReference: string): string =>
-  `VOID-${paymentReference}`;
+  `${SYSTEM_REFERENCE_PREFIXES.void}-${paymentReference}`;
 
 export const voidMemo = (receiptNumber: string, reason: string): string =>
   `Void of ${receiptNumber}: ${reason}`.slice(0, VOID_MEMO_MAX);
