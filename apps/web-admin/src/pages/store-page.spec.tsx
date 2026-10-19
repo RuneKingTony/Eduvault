@@ -162,8 +162,12 @@ describe('StorePage', () => {
       screen.queryByRole('columnheader', { name: 'In stock' })
     ).not.toBeInTheDocument();
 
-    expect(rowOf('School shirt').getByText('12')).toBeVisible();
-    expect(rowOf('School shirt').getByText('0')).toBeVisible();
+    const heads = screen
+      .getAllByRole('columnheader')
+      .map((head) => head.textContent);
+    const cells = rowOf('School shirt').getAllByRole('cell');
+    expect(cells[heads.indexOf('Lekki')]).toHaveTextContent('12');
+    expect(cells[heads.indexOf('Ikeja')]).toHaveTextContent('0');
   });
 
   it('masks the Stock value and the Cost column until Show costs is on', async () => {
