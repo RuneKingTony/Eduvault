@@ -34,7 +34,7 @@ describe('SuspendedScreen', () => {
     expect(onRetry).toHaveBeenCalledOnce();
   });
 
-  it('shows the switcher it is given beside sign out', () => {
+  it('shows the switcher it is given before the other actions', () => {
     render(
       <SuspendedScreen
         schoolName="St Brendan’s"
@@ -45,11 +45,11 @@ describe('SuspendedScreen', () => {
       />
     );
     expect(
-      screen.getByRole('button', { name: 'Switch school' })
-    ).toBeInTheDocument();
+      screen.getAllByRole('button').map((button) => button.textContent)
+    ).toEqual(['Switch school', 'Check again', 'Sign out']);
   });
 
-  it('has no switcher when none is given', () => {
+  it('offers only Check again and Sign out when no switcher is given', () => {
     render(
       <SuspendedScreen
         schoolName="St Brendan’s"
@@ -59,7 +59,7 @@ describe('SuspendedScreen', () => {
       />
     );
     expect(
-      screen.queryByRole('button', { name: 'Switch school' })
-    ).not.toBeInTheDocument();
+      screen.getAllByRole('button').map((button) => button.textContent)
+    ).toEqual(['Check again', 'Sign out']);
   });
 });
