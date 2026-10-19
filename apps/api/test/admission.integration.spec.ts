@@ -406,6 +406,10 @@ test.describe('admission', () => {
     );
 
     expect(res.status).toBe(409);
+    expect(res.body).toEqual({
+      code: 'Conflict',
+      message: 'Resource already exists',
+    });
     expect(attempts).toBe(2);
     expect(await tally(pool, orgA.id)).toEqual(before);
     const next = await api(owner)
