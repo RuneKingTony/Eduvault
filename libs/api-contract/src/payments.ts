@@ -5,7 +5,9 @@ import { FINANCE_PAGE_SIZE, FINANCE_PAGE_SIZE_MAX } from './finance';
 import { invoiceJournalSchema } from './invoices';
 import {
   currencySchema,
+  RESERVED_REFERENCE_MESSAGE,
   idSchema,
+  notReservedReference,
   paymentMethodSchema,
   paymentMethodsSchema,
 } from './schemas';
@@ -101,7 +103,8 @@ export const paymentReferenceSchema = z
   .max(
     PAYMENT_REFERENCE_MAX,
     `Use ${PAYMENT_REFERENCE_MAX} characters or fewer.`
-  );
+  )
+  .refine(notReservedReference, RESERVED_REFERENCE_MESSAGE);
 
 const minorSchema = z.number().int();
 const countSchema = z.number().int().nonnegative();

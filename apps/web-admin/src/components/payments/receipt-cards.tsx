@@ -6,7 +6,7 @@ import {
   type PaymentAllocation,
 } from '@eduvault/api-contract';
 import { useCan } from '@eduvault/auth-client';
-import { fmtDate, money } from '@eduvault/shared';
+import { fmtTimestamp, money } from '@eduvault/shared';
 import {
   Card,
   CardContent,
@@ -182,7 +182,7 @@ export function ReceiptDetailsCard({ payment }: { payment: Payment }) {
       <CardHeader>
         <CardTitle>Receipt</CardTitle>
         <CardDescription>
-          Recorded {fmtDate(payment.recordedAt)}
+          Recorded {fmtTimestamp(payment.recordedAt)}
         </CardDescription>
       </CardHeader>
       <CardContent>

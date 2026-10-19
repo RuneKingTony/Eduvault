@@ -1,7 +1,6 @@
 import type { INestApplicationContext } from '@nestjs/common';
 import type { GuardianDraft } from '@eduvault/api-contract';
 import { AccountService, type OrgContext } from '../../src/app/common/auth';
-import { Clock } from '../../src/app/common/clock';
 import { KYSELY_TOKEN, type Database } from '../../src/app/common/db/tokens';
 import { stripMemberRole } from '../../src/app/common/auth/portal-login';
 import { ClassService } from '../../src/app/modules/class/class.service';
@@ -375,11 +374,10 @@ async function openPortalLogins(
 /** Most seeded students have no guardian, so the school's guardian-required rule is lifted while the roll is admitted. */
 export async function seedStudents(
   app: INestApplicationContext,
-  options: { owner: OrgContext; today: string; offsetDays: number }
+  options: { owner: OrgContext; offsetDays: number }
 ): Promise<void> {
-  const { owner, today, offsetDays } = options;
+  const { owner, offsetDays } = options;
   const db = app.get<Database>(KYSELY_TOKEN, { strict: false });
-  const clock = app.get(Clock, { strict: false });
   const arms = await loadArms(app, owner);
   const setRequired = (requireGuardian: boolean) =>
     db
@@ -388,7 +386,6 @@ export async function seedStudents(
       .where('organization_id', '=', owner.organizationId)
       .execute();
 
-  clock.set(today);
   await setRequired(false);
   try {
     const admitted = await admitAll(app, { owner, arms });
@@ -407,6 +404,5 @@ export async function seedStudents(
       .execute();
   } finally {
     await setRequired(true);
-    clock.set(null);
   }
 }

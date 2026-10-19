@@ -1,5 +1,5 @@
 import type { FeeAppliesTo, FeeLine } from '@eduvault/api-contract';
-import { countOf, fmtDate } from '@eduvault/shared';
+import { countOf, fmtTimestamp } from '@eduvault/shared';
 
 export const APPLIES_TO_LABELS: Record<FeeAppliesTo, string> = {
   all: 'Everyone',
@@ -26,7 +26,7 @@ export const CAMPUS_OVERRIDE_TIP = 'Campus override';
 export const EVERY_CAMPUS_LABEL = 'Every campus';
 
 export const retiredTip = (line: Pick<FeeLine, 'retiredAt'>): string =>
-  `Retired ${fmtDate(line.retiredAt?.slice(0, 10))}. Kept for history.`;
+  `Retired ${fmtTimestamp(line.retiredAt)}. Kept for history.`;
 
 export const feeCount = (fees: number, levels: number): string =>
   `${fees} ${fees === 1 ? 'fee' : 'fees'} across ${levels} ${levels === 1 ? 'level' : 'levels'}.`;

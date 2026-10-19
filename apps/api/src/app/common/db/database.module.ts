@@ -5,9 +5,10 @@ import {
   type OnApplicationShutdown,
 } from '@nestjs/common';
 import { Kysely, PostgresDialect } from 'kysely';
-import { Pool } from 'pg';
+import type { Pool } from 'pg';
 import type { DB } from '../../../db/db-types';
 import { ENV_TOKEN, type Env } from '../config/env';
+import { createPool } from './create-pool';
 import { DatabaseHealth } from './database-health';
 import { SchoolLock } from './school-lock';
 import { DB_TOKEN, KYSELY_TOKEN, type Database } from './tokens';
@@ -17,8 +18,7 @@ import { DB_TOKEN, KYSELY_TOKEN, type Database } from './tokens';
   providers: [
     {
       provide: DB_TOKEN,
-      useFactory: (env: Env) =>
-        new Pool({ connectionString: env.DATABASE_URL }),
+      useFactory: (env: Env) => createPool(env),
       inject: [ENV_TOKEN],
     },
     {

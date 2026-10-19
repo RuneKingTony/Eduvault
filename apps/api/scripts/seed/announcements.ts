@@ -126,6 +126,6 @@ export async function seedAnnouncements(
       }
     }
   } finally {
-    clock.set(null);
+    clock.set(today);
   }
 }
