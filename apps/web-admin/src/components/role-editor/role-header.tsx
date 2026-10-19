@@ -11,18 +11,13 @@ import { MEMBER_ROLE, OWNER_ROLE } from '@eduvault/policy';
 import {
   Alert,
   AlertDescription,
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
   Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@eduvault/ui';
+import { DetailCrumbs } from '../detail-page';
 import { WithTooltip } from '../member-roles';
 import { RoleSourceBadge } from './role-source-badge';
 import type { RoleEditorModel } from './use-role-editor';
@@ -59,21 +54,14 @@ export function RoleCrumbs({
   onBack: () => void;
 }) {
   return (
-    <Breadcrumb>
-      <BreadcrumbList>
-        <BreadcrumbItem>
-          <BreadcrumbLink asChild>
-            <button type="button" onClick={onBack}>
-              Roles
-            </button>
-          </BreadcrumbLink>
-        </BreadcrumbItem>
-        <BreadcrumbSeparator />
-        <BreadcrumbItem>
-          <BreadcrumbPage>{label}</BreadcrumbPage>
-        </BreadcrumbItem>
-      </BreadcrumbList>
-    </Breadcrumb>
+    <DetailCrumbs
+      parent={
+        <button type="button" onClick={onBack}>
+          Roles
+        </button>
+      }
+      last={label}
+    />
   );
 }
 
