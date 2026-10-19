@@ -3,11 +3,6 @@ import type { DB } from '../../../db/db-types';
 import type { CampusScope } from '../campus-scope';
 import { inCampusScope } from '../db/in-campus-scope';
 
-export interface MoneyAccountScope {
-  organizationId: string;
-  campusScope: CampusScope;
-}
-
 /** Whether a money account in the caller's reach can take money in or out. */
 export type UsableMoneyAccount =
   | { status: 'missing' }
@@ -18,7 +13,7 @@ export type UsableMoneyAccount =
 /** A school-wide account is in reach of every campus; a gateway never takes hand-entered money. */
 export async function usableMoneyAccount(
   db: Kysely<DB>,
-  scope: MoneyAccountScope,
+  scope: { organizationId: string; campusScope: CampusScope },
   moneyAccountId: string
 ): Promise<UsableMoneyAccount> {
   const row = await db
