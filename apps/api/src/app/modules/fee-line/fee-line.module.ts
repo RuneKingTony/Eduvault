@@ -11,6 +11,7 @@ import {
   FeeTypeRepository,
 } from './fee-line.repository';
 import { FeeLineService } from './fee-line.service';
+import { FeeOptInController } from './fee-opt-in.controller';
 import { FeeOptionController } from './fee-option.controller';
 import { FeeOptionService } from './fee-option.service';
 import { FeePreviewService } from './fee-preview.service';
@@ -23,7 +24,12 @@ import { KyselyFeeTypeRepository } from './kysely-fee-type.repository';
 
 @Module({
   imports: [EduvaultAuthModule, CampusModule, ActivityModule],
-  controllers: [FeeLineController, FeeTypeController, FeeOptionController],
+  controllers: [
+    FeeLineController,
+    FeeTypeController,
+    FeeOptionController,
+    FeeOptInController,
+  ],
   providers: [
     FeeLineService,
     FeeGridService,

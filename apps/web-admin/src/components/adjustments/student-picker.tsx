@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { StudentRow } from '@eduvault/api-contract';
 import { NativeSelectOption, SelectField, TextField } from '@eduvault/ui';
@@ -7,21 +7,7 @@ import {
   requestStudentsQueryOptions,
   studentQueryOptions,
 } from '../../queries';
-
-const SEARCH_DELAY_MS = 250;
-
-function useDebounced(value: string): string {
-  const [settled, setSettled] = useState(value);
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setSettled(value);
-    }, SEARCH_DELAY_MS);
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [value]);
-  return settled;
-}
+import { useDebounced } from '../../use-debounced';
 
 const labelOf = (student: StudentRow) =>
   `${student.firstName} ${student.lastName} · ${student.admissionNumber}`;
