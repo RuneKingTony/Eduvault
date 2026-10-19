@@ -1,0 +1,26 @@
+[
+  {
+    "query": "Audit the dashboard module's tests for tautological tests",
+    "should_trigger": true
+  },
+  {
+    "query": "Which of our unit tests just test the fake and would never fail?",
+    "should_trigger": true
+  },
+  {
+    "query": "Can you check whether the web-admin specs have vacuous or change-detector tests?",
+    "should_trigger": true
+  },
+  {
+    "query": "Write an integration test for the new payments route",
+    "should_trigger": false
+  },
+  {
+    "query": "Run the tests for the api project",
+    "should_trigger": false
+  },
+  {
+    "query": "Review this branch for tenancy bugs",
+    "should_trigger": false
+  }
+]
