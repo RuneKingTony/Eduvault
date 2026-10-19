@@ -1,4 +1,5 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { TooltipProvider } from '@eduvault/ui';
 import { feeGrid, gridCell, gridRow } from '../../test-fees';
 import { FeeGridCard } from './fee-grid-card';
@@ -96,11 +97,12 @@ describe('FeeGridCard', () => {
     expect(screen.getByText('—')).toBeInTheDocument();
   });
 
-  it('pages the levels ten at a time', () => {
+  it('pages the levels ten at a time', async () => {
+    const user = userEvent.setup();
     show(feeGrid({ rows: manyRows(12) }));
     expect(screen.getByText('Level 10')).toBeInTheDocument();
     expect(screen.queryByText('Level 11')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Page 2' }));
+    await user.click(screen.getByRole('button', { name: 'Page 2' }));
     expect(screen.getByText('Level 11')).toBeInTheDocument();
     expect(screen.queryByText('Level 1')).not.toBeInTheDocument();
   });

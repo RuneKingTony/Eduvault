@@ -1,4 +1,5 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { ApiError } from '@eduvault/api-contract';
 import { toast } from '@eduvault/ui';
 import {
@@ -15,10 +16,6 @@ vi.mock('@eduvault/ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@eduvault/ui')>()),
   toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() },
 }));
-
-const openMenu = (trigger: HTMLElement) => {
-  fireEvent.keyDown(trigger, { key: 'Enter' });
-};
 
 function setup(api = billingApi({ run: draftRun() }), access = ownerAccess()) {
   const onPage = vi.fn();
@@ -68,8 +65,9 @@ describe('BillingRunPage', () => {
   });
 
   it('sends the round from the dialog and toasts with a link to the charges', async () => {
+    const user = userEvent.setup();
     const { api } = setup();
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('button', { name: 'Send charges' })
     );
     const dialog = await screen.findByRole('dialog', {
@@ -81,7 +79,7 @@ describe('BillingRunPage', () => {
     expect(
       within(dialog).getByText(/Charges that are sent can’t be edited/)
     ).toBeVisible();
-    fireEvent.click(
+    await user.click(
       within(dialog).getByRole('button', { name: 'Send 2 charges' })
     );
     await waitFor(() => {
@@ -100,6 +98,7 @@ describe('BillingRunPage', () => {
   });
 
   it('toasts the refusal when the round was already sent', async () => {
+    const user = userEvent.setup();
     const api = billingApi({ run: draftRun() });
     api.billingRuns.issue.mockRejectedValue(
       new ApiError(409, {
@@ -108,11 +107,11 @@ describe('BillingRunPage', () => {
       })
     );
     setup(api);
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('button', { name: 'Send charges' })
     );
     const dialog = await screen.findByRole('dialog');
-    fireEvent.click(
+    await user.click(
       within(dialog).getByRole('button', { name: 'Send 2 charges' })
     );
     await waitFor(() => {
@@ -123,11 +122,12 @@ describe('BillingRunPage', () => {
   });
 
   it('asks before cancelling and cancels from the menu', async () => {
+    const user = userEvent.setup();
     const { api } = setup();
-    openMenu(
+    await user.click(
       await screen.findByRole('button', { name: 'Actions for BR-2026-0002' })
     );
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('menuitem', { name: 'Cancel these charges' })
     );
     const dialog = await screen.findByRole('dialog', {
@@ -137,7 +137,7 @@ describe('BillingRunPage', () => {
       within(dialog).getByText(/Nothing was recorded in the books/)
     ).toBeVisible();
     expect(api.billingRuns.cancel).not.toHaveBeenCalled();
-    fireEvent.click(
+    await user.click(
       within(dialog).getByRole('button', { name: 'Cancel these charges' })
     );
     await waitFor(() => {
@@ -153,14 +153,15 @@ describe('BillingRunPage', () => {
   });
 
   it('keeps the round when Keep them is pressed', async () => {
+    const user = userEvent.setup();
     const { api } = setup();
-    openMenu(
+    await user.click(
       await screen.findByRole('button', { name: 'Actions for BR-2026-0002' })
     );
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('menuitem', { name: 'Cancel these charges' })
     );
-    fireEvent.click(await screen.findByRole('button', { name: 'Keep them' }));
+    await user.click(await screen.findByRole('button', { name: 'Keep them' }));
     await waitFor(() => {
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
@@ -228,6 +229,7 @@ describe('BillingRunPage', () => {
   });
 
   it('shows the not found state for a round out of scope', async () => {
+    const user = userEvent.setup();
     const api = billingApi();
     api.billingRuns.get.mockRejectedValue(
       new ApiError(404, { code: 'NotFound', message: 'Charge round not found' })
@@ -239,7 +241,7 @@ describe('BillingRunPage', () => {
         'It may have been moved, or it may belong to a campus you don’t look after.'
       )
     ).toBeVisible();
-    fireEvent.click(
+    await user.click(
       screen.getByRole('button', { name: 'Back to charge students' })
     );
     expect(onBack).toHaveBeenCalledTimes(1);

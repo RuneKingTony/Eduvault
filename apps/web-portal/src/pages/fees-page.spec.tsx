@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { fireEvent, screen, within } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { Permission } from '@eduvault/policy';
 import {
   ADA_ID,
@@ -48,6 +49,12 @@ const renderFees = (api: ReturnType<typeof apiWith>, childId = ADA_ID) =>
     api,
     HELD
   );
+
+let user: ReturnType<typeof userEvent.setup>;
+
+beforeEach(() => {
+  user = userEvent.setup();
+});
 
 describe('FeesPage', () => {
   it('names the child and the term under the Fees heading', async () => {
@@ -127,7 +134,7 @@ describe('FeesPage', () => {
       params: { studentId: ADA_ID },
       query: {},
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Previous' }));
+    await user.click(screen.getByRole('button', { name: 'Previous' }));
     await screen.findByRole('heading', { name: 'Fees' });
     expect(api.portal.statement).toHaveBeenCalledWith({
       params: { studentId: ADA_ID },
@@ -175,7 +182,7 @@ describe('FeesPage', () => {
     );
     await screen.findByText('Ada Okeke · First term 2026/2027');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Switch to Tobi' }));
+    await user.click(screen.getByRole('button', { name: 'Switch to Tobi' }));
 
     expect(
       await screen.findByText('Tobi Okeke · First term 2026/2027')
@@ -319,9 +326,9 @@ describe('FeesPage term filter', () => {
     );
     const select = await screen.findByRole('combobox', { name: 'Term' });
 
-    fireEvent.change(select, { target: { value: TERM_2 } });
+    await user.selectOptions(select, TERM_2);
     expect(onTerm).toHaveBeenLastCalledWith(TERM_2);
-    fireEvent.change(select, { target: { value: '' } });
+    await user.selectOptions(select, '');
     expect(onTerm).toHaveBeenLastCalledWith(undefined);
   });
 });

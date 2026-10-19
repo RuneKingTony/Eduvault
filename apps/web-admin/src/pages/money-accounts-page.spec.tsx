@@ -1,4 +1,5 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type {
   CreateMoneyAccountInput,
   UpdateMoneyAccountInput,
@@ -105,6 +106,12 @@ function setup(
   return api;
 }
 
+let user: ReturnType<typeof userEvent.setup>;
+
+beforeEach(() => {
+  user = userEvent.setup();
+});
+
 describe('MoneyAccountsPage tiles', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -136,7 +143,7 @@ describe('MoneyAccountsPage tiles', () => {
 
   it('selects another tile and loads its cash book', async () => {
     const api = setup();
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('button', { name: /Moniepoint POS/ })
     );
     expect(
@@ -265,7 +272,7 @@ describe('MoneyAccountsPage permissions', () => {
       await screen.findByRole('button', { name: 'Edit' })
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Retire' })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /Old cash box/ }));
+    await user.click(screen.getByRole('button', { name: /Old cash box/ }));
     await screen.findByText('Old cash box cash book');
     expect(
       screen.queryByRole('button', { name: 'Retire' })
@@ -275,7 +282,7 @@ describe('MoneyAccountsPage permissions', () => {
 });
 
 const openAdd = async () => {
-  fireEvent.click(await screen.findByRole('button', { name: 'Add account' }));
+  await user.click(await screen.findByRole('button', { name: 'Add account' }));
   const sheet = await screen.findByRole('dialog');
   await within(sheet).findByLabelText('Name');
   return sheet;
@@ -289,20 +296,18 @@ describe('MoneyAccountsPage add form', () => {
   it('refuses a blank name and last 4 that is not four digits, and sends nothing', async () => {
     const api = setup();
     const sheet = await openAdd();
-    fireEvent.click(
+    await user.click(
       await within(sheet).findByRole('button', { name: 'Add account' })
     );
     expect(
       await within(sheet).findByText('Give the account a name.')
     ).toBeInTheDocument();
 
-    fireEvent.change(within(sheet).getByLabelText('Name'), {
-      target: { value: 'Zenith savings' },
-    });
-    fireEvent.change(within(sheet).getByLabelText('Last 4 digits'), {
-      target: { value: '12a' },
-    });
-    fireEvent.click(within(sheet).getByRole('button', { name: 'Add account' }));
+    await user.type(within(sheet).getByLabelText('Name'), 'Zenith savings');
+    await user.type(within(sheet).getByLabelText('Last 4 digits'), '12a');
+    await user.click(
+      within(sheet).getByRole('button', { name: 'Add account' })
+    );
     expect(
       await within(sheet).findByText(
         'Enter the last 4 digits, or leave it blank.'
@@ -315,9 +320,7 @@ describe('MoneyAccountsPage add form', () => {
     setup();
     const sheet = await openAdd();
     expect(within(sheet).getByLabelText('Bank')).toBeInTheDocument();
-    fireEvent.change(within(sheet).getByLabelText('Kind'), {
-      target: { value: 'pos' },
-    });
+    await user.selectOptions(within(sheet).getByLabelText('Kind'), 'pos');
     expect(within(sheet).queryByLabelText('Bank')).not.toBeInTheDocument();
     const campusOptions = within(within(sheet).getByLabelText('Campus'))
       .getAllByRole('option')
@@ -328,16 +331,12 @@ describe('MoneyAccountsPage add form', () => {
   it('adds the account, toasts its ledger code and selects the new tile', async () => {
     const api = setup();
     const sheet = await openAdd();
-    fireEvent.change(within(sheet).getByLabelText('Name'), {
-      target: { value: 'Zenith savings' },
-    });
-    fireEvent.change(within(sheet).getByLabelText('Bank'), {
-      target: { value: 'Zenith' },
-    });
-    fireEvent.change(within(sheet).getByLabelText('Last 4 digits'), {
-      target: { value: '9001' },
-    });
-    fireEvent.click(within(sheet).getByRole('button', { name: 'Add account' }));
+    await user.type(within(sheet).getByLabelText('Name'), 'Zenith savings');
+    await user.type(within(sheet).getByLabelText('Bank'), 'Zenith');
+    await user.type(within(sheet).getByLabelText('Last 4 digits'), '9001');
+    await user.click(
+      within(sheet).getByRole('button', { name: 'Add account' })
+    );
     await waitFor(() => {
       expect(api.moneyAccounts.create).toHaveBeenCalledWith({
         body: {
@@ -364,18 +363,16 @@ describe('MoneyAccountsPage edit and retire', () => {
 
   it('edits the name and last 4 and says it saved', async () => {
     const api = setup();
-    fireEvent.click(await screen.findByRole('button', { name: 'Edit' }));
+    await user.click(await screen.findByRole('button', { name: 'Edit' }));
     const sheet = await screen.findByRole('dialog');
     await within(sheet).findByLabelText('Name');
     expect(within(sheet).queryByLabelText('Kind')).not.toBeInTheDocument();
     expect(within(sheet).queryByLabelText('Campus')).not.toBeInTheDocument();
-    fireEvent.change(within(sheet).getByLabelText('Name'), {
-      target: { value: 'GTBank main' },
-    });
-    fireEvent.change(within(sheet).getByLabelText('Last 4 digits'), {
-      target: { value: '' },
-    });
-    fireEvent.click(
+    const name = within(sheet).getByLabelText('Name');
+    await user.clear(name);
+    await user.type(name, 'GTBank main');
+    await user.clear(within(sheet).getByLabelText('Last 4 digits'));
+    await user.click(
       within(sheet).getByRole('button', { name: 'Save changes' })
     );
     await waitFor(() => {
@@ -391,12 +388,12 @@ describe('MoneyAccountsPage edit and retire', () => {
 
   it('retires after a confirmation and says the cash book is kept', async () => {
     const api = setup();
-    fireEvent.click(await screen.findByRole('button', { name: 'Retire' }));
+    await user.click(await screen.findByRole('button', { name: 'Retire' }));
     const dialog = await screen.findByRole('dialog');
     expect(
       within(dialog).getByText('Retire GTBank current?')
     ).toBeInTheDocument();
-    fireEvent.click(
+    await user.click(
       within(dialog).getByRole('button', { name: 'Retire account' })
     );
     await waitFor(() => {

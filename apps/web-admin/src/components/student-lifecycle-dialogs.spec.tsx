@@ -1,4 +1,5 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { MePermissions } from '@eduvault/api-contract';
 import { toPermissionMap } from '@eduvault/policy';
 import { toast } from '@eduvault/ui';
@@ -63,12 +64,11 @@ describe('MarkAwayDialog', () => {
   });
 
   it('saves the date and the trimmed note, then toasts the Inactive date', async () => {
+    const user = userEvent.setup();
     const success = vi.spyOn(toast, 'success').mockReturnValue(1);
     const { students, onClose } = setup();
-    fireEvent.change(screen.getByLabelText('Note'), {
-      target: { value: '  Phone unanswered  ' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await user.type(screen.getByLabelText('Note'), '  Phone unanswered  ');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => {
       expect(students.markAway).toHaveBeenCalledWith({
         params: { id: student.id },
@@ -84,12 +84,13 @@ describe('MarkAwayDialog', () => {
   });
 
   it('warns when the date is over 5 weeks ago', async () => {
+    const user = userEvent.setup();
     const warning = vi.spyOn(toast, 'warning').mockReturnValue(1);
     setup();
-    fireEvent.change(screen.getByLabelText('Not seen since'), {
-      target: { value: '2026-08-20' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    const date = screen.getByLabelText('Not seen since');
+    await user.clear(date);
+    await user.type(date, '2026-08-20');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => {
       expect(warning).toHaveBeenCalledWith(
         'Over 5 weeks away, so Ada is now Inactive and won’t be billed for new terms.'
@@ -98,6 +99,7 @@ describe('MarkAwayDialog', () => {
   });
 
   it('toasts the server refusal for a future date', async () => {
+    const user = userEvent.setup();
     const failure = vi.spyOn(toast, 'error').mockReturnValue(1);
     const mocks = api();
     mocks.students.markAway.mockRejectedValue(
@@ -107,7 +109,7 @@ describe('MarkAwayDialog', () => {
       <MarkAwayDialog student={student} onClose={vi.fn()} />,
       mocks
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => {
       expect(failure).toHaveBeenCalledWith('Choose a date on or before today.');
     });
@@ -183,15 +185,14 @@ describe('LeaveDialog', () => {
   });
 
   it('records the leaving and toasts with a Left tab action', async () => {
+    const user = userEvent.setup();
     const success = vi.spyOn(toast, 'success').mockReturnValue(1);
     const { students, onOpenTab, onClose } = setup();
-    fireEvent.change(screen.getByLabelText('Reason'), {
-      target: { value: 'transferred' },
-    });
-    fireEvent.change(screen.getByLabelText('Last day attended'), {
-      target: { value: '2026-10-02' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Record leaving' }));
+    await user.selectOptions(screen.getByLabelText('Reason'), 'transferred');
+    const lastDay = screen.getByLabelText('Last day attended');
+    await user.clear(lastDay);
+    await user.type(lastDay, '2026-10-02');
+    await user.click(screen.getByRole('button', { name: 'Record leaving' }));
     await waitFor(() => {
       expect(students.leave).toHaveBeenCalledWith({
         params: { id: student.id },
@@ -228,6 +229,7 @@ describe('UndoLeavingDialog', () => {
   });
 
   it('shows the recorded line and undoes the leaving', async () => {
+    const user = userEvent.setup();
     const success = vi.spyOn(toast, 'success').mockReturnValue(1);
     const mocks = api();
     renderWithApi(
@@ -240,13 +242,14 @@ describe('UndoLeavingDialog', () => {
         '2 Oct 2026 · Relocated · recorded by Tunde Bakare on 7 Oct 2026'
       )
     ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Undo leaving' }));
+    await user.click(screen.getByRole('button', { name: 'Undo leaving' }));
     await waitFor(() => {
       expect(success).toHaveBeenCalledWith('Ada is back on the roll.');
     });
   });
 
   it('toasts a refusal instead of showing it inline', async () => {
+    const user = userEvent.setup();
     const error = vi.spyOn(toast, 'error').mockReturnValue(1);
     const mocks = api();
     mocks.students.undoLeaving.mockRejectedValue(
@@ -256,7 +259,7 @@ describe('UndoLeavingDialog', () => {
       <UndoLeavingDialog student={left} onClose={vi.fn()} />,
       mocks
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Undo leaving' }));
+    await user.click(screen.getByRole('button', { name: 'Undo leaving' }));
     await waitFor(() => {
       expect(error).toHaveBeenCalledWith('The undo window has closed.');
     });
@@ -318,6 +321,7 @@ describe('MoveDialog', () => {
   });
 
   it('warns that the student leaves the list when the class is on another campus', async () => {
+    const user = userEvent.setup();
     renderWithApi(
       <MoveDialog student={movable} onClose={vi.fn()} />,
       api(),
@@ -330,7 +334,7 @@ describe('MoveDialog', () => {
     expect(
       screen.queryByText(/will no longer appear in your list/)
     ).not.toBeInTheDocument();
-    fireEvent.change(select, { target: { value: IDS.silver } });
+    await user.selectOptions(select, IDS.silver);
     expect(
       await screen.findByText(
         'Ada will no longer appear in your list from Second term.'
@@ -339,6 +343,7 @@ describe('MoveDialog', () => {
   });
 
   it('adds the placement for the next term and toasts both terms', async () => {
+    const user = userEvent.setup();
     const success = vi.spyOn(toast, 'success').mockReturnValue(1);
     const mocks = api();
     const onClose = vi.fn();
@@ -351,8 +356,8 @@ describe('MoveDialog', () => {
     await waitFor(() => {
       expect(select).toHaveValue(ARM_ID);
     });
-    fireEvent.change(select, { target: { value: IDS.silver } });
-    fireEvent.click(screen.getByRole('button', { name: 'Add placement' }));
+    await user.selectOptions(select, IDS.silver);
+    await user.click(screen.getByRole('button', { name: 'Add placement' }));
     await waitFor(() => {
       expect(mocks.students.place).toHaveBeenCalledWith({
         params: { id: student.id },

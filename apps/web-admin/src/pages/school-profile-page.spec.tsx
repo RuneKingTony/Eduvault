@@ -1,4 +1,5 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
+import userEvent, { type UserEvent } from '@testing-library/user-event';
 import { ApiError } from '@eduvault/api-contract';
 import { toast } from '@eduvault/ui';
 import { renderWithApi, starterAccess } from '../test-utils';
@@ -42,6 +43,11 @@ function setup(
 
 const logoFile = () => new File(['x'], 'logo.png', { type: 'image/png' });
 
+const typeInto = async (user: UserEvent, field: HTMLElement, value: string) => {
+  await user.clear(field);
+  await user.type(field, value);
+};
+
 describe('SchoolProfilePage (editable)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -65,13 +71,12 @@ describe('SchoolProfilePage (editable)', () => {
   });
 
   it('saves the profile with the typed values and says so', async () => {
+    const user = userEvent.setup();
     const api = setup();
     await screen.findByLabelText('School name');
 
-    fireEvent.change(screen.getByLabelText('Phone'), {
-      target: { value: '0900' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    await typeInto(user, screen.getByLabelText('Phone'), '0900');
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
 
     await waitFor(() => {
       expect(api.schoolAccount.update).toHaveBeenCalledWith({
@@ -90,16 +95,13 @@ describe('SchoolProfilePage (editable)', () => {
   });
 
   it('asks for a name and a real email before saving', async () => {
+    const user = userEvent.setup();
     const api = setup();
     await screen.findByLabelText('School name');
 
-    fireEvent.change(screen.getByLabelText('School name'), {
-      target: { value: ' ' },
-    });
-    fireEvent.change(screen.getByLabelText('Email'), {
-      target: { value: 'nope' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    await typeInto(user, screen.getByLabelText('School name'), ' ');
+    await typeInto(user, screen.getByLabelText('Email'), 'nope');
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
 
     expect(
       await screen.findByText('Give the school a name.')
@@ -111,10 +113,11 @@ describe('SchoolProfilePage (editable)', () => {
   });
 
   it('uploads a logo in two steps and says it was saved', async () => {
+    const user = userEvent.setup();
     const api = setup();
     const input = await screen.findByLabelText('Logo file');
 
-    fireEvent.change(input, { target: { files: [logoFile()] } });
+    await user.upload(input, logoFile());
 
     await waitFor(() => {
       expect(api.schoolAccount.setLogo).toHaveBeenCalledWith({
@@ -130,6 +133,7 @@ describe('SchoolProfilePage (editable)', () => {
   });
 
   it('shows the server’s message when the logo is refused', async () => {
+    const user = userEvent.setup();
     const api = setup();
     api.files.upload.mockRejectedValue(
       new ApiError(400, {
@@ -139,7 +143,7 @@ describe('SchoolProfilePage (editable)', () => {
     );
     const input = await screen.findByLabelText('Logo file');
 
-    fireEvent.change(input, { target: { files: [logoFile()] } });
+    await user.upload(input, logoFile());
 
     expect(
       await screen.findByText('Choose a PNG, JPG or WebP logo.')
@@ -148,13 +152,14 @@ describe('SchoolProfilePage (editable)', () => {
   });
 
   it('offers Change and Remove when there is a logo, and Remove works at once', async () => {
+    const user = userEvent.setup();
     const api = setup({
       school: profile({ logoFileId: LOGO_ID, logoUrl: `/files/${LOGO_ID}` }),
     });
 
     expect(await screen.findByText('Your logo')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Change' })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Remove' }));
+    await user.click(screen.getByRole('button', { name: 'Remove' }));
 
     await waitFor(() => {
       expect(api.schoolAccount.removeLogo).toHaveBeenCalledOnce();

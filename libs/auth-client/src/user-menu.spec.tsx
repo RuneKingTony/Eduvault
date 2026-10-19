@@ -1,4 +1,5 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { PermissionsProvider } from './permissions';
 import { accessOfStarter, fakeAccess } from './testing';
 import { UserMenu } from './user-menu';
@@ -107,9 +108,9 @@ describe('UserMenu', () => {
     ).toBeInTheDocument();
   });
 
-  it('shows the name and email, light or dark and sign out', () => {
+  it('shows the name and email, light or dark and sign out', async () => {
     setup();
-    openMenu(/Funmi Adeyemi/);
+    await openMenu(/Funmi Adeyemi/);
     expect(screen.getByText('funmi@school.test')).toBeInTheDocument();
     expect(
       screen.getByRole('menuitem', { name: 'Light or dark' })
@@ -122,42 +123,46 @@ describe('UserMenu', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('opens My access when the shell has one', () => {
+  it('opens My access when the shell has one', async () => {
+    const user = userEvent.setup();
     const onOpenMyAccess = vi.fn();
     setup({ onOpenMyAccess });
-    openMenu(/Funmi Adeyemi/);
-    fireEvent.click(screen.getByRole('menuitem', { name: 'My access' }));
+    await openMenu(/Funmi Adeyemi/);
+    await user.click(screen.getByRole('menuitem', { name: 'My access' }));
     expect(onOpenMyAccess).toHaveBeenCalledOnce();
   });
 
-  it('hides My access when the shell has none', () => {
+  it('hides My access when the shell has none', async () => {
     setup();
-    openMenu(/Funmi Adeyemi/);
+    await openMenu(/Funmi Adeyemi/);
     expect(
       screen.queryByRole('menuitem', { name: 'My access' })
     ).not.toBeInTheDocument();
   });
 
-  it('opens the command menu when the shell has one', () => {
+  it('opens the command menu when the shell has one', async () => {
+    const user = userEvent.setup();
     const onOpenCommandMenu = vi.fn();
     setup({ onOpenCommandMenu });
-    openMenu(/Funmi Adeyemi/);
-    fireEvent.click(screen.getByRole('menuitem', { name: /Command menu/ }));
+    await openMenu(/Funmi Adeyemi/);
+    await user.click(screen.getByRole('menuitem', { name: /Command menu/ }));
     expect(onOpenCommandMenu).toHaveBeenCalledOnce();
   });
 
-  it('switches between light and dark and remembers it', () => {
+  it('switches between light and dark and remembers it', async () => {
+    const user = userEvent.setup();
     setup();
-    openMenu(/Funmi Adeyemi/);
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Light or dark' }));
+    await openMenu(/Funmi Adeyemi/);
+    await user.click(screen.getByRole('menuitem', { name: 'Light or dark' }));
     expect(document.documentElement).toHaveClass('dark');
     expect(localStorage.getItem('eduvault-theme')).toBe('dark');
   });
 
   it('signs out and tells the app', async () => {
+    const user = userEvent.setup();
     const { signOut, onSignedOut } = setup();
-    openMenu(/Funmi Adeyemi/);
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Sign out' }));
+    await openMenu(/Funmi Adeyemi/);
+    await user.click(screen.getByRole('menuitem', { name: 'Sign out' }));
     await waitFor(() => {
       expect(onSignedOut).toHaveBeenCalledOnce();
     });
@@ -165,30 +170,31 @@ describe('UserMenu', () => {
   });
 
   it('keeps the app signed in when sign out fails', async () => {
+    const user = userEvent.setup();
     const { signOut, onSignedOut } = setup({
       signOutResult: { error: { message: 'No' } },
     });
-    openMenu(/Funmi Adeyemi/);
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Sign out' }));
+    await openMenu(/Funmi Adeyemi/);
+    await user.click(screen.getByRole('menuitem', { name: 'Sign out' }));
     await waitFor(() => {
       expect(signOut).toHaveBeenCalledOnce();
     });
     expect(onSignedOut).not.toHaveBeenCalled();
   });
 
-  it('shows the username in place of a placeholder email', () => {
+  it('shows the username in place of a placeholder email', async () => {
     setup({
       email: 'abc123@users.eduvault.invalid',
       username: 'udoh-family',
     });
-    openMenu(/Funmi Adeyemi/);
+    await openMenu(/Funmi Adeyemi/);
     expect(screen.getByText('udoh-family')).toBeInTheDocument();
     expect(screen.queryByText(/eduvault\.invalid/)).not.toBeInTheDocument();
   });
 
-  it('keeps a real email in the header even when there is a username', () => {
+  it('keeps a real email in the header even when there is a username', async () => {
     setup({ username: 'funmi' });
-    openMenu(/Funmi Adeyemi/);
+    await openMenu(/Funmi Adeyemi/);
     expect(screen.getByText('funmi@school.test')).toBeInTheDocument();
   });
 });
@@ -203,13 +209,13 @@ describe('UserMenu school section', () => {
     vi.unstubAllGlobals();
   });
 
-  it('lists the schools with the active one ticked when there is more than one', () => {
+  it('lists the schools with the active one ticked when there is more than one', async () => {
     setup({
       schools,
       activeOrganizationId: 'school-b',
       onSchoolChanged: vi.fn(),
     });
-    openMenu(/Funmi Adeyemi/);
+    await openMenu(/Funmi Adeyemi/);
     expect(screen.getByText('School')).toBeInTheDocument();
     expect(
       screen.getByRole('menuitem', { name: 'Hillcrest Academy Current' })
@@ -220,14 +226,15 @@ describe('UserMenu school section', () => {
   });
 
   it('switches with setActive and tells the app', async () => {
+    const user = userEvent.setup();
     const onSchoolChanged = vi.fn();
     const { setActive } = setup({
       schools,
       activeOrganizationId: 'school-a',
       onSchoolChanged,
     });
-    openMenu(/Funmi Adeyemi/);
-    fireEvent.click(
+    await openMenu(/Funmi Adeyemi/);
+    await user.click(
       screen.getByRole('menuitem', { name: 'Hillcrest Academy' })
     );
     await waitFor(() => {
@@ -236,15 +243,16 @@ describe('UserMenu school section', () => {
     expect(setActive).toHaveBeenCalledWith({ organizationId: 'school-b' });
   });
 
-  it('does nothing when the active school is chosen again', () => {
+  it('does nothing when the active school is chosen again', async () => {
+    const user = userEvent.setup();
     const onSchoolChanged = vi.fn();
     const { setActive } = setup({
       schools,
       activeOrganizationId: 'school-a',
       onSchoolChanged,
     });
-    openMenu(/Funmi Adeyemi/);
-    fireEvent.click(
+    await openMenu(/Funmi Adeyemi/);
+    await user.click(
       screen.getByRole('menuitem', { name: 'Greenfield College Current' })
     );
     expect(setActive).not.toHaveBeenCalled();
@@ -252,6 +260,7 @@ describe('UserMenu school section', () => {
   });
 
   it('stays put when switching fails', async () => {
+    const user = userEvent.setup();
     const onSchoolChanged = vi.fn();
     const { setActive } = setup({
       schools,
@@ -259,8 +268,8 @@ describe('UserMenu school section', () => {
       onSchoolChanged,
       setActiveResult: { error: { message: 'No' } },
     });
-    openMenu(/Funmi Adeyemi/);
-    fireEvent.click(
+    await openMenu(/Funmi Adeyemi/);
+    await user.click(
       screen.getByRole('menuitem', { name: 'Hillcrest Academy' })
     );
     await waitFor(() => {
@@ -269,18 +278,18 @@ describe('UserMenu school section', () => {
     expect(onSchoolChanged).not.toHaveBeenCalled();
   });
 
-  it('is absent with a single school or when the shell asks for none', () => {
+  it('is absent with a single school or when the shell asks for none', async () => {
     setup({
       schools: [schools[0] ?? { id: '', name: '' }],
       onSchoolChanged: vi.fn(),
     });
-    openMenu(/Funmi Adeyemi/);
+    await openMenu(/Funmi Adeyemi/);
     expect(screen.queryByText('School')).not.toBeInTheDocument();
   });
 
-  it('is absent when no callback is given', () => {
+  it('is absent when no callback is given', async () => {
     setup({ schools });
-    openMenu(/Funmi Adeyemi/);
+    await openMenu(/Funmi Adeyemi/);
     expect(screen.queryByText('School')).not.toBeInTheDocument();
   });
 });

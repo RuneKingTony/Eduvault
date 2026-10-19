@@ -131,6 +131,8 @@ export const reactConfig = [
       ...asErrors(testingLibrary.configs['flat/react']).rules,
       'testing-library/no-test-id-queries': 'error',
       'testing-library/prefer-query-matchers': 'error',
+      'testing-library/prefer-user-event': 'error',
+      'testing-library/prefer-user-event-setup': 'error',
     },
   },
 ];

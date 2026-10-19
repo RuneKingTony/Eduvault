@@ -1,4 +1,5 @@
-import { fireEvent, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { ApiError, type AnnouncementSummary } from '@eduvault/api-contract';
 import { addDays, lagosDateOf } from '@eduvault/shared';
 import {
@@ -48,6 +49,12 @@ const renderPage = (
     { portal: { announcementList } }
   );
 
+let user: ReturnType<typeof userEvent.setup>;
+
+beforeEach(() => {
+  user = userEvent.setup();
+});
+
 describe('AnnouncementsPage', () => {
   it('lists the chosen child’s announcements and asks for the first page of ten', async () => {
     const announcementList = vi.fn().mockResolvedValue(
@@ -96,7 +103,7 @@ describe('AnnouncementsPage', () => {
     expect(await screen.findByText('News 0')).toBeInTheDocument();
     expect(screen.getByText('Showing 1 to 10 of 12')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    await user.click(screen.getByRole('button', { name: 'Next' }));
     expect(await screen.findByText('News 10')).toBeInTheDocument();
     expect(screen.queryByText('News 0')).not.toBeInTheDocument();
     expect(announcementList).toHaveBeenLastCalledWith({
@@ -111,7 +118,7 @@ describe('AnnouncementsPage', () => {
       childId: TOBI_ID,
       onBack,
     });
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('button', { name: 'Back to Home' })
     );
     expect(onBack).toHaveBeenCalledWith(TOBI_ID);

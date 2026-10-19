@@ -1,4 +1,5 @@
-import { fireEvent, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { ApiError } from '@eduvault/api-contract';
 import { toast } from '@eduvault/ui';
 import { YEAR_2, nextYear } from '../../test-calendar';
@@ -31,12 +32,15 @@ describe('DeleteYearDialog', () => {
   });
 
   it('deletes with a success toast', async () => {
+    const user = userEvent.setup();
     const success = vi.spyOn(toast, 'success').mockReturnValue(1);
     const remove = vi.fn(({ params }: { params: { id: string } }) => ({
       id: params.id,
     }));
     const onOpenChange = setup(remove);
-    fireEvent.click(screen.getByRole('button', { name: 'Delete school year' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Delete school year' })
+    );
     await vi.waitFor(() => {
       expect(remove).toHaveBeenCalledWith({ params: { id: YEAR_2 } });
       expect(onOpenChange).toHaveBeenCalledWith(false);
@@ -45,6 +49,7 @@ describe('DeleteYearDialog', () => {
   });
 
   it('shows a late refusal as a danger toast and closes without deleting', async () => {
+    const user = userEvent.setup();
     const error = vi.spyOn(toast, 'error').mockReturnValue(1);
     const remove = vi.fn().mockRejectedValue(
       new ApiError(409, {
@@ -53,7 +58,9 @@ describe('DeleteYearDialog', () => {
       })
     );
     const onOpenChange = setup(remove);
-    fireEvent.click(screen.getByRole('button', { name: 'Delete school year' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Delete school year' })
+    );
     await vi.waitFor(() => {
       expect(error).toHaveBeenCalledWith(
         'A school year that has already started cannot be deleted.'

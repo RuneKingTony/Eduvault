@@ -1,4 +1,5 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import {
   ApiError,
   STORE_SALE_POS_PROOF_MESSAGE,
@@ -83,24 +84,25 @@ function setup(
   return { api, onOpenChange, onRecorded, onStatement };
 }
 
+let user: ReturnType<typeof userEvent.setup>;
+
 const choose = async (id: string) => {
-  fireEvent.change(await screen.findByLabelText('Student'), {
-    target: { value: id },
-  });
+  await user.selectOptions(await screen.findByLabelText('Student'), id);
 };
 
-const quantity = (name: string, text: string) => {
-  fireEvent.change(screen.getByLabelText(`Quantity of ${name}`), {
-    target: { value: text },
-  });
+const quantity = async (name: string, text: string) => {
+  const input = screen.getByLabelText(`Quantity of ${name}`);
+  await user.clear(input);
+  await user.type(input, text);
 };
 
-const record = () => {
-  fireEvent.click(screen.getByRole('button', { name: 'Record purchase' }));
+const record = async () => {
+  await user.click(screen.getByRole('button', { name: 'Record purchase' }));
 };
 
 describe('SaleSheet', () => {
   beforeEach(() => {
+    user = userEvent.setup();
     vi.clearAllMocks();
   });
 
@@ -157,7 +159,7 @@ describe('SaleSheet', () => {
     expect(
       screen.getByLabelText('Quantity of School shirt, Size 12')
     ).toBeDisabled();
-    quantity('School tie', '9');
+    await quantity('School tie', '9');
     expect(screen.getByLabelText('Quantity of School tie')).toHaveValue('5');
   });
 
@@ -179,7 +181,7 @@ describe('SaleSheet', () => {
     const { api } = setup();
     await choose(ADA_ID);
     await screen.findByText('Books for JSS 1');
-    record();
+    await record();
 
     expect(toast.error).toHaveBeenCalledWith(STORE_SALE_REQUIRED_MESSAGE);
     expect(api.store.recordSale).not.toHaveBeenCalled();
@@ -189,18 +191,14 @@ describe('SaleSheet', () => {
     const { api } = setup();
     await choose(ADA_ID);
     await screen.findByText('Books for JSS 1');
-    quantity('School tie', '1');
+    await quantity('School tie', '1');
 
-    fireEvent.change(screen.getByLabelText('Payment'), {
-      target: { value: 'pos' },
-    });
-    record();
+    await user.selectOptions(screen.getByLabelText('Payment'), 'pos');
+    await record();
     expect(toast.error).toHaveBeenLastCalledWith(STORE_SALE_POS_PROOF_MESSAGE);
 
-    fireEvent.change(screen.getByLabelText('Payment'), {
-      target: { value: 'transfer' },
-    });
-    record();
+    await user.selectOptions(screen.getByLabelText('Payment'), 'transfer');
+    await record();
     expect(toast.error).toHaveBeenLastCalledWith(
       STORE_SALE_TRANSFER_PROOF_MESSAGE
     );
@@ -208,19 +206,17 @@ describe('SaleSheet', () => {
   });
 
   it('refuses a Word document as the receipt', async () => {
+    const anyFileUser = userEvent.setup({ applyAccept: false });
     setup();
     await choose(ADA_ID);
     await screen.findByText('Books for JSS 1');
-    quantity('School tie', '1');
-    fireEvent.change(screen.getByLabelText('Payment'), {
-      target: { value: 'pos' },
-    });
-    fireEvent.change(screen.getByLabelText(/Payment receipt/), {
-      target: {
-        files: [new File(['x'], 'slip.docx', { type: 'application/msword' })],
-      },
-    });
-    record();
+    await quantity('School tie', '1');
+    await user.selectOptions(screen.getByLabelText('Payment'), 'pos');
+    await anyFileUser.upload(
+      screen.getByLabelText(/Payment receipt/),
+      new File(['x'], 'slip.docx', { type: 'application/msword' })
+    );
+    await record();
 
     expect(toast.error).toHaveBeenLastCalledWith(
       'The proof must be a photo, a screenshot or a PDF.'
@@ -240,9 +236,7 @@ describe('SaleSheet', () => {
           .map((option) => option.textContent)
       ).toEqual(['Lekki cash box', 'GTBank current']);
 
-      fireEvent.change(screen.getByLabelText('Payment'), {
-        target: { value: 'transfer' },
-      });
+      await user.selectOptions(screen.getByLabelText('Payment'), 'transfer');
       expect(screen.queryByLabelText('Into')).not.toBeInTheDocument();
     });
 
@@ -250,9 +244,7 @@ describe('SaleSheet', () => {
       setup();
       await choose(TOBI_ID);
       await screen.findByText('Books for JSS 1');
-      fireEvent.change(screen.getByLabelText('Payment'), {
-        target: { value: 'pos' },
-      });
+      await user.selectOptions(screen.getByLabelText('Payment'), 'pos');
 
       expect(
         screen.getByText(storeSaleNoAccountMessage('pos', 'Ikeja'))
@@ -268,9 +260,9 @@ describe('SaleSheet', () => {
       const { api, onRecorded, onStatement } = setup();
       await choose(ADA_ID);
       await screen.findByText('Books for JSS 1');
-      quantity('School shirt, Size 12', '2');
-      quantity('School tie', '1');
-      record();
+      await quantity('School shirt, Size 12', '2');
+      await quantity('School tie', '1');
+      await record();
 
       await waitFor(() => {
         expect(api.store.recordSale).toHaveBeenCalledTimes(1);
@@ -305,8 +297,8 @@ describe('SaleSheet', () => {
       const { api } = setup({ access: storeOnlyAccess() });
       await choose(ADA_ID);
       await screen.findByText('Books for JSS 1');
-      quantity('School tie', '1');
-      record();
+      await quantity('School tie', '1');
+      await record();
 
       await waitFor(() => {
         expect(api.store.recordSale).toHaveBeenCalledTimes(1);
@@ -326,16 +318,13 @@ describe('SaleSheet', () => {
       const { api } = setup();
       await choose(ADA_ID);
       await screen.findByText('Books for JSS 1');
-      quantity('School tie', '1');
-      fireEvent.change(screen.getByLabelText('Payment'), {
-        target: { value: 'pos' },
-      });
-      fireEvent.change(screen.getByLabelText(/Payment receipt/), {
-        target: {
-          files: [new File(['x'], 'slip.pdf', { type: 'application/pdf' })],
-        },
-      });
-      record();
+      await quantity('School tie', '1');
+      await user.selectOptions(screen.getByLabelText('Payment'), 'pos');
+      await user.upload(
+        screen.getByLabelText(/Payment receipt/),
+        new File(['x'], 'slip.pdf', { type: 'application/pdf' })
+      );
+      await record();
 
       await waitFor(() => {
         expect(api.store.recordSale).toHaveBeenCalledTimes(1);
@@ -354,8 +343,8 @@ describe('SaleSheet', () => {
       });
       await choose(ADA_ID);
       await screen.findByText('Books for JSS 1');
-      quantity('School tie', '1');
-      record();
+      await quantity('School tie', '1');
+      await record();
 
       await waitFor(() => {
         expect(toast.warning).toHaveBeenCalledWith(
@@ -379,8 +368,8 @@ describe('SaleSheet', () => {
       });
       await choose(ADA_ID);
       await screen.findByText('Books for JSS 1');
-      quantity('School tie', '3');
-      record();
+      await quantity('School tie', '3');
+      await record();
 
       await waitFor(() => {
         expect(toast.error).toHaveBeenCalledWith(
@@ -388,7 +377,7 @@ describe('SaleSheet', () => {
         );
       });
       expect(onRecorded).not.toHaveBeenCalled();
-      record();
+      await record();
       await waitFor(() => {
         expect(api.store.recordSale).toHaveBeenCalledTimes(2);
       });
@@ -402,8 +391,8 @@ describe('SaleSheet', () => {
       setup({ record: vi.fn(() => new Promise(() => undefined)) });
       await choose(ADA_ID);
       await screen.findByText('Books for JSS 1');
-      quantity('School tie', '1');
-      record();
+      await quantity('School tie', '1');
+      await record();
 
       await waitFor(() => {
         expect(

@@ -1,4 +1,5 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { SetElectiveTakersInput, Subject } from '@eduvault/api-contract';
 import { toast } from '@eduvault/ui';
 import {
@@ -21,6 +22,12 @@ vi.mock('@eduvault/ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@eduvault/ui')>()),
   toast: { success: vi.fn(), error: vi.fn() },
 }));
+
+let user: ReturnType<typeof userEvent.setup>;
+
+beforeEach(() => {
+  user = userEvent.setup();
+});
 
 const LEVEL_JSS2 = SUBJECT_IDS.jss2;
 
@@ -179,15 +186,13 @@ describe('SubjectsPage catalogue', () => {
       subject({ code: 'GEO', name: 'Geography', levelCodes: [] })
     );
     renderWithApi(page('catalogue'), api, ownerAccess());
-    fireEvent.click(await screen.findByRole('button', { name: 'Add subject' }));
-    fireEvent.change(await screen.findByLabelText('Code'), {
-      target: { value: ' geo ' },
-    });
-    fireEvent.change(screen.getByLabelText('Name'), {
-      target: { value: 'Geography' },
-    });
+    await user.click(
+      await screen.findByRole('button', { name: 'Add subject' })
+    );
+    await user.type(await screen.findByLabelText('Code'), ' geo ');
+    await user.type(screen.getByLabelText('Name'), 'Geography');
     const buttons = screen.getAllByRole('button', { name: 'Add subject' });
-    fireEvent.click(buttons.at(-1)!);
+    await user.click(buttons.at(-1)!);
     await waitFor(() => {
       expect(api.subjects.create).toHaveBeenCalledWith({
         body: { code: 'GEO', name: 'Geography' },
@@ -198,14 +203,12 @@ describe('SubjectsPage catalogue', () => {
   it('keeps the sheet open with the message for a bad code', async () => {
     const api = apiFor();
     renderWithApi(page('catalogue'), api);
-    fireEvent.click(await screen.findByRole('button', { name: 'Add subject' }));
-    fireEvent.change(await screen.findByLabelText('Code'), {
-      target: { value: 'AB1' },
-    });
-    fireEvent.change(screen.getByLabelText('Name'), {
-      target: { value: 'Art' },
-    });
-    fireEvent.click(
+    await user.click(
+      await screen.findByRole('button', { name: 'Add subject' })
+    );
+    await user.type(await screen.findByLabelText('Code'), 'AB1');
+    await user.type(screen.getByLabelText('Name'), 'Art');
+    await user.click(
       screen.getAllByRole('button', { name: 'Add subject' }).at(-1)!
     );
     expect(
@@ -247,13 +250,12 @@ const openEditor = async (level: 'JSS 1' | 'JSS 2' = 'JSS 2') => {
   const buttons = await screen.findAllByRole('button', {
     name: 'Edit subjects',
   });
-  fireEvent.click(buttons[LEVELS_IN_ORDER.indexOf(level)]!);
+  await user.click(buttons[LEVELS_IN_ORDER.indexOf(level)]!);
   await screen.findByText(`Subjects for ${level}`);
 };
 
-const save = () => {
-  fireEvent.click(screen.getByRole('button', { name: 'Save subjects' }));
-};
+const save = () =>
+  user.click(screen.getByRole('button', { name: 'Save subjects' }));
 
 describe('SubjectsPage level subjects sheet', () => {
   it('reorders with Move up and Move down and saves that order', async () => {
@@ -266,11 +268,11 @@ describe('SubjectsPage level subjects sheet', () => {
     expect(
       screen.getByRole('button', { name: 'Move Music down' })
     ).toBeDisabled();
-    fireEvent.click(screen.getByRole('button', { name: 'Move Music up' }));
-    fireEvent.click(
+    await user.click(screen.getByRole('button', { name: 'Move Music up' }));
+    await user.click(
       screen.getByRole('button', { name: 'Move Mathematics down' })
     );
-    save();
+    await save();
     await waitFor(() => {
       expect(api.levelSubjects.replace).toHaveBeenCalledWith({
         params: { id: LEVEL_JSS2 },
@@ -292,21 +294,23 @@ describe('SubjectsPage level subjects sheet', () => {
     const api = apiFor();
     renderWithApi(page('by-level'), api);
     await openEditor();
-    fireEvent.change(screen.getByLabelText('Kind of Mathematics'), {
-      target: { value: 'elective' },
-    });
+    await user.selectOptions(
+      screen.getByLabelText('Kind of Mathematics'),
+      'elective'
+    );
     await waitFor(() => {
       expect(
         screen.getByRole('option', { name: 'English Language' })
       ).toBeInTheDocument();
     });
-    fireEvent.change(screen.getByLabelText('Add a subject'), {
-      target: { value: SUBJECT_IDS.english },
-    });
+    await user.selectOptions(
+      screen.getByLabelText('Add a subject'),
+      SUBJECT_IDS.english
+    );
     expect(
       screen.queryByRole('option', { name: 'English Language' })
     ).not.toBeInTheDocument();
-    save();
+    await save();
     await waitFor(() => {
       expect(api.levelSubjects.replace).toHaveBeenCalledWith({
         params: { id: LEVEL_JSS2 },
@@ -336,13 +340,13 @@ describe('SubjectsPage level subjects sheet', () => {
     const api = apiFor();
     renderWithApi(page('by-level'), api);
     await openEditor();
-    fireEvent.click(screen.getByRole('button', { name: 'Remove French' }));
+    await user.click(screen.getByRole('button', { name: 'Remove French' }));
     expect(
       await screen.findByText(
         '3 students take French as an elective this session. Remove it anyway?'
       )
     ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
     await waitFor(() => {
       expect(
         screen.queryByText(/take French as an elective/)
@@ -358,15 +362,15 @@ describe('SubjectsPage level subjects sheet', () => {
     const api = apiFor();
     renderWithApi(page('by-level'), api);
     await openEditor();
-    fireEvent.click(screen.getByRole('button', { name: 'Remove French' }));
+    await user.click(screen.getByRole('button', { name: 'Remove French' }));
     await screen.findByText(/take French as an elective/);
-    fireEvent.click(screen.getByRole('button', { name: 'Remove' }));
+    await user.click(screen.getByRole('button', { name: 'Remove' }));
     await waitFor(() => {
       expect(
         screen.queryByRole('button', { name: 'Remove French' })
       ).not.toBeInTheDocument();
     });
-    save();
+    await save();
     await waitFor(() => {
       expect(api.levelSubjects.replace).toHaveBeenCalledWith({
         params: { id: LEVEL_JSS2 },
@@ -384,15 +388,13 @@ describe('SubjectsPage level subjects sheet', () => {
     const api = apiFor();
     renderWithApi(page('by-level'), api);
     await openEditor();
-    fireEvent.change(screen.getByLabelText('Kind of French'), {
-      target: { value: 'core' },
-    });
+    await user.selectOptions(screen.getByLabelText('Kind of French'), 'core');
     expect(
       await screen.findByText(
         '3 students take French as an elective this session. Making it core clears those choices. Continue?'
       )
     ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
     await waitFor(() => {
       expect(
         screen.queryByText(/Making it core clears/)
@@ -406,15 +408,13 @@ describe('SubjectsPage level subjects sheet', () => {
     const api = apiFor();
     renderWithApi(page('by-level'), api);
     await openEditor();
-    fireEvent.change(screen.getByLabelText('Kind of French'), {
-      target: { value: 'core' },
-    });
+    await user.selectOptions(screen.getByLabelText('Kind of French'), 'core');
     await screen.findByText(/Making it core clears/);
-    fireEvent.click(screen.getByRole('button', { name: 'Make core' }));
+    await user.click(screen.getByRole('button', { name: 'Make core' }));
     await waitFor(() => {
       expect(screen.getByLabelText('Kind of French')).toHaveValue('core');
     });
-    save();
+    await save();
     await waitFor(() => {
       expect(api.levelSubjects.replace).toHaveBeenCalledWith({
         params: { id: LEVEL_JSS2 },
@@ -432,7 +432,7 @@ describe('SubjectsPage level subjects sheet', () => {
   it('removes an elective without takers straight away', async () => {
     renderWithApi(page('by-level'), apiFor());
     await openEditor();
-    fireEvent.click(screen.getByRole('button', { name: 'Remove Music' }));
+    await user.click(screen.getByRole('button', { name: 'Remove Music' }));
     expect(
       screen.queryByRole('button', { name: 'Remove Music' })
     ).not.toBeInTheDocument();
@@ -446,7 +446,7 @@ describe('SubjectsPage level subjects sheet', () => {
     );
     renderWithApi(page('by-level'), api);
     await openEditor();
-    save();
+    await save();
     await waitFor(() => {
       expect(toast.error).toHaveBeenCalledWith(
         'Each subject can be on a level once.'
@@ -495,7 +495,7 @@ describe('SubjectsPage electives card', () => {
       }) => ({ subjectId: params.subjectId, studentIds: body.studentIds })
     );
     renderWithApi(page('by-level'), api);
-    fireEvent.click(
+    await user.click(
       (await screen.findAllByRole('button', { name: 'Choose students' }))[0]!
     );
     expect(await screen.findByText('French · 2026/2027')).toBeInTheDocument();
@@ -509,14 +509,15 @@ describe('SubjectsPage electives card', () => {
     ).not.toBeChecked();
 
     const search = screen.getByPlaceholderText('Search name or GF number');
-    fireEvent.change(search, { target: { value: 'GF-0124' } });
+    await user.type(search, 'GF-0124');
     expect(screen.queryByText(/Ada Obi/)).not.toBeInTheDocument();
-    fireEvent.change(search, { target: { value: 'ada' } });
+    await user.clear(search);
+    await user.type(search, 'ada');
     expect(screen.queryByText(/Bola Ade/)).not.toBeInTheDocument();
-    fireEvent.change(search, { target: { value: '' } });
+    await user.clear(search);
 
-    fireEvent.click(screen.getByRole('checkbox', { name: /Bola Ade/ }));
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await user.click(screen.getByRole('checkbox', { name: /Bola Ade/ }));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => {
       expect(api.electives.set).toHaveBeenCalledWith({
         params: { subjectId: SUBJECT_IDS.french },
@@ -607,13 +608,13 @@ describe('SubjectsPage subject teachers', () => {
       from: { id: SUBJECT_IDS.previous, name: 'Third term' },
     });
     renderWithApi(page('teachers'), withMe(api));
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('button', { name: 'Copy from last term' })
     );
     expect(
       await screen.findByText('Copy last term’s subject teachers?')
     ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Copy teachers' }));
+    await user.click(screen.getByRole('button', { name: 'Copy teachers' }));
     await waitFor(() => {
       expect(api.subjectTeachers.copyFromPreviousTerm).toHaveBeenCalledTimes(1);
     });
@@ -648,7 +649,7 @@ describe('SubjectsPage subject teachers', () => {
       { userId: SUBJECT_IDS.emeka, name: 'Emeka Obi' },
     ]);
     renderWithApi(page('teachers'), withMe(api));
-    fireEvent.click(await screen.findByRole('button', { name: 'Change' }));
+    await user.click(await screen.findByRole('button', { name: 'Change' }));
     const select = await screen.findByLabelText('Teacher');
     await waitFor(() => {
       expect(select).toHaveValue(SUBJECT_IDS.emeka);
@@ -664,7 +665,7 @@ describe('SubjectsPage subject teachers', () => {
 
   it('shows the no-candidate hint and disables Save teacher', async () => {
     renderWithApi(page('teachers'), withMe(apiFor()));
-    fireEvent.click(await screen.findByRole('button', { name: 'Assign' }));
+    await user.click(await screen.findByRole('button', { name: 'Assign' }));
     expect(await screen.findByText(/ · First term$/)).toBeInTheDocument();
     expect(
       await screen.findByText(

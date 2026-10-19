@@ -1,4 +1,5 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
+import userEvent, { type UserEvent } from '@testing-library/user-event';
 import { ApiError } from '@eduvault/api-contract';
 import { toast } from '@eduvault/ui';
 import { VOID_ID, voidRow } from '../test-approvals';
@@ -37,6 +38,11 @@ function setup(
   );
   return api;
 }
+
+const typeInto = async (user: UserEvent, field: HTMLElement, value: string) => {
+  await user.clear(field);
+  await user.type(field, value);
+};
 
 describe('ReceiptPage', () => {
   it('titles the receipt with its status, amount, payer and date', async () => {
@@ -304,8 +310,9 @@ describe('ReceiptPage cancellation', () => {
   });
 
   it('asks for a reason, then requests the void and toasts that it needs a second person’s approval', async () => {
+    const user = userEvent.setup();
     const api = setupVoid();
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('button', { name: 'Request void' })
     );
     const dialog = await screen.findByRole('dialog');
@@ -319,7 +326,7 @@ describe('ReceiptPage cancellation', () => {
       )
     ).toBeVisible();
 
-    fireEvent.click(
+    await user.click(
       within(dialog).getByRole('button', { name: 'Request void' })
     );
     expect(
@@ -329,10 +336,12 @@ describe('ReceiptPage cancellation', () => {
     ).toBeVisible();
     expect(api.payments.requestVoid).not.toHaveBeenCalled();
 
-    fireEvent.change(within(dialog).getByLabelText('Reason'), {
-      target: { value: 'Keyed the wrong amount' },
-    });
-    fireEvent.click(
+    await typeInto(
+      user,
+      within(dialog).getByLabelText('Reason'),
+      'Keyed the wrong amount'
+    );
+    await user.click(
       within(dialog).getByRole('button', { name: 'Request void' })
     );
 
@@ -351,15 +360,18 @@ describe('ReceiptPage cancellation', () => {
   });
 
   it('adds an Open voids action for a member who can see the voids list', async () => {
+    const user = userEvent.setup();
     setupVoid({ access: starterAccess('bursar') });
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('button', { name: 'Request void' })
     );
     const dialog = await screen.findByRole('dialog');
-    fireEvent.change(within(dialog).getByLabelText('Reason'), {
-      target: { value: 'Wrong child' },
-    });
-    fireEvent.click(
+    await typeInto(
+      user,
+      within(dialog).getByLabelText('Reason'),
+      'Wrong child'
+    );
+    await user.click(
       within(dialog).getByRole('button', { name: 'Request void' })
     );
 
@@ -374,15 +386,18 @@ describe('ReceiptPage cancellation', () => {
   });
 
   it('says the payment was cancelled when approval is switched off', async () => {
+    const user = userEvent.setup();
     setupVoid({ autoApproved: true });
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('button', { name: 'Request void' })
     );
     const dialog = await screen.findByRole('dialog');
-    fireEvent.change(within(dialog).getByLabelText('Reason'), {
-      target: { value: 'Wrong child' },
-    });
-    fireEvent.click(
+    await typeInto(
+      user,
+      within(dialog).getByLabelText('Reason'),
+      'Wrong child'
+    );
+    await user.click(
       within(dialog).getByRole('button', { name: 'Request void' })
     );
 
@@ -394,20 +409,23 @@ describe('ReceiptPage cancellation', () => {
   });
 
   it('shows the refusal in the dialog when a void already exists', async () => {
+    const user = userEvent.setup();
     setupVoid({
       failWith: new ApiError(409, {
         code: 'Conflict',
         message: 'A void already exists for this payment.',
       }),
     });
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('button', { name: 'Request void' })
     );
     const dialog = await screen.findByRole('dialog');
-    fireEvent.change(within(dialog).getByLabelText('Reason'), {
-      target: { value: 'Wrong child' },
-    });
-    fireEvent.click(
+    await typeInto(
+      user,
+      within(dialog).getByLabelText('Reason'),
+      'Wrong child'
+    );
+    await user.click(
       within(dialog).getByRole('button', { name: 'Request void' })
     );
 

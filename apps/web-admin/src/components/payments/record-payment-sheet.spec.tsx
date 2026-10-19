@@ -1,4 +1,5 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { ApiError } from '@eduvault/api-contract';
 import { toast } from '@eduvault/ui';
 import {
@@ -90,8 +91,11 @@ function setup(
 const amount = () => screen.getByLabelText('Amount received (₦)');
 const share = (name: string) => screen.getByLabelText(`Amount for ${name}`);
 
+let user: ReturnType<typeof userEvent.setup>;
+
 describe('RecordPaymentSheet', () => {
   beforeEach(() => {
+    user = userEvent.setup();
     vi.clearAllMocks();
   });
 
@@ -113,9 +117,8 @@ describe('RecordPaymentSheet', () => {
 
   it('shares a smaller amount in order and says what is still owed', async () => {
     setup();
-    fireEvent.change(await screen.findByLabelText('Amount received (₦)'), {
-      target: { value: '200000' },
-    });
+    await user.clear(await screen.findByLabelText('Amount received (₦)'));
+    await user.type(amount(), '200000');
 
     expect(share('Ada Okeke')).toHaveValue('180000');
     expect(share('Chidi Okeke')).toHaveValue('20000');
@@ -129,9 +132,8 @@ describe('RecordPaymentSheet', () => {
 
   it('puts an overpayment on the first child and says it is kept as credit', async () => {
     setup();
-    fireEvent.change(await screen.findByLabelText('Amount received (₦)'), {
-      target: { value: '320000' },
-    });
+    await user.clear(await screen.findByLabelText('Amount received (₦)'));
+    await user.type(amount(), '320000');
 
     expect(share('Ada Okeke')).toHaveValue('200000');
     expect(
@@ -143,9 +145,8 @@ describe('RecordPaymentSheet', () => {
 
   it('warns when the rows no longer add up to the amount', async () => {
     setup();
-    fireEvent.change(await screen.findByLabelText('Amount for Ada Okeke'), {
-      target: { value: '100000' },
-    });
+    await user.clear(await screen.findByLabelText('Amount for Ada Okeke'));
+    await user.type(share('Ada Okeke'), '100000');
 
     expect(screen.getByText('Split ₦220,000 ≠ amount ₦300,000')).toBeVisible();
   });
@@ -167,9 +168,7 @@ describe('RecordPaymentSheet', () => {
 
   it('rebuilds the single row when Someone else picks another student', async () => {
     setup({ prefill: { studentId: CHIDI } });
-    fireEvent.change(await screen.findByLabelText('Student'), {
-      target: { value: ADA },
-    });
+    await user.selectOptions(await screen.findByLabelText('Student'), ADA);
 
     expect(amount()).toHaveValue('180000');
     expect(share('Ada Okeke')).toHaveValue('180000');
@@ -200,16 +199,17 @@ describe('RecordPaymentSheet', () => {
     const how = await screen.findByLabelText('How they paid');
     expect(how).toHaveValue('transfer');
     expect(screen.getByText(/^References · TRF-20261007-/)).toBeVisible();
-    fireEvent.change(how, { target: { value: 'pos' } });
+    await user.selectOptions(how, 'pos');
     expect(screen.getByText(/^References · POS-20261007-/)).toBeVisible();
   });
 
   it('asks for the proof of a transfer inline and keeps the sheet open', async () => {
     const { api } = setup();
-    fireEvent.change(await screen.findByLabelText('How they paid'), {
-      target: { value: 'transfer' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Record payment' }));
+    await user.selectOptions(
+      await screen.findByLabelText('How they paid'),
+      'transfer'
+    );
+    await user.click(screen.getByRole('button', { name: 'Record payment' }));
 
     expect(
       await screen.findByText(
@@ -220,23 +220,19 @@ describe('RecordPaymentSheet', () => {
   });
 
   it('refuses a Word document as proof', async () => {
+    const anyFileUser = userEvent.setup({ applyAccept: false });
     const { api } = setup();
-    fireEvent.change(await screen.findByLabelText('How they paid'), {
-      target: { value: 'transfer' },
-    });
-    fireEvent.change(
-      screen.getByLabelText('Proof of transfer (needed for bank transfers)'),
-      {
-        target: {
-          files: [
-            new File(['x'], 'proof.docx', {
-              type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            }),
-          ],
-        },
-      }
+    await user.selectOptions(
+      await screen.findByLabelText('How they paid'),
+      'transfer'
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Record payment' }));
+    await anyFileUser.upload(
+      screen.getByLabelText('Proof of transfer (needed for bank transfers)'),
+      new File(['x'], 'proof.docx', {
+        type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      })
+    );
+    await user.click(screen.getByRole('button', { name: 'Record payment' }));
 
     expect(
       await screen.findByText(
@@ -249,7 +245,7 @@ describe('RecordPaymentSheet', () => {
   it('asks who paid when Someone else is chosen with no name', async () => {
     const { api } = setup({ prefill: { studentId: CHIDI } });
     await screen.findByLabelText('Payer name');
-    fireEvent.click(screen.getByRole('button', { name: 'Record payment' }));
+    await user.click(screen.getByRole('button', { name: 'Record payment' }));
 
     expect(await screen.findByText('Enter who paid.')).toBeVisible();
     expect(api.payments.record).not.toHaveBeenCalled();
@@ -257,18 +253,15 @@ describe('RecordPaymentSheet', () => {
 
   it('uploads the proof, records the payment and opens the receipt', async () => {
     const { api, router } = setup();
-    fireEvent.change(await screen.findByLabelText('How they paid'), {
-      target: { value: 'transfer' },
-    });
-    fireEvent.change(
-      screen.getByLabelText('Proof of transfer (needed for bank transfers)'),
-      {
-        target: {
-          files: [new File(['x'], 'alert.pdf', { type: 'application/pdf' })],
-        },
-      }
+    await user.selectOptions(
+      await screen.findByLabelText('How they paid'),
+      'transfer'
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Record payment' }));
+    await user.upload(
+      screen.getByLabelText('Proof of transfer (needed for bank transfers)'),
+      new File(['x'], 'alert.pdf', { type: 'application/pdf' })
+    );
+    await user.click(screen.getByRole('button', { name: 'Record payment' }));
 
     await waitFor(() => {
       expect(api.payments.record).toHaveBeenCalledTimes(1);
@@ -302,10 +295,9 @@ describe('RecordPaymentSheet', () => {
 
   it('mentions credit when a child is now paid in extra', async () => {
     setup();
-    fireEvent.change(await screen.findByLabelText('Amount received (₦)'), {
-      target: { value: '320000' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Record payment' }));
+    await user.clear(await screen.findByLabelText('Amount received (₦)'));
+    await user.type(amount(), '320000');
+    await user.click(screen.getByRole('button', { name: 'Record payment' }));
 
     await waitFor(() => {
       expect(toast.success).toHaveBeenCalledWith(
@@ -316,7 +308,7 @@ describe('RecordPaymentSheet', () => {
 
   it('stays on the page and offers View receipt when opened from a statement', async () => {
     const { router } = setup({ stay: true });
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('button', { name: 'Record payment' })
     );
 
@@ -332,7 +324,7 @@ describe('RecordPaymentSheet', () => {
     const { router } = setup({
       record: vi.fn().mockResolvedValue(recorded({ replayed: true })),
     });
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('button', { name: 'Record payment' })
     );
 
@@ -358,7 +350,7 @@ describe('RecordPaymentSheet', () => {
         })
       ),
     });
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('button', { name: 'Record payment' })
     );
 
@@ -375,7 +367,7 @@ describe('RecordPaymentSheet', () => {
     const button = await screen.findByRole('button', {
       name: 'Record payment',
     });
-    fireEvent.click(button);
+    await user.click(button);
 
     await waitFor(() => {
       expect(button).toBeDisabled();

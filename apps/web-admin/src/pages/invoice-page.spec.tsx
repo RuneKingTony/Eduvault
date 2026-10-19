@@ -1,4 +1,5 @@
-import { fireEvent, screen, within } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { ApiError } from '@eduvault/api-contract';
 import { toPermissionMap } from '@eduvault/policy';
 import {
@@ -35,6 +36,12 @@ const storeCharge = () =>
     billingRun: null,
     source: { kind: 'store_sale', id: SALE_ID, number: 'ISS-2026-0001' },
   });
+
+let user: ReturnType<typeof userEvent.setup>;
+
+beforeEach(() => {
+  user = userEvent.setup();
+});
 
 describe('InvoicePage', () => {
   it('shows a sent charge: header, lines with the discount muted, and the total', async () => {
@@ -131,7 +138,7 @@ describe('InvoicePage', () => {
     const trigger = await screen.findByRole('button', {
       name: /For your accountant: CHG-2026-00001/,
     });
-    fireEvent.click(trigger);
+    await user.click(trigger);
     expect(await screen.findByText('Balanced')).toBeVisible();
     expect(screen.getByText('1100 Fees owed to the school')).toBeVisible();
     expect(screen.getByText('4010 Tuition')).toBeVisible();
@@ -146,7 +153,7 @@ describe('InvoicePage', () => {
         }),
       })
     );
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('button', { name: /For your accountant/ })
     );
     expect(await screen.findByText('Out of balance')).toBeVisible();
@@ -186,7 +193,7 @@ describe('InvoicePage', () => {
     );
     const { onBack } = setup(api);
     expect(await screen.findByText('No charge here')).toBeVisible();
-    fireEvent.click(screen.getByRole('button', { name: 'Back to charges' }));
+    await user.click(screen.getByRole('button', { name: 'Back to charges' }));
     expect(onBack).toHaveBeenCalledTimes(1);
     expect(screen.getByRole('heading', { name: 'Not found' })).toBeVisible();
   });

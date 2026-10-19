@@ -1,4 +1,5 @@
-import { fireEvent, screen, within } from '@testing-library/react';
+import { act, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { SchoolYear } from '@eduvault/api-contract';
 import { actingAccess, fakeAccess, renderWithApi } from '../test-utils';
 import {
@@ -12,6 +13,12 @@ import {
 } from '../test-calendar';
 import { testId } from '../test-api';
 import { CalendarPage } from './calendar-page';
+
+let user: ReturnType<typeof userEvent.setup>;
+
+beforeEach(() => {
+  user = userEvent.setup();
+});
 
 const OLD_YEAR = testId(0x2_00_01);
 const OLD_TERM = testId(0x2_00_02);
@@ -89,9 +96,8 @@ const WRITE_CONTROLS = [
 ];
 
 async function openMore(name: string) {
-  fireEvent.keyDown(
-    await screen.findByRole('button', { name: `More for ${name}` }),
-    { key: 'Enter' }
+  await user.click(
+    await screen.findByRole('button', { name: `More for ${name}` })
   );
   return screen.findByRole('menuitem', { name: 'Delete school year' });
 }
@@ -135,9 +141,11 @@ describe('CalendarPage', () => {
     expect(
       await screen.findByText('Each school year and its terms.')
     ).toBeInTheDocument();
-    fireEvent.focus(
-      screen.getByRole('button', { name: 'About school years and terms' })
-    );
+    act(() => {
+      screen
+        .getByRole('button', { name: 'About school years and terms' })
+        .focus();
+    });
     expect(
       (
         await screen.findAllByText(
@@ -151,7 +159,9 @@ describe('CalendarPage', () => {
     setup();
     await yearToggle('2026/2027');
     const count = screen.getByRole('button', { name: '3 days' });
-    fireEvent.focus(count);
+    act(() => {
+      count.focus();
+    });
     expect(
       (
         await screen.findAllByText(
@@ -235,13 +245,10 @@ describe('CalendarPage', () => {
   it('offers Edit dates from a term row menu', async () => {
     setup();
     const now = within(await termsOf('2026/2027'));
-    fireEvent.keyDown(
-      now.getByRole('button', { name: 'Actions for Second term' }),
-      {
-        key: 'Enter',
-      }
+    await user.click(
+      now.getByRole('button', { name: 'Actions for Second term' })
     );
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('menuitem', { name: 'Edit dates' })
     );
     expect(
@@ -255,7 +262,9 @@ describe('CalendarPage', () => {
       setup();
       const item = await openMore('2026/2027');
       expect(item).toHaveAttribute('aria-disabled', 'true');
-      fireEvent.focus(item);
+      act(() => {
+        item.focus();
+      });
       expect(
         (await screen.findAllByText(NEXT_YEAR_STARTS)).length
       ).toBeGreaterThan(0);
@@ -265,7 +274,7 @@ describe('CalendarPage', () => {
       setup();
       const item = await openMore('2027/2028');
       expect(item).not.toHaveAttribute('aria-disabled', 'true');
-      fireEvent.click(item);
+      await user.click(item);
       expect(await screen.findByText('Delete 2027/2028?')).toBeInTheDocument();
       expect(
         screen.getByText(
@@ -279,7 +288,7 @@ describe('CalendarPage', () => {
     it('moves to another term of the current year at once', async () => {
       const { api } = setup();
       const now = within(await termsOf('2026/2027'));
-      fireEvent.click(
+      await user.click(
         within(now.getByRole('row', { name: /Second term/ })).getByRole(
           'button',
           { name: 'Make current' }
@@ -302,7 +311,7 @@ describe('CalendarPage', () => {
           { name: 'Make current' }
         )
       ).not.toBeInTheDocument();
-      fireEvent.click(
+      await user.click(
         within(next.getByRole('row', { name: /First term/ })).getByRole(
           'button',
           { name: 'Make current' }
@@ -323,14 +332,14 @@ describe('CalendarPage', () => {
     it('sends a holder of enrollment:place to the Start dialog from the waiting callout', async () => {
       const { api, onStartYear } = setup();
       const next = within(await termsOf('2027/2028'));
-      fireEvent.click(
+      await user.click(
         within(next.getByRole('row', { name: /First term/ })).getByRole(
           'button',
           { name: 'Make current' }
         )
       );
       const dialog = await screen.findByRole('dialog');
-      fireEvent.click(
+      await user.click(
         within(dialog).getByRole('button', { name: 'Start 2027/2028 first' })
       );
       expect(onStartYear).toHaveBeenCalled();
@@ -347,7 +356,7 @@ describe('CalendarPage', () => {
       })
     );
     await yearToggle('2026/2027');
-    fireEvent.click(screen.getByRole('button', { name: '3 days' }));
+    await user.click(screen.getByRole('button', { name: '3 days' }));
     const dialog = await screen.findByRole('dialog');
     expect(
       within(dialog).getByText('Holidays in First term, 2026/2027')
@@ -355,7 +364,7 @@ describe('CalendarPage', () => {
     expect(
       within(dialog).getByText(/29 Oct 2026 · Mid-term break/)
     ).toBeInTheDocument();
-    fireEvent.click(
+    await user.click(
       within(dialog).getByRole('button', {
         name: 'Remove Mid-term break, 29 Oct 2026',
       })
@@ -370,7 +379,7 @@ describe('CalendarPage', () => {
   it('preselects the current term in Add a holiday and lists only terms not yet ended', async () => {
     setup();
     await yearToggle('2026/2027');
-    fireEvent.click(
+    await user.click(
       screen
         .getAllByRole('button', { name: 'Add holiday' })
         .at(YEARS_NEWEST_FIRST.indexOf('2026/2027'))!
@@ -402,7 +411,7 @@ describe('CalendarPage', () => {
     ).toBeInTheDocument();
     const buttons = screen.getAllByRole('button', { name: 'New school year' });
     expect(buttons).toHaveLength(2);
-    fireEvent.click(buttons[1]!);
+    await user.click(buttons[1]!);
     expect(onNewYearOpenChange).toHaveBeenCalledWith(true);
   });
 
@@ -435,7 +444,7 @@ describe('CalendarPage', () => {
     expect(
       await screen.findByText('Showing 1 to 10 of 24')
     ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Page 3' }));
+    await user.click(screen.getByRole('button', { name: 'Page 3' }));
     expect(onPageChange).toHaveBeenCalledWith(3);
   });
 

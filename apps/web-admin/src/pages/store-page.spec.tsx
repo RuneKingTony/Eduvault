@@ -1,4 +1,5 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
+import userEvent, { type UserEvent } from '@testing-library/user-event';
 import { toast } from '@eduvault/ui';
 import {
   FINANCE_PAGE_SIZE_MAX,
@@ -123,6 +124,11 @@ function setup(
 const rowOf = (text: string) =>
   within(screen.getByRole('row', { name: new RegExp(text) }));
 
+const typeInto = async (user: UserEvent, field: HTMLElement, value: string) => {
+  await user.clear(field);
+  await user.type(field, value);
+};
+
 describe('StorePage', () => {
   beforeEach(() => {
     localStorage.clear();
@@ -171,6 +177,7 @@ describe('StorePage', () => {
   });
 
   it('masks the Stock value and the Cost column until Show costs is on', async () => {
+    const user = userEvent.setup();
     setup();
 
     expect(await screen.findByText('School shirt')).toBeVisible();
@@ -181,7 +188,7 @@ describe('StorePage', () => {
       '₦ ••••'
     );
 
-    fireEvent.click(screen.getByRole('switch', { name: 'Show costs' }));
+    await user.click(screen.getByRole('switch', { name: 'Show costs' }));
 
     expect(await screen.findByText('₦70,000')).toBeVisible();
     expect(rowOf('School shirt').getByText('₦3,500')).toBeVisible();
@@ -189,6 +196,7 @@ describe('StorePage', () => {
   });
 
   it('masks the delivery Cost on the Deliveries tab and shows it once Show costs is on', async () => {
+    const user = userEvent.setup();
     setup({ search: { tab: 'deliveries' } });
 
     expect(await screen.findByText('Adebayo Uniforms Ltd')).toBeVisible();
@@ -197,16 +205,17 @@ describe('StorePage', () => {
     expect(screen.getByText('Stock held at go-live')).toBeVisible();
     expect(row.getByText('GTBank current')).toBeVisible();
 
-    fireEvent.click(screen.getByRole('switch', { name: 'Show costs' }));
+    await user.click(screen.getByRole('switch', { name: 'Show costs' }));
 
     expect(await screen.findByText('₦35,000')).toBeVisible();
     expect(screen.getByText('₦100,000')).toBeVisible();
   });
 
   it('opens a delivery by putting its id in the address', async () => {
+    const user = userEvent.setup();
     const { onSearchChange } = setup({ search: { tab: 'deliveries' } });
 
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('button', { name: 'DEL-2026-0001' })
     );
 
@@ -217,11 +226,12 @@ describe('StorePage', () => {
   });
 
   it('shows the delivery sheet and takes an item to the Items tab on the delivery campus', async () => {
+    const user = userEvent.setup();
     const { api, onSearchChange } = setup({
       search: { tab: 'deliveries', delivery: DELIVERY_ID },
     });
 
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('button', { name: 'School shirt, Size 12' })
     );
 
@@ -236,6 +246,7 @@ describe('StorePage', () => {
   });
 
   it('keeps the chosen campus for a single-campus viewer and shows retired items', async () => {
+    const user = userEvent.setup();
     const { onSearchChange } = setup({
       campuses: [LEKKI],
       search: { tab: 'deliveries', delivery: DELIVERY_ID },
@@ -244,7 +255,7 @@ describe('StorePage', () => {
       }),
     });
 
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('button', { name: 'School shirt, Size 12' })
     );
 
@@ -256,11 +267,12 @@ describe('StorePage', () => {
   });
 
   it('closes the delivery sheet by clearing it from the address', async () => {
+    const user = userEvent.setup();
     const { onSearchChange } = setup({
       search: { tab: 'deliveries', delivery: DELIVERY_ID },
     });
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Close' }));
+    await user.click(await screen.findByRole('button', { name: 'Close' }));
 
     expect(onSearchChange).toHaveBeenCalledWith({
       tab: 'deliveries',
@@ -277,9 +289,12 @@ describe('StorePage', () => {
   });
 
   it('turns the low filter on from the Stock value tile', async () => {
+    const user = userEvent.setup();
     const { onSearchChange } = setup();
 
-    fireEvent.click(await screen.findByRole('button', { name: /Stock value/ }));
+    await user.click(
+      await screen.findByRole('button', { name: /Stock value/ })
+    );
 
     expect(onSearchChange).toHaveBeenCalledWith({
       tab: undefined,
@@ -289,9 +304,10 @@ describe('StorePage', () => {
   });
 
   it('turns the low filter on from the switch', async () => {
+    const user = userEvent.setup();
     const { onSearchChange } = setup();
 
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('switch', { name: 'Low or out of stock (2)' })
     );
     expect(onSearchChange).toHaveBeenCalledWith({
@@ -314,18 +330,17 @@ describe('StorePage', () => {
   });
 
   it('refuses a selling price below cost when adding an item', async () => {
+    const user = userEvent.setup();
     const { api } = setup({ search: { add: 1 } });
 
-    fireEvent.change(await screen.findByLabelText('Name'), {
-      target: { value: 'School cardigan' },
-    });
-    fireEvent.change(screen.getByLabelText('Cost price (₦)'), {
-      target: { value: '5000' },
-    });
-    fireEvent.change(screen.getByLabelText('Selling price (₦)'), {
-      target: { value: '3000' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Add item' }));
+    await typeInto(
+      user,
+      await screen.findByLabelText('Name'),
+      'School cardigan'
+    );
+    await typeInto(user, screen.getByLabelText('Cost price (₦)'), '5000');
+    await typeInto(user, screen.getByLabelText('Selling price (₦)'), '3000');
+    await user.click(screen.getByRole('button', { name: 'Add item' }));
 
     expect(
       await screen.findByText(ITEM_PRICE_BELOW_COST_MESSAGE)
@@ -334,16 +349,20 @@ describe('StorePage', () => {
   });
 
   it('records a delivery from a bank account and toasts the number, total and account', async () => {
+    const user = userEvent.setup();
     const { api, onSearchChange } = setup({ search: { deliver: 1 } });
 
-    fireEvent.change(await screen.findByLabelText('Supplier'), {
-      target: { value: 'Adebayo Uniforms Ltd' },
-    });
-    fireEvent.change(
-      await screen.findByLabelText('Quantity for School shirt, Size 12'),
-      { target: { value: '10' } }
+    await typeInto(
+      user,
+      await screen.findByLabelText('Supplier'),
+      'Adebayo Uniforms Ltd'
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Record delivery' }));
+    await typeInto(
+      user,
+      await screen.findByLabelText('Quantity for School shirt, Size 12'),
+      '10'
+    );
+    await user.click(screen.getByRole('button', { name: 'Record delivery' }));
 
     await waitFor(() => {
       expect(api.store.recordDelivery).toHaveBeenCalledWith({
@@ -370,11 +389,13 @@ describe('StorePage', () => {
   });
 
   it('masks the delivery sheet total until Show costs is on', async () => {
+    const user = userEvent.setup();
     setup({ search: { deliver: 1 } });
 
-    fireEvent.change(
+    await typeInto(
+      user,
       await screen.findByLabelText('Quantity for School shirt, Size 12'),
-      { target: { value: '10' } }
+      '10'
     );
 
     expect(screen.getByText(/Total at cost/)).toHaveTextContent(
@@ -454,33 +475,31 @@ describe('StorePage', () => {
   });
 
   it('puts the delivery and the new item in the overflow menu', async () => {
+    const user = userEvent.setup();
     const { onSearchChange } = setup();
-    fireEvent.keyDown(
-      await screen.findByRole('button', { name: 'More actions' }),
-      { key: 'Enter' }
+    await user.click(
+      await screen.findByRole('button', { name: 'More actions' })
     );
 
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('menuitem', { name: 'Add an item' })
     );
     expect(onSearchChange).toHaveBeenLastCalledWith({ add: 1 });
-    fireEvent.keyDown(screen.getByRole('button', { name: 'More actions' }), {
-      key: 'Enter',
-    });
-    fireEvent.click(
+    await user.click(screen.getByRole('button', { name: 'More actions' }));
+    await user.click(
       await screen.findByRole('menuitem', { name: 'Record a delivery' })
     );
     expect(onSearchChange).toHaveBeenLastCalledWith({ deliver: 1 });
   });
 
   it('puts Start a stock count in the overflow menu for the owner', async () => {
+    const user = userEvent.setup();
     const { onSearchChange } = setup();
-    fireEvent.keyDown(
-      await screen.findByRole('button', { name: 'More actions' }),
-      { key: 'Enter' }
+    await user.click(
+      await screen.findByRole('button', { name: 'More actions' })
     );
 
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('menuitem', { name: 'Start a stock count' })
     );
 
@@ -488,6 +507,7 @@ describe('StorePage', () => {
   });
 
   it('gives a bursar who can only count the overflow menu with just the count, keeping the purchase button', async () => {
+    const user = userEvent.setup();
     setup({
       access: fakeAccess({
         roles: ['custom'],
@@ -502,9 +522,8 @@ describe('StorePage', () => {
     expect(
       await screen.findByRole('button', { name: 'Record student purchase' })
     ).toBeVisible();
-    fireEvent.keyDown(
-      await screen.findByRole('button', { name: 'More actions' }),
-      { key: 'Enter' }
+    await user.click(
+      await screen.findByRole('button', { name: 'More actions' })
     );
 
     expect(
@@ -564,8 +583,9 @@ describe('StorePage', () => {
   });
 
   it('opens the purchase sheet from the button and from the address', async () => {
+    const user = userEvent.setup();
     const { onSearchChange } = setup();
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('button', { name: 'Record student purchase' })
     );
     expect(onSearchChange).toHaveBeenCalledWith({ sell: 1 });
@@ -578,6 +598,7 @@ describe('StorePage', () => {
 
   describe('the term tiles and the Items sold tab', () => {
     it('shows sold, profit and items sold for the term, with profit masked until Show costs is on', async () => {
+      const user = userEvent.setup();
       setup();
 
       expect(await screen.findByText('₦27,000')).toBeVisible();
@@ -585,15 +606,16 @@ describe('StorePage', () => {
       expect(screen.getByText('9')).toBeVisible();
       expect(screen.queryByText('₦7,000')).not.toBeInTheDocument();
 
-      fireEvent.click(screen.getByRole('switch', { name: 'Show costs' }));
+      await user.click(screen.getByRole('switch', { name: 'Show costs' }));
 
       expect(await screen.findByText('₦7,000')).toBeVisible();
     });
 
     it('sends the Sold this term and Items sold tiles to the Items sold tab', async () => {
+      const user = userEvent.setup();
       const { onSearchChange } = setup();
 
-      fireEvent.click(
+      await user.click(
         await screen.findByRole('button', { name: /Sold this term/ })
       );
       expect(onSearchChange).toHaveBeenCalledTimes(1);
@@ -602,7 +624,7 @@ describe('StorePage', () => {
         tab: 'sold',
       });
       onSearchChange.mockClear();
-      fireEvent.click(screen.getByRole('button', { name: /Items sold/ }));
+      await user.click(screen.getByRole('button', { name: /Items sold/ }));
       expect(onSearchChange).toHaveBeenCalledTimes(1);
       expect(onSearchChange).toHaveBeenLastCalledWith({
         campus: undefined,
@@ -620,6 +642,7 @@ describe('StorePage', () => {
     });
 
     it('counts the Stock counts tab and lists the count with its status and Approvals link', async () => {
+      const user = userEvent.setup();
       const { onApprovals } = setup({ search: { tab: 'counts' } });
 
       expect(await screen.findByText('CNT-2026-0001')).toBeVisible();
@@ -627,19 +650,19 @@ describe('StorePage', () => {
       const count = within(screen.getByRole('row', { name: /Approvals/ }));
       expect(count.getByText('CNT-2026-0001')).toBeVisible();
       expect(count.getByText('Waiting')).toBeVisible();
-      fireEvent.click(screen.getByRole('button', { name: 'Approvals' }));
+      await user.click(screen.getByRole('button', { name: 'Approvals' }));
       expect(onApprovals).toHaveBeenCalledOnce();
     });
 
     it('switches to the Stock counts tab without carrying filters over', async () => {
+      const user = userEvent.setup();
       const { onSearchChange } = setup({
         search: { campus: LEKKI.id, low: 1 },
       });
 
-      fireEvent.mouseDown(
+      await user.click(
         await screen.findByRole('tab', { name: /Stock counts/ })
       );
-      fireEvent.click(screen.getByRole('tab', { name: /Stock counts/ }));
 
       expect(onSearchChange).toHaveBeenCalledWith({
         campus: LEKKI.id,
@@ -648,12 +671,13 @@ describe('StorePage', () => {
     });
 
     it('opens a sale by putting its id in the address', async () => {
+      const user = userEvent.setup();
       const { onSearchChange } = setup({
         search: { tab: 'sold' },
         sales: saleList([sale(), secondSale()]),
       });
 
-      fireEvent.click(
+      await user.click(
         await screen.findByRole('button', { name: 'ISS-2026-0002' })
       );
 
@@ -664,14 +688,12 @@ describe('StorePage', () => {
     });
 
     it('switches tabs without carrying filters over', async () => {
+      const user = userEvent.setup();
       const { onSearchChange } = setup({
         search: { campus: LEKKI.id, low: 1 },
       });
 
-      fireEvent.mouseDown(
-        await screen.findByRole('tab', { name: /Items sold/ })
-      );
-      fireEvent.click(screen.getByRole('tab', { name: /Items sold/ }));
+      await user.click(await screen.findByRole('tab', { name: /Items sold/ }));
 
       expect(onSearchChange).toHaveBeenCalledWith({
         campus: LEKKI.id,

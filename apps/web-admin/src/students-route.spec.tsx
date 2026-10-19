@@ -4,7 +4,8 @@ import {
   createMemoryHistory,
   createRouter,
 } from '@tanstack/react-router';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import {
   AuthClientProvider,
   type EduvaultAuthClient,
@@ -112,8 +113,9 @@ describe('the students route', () => {
   });
 
   it('sends "Charge this student" to the billing page with the prepare sheet open', async () => {
+    const user = userEvent.setup();
     const { navigate } = renderStudents();
-    fireEvent.click(await screen.findByRole('button', { name: 'Admit' }));
+    await user.click(await screen.findByRole('button', { name: 'Admit' }));
 
     const options = vi
       .mocked(toast.success)
