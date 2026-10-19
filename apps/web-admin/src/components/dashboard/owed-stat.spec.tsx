@@ -8,7 +8,7 @@ describe('OwedStat', () => {
     expect(await screen.findByText('Still owed')).toBeInTheDocument();
     expect(screen.getByText('₦250,000')).toBeInTheDocument();
     expect(screen.getByText('9 students owe')).toBeInTheDocument();
-    expect(screen.getByText('Still owed').closest('a')).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /Still owed/ })).toHaveAttribute(
       'href',
       '/finance/accounts'
     );

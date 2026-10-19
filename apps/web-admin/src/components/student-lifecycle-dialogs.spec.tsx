@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import type { MePermissions } from '@eduvault/api-contract';
 import { toPermissionMap } from '@eduvault/policy';
 import { toast } from '@eduvault/ui';
@@ -169,9 +169,9 @@ describe('LeaveDialog', () => {
   it('lists the six reasons', () => {
     setup();
     expect(
-      [...screen.getByLabelText('Reason').querySelectorAll('option')].map(
-        (option) => option.textContent
-      )
+      within(screen.getByLabelText('Reason'))
+        .getAllByRole('option')
+        .map((option) => option.textContent)
     ).toEqual([
       'Did not return',
       'Relocated',
@@ -311,7 +311,9 @@ describe('MoveDialog', () => {
       expect(select).toHaveValue(ARM_ID);
     });
     expect(
-      [...select.querySelectorAll('option')].map((option) => option.textContent)
+      within(select)
+        .getAllByRole('option')
+        .map((option) => option.textContent)
     ).toEqual(['JSS 2 Gold · Lekki', 'JSS 2 Emerald · Ikeja']);
   });
 

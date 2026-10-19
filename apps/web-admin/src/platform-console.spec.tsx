@@ -4,13 +4,7 @@ import {
   createMemoryHistory,
   createRouter,
 } from '@tanstack/react-router';
-import {
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-  within,
-} from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import {
   AuthClientProvider,
   type EduvaultAuthClient,
@@ -132,6 +126,11 @@ async function renderAt(path: string, answer: Me) {
   return { router, permissions, api };
 }
 
+const sidebarLink = (name: string) =>
+  screen
+    .getAllByRole('link', { name })
+    .find((link) => !link.hasAttribute('aria-disabled'));
+
 describe('platform console', () => {
   beforeEach(() => {
     localStorage.clear();
@@ -151,12 +150,10 @@ describe('platform console', () => {
     expect(router.state.location.pathname).toBe('/platform/schools');
     expect(screen.getByText('Eduvault platform')).toBeInTheDocument();
     expect(screen.getByText('Super admin console')).toBeInTheDocument();
-    const nav = document.querySelector<HTMLElement>('[data-slot="sidebar"]')!;
-    expect(within(nav).getByText('Platform')).toBeInTheDocument();
-    expect(within(nav).getByRole('link', { name: 'Schools' })).toHaveAttribute(
-      'aria-current',
-      'page'
-    );
+    expect(
+      screen.getByRole('button', { name: 'Platform' })
+    ).toBeInTheDocument();
+    expect(sidebarLink('Schools')).toHaveAttribute('aria-current', 'page');
     expect(screen.getByText('Greenfield College')).toBeInTheDocument();
     expect(permissions).not.toHaveBeenCalled();
   });
@@ -194,10 +191,7 @@ describe('platform console', () => {
     expect(
       await screen.findByRole('heading', { name: 'Audit log' })
     ).toBeInTheDocument();
-    const nav = document.querySelector<HTMLElement>('[data-slot="sidebar"]')!;
-    expect(
-      within(nav).getByRole('link', { name: 'Audit log' })
-    ).toHaveAttribute('aria-current', 'page');
+    expect(sidebarLink('Audit log')).toHaveAttribute('aria-current', 'page');
   });
 
   describe('acting', () => {

@@ -80,10 +80,10 @@ describe('MembersPage', () => {
       summary({ id: FUNMI_ID, name: 'Funmi Adeyemi' }),
       summary({ id: EMEKA_ID, name: 'Emeka Obi', onLeave: true }),
     ]);
-    const away = (await screen.findByText('Emeka Obi')).closest('tr');
-    expect(within(away as HTMLElement).getByText('On leave')).toBeVisible();
-    const present = screen.getByText('Funmi Adeyemi').closest('tr');
-    expect(within(present as HTMLElement).queryByText('On leave')).toBeNull();
+    const away = await screen.findByRole('row', { name: /Emeka Obi/ });
+    expect(within(away).getByText('On leave')).toBeVisible();
+    const present = screen.getByRole('row', { name: /Funmi Adeyemi/ });
+    expect(within(present).queryByText('On leave')).toBeNull();
   });
 
   it('passes search, role and page through to the list request', async () => {

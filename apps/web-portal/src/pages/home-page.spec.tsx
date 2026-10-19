@@ -498,7 +498,8 @@ describe('Home fees tile', () => {
     expect(
       screen.queryByRole('button', { name: /Fees/ })
     ).not.toBeInTheDocument();
-    expect(api.portal.children).not.toHaveBeenCalled();
-    expect(api.portal.familyStatement).not.toHaveBeenCalled();
+    const { children, familyStatement } = api.portal;
+    expect(children).not.toHaveBeenCalled();
+    expect(familyStatement).not.toHaveBeenCalled();
   });
 });

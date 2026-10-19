@@ -397,14 +397,14 @@ describe('MemberLeaveCard Cancel leave', () => {
   });
 
   it('is hidden while a super admin is acting read-only and shown once they have a reason', async () => {
-    const readOnly = renderWithApi(
+    const { unmount } = renderWithApi(
       <MemberLeaveCard userId="user-emeka" />,
       memberApi(),
       actingApprover(false)
     );
     await screen.findByText('Approved');
     expect(screen.queryByRole('button', { name: 'Cancel leave' })).toBeNull();
-    readOnly.unmount();
+    unmount();
 
     renderWithApi(
       <MemberLeaveCard userId="user-emeka" />,

@@ -57,9 +57,9 @@ describe('BillingPage', () => {
         ],
       })
     );
-    const row = (await screen.findByText('BR-2026-0002')).closest('tr');
-    expect(row).not.toBeNull();
-    const cells = within(row as HTMLElement);
+    const cells = within(
+      await screen.findByRole('row', { name: /BR-2026-0002/ })
+    );
     expect(
       cells.getByText('Second term, 2026/2027 · Campus: Lekki')
     ).toBeVisible();

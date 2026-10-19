@@ -99,7 +99,7 @@ function renderStudents() {
       </ApiProvider>
     </QueryClientProvider>
   );
-  return navigate;
+  return { navigate };
 }
 
 describe('the students route', () => {
@@ -112,7 +112,7 @@ describe('the students route', () => {
   });
 
   it('sends "Charge this student" to the billing page with the prepare sheet open', async () => {
-    const navigate = renderStudents();
+    const { navigate } = renderStudents();
     fireEvent.click(await screen.findByRole('button', { name: 'Admit' }));
 
     const options = vi

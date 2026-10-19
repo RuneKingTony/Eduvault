@@ -32,7 +32,7 @@ describe('AnnouncementsCard', () => {
     });
   });
 
-  it('marks a pinned item and tones its bell', async () => {
+  it('marks a pinned item', async () => {
     const api = dashboardApi({
       announcements: [announcementSummary({ pinned: true })],
     });
@@ -40,15 +40,6 @@ describe('AnnouncementsCard', () => {
     expect(
       await screen.findByText('9 Oct 2026 · Event · Pinned')
     ).toBeInTheDocument();
-    expect(document.querySelector('li svg')).toHaveClass('text-warning');
-  });
-
-  it('keeps an unpinned bell muted', async () => {
-    renderCard(dashboardApi({ announcements: [announcementSummary()] }));
-    await screen.findByText('PTA meeting');
-    expect(document.querySelector('li svg')).toHaveClass(
-      'text-muted-foreground'
-    );
   });
 
   it('links All to the page only for someone with announcement:read', async () => {

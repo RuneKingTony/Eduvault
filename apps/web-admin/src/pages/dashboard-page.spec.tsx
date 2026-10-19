@@ -378,10 +378,9 @@ describe('DashboardPage Charged this term', () => {
     expect(await screen.findByText('Charged this term')).toBeInTheDocument();
     expect(screen.getByText('₦452,000')).toBeInTheDocument();
     expect(screen.getByText('First term, 2026/2027')).toBeInTheDocument();
-    expect(screen.getByText('Charged this term').closest('a')).toHaveAttribute(
-      'href',
-      '/finance/invoices'
-    );
+    expect(
+      screen.getByRole('link', { name: /Charged this term/ })
+    ).toHaveAttribute('href', '/finance/invoices');
   });
 
   it('asks for nothing and shows nothing without invoice:read', async () => {

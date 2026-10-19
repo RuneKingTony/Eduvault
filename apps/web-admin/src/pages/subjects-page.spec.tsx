@@ -145,9 +145,9 @@ describe('SubjectsPage catalogue', () => {
 
   it('shows four level badges and a +n badge for the rest', async () => {
     renderWithApi(page('catalogue'), apiFor());
-    const row = (await screen.findByText('English Language')).closest('tr');
-    expect(row).not.toBeNull();
-    const cells = within(row!);
+    const cells = within(
+      await screen.findByRole('row', { name: /English Language/ })
+    );
     expect(cells.getByText('P4')).toBeInTheDocument();
     expect(cells.getByText('JSS3')).toBeInTheDocument();
     expect(cells.queryByText('SS1')).not.toBeInTheDocument();
@@ -219,32 +219,35 @@ describe('SubjectsPage by level', () => {
   it('lists each level with its subjects in sequence and Core or Elective', async () => {
     renderWithApi(page('by-level'), apiFor());
     expect(await screen.findByText('JSS 2')).toBeInTheDocument();
-    const card = (await screen.findByText('JSS 2')).closest(
-      '[data-slot="card"]'
-    );
-    expect(card).not.toBeNull();
-    const cells = within(card as HTMLElement);
-    expect(cells.getByText('Core')).toBeInTheDocument();
-    expect(cells.getAllByText('Elective')).toHaveLength(2);
-    expect(cells.getByText('French')).toBeInTheDocument();
+    const rows = screen.getAllByRole('row').slice(1);
+    expect(
+      rows.map((row) =>
+        within(row)
+          .getAllByRole('cell')
+          .map((cell) => cell.textContent)
+      )
+    ).toEqual([
+      ['1', 'Mathematics', 'Core'],
+      ['2', 'French', 'Elective'],
+      ['3', 'Music', 'Elective'],
+    ]);
   });
 
   it('gives an empty level a card that reads No subjects yet', async () => {
     renderWithApi(page('by-level'), apiFor());
-    const card = (await screen.findByText('JSS 1')).closest(
-      '[data-slot="card"]'
-    );
-    expect(
-      within(card as HTMLElement).getByText('No subjects yet')
-    ).toBeInTheDocument();
+    expect(await screen.findByText('JSS 1')).toBeInTheDocument();
+    expect(screen.getByText('No subjects yet')).toBeInTheDocument();
+    expect(screen.getAllByRole('table')).toHaveLength(1);
   });
 });
 
+const LEVELS_IN_ORDER = ['JSS 1', 'JSS 2'];
+
 const openEditor = async (level: 'JSS 1' | 'JSS 2' = 'JSS 2') => {
-  const card = (await screen.findByText(level)).closest('[data-slot="card"]');
-  fireEvent.click(
-    within(card as HTMLElement).getByRole('button', { name: 'Edit subjects' })
-  );
+  const buttons = await screen.findAllByRole('button', {
+    name: 'Edit subjects',
+  });
+  fireEvent.click(buttons[LEVELS_IN_ORDER.indexOf(level)]!);
   await screen.findByText(`Subjects for ${level}`);
 };
 
@@ -456,13 +459,21 @@ describe('SubjectsPage level subjects sheet', () => {
 describe('SubjectsPage electives card', () => {
   it('shows an avatar per taker and Nobody yet for an elective with none', async () => {
     renderWithApi(page('by-level'), apiFor());
-    const card = (
-      await screen.findByText('Electives taken this session')
-    ).closest('[data-slot="collapsible"]');
-    const inside = within(card as HTMLElement);
-    expect(await inside.findByText('AO')).toBeInTheDocument();
-    expect(inside.getByText('Nobody yet')).toBeInTheDocument();
-    expect(inside.getByText('2')).toBeInTheDocument();
+    expect(
+      await screen.findByRole('button', {
+        name: 'Electives taken this session 2',
+      })
+    ).toBeInTheDocument();
+    const lineOf = (name: string) =>
+      within(
+        screen
+          .getAllByRole('listitem')
+          .find((item) => within(item).queryByText(name) !== null)!
+      );
+    expect(await screen.findByText('AO')).toBeInTheDocument();
+    expect(lineOf('French').getByText('AO')).toBeInTheDocument();
+    expect(lineOf('Music').getByText('Nobody yet')).toBeInTheDocument();
+    expect(lineOf('Music').queryByText('AO')).not.toBeInTheDocument();
   });
 
   it('says No electives. when the school has none', async () => {

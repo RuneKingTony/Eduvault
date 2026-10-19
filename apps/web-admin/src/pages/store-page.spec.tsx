@@ -121,7 +121,7 @@ function setup(
 }
 
 const rowOf = (text: string) =>
-  within(screen.getByText(text).closest('tr') as HTMLElement);
+  within(screen.getByRole('row', { name: new RegExp(text) }));
 
 describe('StorePage', () => {
   beforeEach(() => {
@@ -192,7 +192,7 @@ describe('StorePage', () => {
     setup({ search: { tab: 'deliveries' } });
 
     expect(await screen.findByText('Adebayo Uniforms Ltd')).toBeVisible();
-    const row = rowOf('DEL-2026-0001');
+    const row = within(screen.getByRole('row', { name: /DEL-2026-0001/ }));
     expect(row.getByLabelText('Hidden')).toHaveTextContent('₦ ••••');
     expect(screen.getByText('Stock held at go-live')).toBeVisible();
     expect(row.getByText('GTBank current')).toBeVisible();
@@ -624,7 +624,9 @@ describe('StorePage', () => {
 
       expect(await screen.findByText('CNT-2026-0001')).toBeVisible();
       expect(screen.getByRole('tab', { name: 'Stock counts 1' })).toBeVisible();
-      expect(rowOf('CNT-2026-0001').getByText('Waiting')).toBeVisible();
+      const count = within(screen.getByRole('row', { name: /Approvals/ }));
+      expect(count.getByText('CNT-2026-0001')).toBeVisible();
+      expect(count.getByText('Waiting')).toBeVisible();
       fireEvent.click(screen.getByRole('button', { name: 'Approvals' }));
       expect(onApprovals).toHaveBeenCalledOnce();
     });

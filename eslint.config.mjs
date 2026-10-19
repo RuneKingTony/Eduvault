@@ -13,6 +13,7 @@ import unicorn from 'eslint-plugin-unicorn';
 import importX from 'eslint-plugin-import-x';
 import regexp from 'eslint-plugin-regexp';
 import vitest from '@vitest/eslint-plugin';
+import testingLibrary from 'eslint-plugin-testing-library';
 import betterTailwindcss from 'eslint-plugin-better-tailwindcss';
 import { createTypeScriptImportResolver } from 'eslint-import-resolver-typescript';
 
@@ -121,6 +122,15 @@ export const reactConfig = [
         'error',
         { checksVoidReturn: { attributes: false } },
       ],
+    },
+  },
+  {
+    ...asErrors(testingLibrary.configs['flat/react']),
+    files: ['**/*.spec.{ts,tsx}'],
+    rules: {
+      ...asErrors(testingLibrary.configs['flat/react']).rules,
+      'testing-library/no-test-id-queries': 'error',
+      'testing-library/prefer-query-matchers': 'error',
     },
   },
 ];

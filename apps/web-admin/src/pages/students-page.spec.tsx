@@ -543,9 +543,8 @@ describe('StudentsPage scope notes', () => {
 describe('within a row', () => {
   it('keeps the name and number together in the first cell', async () => {
     setup();
-    const row = (await screen.findByText('GF-0123')).closest('tr');
-    expect(row).not.toBeNull();
-    expect(within(row!).getByText('Ada Okeke')).toBeInTheDocument();
+    const row = await screen.findByRole('row', { name: /GF-0123/ });
+    expect(within(row).getByText('Ada Okeke')).toBeInTheDocument();
   });
 });
 

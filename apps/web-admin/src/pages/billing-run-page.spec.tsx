@@ -47,10 +47,9 @@ describe('BillingRunPage', () => {
       )
     ).toBeVisible();
     const steps = screen.getByRole('list', { name: 'Progress' });
-    expect(within(steps).getByText('Prepared').closest('li')).toHaveAttribute(
-      'aria-current',
-      'step'
-    );
+    expect(
+      within(steps).getByRole('listitem', { current: 'step' })
+    ).toHaveTextContent('Prepared');
     expect(screen.getByText(/2 charges · ₦452,000 in total/)).toBeVisible();
     expect(screen.getByText('Check these charges')).toBeVisible();
     expect(screen.getAllByText('Given when sent')).toHaveLength(2);
@@ -203,10 +202,9 @@ describe('BillingRunPage', () => {
       screen.queryByRole('button', { name: 'Send charges' })
     ).not.toBeInTheDocument();
     const steps = screen.getByRole('list', { name: 'Progress' });
-    expect(within(steps).getByText('Sent').closest('li')).toHaveAttribute(
-      'aria-current',
-      'step'
-    );
+    expect(
+      within(steps).getByRole('listitem', { current: 'step' })
+    ).toHaveTextContent('Sent');
   });
 
   it('explains a cancelled round', async () => {

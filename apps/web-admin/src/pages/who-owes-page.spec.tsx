@@ -121,8 +121,7 @@ describe('WhoOwesPage', () => {
 
   it('lists the student, class, guardian, owing, paid and total', async () => {
     setup();
-    const row = (await screen.findByText('Ada Okeke')).closest('tr');
-    const cells = within(row as HTMLElement);
+    const cells = within(await screen.findByRole('row', { name: /Ada Okeke/ }));
     expect(cells.getByText('GF-0001')).toBeVisible();
     expect(cells.getByText('JSS 1 Gold')).toBeVisible();
     expect(cells.getByText('Ngozi Okeke')).toBeVisible();
@@ -154,10 +153,14 @@ describe('WhoOwesPage', () => {
       ]),
     });
     expect(await screen.findByText('GF-0002 · left')).toBeVisible();
-    expect(screen.getByText('₦5,000 extra paid')).toBeVisible();
     expect(
-      screen.getAllByText('Paid up').some((node) => node.closest('tr') !== null)
-    ).toBe(true);
+      within(screen.getByRole('row', { name: /David Eze/ })).getByText(
+        '₦5,000 extra paid'
+      )
+    ).toBeVisible();
+    expect(
+      within(screen.getByRole('row', { name: /Tobi Ade/ })).getByText('Paid up')
+    ).toBeVisible();
   });
 
   it('shows a dash for a student with no guardian or class', async () => {
