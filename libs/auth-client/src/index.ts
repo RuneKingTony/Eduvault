@@ -14,3 +14,4 @@ export * from './auth-client-context';
 export * from './sign-out-button';
 export * from './entry-gate';
 export * from './me-gate';
+export * from './wrong-app-screen';

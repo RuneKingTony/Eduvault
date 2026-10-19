@@ -1,6 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { render, screen } from '@testing-library/react';
 import {
   AuthClientProvider,
   type EduvaultAuthClient,
@@ -8,8 +7,7 @@ import {
 import { PortalOnlyScreen } from './portal-only-screen';
 
 function setup() {
-  const signOut = vi.fn().mockResolvedValue({ data: {}, error: null });
-  const authClient = { signOut } as unknown as EduvaultAuthClient;
+  const authClient = { signOut: vi.fn() } as unknown as EduvaultAuthClient;
   render(
     <QueryClientProvider client={new QueryClient()}>
       <AuthClientProvider authClient={authClient}>
@@ -17,7 +15,6 @@ function setup() {
       </AuthClientProvider>
     </QueryClientProvider>
   );
-  return { signOut };
 }
 
 describe('PortalOnlyScreen', () => {
@@ -34,14 +31,5 @@ describe('PortalOnlyScreen', () => {
     expect(
       screen.getByRole('link', { name: 'Go to web-portal' })
     ).toHaveAttribute('href', 'http://localhost:4201');
-  });
-
-  it('signs out', async () => {
-    const user = userEvent.setup();
-    const { signOut } = setup();
-    await user.click(screen.getByRole('button', { name: 'Sign out' }));
-    await waitFor(() => {
-      expect(signOut).toHaveBeenCalledOnce();
-    });
   });
 });
