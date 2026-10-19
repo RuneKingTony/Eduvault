@@ -11,7 +11,7 @@ interface RolePermissionRow {
   permission: string;
 }
 
-export function customRolePermissions(
+function customRolePermissions(
   rows: readonly RolePermissionRow[]
 ): Record<string, PermissionMap> {
   const custom: Record<string, PermissionMap> = {};
