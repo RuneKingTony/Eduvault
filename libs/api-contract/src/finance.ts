@@ -581,3 +581,51 @@ export const feeOptionResultSchema = z.object({
   optedIn: z.boolean(),
 });
 export type FeeOptionResult = z.infer<typeof feeOptionResultSchema>;
+
+export const FEE_OPT_IN_LIMIT = 200;
+
+export const feeOptInParamsSchema = z.object({ feeTypeId: idSchema });
+
+export const feeOptInsQuerySchema = z.object({
+  termId: idSchema,
+  q: z.string().trim().max(120).optional(),
+});
+export type FeeOptInsQuery = z.output<typeof feeOptInsQuerySchema>;
+
+export const feeOptInRowSchema = z.object({
+  studentId: idSchema,
+  name: z.string(),
+  admissionNumber: z.string(),
+  levelName: z.string(),
+  campusName: z.string(),
+  optedIn: z.boolean(),
+});
+export type FeeOptInRow = z.infer<typeof feeOptInRowSchema>;
+
+export const feeOptInsSchema = z.object({
+  schoolYearName: z.string(),
+  items: z.array(feeOptInRowSchema),
+  total: z.number().int().nonnegative(),
+});
+export type FeeOptIns = z.infer<typeof feeOptInsSchema>;
+
+export const setFeeOptInsSchema = z.object({
+  termId: idSchema,
+  studentIds: z
+    .array(idSchema)
+    .min(1)
+    .max(FEE_OPT_IN_LIMIT)
+    .refine((ids) => new Set(ids).size === ids.length, {
+      message: 'Each student can be listed once.',
+    }),
+  optedIn: z.boolean(),
+});
+export type SetFeeOptInsInput = z.input<typeof setFeeOptInsSchema>;
+
+export const feeOptInsResultSchema = z.object({
+  feeTypeId: idSchema,
+  optedIn: z.boolean(),
+  changed: z.number().int().nonnegative(),
+  unchanged: z.number().int().nonnegative(),
+});
+export type FeeOptInsResult = z.infer<typeof feeOptInsResultSchema>;

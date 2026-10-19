@@ -162,7 +162,7 @@ class KyselyStockCountTx implements StockCountTx {
   }
 
   async post(entry: PostInput): Promise<string> {
-    const { entry: posted } = await this.deps.poster.post(this.trx, entry);
+    const posted = await this.deps.poster.postOnce(this.trx, entry);
     return posted.id;
   }
 

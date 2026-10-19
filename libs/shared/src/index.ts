@@ -15,6 +15,7 @@ export * from './placeholder-email';
 export * from './logo-src';
 export * from './search-params';
 export * from './payment-reference';
+export * from './reference-namespace';
 export * from './payment-split';
 export * from './payment-proof';
 export * from './statement-copy';

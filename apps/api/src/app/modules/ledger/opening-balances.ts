@@ -2,6 +2,7 @@ import type {
   OpeningMoneyAccountItem,
   OpeningStudentItem,
 } from '@eduvault/api-contract';
+import { SYSTEM_REFERENCE_PREFIXES } from '@eduvault/shared';
 import type { LedgerLine } from '../../common/ledger';
 
 export const OPENING_MEMO = 'Opening balance';
@@ -47,7 +48,7 @@ export function planStudentEntry(
     creditMinor: owed ? amount : 0,
   };
   return {
-    reference: `OPEN-${item.studentId}`,
+    reference: `${SYSTEM_REFERENCE_PREFIXES.opening}-${item.studentId}`,
     effectiveOn: item.effectiveOn,
     memo: item.memo ?? OPENING_MEMO,
     lines: [fees, equity],
@@ -61,7 +62,7 @@ export function planMoneyAccountEntry(
 ): PlannedEntry {
   const amount = item.amountMinor;
   return {
-    reference: `OPEN-MA-${item.moneyAccountId}`,
+    reference: `${SYSTEM_REFERENCE_PREFIXES.opening}-MA-${item.moneyAccountId}`,
     effectiveOn: item.effectiveOn,
     memo: OPENING_MEMO,
     lines: [

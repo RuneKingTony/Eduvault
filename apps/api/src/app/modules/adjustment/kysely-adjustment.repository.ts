@@ -271,7 +271,7 @@ class KyselyAdjustmentTx implements AdjustmentTx {
   }
 
   async post(entry: AdjustmentPost): Promise<string> {
-    const { entry: posted } = await this.deps.poster.post(this.trx, {
+    const posted = await this.deps.poster.postOnce(this.trx, {
       ...entry,
       organizationId: this.organizationId,
       postedBy: this.who.userId,
