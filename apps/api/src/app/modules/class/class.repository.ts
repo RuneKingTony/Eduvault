@@ -4,8 +4,7 @@ import type {
   RosterRow,
 } from '@eduvault/api-contract';
 import type { PermissionMap } from '@eduvault/policy';
-import type { ClassScope } from '../../common/class-scope';
-import type { CampusScope } from '../../common/campus-scope';
+import type { CampusClassScope } from '../../common/scope';
 
 export interface LevelRecord {
   id: string;
@@ -33,12 +32,7 @@ export interface ClassRecord {
   retiredAt: string | null;
 }
 
-export interface Visibility {
-  campusScope: CampusScope;
-  classScope: ClassScope;
-}
-
-export interface ClassFilter extends Visibility {
+export interface ClassFilter extends CampusClassScope {
   campusId?: string;
   levelId?: string;
   status: ClassStatus;
@@ -115,7 +109,7 @@ export abstract class ClassRepository {
   abstract findClass(
     organizationId: string,
     id: string,
-    visibility: Visibility
+    visibility: CampusClassScope
   ): Promise<ClassRecord | undefined>;
 
   abstract findClassByName(

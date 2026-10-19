@@ -4,14 +4,9 @@ import type {
   LedgerAccount,
   LedgerAccountType,
 } from '@eduvault/api-contract';
-import type { CampusScope } from '../../common/campus-scope';
 import type { ChartAccount } from '../../common/ledger';
 import type { PlannedEntry } from './opening-balances';
-
-export interface LedgerScope {
-  organizationId: string;
-  campusScope: CampusScope;
-}
+import type { OrgScope } from '../../common/scope';
 
 export interface LedgerAccountRef {
   id: string;
@@ -44,7 +39,7 @@ export interface OpeningPost {
 }
 
 export abstract class LedgerRepository {
-  abstract chart(scope: LedgerScope): Promise<ChartAccount[]>;
+  abstract chart(scope: OrgScope): Promise<ChartAccount[]>;
 
   abstract currency(organizationId: string): Promise<string>;
 
@@ -59,18 +54,15 @@ export abstract class LedgerRepository {
     name: string;
   }): Promise<LedgerOutcome>;
 
-  abstract journal(
-    scope: LedgerScope,
-    query: JournalQuery
-  ): Promise<JournalList>;
+  abstract journal(scope: OrgScope, query: JournalQuery): Promise<JournalList>;
 
   abstract studentCampuses(
-    scope: LedgerScope,
+    scope: OrgScope,
     options: { studentIds: string[]; today: string }
   ): Promise<Map<string, string>>;
 
   abstract moneyAccounts(
-    scope: LedgerScope,
+    scope: OrgScope,
     ids: string[]
   ): Promise<MoneyAccountRef[]>;
 

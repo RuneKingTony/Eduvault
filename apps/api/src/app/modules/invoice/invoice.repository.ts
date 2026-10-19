@@ -5,13 +5,8 @@ import type {
   InvoiceListSummary,
   InvoiceSummary,
 } from '@eduvault/api-contract';
-import type { CampusScope } from '../../common/campus-scope';
 import type { ReceivableMovement } from '../../common/ledger';
-
-export interface InvoiceScope {
-  organizationId: string;
-  campusScope: CampusScope;
-}
+import type { OrgScope } from '../../common/scope';
 
 export interface InvoicePage {
   items: InvoiceSummary[];
@@ -28,27 +23,21 @@ export type InvoiceRecord = Omit<
 export abstract class InvoiceRepository {
   abstract currency(organizationId: string): Promise<string>;
 
-  abstract studentVisible(
-    scope: InvoiceScope,
-    studentId: string
-  ): Promise<boolean>;
+  abstract studentVisible(scope: OrgScope, studentId: string): Promise<boolean>;
 
-  abstract list(
-    scope: InvoiceScope,
-    query: InvoiceListQuery
-  ): Promise<InvoicePage>;
+  abstract list(scope: OrgScope, query: InvoiceListQuery): Promise<InvoicePage>;
 
-  abstract counts(scope: InvoiceScope): Promise<InvoiceCounts>;
+  abstract counts(scope: OrgScope): Promise<InvoiceCounts>;
 
-  abstract summary(scope: InvoiceScope): Promise<InvoiceListSummary>;
+  abstract summary(scope: OrgScope): Promise<InvoiceListSummary>;
 
   abstract termTotals(
-    scope: InvoiceScope,
+    scope: OrgScope,
     termId: string
   ): Promise<{ count: number; totalMinor: number }>;
 
   abstract find(
-    scope: InvoiceScope,
+    scope: OrgScope,
     id: string
   ): Promise<InvoiceRecord | undefined>;
 

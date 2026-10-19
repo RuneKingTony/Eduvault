@@ -7,7 +7,8 @@ import {
 import type { OrgContext } from '../../common/auth';
 import { buildFeeGrid } from '../../common/fees';
 import { FeeLineRepository, FeeTypeRepository } from './fee-line.repository';
-import { feeScopeOf, inFeeGroup } from './fee-scope';
+import { inFeeGroup } from './fee-scope';
+import { orgScopeOf } from '../../common/scope';
 
 @Injectable()
 export class FeeGridService {
@@ -22,7 +23,7 @@ export class FeeGridService {
       throw new NotFoundException(FEE_TERM_NOT_FOUND_MESSAGE);
     }
     const [live, feeTypes, currency] = await Promise.all([
-      this.lines.list(feeScopeOf(ctx), {
+      this.lines.list(orgScopeOf(ctx), {
         termId: query.termId,
         includeRetired: false,
       }),

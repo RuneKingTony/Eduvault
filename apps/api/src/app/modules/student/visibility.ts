@@ -1,6 +1,4 @@
-import type { OrgContext } from '../../common/auth';
-import type { CampusScope } from '../../common/campus-scope';
-import type { ClassScope } from '../../common/class-scope';
+import type { CampusClassScope } from '../../common/scope';
 
 export interface PlacementFacts {
   campusId: string;
@@ -13,22 +11,12 @@ export interface VisibilityFacts {
   currentPlacement: PlacementFacts | null;
 }
 
-export interface StudentVisibility {
-  campusScope: CampusScope;
-  classScope: ClassScope;
-}
-
-export const scopeOf = (ctx: OrgContext): StudentVisibility => ({
-  campusScope: ctx.campusScope,
-  classScope: ctx.classScope,
-});
-
 export const effectiveCampusId = (facts: VisibilityFacts): string =>
   facts.currentPlacement?.campusId ?? facts.homeCampusId;
 
 export function isStudentVisible(
   facts: VisibilityFacts,
-  scope: StudentVisibility
+  scope: CampusClassScope
 ): boolean {
   const campusOk =
     scope.campusScope === 'all' ||

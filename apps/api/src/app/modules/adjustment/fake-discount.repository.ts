@@ -1,7 +1,6 @@
 import type { StudentDiscountListQuery } from '@eduvault/api-contract';
 import type { ActivityInput } from '../../common/activity';
 import type { WaitingApproval } from '../../common/approvals';
-import type { AdjustmentScope } from './adjustment.repository';
 import {
   DiscountRepository,
   type DiscountEnding,
@@ -14,6 +13,7 @@ import {
   type FeeTypeCheck,
   type TermInfo,
 } from './discount.repository';
+import type { OrgScope } from '../../common/scope';
 
 interface StoredDiscount extends NewDiscount {
   id: string;
@@ -41,7 +41,7 @@ export class FakeDiscountRepository extends DiscountRepository {
     return Promise.resolve('NGN');
   }
 
-  studentInScope(_scope: AdjustmentScope, studentId: string): Promise<boolean> {
+  studentInScope(_scope: OrgScope, studentId: string): Promise<boolean> {
     return Promise.resolve(this.studentsInScope.has(studentId));
   }
 
@@ -72,7 +72,7 @@ export class FakeDiscountRepository extends DiscountRepository {
   }
 
   withTx<T>(
-    _scope: AdjustmentScope,
+    _scope: OrgScope,
     userId: string,
     work: (tx: DiscountTx) => Promise<T>
   ): Promise<T> {
@@ -172,10 +172,7 @@ export class FakeDiscountRepository extends DiscountRepository {
     return true;
   }
 
-  findById(
-    _scope: AdjustmentScope,
-    id: string
-  ): Promise<DiscountRecord | undefined> {
+  findById(_scope: OrgScope, id: string): Promise<DiscountRecord | undefined> {
     const row = this.stored.find((candidate) => candidate.id === id);
     const from = row && this.terms.get(row.fromTermId);
     if (row === undefined || from === undefined) {
@@ -217,7 +214,7 @@ export class FakeDiscountRepository extends DiscountRepository {
   }
 
   list(
-    _scope: AdjustmentScope,
+    _scope: OrgScope,
     _query: StudentDiscountListQuery
   ): Promise<DiscountPage> {
     return Promise.resolve({ items: [], total: 0, waitingCount: 0 });

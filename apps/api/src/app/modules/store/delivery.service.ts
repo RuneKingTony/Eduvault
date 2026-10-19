@@ -33,9 +33,9 @@ import {
   type DeliveryActivity,
   type ExistingDelivery,
   type StoreRef,
-  type StoreScope,
 } from './store.repository';
-import { deliveryInScope, scopeOf, storeInView } from './store-view';
+import { deliveryInScope, storeInView } from './store-view';
+import { orgScopeOf, type OrgScope } from '../../common/scope';
 
 interface Checked {
   store: StoreRef;
@@ -127,7 +127,7 @@ export class DeliveryService {
     existing: ExistingDelivery,
     request: { input: RecordDelivery; requestHash: string }
   ): Promise<RecordedDelivery> {
-    const visible = await this.store.findDelivery(scopeOf(ctx), existing.id);
+    const visible = await this.store.findDelivery(orgScopeOf(ctx), existing.id);
     if (visible === undefined) {
       throw new ConflictException(DELIVERY_REFERENCE_TAKEN_MESSAGE);
     }
@@ -143,7 +143,7 @@ export class DeliveryService {
     ctx: OrgContext,
     input: RecordDelivery
   ): Promise<Checked> {
-    const scope = scopeOf(ctx);
+    const scope = orgScopeOf(ctx);
     const store = await storeInView(this.store, ctx, input.campusId);
     if (
       input.isOpening === true &&
@@ -163,7 +163,7 @@ export class DeliveryService {
   }
 
   private async checkLines(
-    scope: StoreScope,
+    scope: OrgScope,
     input: RecordDelivery
   ): Promise<void> {
     if (input.lines.length === 0) {
@@ -186,7 +186,7 @@ export class DeliveryService {
   }
 
   private async checkAccount(
-    scope: StoreScope,
+    scope: OrgScope,
     input: RecordDelivery
   ): Promise<Checked['moneyAccount']> {
     if (input.isOpening === true) {

@@ -14,9 +14,9 @@ import { visibleStudentsCte } from '../../common/students';
 import {
   FeeStudentRepository,
   type ChargeFacts,
-  type FeeScope,
   type StudentFeeContext,
 } from './fee-line.repository';
+import type { OrgScope } from '../../common/scope';
 
 @Injectable()
 export class KyselyFeeStudentRepository extends FeeStudentRepository {
@@ -28,7 +28,7 @@ export class KyselyFeeStudentRepository extends FeeStudentRepository {
   }
 
   async findStudent(
-    scope: FeeScope,
+    scope: OrgScope,
     query: {
       studentId: string;
       sessionId: string | undefined;
@@ -202,7 +202,7 @@ export class KyselyFeeStudentRepository extends FeeStudentRepository {
   }
 
   async candidates(
-    scope: FeeScope,
+    scope: OrgScope,
     query: { sessionId: string; q: string | undefined }
   ): Promise<FeeCandidates> {
     const { organizationId, campusScope } = scope;

@@ -7,12 +7,7 @@ import type {
   ItemKind,
 } from '@eduvault/api-contract';
 import type { ActivityInput } from '../../common/activity';
-import type { CampusScope } from '../../common/campus-scope';
-
-export interface StoreScope {
-  organizationId: string;
-  campusScope: CampusScope;
-}
+import type { OrgScope } from '../../common/scope';
 
 export type ItemRecord = Omit<Item, 'stock' | 'state'>;
 
@@ -143,7 +138,7 @@ export abstract class StoreRepository {
 
   abstract updateItem(change: ItemChange): Promise<ItemUpdateOutcome>;
 
-  abstract storesInScope(scope: StoreScope): Promise<StoreRef[]>;
+  abstract storesInScope(scope: OrgScope): Promise<StoreRef[]>;
 
   abstract stockTotals(
     organizationId: string,
@@ -156,7 +151,7 @@ export abstract class StoreRepository {
   ): Promise<ExistingDelivery | undefined>;
 
   abstract moneyAccount(
-    scope: StoreScope,
+    scope: OrgScope,
     moneyAccountId: string
   ): Promise<MoneyAccountCheck>;
 
@@ -173,12 +168,12 @@ export abstract class StoreRepository {
   ): Promise<DeliveryOutcome>;
 
   abstract listDeliveries(
-    scope: StoreScope,
+    scope: OrgScope,
     query: DeliveryPageQuery
   ): Promise<DeliveryPage>;
 
   abstract findDelivery(
-    scope: StoreScope,
+    scope: OrgScope,
     id: string
   ): Promise<DeliveryDetail | undefined>;
 }

@@ -1,4 +1,4 @@
-import type { ItemRecord, StoreRef, StoreScope } from './store.repository';
+import type { ItemRecord, StoreRef } from './store.repository';
 import type {
   StockCount,
   StockCountList,
@@ -25,6 +25,7 @@ import {
   type StockCountRecord,
   type StockCountTx,
 } from './stock-count.repository';
+import type { OrgScope } from '../../common/scope';
 
 interface StoredCount extends Omit<NewStockCount, 'status'> {
   createdBy: string;
@@ -61,7 +62,7 @@ export class FakeStockCountRepository extends StockCountRepository {
   }
 
   async withTx<T>(
-    _scope: StoreScope,
+    _scope: OrgScope,
     userId: string,
     work: (tx: StockCountTx) => Promise<T>
   ): Promise<T> {
@@ -84,7 +85,7 @@ export class FakeStockCountRepository extends StockCountRepository {
   }
 
   waitingNumber(
-    _scope: StoreScope,
+    _scope: OrgScope,
     campusId: string
   ): Promise<string | undefined> {
     const store = this.stores.get(campusId);
@@ -95,7 +96,7 @@ export class FakeStockCountRepository extends StockCountRepository {
     );
   }
 
-  list(scope: StoreScope, query: StockCountListQuery): Promise<StockCountList> {
+  list(scope: OrgScope, query: StockCountListQuery): Promise<StockCountList> {
     const all = this.stored
       .map((count) => this.view(count))
       .toReversed()
@@ -111,7 +112,7 @@ export class FakeStockCountRepository extends StockCountRepository {
     });
   }
 
-  find(scope: StoreScope, id: string): Promise<StockCount | undefined> {
+  find(scope: OrgScope, id: string): Promise<StockCount | undefined> {
     const found = this.stored.find((count) => count.id === id);
     const view = found && this.view(found);
     return Promise.resolve(

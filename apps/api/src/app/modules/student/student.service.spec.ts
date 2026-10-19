@@ -10,7 +10,7 @@ import {
   type StudentListResult,
 } from './student.repository';
 import { StudentService } from './student.service';
-import type { StudentVisibility } from './visibility';
+import type { CampusClassScope } from '../../common/scope';
 
 const ORG = 'school-a';
 const STUDENT = '9c0f1e1e-6e53-4c52-9f1c-0a1d7a7f9c22';
@@ -25,7 +25,7 @@ class FakeStudents extends StudentRepository {
 
   list(
     _organizationId: string,
-    _scope: StudentVisibility,
+    _scope: CampusClassScope,
     params: StudentListParams
   ): Promise<StudentListResult> {
     this.listed.push(params);
@@ -39,7 +39,7 @@ class FakeStudents extends StudentRepository {
 
   findDetail(
     _organizationId: string,
-    _scope: StudentVisibility,
+    _scope: CampusClassScope,
     target: StudentDetailTarget
   ) {
     this.read.push(target);

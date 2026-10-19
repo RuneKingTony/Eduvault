@@ -22,7 +22,7 @@ import {
   NO_STOCK,
   type StockLevel,
 } from './stock-count';
-import type { StoreScope } from './store.repository';
+import type { OrgScope } from '../../common/scope';
 
 interface CountRow {
   id: string;
@@ -73,7 +73,7 @@ const COUNT_JOINS = sql`
 
 export const STORE_CAMPUS = sql`s.campus_id`;
 
-const visible = (scope: StoreScope) =>
+const visible = (scope: OrgScope) =>
   sql`sc.organization_id = ${scope.organizationId}
     AND ${inScope(STORE_CAMPUS, scope.campusScope)}`;
 
@@ -95,7 +95,7 @@ const keyOf = (...parts: string[]): string => parts.join(':');
 
 export async function readLines(
   db: Database,
-  scope: StoreScope,
+  scope: OrgScope,
   ids: readonly string[]
 ): Promise<Map<string, LineRow[]>> {
   const { rows } = await sql<LineRow>`
@@ -119,7 +119,7 @@ export async function readLines(
 
 async function readStock(
   db: Database,
-  scope: StoreScope,
+  scope: OrgScope,
   counts: readonly CountRow[]
 ): Promise<Map<string, StockLevel>> {
   const storeIds = [...new Set(counts.map((count) => count.store_id))];
@@ -144,7 +144,7 @@ async function readStock(
 
 async function readPosted(
   db: Database,
-  scope: StoreScope,
+  scope: OrgScope,
   counts: readonly CountRow[]
 ): Promise<Map<string, number>> {
   const numbers = counts
@@ -240,7 +240,7 @@ function toCount(
 
 async function totalOf(
   db: Database,
-  scope: StoreScope,
+  scope: OrgScope,
   filter: CountFilter
 ): Promise<number> {
   const { rows } = await sql<{ total: number }>`
@@ -251,7 +251,7 @@ async function totalOf(
 
 async function readCounts(
   db: Database,
-  scope: StoreScope,
+  scope: OrgScope,
   filter: CountFilter
 ): Promise<StockCountList> {
   const { page } = filter;
@@ -292,14 +292,14 @@ async function readCounts(
 
 export const listStockCounts = (
   db: Database,
-  scope: StoreScope,
+  scope: OrgScope,
   query: StockCountListQuery
 ): Promise<StockCountList> =>
   readCounts(db, scope, { campusId: query.campusId, page: query });
 
 export async function findStockCount(
   db: Database,
-  scope: StoreScope,
+  scope: OrgScope,
   id: string
 ): Promise<StockCount | undefined> {
   const { items } = await readCounts(db, scope, { id });
@@ -308,7 +308,7 @@ export async function findStockCount(
 
 export async function waitingStockCounts(
   db: Database,
-  scope: StoreScope
+  scope: OrgScope
 ): Promise<WaitingApproval[]> {
   const { items } = await readCounts(db, scope, { status: 'submitted' });
   return items.map((count) => ({
@@ -326,7 +326,7 @@ export async function waitingStockCounts(
 
 export async function waitingCountNumber(
   db: Database,
-  scope: StoreScope,
+  scope: OrgScope,
   campusId: string
 ): Promise<string | undefined> {
   const { rows } = await sql<{ number: string }>`

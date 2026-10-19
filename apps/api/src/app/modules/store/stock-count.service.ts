@@ -43,7 +43,7 @@ import {
 } from './stock-count.repository';
 import type { StoreRef } from './store.repository';
 import { countPosting } from './store-posting';
-import { scopeOf } from './store-view';
+import { orgScopeOf } from '../../common/scope';
 
 const SUBMIT_ATTEMPTS = 2;
 
@@ -85,7 +85,7 @@ export class StockCountService {
     ctx: OrgContext,
     query: StockCountListQuery
   ): Promise<StockCountList> {
-    const list = await this.counts.list(scopeOf(ctx), query);
+    const list = await this.counts.list(orgScopeOf(ctx), query);
     if (list.items.length === 0 && query.campusId !== undefined) {
       await this.assertCampusVisible(ctx, query.campusId);
     }
@@ -97,7 +97,7 @@ export class StockCountService {
   }
 
   async submit(ctx: OrgContext, input: SubmitStockCount): Promise<StockCount> {
-    const scope = scopeOf(ctx);
+    const scope = orgScopeOf(ctx);
     const year = documentYear(this.clock);
     for (let attempt = 0; attempt < SUBMIT_ATTEMPTS; attempt += 1) {
       try {
@@ -119,7 +119,7 @@ export class StockCountService {
   }
 
   async approve(ctx: OrgContext, id: string): Promise<StockCount> {
-    await this.counts.withTx(scopeOf(ctx), ctx.user.id, async (tx) => {
+    await this.counts.withTx(orgScopeOf(ctx), ctx.user.id, async (tx) => {
       const found = await tx.lockCount(id);
       if (found === undefined) {
         throw notFound();
@@ -165,7 +165,7 @@ export class StockCountService {
     reason: string
   ): Promise<StockCount> {
     const declineReason = assertDeclineReason(reason);
-    await this.counts.withTx(scopeOf(ctx), ctx.user.id, async (tx) => {
+    await this.counts.withTx(orgScopeOf(ctx), ctx.user.id, async (tx) => {
       const found = await tx.lockCount(id);
       if (found === undefined) {
         throw notFound();
@@ -200,8 +200,10 @@ export class StockCountService {
     ctx: OrgContext,
     campusId: string
   ): Promise<void> {
-    const campus = await this.counts.withTx(scopeOf(ctx), ctx.user.id, (tx) =>
-      tx.store(campusId)
+    const campus = await this.counts.withTx(
+      orgScopeOf(ctx),
+      ctx.user.id,
+      (tx) => tx.store(campusId)
     );
     if (campus === undefined) {
       throw new NotFoundException(STORE_CAMPUS_NOT_FOUND_MESSAGE);
@@ -209,7 +211,7 @@ export class StockCountService {
   }
 
   private async item(ctx: OrgContext, id: string): Promise<StockCount> {
-    const found = await this.counts.find(scopeOf(ctx), id);
+    const found = await this.counts.find(orgScopeOf(ctx), id);
     if (found === undefined) {
       throw notFound();
     }

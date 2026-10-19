@@ -33,7 +33,7 @@ import {
   type DuplicateMatch,
   type SchoolNaming,
 } from './admission.repository';
-import type { StudentVisibility } from './visibility';
+import type { CampusClassScope } from '../../common/scope';
 
 const PG_UNIQUE_VIOLATION = '23505';
 const USERNAME_INDEX = 'user_username_uidx';
@@ -358,7 +358,7 @@ export class KyselyAdmissionRepository extends AdmissionRepository {
 
   async duplicates(
     organizationId: string,
-    scope: StudentVisibility,
+    scope: CampusClassScope,
     input: {
       firstName: string;
       lastName: string;

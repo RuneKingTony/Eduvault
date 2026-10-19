@@ -41,7 +41,6 @@ import {
   type AdjustmentPage,
   type AdjustmentPost,
   type AdjustmentRecord,
-  type AdjustmentScope,
   type LockedAdjustment,
   type AdjustmentTx,
   type CreditAccountCheck,
@@ -57,6 +56,7 @@ import {
   listAdjustments,
   waitingAdjustments,
 } from './kysely-adjustment-read.repository';
+import type { OrgScope } from '../../common/scope';
 
 interface AdjustmentRow {
   id: string;
@@ -93,7 +93,7 @@ class KyselyAdjustmentTx implements AdjustmentTx {
   constructor(
     private readonly trx: Kysely<DB>,
     private readonly deps: { poster: LedgerPoster; activity: ActivityRecorder },
-    private readonly who: { scope: AdjustmentScope; userId: string }
+    private readonly who: { scope: OrgScope; userId: string }
   ) {
     this.activity = deps.activity;
     this.decisions = decisionsFor(trx, {
@@ -347,7 +347,7 @@ export class KyselyAdjustmentRepository extends AdjustmentRepository {
   }
 
   withTx<T>(
-    scope: AdjustmentScope,
+    scope: OrgScope,
     userId: string,
     work: (tx: AdjustmentTx) => Promise<T>
   ): Promise<T> {
@@ -365,21 +365,15 @@ export class KyselyAdjustmentRepository extends AdjustmentRepository {
     );
   }
 
-  findById(
-    scope: AdjustmentScope,
-    id: string
-  ): Promise<Adjustment | undefined> {
+  findById(scope: OrgScope, id: string): Promise<Adjustment | undefined> {
     return findAdjustment(this.db, scope, id);
   }
 
-  list(
-    scope: AdjustmentScope,
-    query: AdjustmentListQuery
-  ): Promise<AdjustmentPage> {
+  list(scope: OrgScope, query: AdjustmentListQuery): Promise<AdjustmentPage> {
     return listAdjustments(this.db, scope, query);
   }
 
-  waiting(scope: AdjustmentScope): Promise<WaitingApproval[]> {
+  waiting(scope: OrgScope): Promise<WaitingApproval[]> {
     return waitingAdjustments(this.db, scope);
   }
 }

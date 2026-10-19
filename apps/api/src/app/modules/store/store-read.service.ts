@@ -29,11 +29,11 @@ import {
 import {
   deliveryInScope,
   isLow,
-  scopeOf,
   stockTotalsOf,
   storesInView,
   withStock,
 } from './store-view';
+import { orgScopeOf } from '../../common/scope';
 
 interface LowStock {
   count: number;
@@ -56,7 +56,7 @@ export class StoreReadService {
     const totals = await stockTotalsOf(this.store, ctx, stores);
     const [low, term] = await Promise.all([
       this.lowItems(ctx, stores, totals),
-      this.sales.termFigures(scopeOf(ctx), campusId),
+      this.sales.termFigures(orgScopeOf(ctx), campusId),
     ]);
     return { stockValueMinor: valueOf(totals), lowCount: low.count, ...term };
   }
@@ -65,7 +65,7 @@ export class StoreReadService {
     const stores = await storesInView(this.store, ctx);
     const [totals, term] = await Promise.all([
       stockTotalsOf(this.store, ctx, stores),
-      this.sales.termFigures(scopeOf(ctx)),
+      this.sales.termFigures(orgScopeOf(ctx)),
     ]);
     return { stockValueMinor: valueOf(totals), ...term };
   }
@@ -84,7 +84,7 @@ export class StoreReadService {
     query: DeliveryListQuery
   ): Promise<DeliveryList> {
     await storesInView(this.store, ctx, query.campusId);
-    return this.store.listDeliveries(scopeOf(ctx), query);
+    return this.store.listDeliveries(orgScopeOf(ctx), query);
   }
 
   async delivery(ctx: OrgContext, id: string): Promise<DeliveryDetail> {
@@ -93,14 +93,14 @@ export class StoreReadService {
 
   async saleList(ctx: OrgContext, query: SaleListQuery): Promise<SaleList> {
     await storesInView(this.store, ctx, query.campusId);
-    return this.sales.list(scopeOf(ctx), {
+    return this.sales.list(orgScopeOf(ctx), {
       ...query,
       pageSize: FINANCE_PAGE_SIZE,
     });
   }
 
   async sale(ctx: OrgContext, id: string): Promise<Sale> {
-    const found = await this.sales.find(scopeOf(ctx), id);
+    const found = await this.sales.find(orgScopeOf(ctx), id);
     if (found === undefined) {
       throw new NotFoundException(STORE_SALE_NOT_FOUND_MESSAGE);
     }
@@ -108,7 +108,7 @@ export class StoreReadService {
   }
 
   async saleOptions(ctx: OrgContext): Promise<SaleOptions> {
-    const scope = scopeOf(ctx);
+    const scope = orgScopeOf(ctx);
     const [students, methods, accounts] = await Promise.all([
       this.sales.optionStudents(scope, {
         today: this.clock.today(),

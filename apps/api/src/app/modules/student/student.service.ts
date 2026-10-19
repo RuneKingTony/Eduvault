@@ -21,9 +21,9 @@ import {
   StudentRepository,
   type StudentDetailTarget,
 } from './student.repository';
-import { scopeOf, type StudentVisibility } from './visibility';
+import { campusClassScopeOf, type CampusClassScope } from '../../common/scope';
 
-const ALL_SCOPE: StudentVisibility = { campusScope: 'all', classScope: 'all' };
+const ALL_SCOPE: CampusClassScope = { campusScope: 'all', classScope: 'all' };
 
 const financeTarget = (ctx: OrgContext, id: string): StudentDetailTarget => ({
   id,
@@ -47,7 +47,7 @@ export class StudentService {
     if (query.campusId !== undefined) {
       await this.campuses.assertInScope(ctx, query.campusId);
     }
-    return this.students.list(ctx.organizationId, scopeOf(ctx), {
+    return this.students.list(ctx.organizationId, campusClassScopeOf(ctx), {
       ...query,
       withGuardians: can(ctx.permissions, 'guardian', 'read'),
       withFinance: canAny(ctx.permissions, FINANCE_READ_GATE),
@@ -55,7 +55,11 @@ export class StudentService {
   }
 
   async get(ctx: OrgContext, id: string): Promise<StudentDetail> {
-    const detail = await this.read(ctx, scopeOf(ctx), financeTarget(ctx, id));
+    const detail = await this.read(
+      ctx,
+      campusClassScopeOf(ctx),
+      financeTarget(ctx, id)
+    );
     if (!can(ctx.permissions, 'guardian', 'read')) {
       return detail;
     }
@@ -79,7 +83,7 @@ export class StudentService {
     id: string,
     patch: UpdateStudentInput
   ): Promise<StudentDetail> {
-    const student = await this.read(ctx, scopeOf(ctx), {
+    const student = await this.read(ctx, campusClassScopeOf(ctx), {
       id,
       withFinance: false,
     });
@@ -100,7 +104,11 @@ export class StudentService {
 
   async assertVisible(ctx: OrgContext, id: string): Promise<void> {
     if (
-      !(await this.students.isVisible(ctx.organizationId, scopeOf(ctx), id))
+      !(await this.students.isVisible(
+        ctx.organizationId,
+        campusClassScopeOf(ctx),
+        id
+      ))
     ) {
       throw notFound();
     }
@@ -108,7 +116,7 @@ export class StudentService {
 
   private async read(
     ctx: OrgContext,
-    scope: StudentVisibility,
+    scope: CampusClassScope,
     target: StudentDetailTarget
   ): Promise<StudentDetail> {
     const detail = await this.students.findDetail(

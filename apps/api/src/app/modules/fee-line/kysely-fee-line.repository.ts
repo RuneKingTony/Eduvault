@@ -20,12 +20,12 @@ import {
   type CopyFeeLines,
   type CopyOutcome,
   type FeeLineOutcome,
-  type FeeScope,
   type LevelRef,
   type LineActivity,
   type NewFeeLine,
   type TermRef,
 } from './fee-line.repository';
+import type { OrgScope } from '../../common/scope';
 
 const LIVE_LINE_KEY = 'fee_line_live_key';
 
@@ -133,7 +133,7 @@ export class KyselyFeeLineRepository extends FeeLineRepository {
   }
 
   async list(
-    scope: FeeScope,
+    scope: OrgScope,
     query: { termId: string; includeRetired: boolean }
   ): Promise<FeeLine[]> {
     let lines = this.lines()
@@ -157,7 +157,7 @@ export class KyselyFeeLineRepository extends FeeLineRepository {
     return rows.map((row) => toLine(row));
   }
 
-  async findById(scope: FeeScope, id: string): Promise<FeeLine | undefined> {
+  async findById(scope: OrgScope, id: string): Promise<FeeLine | undefined> {
     const row = await this.lines()
       .where('fee_line.organization_id', '=', scope.organizationId)
       .where('fee_line.id', '=', id)

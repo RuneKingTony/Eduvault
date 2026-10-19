@@ -10,7 +10,8 @@ import type {
   StudentLife,
 } from '@eduvault/api-contract';
 import type { ProofState } from '../../common/payments';
-import type { StoreRef, StoreScope } from './store.repository';
+import type { StoreRef } from './store.repository';
+import type { OrgScope } from '../../common/scope';
 
 export interface SaleAccount {
   id: string;
@@ -98,17 +99,17 @@ export abstract class SaleRepository {
     reference: string
   ): Promise<ExistingSale | undefined>;
 
-  abstract find(scope: StoreScope, id: string): Promise<Sale | undefined>;
+  abstract find(scope: OrgScope, id: string): Promise<Sale | undefined>;
 
-  abstract list(scope: StoreScope, query: SalePageQuery): Promise<SalePage>;
+  abstract list(scope: OrgScope, query: SalePageQuery): Promise<SalePage>;
 
   abstract student(
-    scope: StoreScope,
+    scope: OrgScope,
     request: { studentId: string; today: string }
   ): Promise<SaleStudent | undefined>;
 
   abstract optionStudents(
-    scope: StoreScope,
+    scope: OrgScope,
     request: { today: string; withBalance: boolean }
   ): Promise<OptionStudents>;
 
@@ -118,7 +119,7 @@ export abstract class SaleRepository {
 
   abstract paymentMethods(organizationId: string): Promise<PaymentMethods>;
 
-  abstract accounts(scope: StoreScope): Promise<SaleAccount[]>;
+  abstract accounts(scope: OrgScope): Promise<SaleAccount[]>;
 
   abstract proofState(
     organizationId: string,
@@ -129,7 +130,7 @@ export abstract class SaleRepository {
   abstract insert(input: NewSale): Promise<SaleOutcome>;
 
   abstract termFigures(
-    scope: StoreScope,
+    scope: OrgScope,
     campusId?: string
   ): Promise<StoreTermFigures>;
 

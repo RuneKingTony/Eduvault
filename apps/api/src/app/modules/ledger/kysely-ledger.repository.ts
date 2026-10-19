@@ -25,11 +25,11 @@ import {
   LedgerRepository,
   type LedgerAccountRef,
   type LedgerOutcome,
-  type LedgerScope,
   type MoneyAccountRef,
   type OpeningPost,
   type SystemAccounts,
 } from './ledger.repository';
+import type { OrgScope } from '../../common/scope';
 
 interface EntryRow {
   id: string;
@@ -93,7 +93,7 @@ export class KyselyLedgerRepository extends LedgerRepository {
     super();
   }
 
-  async chart(scope: LedgerScope): Promise<ChartAccount[]> {
+  async chart(scope: OrgScope): Promise<ChartAccount[]> {
     const rows = await this.db
       .selectFrom('ledger_account')
       .leftJoin('journal_line', (join) =>
@@ -203,7 +203,7 @@ export class KyselyLedgerRepository extends LedgerRepository {
     });
   }
 
-  private entries(scope: LedgerScope, query: JournalQuery) {
+  private entries(scope: OrgScope, query: JournalQuery) {
     return this.db
       .selectFrom('journal_entry')
       .where('journal_entry.organization_id', '=', scope.organizationId)
@@ -238,7 +238,7 @@ export class KyselyLedgerRepository extends LedgerRepository {
       );
   }
 
-  async journal(scope: LedgerScope, query: JournalQuery): Promise<JournalList> {
+  async journal(scope: OrgScope, query: JournalQuery): Promise<JournalList> {
     const [page, count, currency] = await Promise.all([
       this.entries(scope, query)
         .select([
@@ -293,7 +293,7 @@ export class KyselyLedgerRepository extends LedgerRepository {
   }
 
   private async linesOf(
-    scope: LedgerScope,
+    scope: OrgScope,
     entryIds: string[]
   ): Promise<LineRow[]> {
     if (entryIds.length === 0) {
@@ -342,7 +342,7 @@ export class KyselyLedgerRepository extends LedgerRepository {
   }
 
   async studentCampuses(
-    scope: LedgerScope,
+    scope: OrgScope,
     options: { studentIds: string[]; today: string }
   ): Promise<Map<string, string>> {
     if (options.studentIds.length === 0) {
@@ -362,7 +362,7 @@ export class KyselyLedgerRepository extends LedgerRepository {
   }
 
   async moneyAccounts(
-    scope: LedgerScope,
+    scope: OrgScope,
     ids: string[]
   ): Promise<MoneyAccountRef[]> {
     if (ids.length === 0) {

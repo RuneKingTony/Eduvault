@@ -3,7 +3,6 @@ import type { Pool } from 'pg';
 import { DASHBOARD_SAMPLE_SIZE } from '@eduvault/api-contract';
 import type { OrgContext } from '../src/app/common/auth';
 import { BillingPlanService } from '../src/app/modules/billing/billing-plan.service';
-import { scopeOf } from '../src/app/modules/billing/billing-scope';
 import {
   BillingRepository,
   type TermInfo,
@@ -19,6 +18,7 @@ import { createFeeLine, feeFixture } from './support/factories/fees';
 import { orgContextFor } from './support/factories/org-context';
 import { createStudent } from './support/factories/students';
 import { schoolsTest as test } from './support/two-schools';
+import { orgScopeOf } from '../src/app/common/scope';
 
 const TUITION = 1_000_000;
 const TODAY = '2026-10-16';
@@ -340,7 +340,7 @@ test.describe('chargeSummary equals the round plan', () => {
       ] as const) {
         const where = `${label} ${which} term`;
         const plan = await plans.plan(ctx, term, { scope: 'school' });
-        const summary = await repo.chargeSummary(scopeOf(ctx), term, {
+        const summary = await repo.chargeSummary(orgScopeOf(ctx), term, {
           today: plans.stamp(ctx).today,
           sampleSize: DASHBOARD_SAMPLE_SIZE,
         });
@@ -370,7 +370,7 @@ test.describe('chargeSummary equals the round plan', () => {
     }
 
     const ctx = await orgContextFor(app, owner);
-    const none = await repo.chargeSummary(scopeOf(ctx), firstTerm, {
+    const none = await repo.chargeSummary(orgScopeOf(ctx), firstTerm, {
       today: TODAY,
       sampleSize: 0,
     });

@@ -19,8 +19,8 @@ import {
   type NewItem,
   type StockTotals,
   type StoreRef,
-  type StoreScope,
 } from './store.repository';
+import type { OrgScope } from '../../common/scope';
 
 export const storeItem = (overrides: Partial<ItemRecord> = {}): ItemRecord => {
   const item: ItemRecord = {
@@ -240,7 +240,7 @@ export class FakeStoreRepository extends StoreRepository {
     );
   }
 
-  storesInScope(scope: StoreScope): Promise<StoreRef[]> {
+  storesInScope(scope: OrgScope): Promise<StoreRef[]> {
     return Promise.resolve(
       this.stores.filter(
         (store) =>
@@ -265,7 +265,7 @@ export class FakeStoreRepository extends StoreRepository {
   }
 
   moneyAccount(
-    _scope: StoreScope,
+    _scope: OrgScope,
     moneyAccountId: string
   ): Promise<MoneyAccountCheck> {
     return Promise.resolve(
@@ -305,7 +305,7 @@ export class FakeStoreRepository extends StoreRepository {
   }
 
   listDeliveries(
-    _scope: StoreScope,
+    _scope: OrgScope,
     query: DeliveryPageQuery
   ): Promise<DeliveryPage> {
     const start = (query.page - 1) * query.pageSize;
@@ -317,7 +317,7 @@ export class FakeStoreRepository extends StoreRepository {
   }
 
   findDelivery(
-    _scope: StoreScope,
+    _scope: OrgScope,
     id: string
   ): Promise<DeliveryDetail | undefined> {
     return Promise.resolve(

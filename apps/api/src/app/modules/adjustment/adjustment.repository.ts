@@ -6,14 +6,9 @@ import type {
 } from '@eduvault/api-contract';
 import type { ActivityRecorder } from '../../common/activity';
 import type { WaitingApproval } from '../../common/approvals';
-import type { CampusScope } from '../../common/campus-scope';
 import type { PostInput } from '../../common/ledger';
 import type { StudentIdentity } from '../../common/students';
-
-export interface AdjustmentScope {
-  organizationId: string;
-  campusScope: CampusScope;
-}
+import type { OrgScope } from '../../common/scope';
 
 export interface StudentFacts extends StudentIdentity {
   admissionNumber: string;
@@ -104,20 +99,20 @@ export abstract class AdjustmentRepository {
   abstract currency(organizationId: string): Promise<string>;
 
   abstract withTx<T>(
-    scope: AdjustmentScope,
+    scope: OrgScope,
     userId: string,
     work: (tx: AdjustmentTx) => Promise<T>
   ): Promise<T>;
 
   abstract findById(
-    scope: AdjustmentScope,
+    scope: OrgScope,
     id: string
   ): Promise<Adjustment | undefined>;
 
   abstract list(
-    scope: AdjustmentScope,
+    scope: OrgScope,
     query: AdjustmentListQuery
   ): Promise<AdjustmentPage>;
 
-  abstract waiting(scope: AdjustmentScope): Promise<WaitingApproval[]>;
+  abstract waiting(scope: OrgScope): Promise<WaitingApproval[]>;
 }

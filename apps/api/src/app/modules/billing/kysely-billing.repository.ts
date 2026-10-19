@@ -42,7 +42,6 @@ import type { DB } from '../../../db/db-types';
 import { scopeLabel, type RoundFilter } from './billing-round';
 import {
   BillingRepository,
-  type BillingScope,
   type ChargeSummary,
   type ChargeSummaryOptions,
   type CreatedRound,
@@ -59,6 +58,7 @@ import {
 } from './billing.repository';
 import type { RoundCandidate } from './round-plan';
 import { sendOrder } from './send-order';
+import type { OrgScope } from '../../common/scope';
 
 const INSERT_CHUNK = 500;
 
@@ -366,7 +366,7 @@ export class KyselyBillingRepository extends BillingRepository {
   }
 
   async roundCandidates(
-    scope: BillingScope,
+    scope: OrgScope,
     term: TermInfo,
     options: RoundCandidateOptions
   ): Promise<RoundCandidates> {
@@ -414,7 +414,7 @@ export class KyselyBillingRepository extends BillingRepository {
   }
 
   async chargeSummary(
-    scope: BillingScope,
+    scope: OrgScope,
     term: TermInfo,
     options: ChargeSummaryOptions
   ): Promise<ChargeSummary> {
@@ -640,7 +640,7 @@ export class KyselyBillingRepository extends BillingRepository {
     }
   }
 
-  private chargeTotals(scope: BillingScope) {
+  private chargeTotals(scope: OrgScope) {
     return sql`
       CROSS JOIN LATERAL (
         SELECT
@@ -661,7 +661,7 @@ export class KyselyBillingRepository extends BillingRepository {
   }
 
   private runRows(
-    scope: BillingScope,
+    scope: OrgScope,
     options: {
       id?: string;
       status?: string;
@@ -713,7 +713,7 @@ export class KyselyBillingRepository extends BillingRepository {
   }
 
   async listRuns(
-    scope: BillingScope,
+    scope: OrgScope,
     query: BillingRunListQuery
   ): Promise<RunPage> {
     const { rows } = await this.runRows(scope, {
@@ -726,10 +726,7 @@ export class KyselyBillingRepository extends BillingRepository {
     };
   }
 
-  async findRun(
-    scope: BillingScope,
-    id: string
-  ): Promise<RunHeader | undefined> {
+  async findRun(scope: OrgScope, id: string): Promise<RunHeader | undefined> {
     const { rows } = await this.runRows(scope, { id }).execute(this.db);
     const row = rows[0];
     return row && toHeader(row);

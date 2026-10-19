@@ -4,13 +4,11 @@ import type {
   StudentLife,
   OwedByLife,
 } from '@eduvault/api-contract';
-import type { CampusScope } from '../../common/campus-scope';
 import type { KindMovement } from '../../common/ledger';
 import type { MovementRecord } from './statement-assembly';
+import type { OrgScope } from '../../common/scope';
 
-export interface AccountScope {
-  organizationId: string;
-  campusScope: CampusScope;
+export interface AccountScope extends OrgScope {
   today: string;
 }
 

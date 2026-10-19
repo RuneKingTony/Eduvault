@@ -37,15 +37,10 @@ import { capProblem } from './adjustment-caps';
 import {
   AdjustmentRepository,
   type AdjustmentRecord,
-  type AdjustmentScope,
   type AdjustmentTx,
   type StudentFacts,
 } from './adjustment.repository';
-
-const scopeOf = (ctx: OrgContext): AdjustmentScope => ({
-  organizationId: ctx.organizationId,
-  campusScope: ctx.campusScope,
-});
+import { orgScopeOf, type OrgScope } from '../../common/scope';
 
 const notFound = () => new NotFoundException(ADJUSTMENT_NOT_FOUND_MESSAGE);
 
@@ -188,20 +183,20 @@ export class AdjustmentService {
   ): Promise<AdjustmentList> {
     const [currency, page] = await Promise.all([
       this.adjustments.currency(ctx.organizationId),
-      this.adjustments.list(scopeOf(ctx), query),
+      this.adjustments.list(orgScopeOf(ctx), query),
     ]);
     return { currency, ...page };
   }
 
   async get(ctx: OrgContext, id: string): Promise<Adjustment> {
-    return this.item(scopeOf(ctx), id);
+    return this.item(orgScopeOf(ctx), id);
   }
 
   async create(
     ctx: OrgContext,
     input: CreateAdjustment
   ): Promise<CreatedAdjustment> {
-    const scope = scopeOf(ctx);
+    const scope = orgScopeOf(ctx);
     const year = documentYear(this.clock);
     const made = await this.adjustments.withTx(
       scope,
@@ -246,7 +241,7 @@ export class AdjustmentService {
   }
 
   async approve(ctx: OrgContext, id: string): Promise<Adjustment> {
-    const scope = scopeOf(ctx);
+    const scope = orgScopeOf(ctx);
     await this.adjustments.withTx(scope, ctx.user.id, async (tx) => {
       const found = await tx.lockAdjustment(id);
       if (found === undefined) {
@@ -293,7 +288,7 @@ export class AdjustmentService {
     reason: string
   ): Promise<Adjustment> {
     const declineReason = assertDeclineReason(reason);
-    const scope = scopeOf(ctx);
+    const scope = orgScopeOf(ctx);
     await this.adjustments.withTx(scope, ctx.user.id, async (tx) => {
       const found = await tx.lockAdjustment(id);
       if (found === undefined) {
@@ -321,7 +316,7 @@ export class AdjustmentService {
     return this.item(scope, id);
   }
 
-  private async item(scope: AdjustmentScope, id: string): Promise<Adjustment> {
+  private async item(scope: OrgScope, id: string): Promise<Adjustment> {
     const found = await this.adjustments.findById(scope, id);
     if (found === undefined) {
       throw notFound();

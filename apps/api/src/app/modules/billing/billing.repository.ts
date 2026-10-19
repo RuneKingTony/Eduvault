@@ -3,7 +3,6 @@ import type {
   BillingRunListQuery,
   BillingRunSummary,
 } from '@eduvault/api-contract';
-import type { CampusScope } from '../../common/campus-scope';
 import type {
   ChargeableFeeLine,
   DiscountFacts,
@@ -11,11 +10,7 @@ import type {
 } from '../../common/fees';
 import type { RoundFilter } from './billing-round';
 import type { PlannedCharge, RoundCandidate } from './round-plan';
-
-export interface BillingScope {
-  organizationId: string;
-  campusScope: CampusScope;
-}
+import type { OrgScope } from '../../common/scope';
 
 export interface TermInfo {
   id: string;
@@ -76,7 +71,7 @@ export interface CreatedRound {
 }
 
 export interface RunAction {
-  scope: BillingScope;
+  scope: OrgScope;
   runId: string;
   userId: string;
   userName: string;
@@ -109,13 +104,13 @@ export abstract class BillingRepository {
   ): Promise<LevelRef | undefined>;
 
   abstract roundCandidates(
-    scope: BillingScope,
+    scope: OrgScope,
     term: TermInfo,
     options: RoundCandidateOptions
   ): Promise<RoundCandidates>;
 
   abstract chargeSummary(
-    scope: BillingScope,
+    scope: OrgScope,
     term: TermInfo,
     options: ChargeSummaryOptions
   ): Promise<ChargeSummary>;
@@ -140,14 +135,11 @@ export abstract class BillingRepository {
   abstract createRound(input: NewRound): Promise<CreatedRound>;
 
   abstract listRuns(
-    scope: BillingScope,
+    scope: OrgScope,
     query: BillingRunListQuery
   ): Promise<RunPage>;
 
-  abstract findRun(
-    scope: BillingScope,
-    id: string
-  ): Promise<RunHeader | undefined>;
+  abstract findRun(scope: OrgScope, id: string): Promise<RunHeader | undefined>;
 
   abstract issue(input: IssueRound): Promise<RunOutcome>;
 

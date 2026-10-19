@@ -8,10 +8,10 @@ import {
   MoneyAccountRepository,
   type MoneyAccountChange,
   type MoneyAccountOutcome,
-  type MoneyAccountScope,
   type NewMoneyAccount,
   type RecordingOption,
 } from './money-account.repository';
+import type { OrgScope } from '../../common/scope';
 
 export class FakeMoneyAccountRepository extends MoneyAccountRepository {
   rows: MoneyAccount[] = [];
@@ -25,7 +25,7 @@ export class FakeMoneyAccountRepository extends MoneyAccountRepository {
     this.organizationOf.set(row.id, organizationId);
   }
 
-  private visible(scope: MoneyAccountScope): MoneyAccount[] {
+  private visible(scope: OrgScope): MoneyAccount[] {
     return this.rows.filter(
       (row) =>
         this.organizationOf.get(row.id) === scope.organizationId &&
@@ -35,7 +35,7 @@ export class FakeMoneyAccountRepository extends MoneyAccountRepository {
     );
   }
 
-  list(scope: MoneyAccountScope): Promise<MoneyAccountList> {
+  list(scope: OrgScope): Promise<MoneyAccountList> {
     const hidden = this.rows.filter(
       (row) =>
         this.organizationOf.get(row.id) === scope.organizationId &&
@@ -50,10 +50,7 @@ export class FakeMoneyAccountRepository extends MoneyAccountRepository {
     });
   }
 
-  findById(
-    scope: MoneyAccountScope,
-    id: string
-  ): Promise<MoneyAccount | undefined> {
+  findById(scope: OrgScope, id: string): Promise<MoneyAccount | undefined> {
     return Promise.resolve(this.visible(scope).find((row) => row.id === id));
   }
 
@@ -88,7 +85,7 @@ export class FakeMoneyAccountRepository extends MoneyAccountRepository {
   }
 
   update(
-    scope: MoneyAccountScope,
+    scope: OrgScope,
     id: string,
     change: MoneyAccountChange
   ): Promise<MoneyAccountOutcome | undefined> {
@@ -111,7 +108,7 @@ export class FakeMoneyAccountRepository extends MoneyAccountRepository {
     return Promise.resolve({ status: 'saved', account });
   }
 
-  recordingOptions(scope: MoneyAccountScope): Promise<RecordingOption[]> {
+  recordingOptions(scope: OrgScope): Promise<RecordingOption[]> {
     return Promise.resolve(
       this.rows
         .filter(

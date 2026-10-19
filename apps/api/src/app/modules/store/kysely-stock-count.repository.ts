@@ -49,7 +49,8 @@ import {
   type StockCountRecord,
   type StockCountTx,
 } from './stock-count.repository';
-import type { ItemRecord, StoreRef, StoreScope } from './store.repository';
+import type { ItemRecord, StoreRef } from './store.repository';
+import type { OrgScope } from '../../common/scope';
 
 const WAITING_KEY = 'stock_count_waiting_key';
 interface RecordRow {
@@ -70,7 +71,7 @@ class KyselyStockCountTx implements StockCountTx {
   constructor(
     private readonly trx: Kysely<DB>,
     private readonly deps: { poster: LedgerPoster; activity: ActivityRecorder },
-    private readonly who: { scope: StoreScope; userId: string }
+    private readonly who: { scope: OrgScope; userId: string }
   ) {
     this.activity = deps.activity;
     this.decisions = decisionsFor(trx, {
@@ -280,7 +281,7 @@ export class KyselyStockCountRepository extends StockCountRepository {
   }
 
   async withTx<T>(
-    scope: StoreScope,
+    scope: OrgScope,
     userId: string,
     work: (tx: StockCountTx) => Promise<T>
   ): Promise<T> {
@@ -305,21 +306,21 @@ export class KyselyStockCountRepository extends StockCountRepository {
   }
 
   waitingNumber(
-    scope: StoreScope,
+    scope: OrgScope,
     campusId: string
   ): Promise<string | undefined> {
     return waitingCountNumber(this.db, scope, campusId);
   }
 
-  list(scope: StoreScope, query: StockCountListQuery): Promise<StockCountList> {
+  list(scope: OrgScope, query: StockCountListQuery): Promise<StockCountList> {
     return listStockCounts(this.db, scope, query);
   }
 
-  find(scope: StoreScope, id: string): Promise<StockCount | undefined> {
+  find(scope: OrgScope, id: string): Promise<StockCount | undefined> {
     return findStockCount(this.db, scope, id);
   }
 
-  waiting(scope: StoreScope): Promise<WaitingApproval[]> {
+  waiting(scope: OrgScope): Promise<WaitingApproval[]> {
     return waitingStockCounts(this.db, scope);
   }
 }

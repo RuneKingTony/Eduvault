@@ -4,11 +4,11 @@ import {
   LedgerRepository,
   type LedgerAccountRef,
   type LedgerOutcome,
-  type LedgerScope,
   type MoneyAccountRef,
   type OpeningPost,
   type SystemAccounts,
 } from './ledger.repository';
+import type { OrgScope } from '../../common/scope';
 
 export class FakeLedgerRepository extends LedgerRepository {
   chartRows: ChartAccount[] = [];
@@ -18,9 +18,9 @@ export class FakeLedgerRepository extends LedgerRepository {
   posted: OpeningPost[] = [];
   alreadyPosted = new Set<string>();
   outcome: LedgerOutcome | undefined;
-  scopes: LedgerScope[] = [];
+  scopes: OrgScope[] = [];
 
-  chart(scope: LedgerScope): Promise<ChartAccount[]> {
+  chart(scope: OrgScope): Promise<ChartAccount[]> {
     this.scopes.push(scope);
     return Promise.resolve(this.chartRows);
   }

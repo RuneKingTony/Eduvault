@@ -17,7 +17,7 @@ import {
   type SaleStudent,
   type StudentPlacement,
 } from './sale.repository';
-import type { StoreScope } from './store.repository';
+import type { OrgScope } from '../../common/scope';
 
 export const saleStudent = (
   overrides: Partial<SaleStudent> = {}
@@ -83,25 +83,25 @@ export class FakeSaleRepository extends SaleRepository {
     return Promise.resolve(this.existing);
   }
 
-  find(_scope: StoreScope, id: string): Promise<Sale | undefined> {
+  find(_scope: OrgScope, id: string): Promise<Sale | undefined> {
     return Promise.resolve(this.stored.get(id));
   }
 
-  list(_scope: StoreScope, query: SalePageQuery): Promise<SalePage> {
+  list(_scope: OrgScope, query: SalePageQuery): Promise<SalePage> {
     this.listed.push(query);
     const items = [...this.stored.values()];
     return Promise.resolve({ items, total: items.length });
   }
 
   student(
-    _scope: StoreScope,
+    _scope: OrgScope,
     request: { studentId: string }
   ): Promise<SaleStudent | undefined> {
     return Promise.resolve(this.students.get(request.studentId));
   }
 
   optionStudents(
-    _scope: StoreScope,
+    _scope: OrgScope,
     request: { today: string; withBalance: boolean }
   ): Promise<OptionStudents> {
     this.optionRequests.push(request);

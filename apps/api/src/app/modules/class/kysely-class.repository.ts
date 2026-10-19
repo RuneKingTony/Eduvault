@@ -20,8 +20,8 @@ import {
   type NewClassTeacher,
   type NewLevel,
   type SchoolMemberRecord,
-  type Visibility,
 } from './class.repository';
+import type { CampusClassScope } from '../../common/scope';
 
 interface LevelRow {
   id: string;
@@ -103,7 +103,7 @@ export class KyselyClassRepository extends ClassRepository {
       ]);
   }
 
-  private visible(organizationId: string, visibility: Visibility) {
+  private visible(organizationId: string, visibility: CampusClassScope) {
     return this.classes(organizationId)
       .where((eb) =>
         inCampusScope(eb, 'class_arm.campus_id', {
@@ -232,7 +232,7 @@ export class KyselyClassRepository extends ClassRepository {
   async findClass(
     organizationId: string,
     id: string,
-    visibility: Visibility
+    visibility: CampusClassScope
   ): Promise<ClassRecord | undefined> {
     const row = await this.visible(organizationId, visibility)
       .where('class_arm.id', '=', id)

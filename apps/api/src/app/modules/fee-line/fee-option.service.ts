@@ -16,13 +16,13 @@ import {
   financeActorIn,
 } from '../../common/activity';
 import type { OrgContext } from '../../common/auth';
-import { feeScopeOf } from './fee-scope';
 import {
   FeeLineRepository,
   FeeOptionRepository,
   FeeStudentRepository,
   type StudentFeeContext,
 } from './fee-line.repository';
+import { orgScopeOf } from '../../common/scope';
 
 type EnrolledStudent = StudentFeeContext & {
   enrollment: NonNullable<StudentFeeContext['enrollment']>;
@@ -136,7 +136,7 @@ export class FeeOptionService {
     }
     const sessionId =
       requested ?? (await this.options.currentSessionId(ctx.organizationId));
-    const student = await this.students.findStudent(feeScopeOf(ctx), {
+    const student = await this.students.findStudent(orgScopeOf(ctx), {
       studentId,
       sessionId,
     });

@@ -10,13 +10,13 @@ import {
   LeaveRepository,
   asDecided,
   type LeaveEntry,
-  type LeaveScope,
   type LeaveTx,
   type LockedLeave,
   type NewLeave,
   type UnseenDecisions,
   type WaitingLeave,
 } from './leave.repository';
+import type { OrgScope } from '../../common/scope';
 
 interface StoredLeave {
   id: string;
@@ -38,7 +38,7 @@ interface StoredLeave {
 class FakeLeaveTx implements LeaveTx {
   constructor(
     private readonly store: FakeLeaveRepository,
-    private readonly scope: LeaveScope,
+    private readonly scope: OrgScope,
     private readonly userId: string
   ) {}
 
@@ -143,7 +143,7 @@ export class FakeLeaveRepository extends LeaveRepository {
     return this.names.get(userId) ?? userId;
   }
 
-  inScope(scope: LeaveScope, row: StoredLeave): boolean {
+  inScope(scope: OrgScope, row: StoredLeave): boolean {
     return (
       scope.campusScope === 'all' ||
       (this.campuses.get(row.createdBy) ?? []).some((campus) =>
@@ -194,7 +194,7 @@ export class FakeLeaveRepository extends LeaveRepository {
   }
 
   withTx<T>(
-    scope: LeaveScope,
+    scope: OrgScope,
     userId: string,
     work: (tx: LeaveTx) => Promise<T>
   ): Promise<T> {
@@ -278,7 +278,7 @@ export class FakeLeaveRepository extends LeaveRepository {
   }
 
   list(
-    scope: LeaveScope,
+    scope: OrgScope,
     viewerId: string,
     query: LeaveListQuery
   ): Promise<LeaveEntry[]> {
@@ -303,7 +303,7 @@ export class FakeLeaveRepository extends LeaveRepository {
     );
   }
 
-  waiting(scope: LeaveScope): Promise<WaitingLeave[]> {
+  waiting(scope: OrgScope): Promise<WaitingLeave[]> {
     return Promise.resolve(
       this.rows
         .filter((row) => row.status === 'submitted' && this.inScope(scope, row))

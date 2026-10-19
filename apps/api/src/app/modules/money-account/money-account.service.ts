@@ -23,14 +23,9 @@ import { CampusService } from '../campus/campus.service';
 import {
   MoneyAccountRepository,
   type MoneyAccountOutcome,
-  type MoneyAccountScope,
   type RecordingOption,
 } from './money-account.repository';
-
-const scopeOf = (ctx: OrgContext): MoneyAccountScope => ({
-  organizationId: ctx.organizationId,
-  campusScope: ctx.campusScope,
-});
+import { orgScopeOf } from '../../common/scope';
 
 function accountOf(outcome: MoneyAccountOutcome, name: string): MoneyAccount {
   if (outcome.status === 'saved') {
@@ -47,7 +42,7 @@ export class MoneyAccountService {
   ) {}
 
   private async require(ctx: OrgContext, id: string): Promise<MoneyAccount> {
-    const found = await this.accounts.findById(scopeOf(ctx), id);
+    const found = await this.accounts.findById(orgScopeOf(ctx), id);
     if (found === undefined) {
       throw new NotFoundException(MONEY_ACCOUNT_NOT_FOUND_MESSAGE);
     }
@@ -55,7 +50,7 @@ export class MoneyAccountService {
   }
 
   list(ctx: OrgContext): Promise<MoneyAccountList> {
-    return this.accounts.list(scopeOf(ctx));
+    return this.accounts.list(orgScopeOf(ctx));
   }
 
   async cashBook(
@@ -65,7 +60,7 @@ export class MoneyAccountService {
   ): Promise<CashBook> {
     const account = await this.require(ctx, id);
     const { items, total, currency } = await this.accounts.cashBook(
-      scopeOf(ctx),
+      orgScopeOf(ctx),
       account,
       query
     );
@@ -107,7 +102,7 @@ export class MoneyAccountService {
     if (input.bankName !== undefined && current.kind !== 'bank') {
       throw new BadRequestException(MONEY_ACCOUNT_BANK_NAME_MESSAGE);
     }
-    const outcome = await this.accounts.update(scopeOf(ctx), id, {
+    const outcome = await this.accounts.update(orgScopeOf(ctx), id, {
       name: input.name,
       bankName: input.bankName,
       last4: input.last4,
@@ -120,6 +115,6 @@ export class MoneyAccountService {
   }
 
   listForRecording(ctx: OrgContext): Promise<RecordingOption[]> {
-    return this.accounts.recordingOptions(scopeOf(ctx));
+    return this.accounts.recordingOptions(orgScopeOf(ctx));
   }
 }

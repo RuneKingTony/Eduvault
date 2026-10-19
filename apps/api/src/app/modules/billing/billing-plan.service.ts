@@ -17,13 +17,13 @@ import { Clock, schoolToday } from '../../common/clock';
 import { documentYear } from '../../common/documents';
 import { CampusService } from '../campus/campus.service';
 import { chargedState, defaultTermId, type RoundFilter } from './billing-round';
-import { scopeOf } from './billing-scope';
 import {
   BillingRepository,
   type ChargeSummary,
   type TermInfo,
 } from './billing.repository';
 import { planRound, type RoundPlan } from './round-plan';
+import { orgScopeOf } from '../../common/scope';
 
 const NO_SAMPLE = 0;
 
@@ -47,7 +47,7 @@ export class BillingPlanService {
     term: TermInfo,
     sampleSize: number
   ): Promise<ChargeSummary> {
-    return this.billing.chargeSummary(scopeOf(ctx), term, {
+    return this.billing.chargeSummary(orgScopeOf(ctx), term, {
       today: schoolToday(ctx, this.clock),
       sampleSize,
     });
@@ -126,7 +126,7 @@ export class BillingPlanService {
     filter: RoundFilter
   ): Promise<RoundPlan> {
     const { candidates, skipped } = await this.billing.roundCandidates(
-      scopeOf(ctx),
+      orgScopeOf(ctx),
       term,
       { filter, today: schoolToday(ctx, this.clock) }
     );

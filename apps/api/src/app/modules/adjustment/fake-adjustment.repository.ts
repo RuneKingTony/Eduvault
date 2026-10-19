@@ -10,7 +10,6 @@ import {
   type AdjustmentPage,
   type AdjustmentPost,
   type AdjustmentRecord,
-  type AdjustmentScope,
   type AdjustmentTx,
   type CreditAccountCheck,
   type NewAdjustment,
@@ -19,6 +18,7 @@ import {
   type StudentFacts,
   type SystemAccounts,
 } from './adjustment.repository';
+import type { OrgScope } from '../../common/scope';
 
 interface StoredAdjustment extends AdjustmentRecord {
   approvedBy: string | null;
@@ -52,7 +52,7 @@ export class FakeAdjustmentRepository extends AdjustmentRepository {
   }
 
   withTx<T>(
-    _scope: AdjustmentScope,
+    _scope: OrgScope,
     userId: string,
     work: (tx: AdjustmentTx) => Promise<T>
   ): Promise<T> {
@@ -176,10 +176,7 @@ export class FakeAdjustmentRepository extends AdjustmentRepository {
     });
   }
 
-  findById(
-    _scope: AdjustmentScope,
-    id: string
-  ): Promise<Adjustment | undefined> {
+  findById(_scope: OrgScope, id: string): Promise<Adjustment | undefined> {
     const row = this.stored.find((candidate) => candidate.id === id);
     const student = row && this.students.get(row.studentId);
     return Promise.resolve(
@@ -208,10 +205,7 @@ export class FakeAdjustmentRepository extends AdjustmentRepository {
     );
   }
 
-  list(
-    _scope: AdjustmentScope,
-    _query: AdjustmentListQuery
-  ): Promise<AdjustmentPage> {
+  list(_scope: OrgScope, _query: AdjustmentListQuery): Promise<AdjustmentPage> {
     return Promise.resolve({ items: [], total: 0, waitingCount: 0 });
   }
 

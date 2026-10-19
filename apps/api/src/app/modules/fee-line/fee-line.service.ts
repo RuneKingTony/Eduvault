@@ -42,7 +42,8 @@ import type { OrgContext } from '../../common/auth';
 import { Clock, schoolToday } from '../../common/clock';
 import { CampusService } from '../campus/campus.service';
 import { FeeLineRepository, type TermRef } from './fee-line.repository';
-import { feeScopeOf, inFeeGroup } from './fee-scope';
+import { inFeeGroup } from './fee-scope';
+import { orgScopeOf } from '../../common/scope';
 
 const copyTerm = (term: TermRef): FeeCopyTerm => ({
   id: term.id,
@@ -70,7 +71,7 @@ export class FeeLineService {
 
   async list(ctx: OrgContext, query: FeeLineListQuery): Promise<FeeLine[]> {
     await this.requireTerm(ctx, query.termId);
-    const lines = await this.lines.list(feeScopeOf(ctx), {
+    const lines = await this.lines.list(orgScopeOf(ctx), {
       termId: query.termId,
       includeRetired: query.includeRetired,
     });
@@ -231,7 +232,7 @@ export class FeeLineService {
     id: string,
     retiredMessage: string
   ): Promise<FeeLine> {
-    const line = await this.lines.findById(feeScopeOf(ctx), id);
+    const line = await this.lines.findById(orgScopeOf(ctx), id);
     if (line === undefined) {
       throw new NotFoundException(FEE_LINE_NOT_FOUND_MESSAGE);
     }

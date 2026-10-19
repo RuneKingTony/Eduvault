@@ -7,11 +7,8 @@ import {
 } from '@eduvault/api-contract';
 import type { Database } from '../../common/db/tokens';
 import { inScope } from '../../common/students';
-import type {
-  DeliveryPage,
-  DeliveryPageQuery,
-  StoreScope,
-} from './store.repository';
+import type { DeliveryPage, DeliveryPageQuery } from './store.repository';
+import type { OrgScope } from '../../common/scope';
 
 interface DeliveryRow {
   id: string;
@@ -81,7 +78,7 @@ const SELECT = sql`
   LEFT JOIN "user" u ON u.id = d.received_by`;
 
 function filters(
-  scope: StoreScope,
+  scope: OrgScope,
   extra: RawBuilder<unknown>[]
 ): RawBuilder<unknown> {
   return sql.join(
@@ -94,7 +91,7 @@ function filters(
   );
 }
 
-async function suppliersOf(db: Database, scope: StoreScope): Promise<string[]> {
+async function suppliersOf(db: Database, scope: OrgScope): Promise<string[]> {
   const { rows } = await sql<{ supplier_name: string }>`
     SELECT DISTINCT d.supplier_name
     FROM stock_delivery d
@@ -106,7 +103,7 @@ async function suppliersOf(db: Database, scope: StoreScope): Promise<string[]> {
 
 export async function listDeliveries(
   db: Database,
-  scope: StoreScope,
+  scope: OrgScope,
   query: DeliveryPageQuery
 ): Promise<DeliveryPage> {
   const extra =
@@ -130,7 +127,7 @@ export async function listDeliveries(
 
 export async function findDelivery(
   db: Database,
-  scope: StoreScope,
+  scope: OrgScope,
   id: string
 ): Promise<DeliveryDetail | undefined> {
   const byId = sql`d.id = ${id}`;

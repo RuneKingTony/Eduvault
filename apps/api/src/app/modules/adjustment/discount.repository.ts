@@ -8,7 +8,7 @@ import type { ActivityRecorder } from '../../common/activity';
 import type { WaitingApproval } from '../../common/approvals';
 import type { TermPosition } from '../../common/fees';
 import type { StudentIdentity } from '../../common/students';
-import type { AdjustmentScope } from './adjustment.repository';
+import type { OrgScope } from '../../common/scope';
 
 export interface TermInfo {
   id: string;
@@ -82,10 +82,7 @@ export interface DiscountPage {
 export abstract class DiscountRepository {
   abstract currency(organizationId: string): Promise<string>;
 
-  abstract studentInScope(
-    scope: AdjustmentScope,
-    studentId: string
-  ): Promise<boolean>;
+  abstract studentInScope(scope: OrgScope, studentId: string): Promise<boolean>;
 
   abstract termChoices(organizationId: string): Promise<TermChoice[]>;
 
@@ -102,20 +99,20 @@ export abstract class DiscountRepository {
   ): Promise<FeeTypeCheck>;
 
   abstract withTx<T>(
-    scope: AdjustmentScope,
+    scope: OrgScope,
     userId: string,
     work: (tx: DiscountTx) => Promise<T>
   ): Promise<T>;
 
   abstract findById(
-    scope: AdjustmentScope,
+    scope: OrgScope,
     id: string
   ): Promise<DiscountRecord | undefined>;
 
   abstract list(
-    scope: AdjustmentScope,
+    scope: OrgScope,
     query: StudentDiscountListQuery
   ): Promise<DiscountPage>;
 
-  abstract waiting(scope: AdjustmentScope): Promise<WaitingApproval[]>;
+  abstract waiting(scope: OrgScope): Promise<WaitingApproval[]>;
 }
