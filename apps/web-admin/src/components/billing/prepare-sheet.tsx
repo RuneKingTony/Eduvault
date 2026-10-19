@@ -29,7 +29,7 @@ import {
   billingTermsQueryOptions,
   campusesQueryOptions,
   feeSetupQueryOptions,
-  invalidateBilling,
+  invalidateCharges,
 } from '../../queries';
 import {
   SCOPE_OPTIONS,
@@ -54,7 +54,7 @@ function usePrepare(
   return useMutation({
     mutationFn: (body: PrepareBody) => api.billingRuns.prepare({ body }),
     onSuccess: async (result) => {
-      await invalidateBilling(queryClient);
+      await invalidateCharges(queryClient);
       const term = terms.find(
         (candidate) => candidate.termId === result.termId
       );
