@@ -274,7 +274,7 @@ const feesApi = (
   },
 });
 
-const renderFees = (
+const showFees = (
   children: ReturnType<typeof portalChild>[],
   props: {
     onSeeFees?: (id: string) => void;
@@ -314,7 +314,7 @@ const cardOf = (name: string) => {
 
 describe('ChildrenPage fees', () => {
   it('adds Here is what each one owes to the description', async () => {
-    renderFees([adaOwes, tobiCredit]);
+    showFees([adaOwes, tobiCredit]);
     expect(
       await screen.findByText(
         '2 children at Greenfield College. Here is what each one owes.'
@@ -323,7 +323,7 @@ describe('ChildrenPage fees', () => {
   });
 
   it('gives each card a School fees row for owing, credit and zero', async () => {
-    renderFees([adaOwes, tobiCredit, paidUp]);
+    showFees([adaOwes, tobiCredit, paidUp]);
     await screen.findByRole('heading', { name: 'Family statement' });
     expect(cardOf('Ada').getByText('₦60,000 owed')).toBeInTheDocument();
     expect(cardOf('Tobi').getByText('₦20,000 in credit')).toBeInTheDocument();
@@ -354,14 +354,14 @@ describe('ChildrenPage fees', () => {
 
   it('opens Fees for the child from See fees', async () => {
     const onSeeFees = vi.fn();
-    renderFees([adaOwes, tobiCredit], { onSeeFees });
+    showFees([adaOwes, tobiCredit], { onSeeFees });
     await screen.findByRole('heading', { name: 'Family statement' });
     fireEvent.click(cardOf('Tobi').getByRole('button', { name: 'See fees' }));
     expect(onSeeFees).toHaveBeenCalledWith(TOBI_ID);
   });
 
   it('shows the family total and credit the server reports', async () => {
-    renderFees([adaOwes, tobiCredit, efeLeft]);
+    showFees([adaOwes, tobiCredit, efeLeft]);
     expect(
       await screen.findByRole('heading', { name: 'Family statement' })
     ).toBeInTheDocument();
@@ -378,7 +378,7 @@ describe('ChildrenPage fees', () => {
   });
 
   it('shows a statement card per child', async () => {
-    renderFees([adaOwes, tobiCredit]);
+    showFees([adaOwes, tobiCredit]);
     expect(
       await screen.findByText('GF-0123 · JSS 1 Gold · Lekki')
     ).toBeInTheDocument();
@@ -386,7 +386,7 @@ describe('ChildrenPage fees', () => {
   });
 
   it('lists a child who left with their debt as archived', async () => {
-    renderFees([adaOwes, efeLeft]);
+    showFees([adaOwes, efeLeft]);
     await screen.findByRole('heading', { name: 'Family statement' });
     expect(
       screen.getByRole('button', {
@@ -400,7 +400,7 @@ describe('ChildrenPage fees', () => {
   });
 
   it('shows only Total owed, with no tiles, for a single child', async () => {
-    renderFees([adaOwes], {
+    showFees([adaOwes], {
       totals: { totalOwedMinor: 6_000_000, creditMinor: 0 },
     });
     await screen.findByRole('heading', { name: 'Family statement' });
@@ -441,7 +441,7 @@ describe('ChildrenPage fees', () => {
 
 describe('ChildrenPage term filter', () => {
   it('offers Whole history and the response’s terms, with the whole history picked', async () => {
-    renderFees([adaOwes, tobiCredit]);
+    showFees([adaOwes, tobiCredit]);
 
     const select = await screen.findByRole('combobox', { name: 'Term' });
 
@@ -459,7 +459,7 @@ describe('ChildrenPage term filter', () => {
   });
 
   it('asks for the family statement and each child’s statement with the term', async () => {
-    const api = renderFees([adaOwes, tobiCredit], { term: TERM_1 });
+    const api = showFees([adaOwes, tobiCredit], { term: TERM_1 });
 
     expect(await screen.findByRole('combobox', { name: 'Term' })).toHaveValue(
       TERM_1
@@ -476,7 +476,7 @@ describe('ChildrenPage term filter', () => {
   });
 
   it('sends no term for the whole history', async () => {
-    const api = renderFees([adaOwes, tobiCredit]);
+    const api = showFees([adaOwes, tobiCredit]);
 
     await screen.findByRole('combobox', { name: 'Term' });
 
@@ -488,7 +488,7 @@ describe('ChildrenPage term filter', () => {
   });
 
   it('shows Brought forward first on each child’s card under a term', async () => {
-    renderFees([adaOwes, tobiCredit], { term: TERM_1 });
+    showFees([adaOwes, tobiCredit], { term: TERM_1 });
 
     await waitFor(() => {
       expect(
@@ -503,7 +503,7 @@ describe('ChildrenPage term filter', () => {
   });
 
   it('keeps Total owed, the tiles and the card balances whole-account under a term', async () => {
-    renderFees([adaOwes, tobiCredit, efeLeft], { term: TERM_1 });
+    showFees([adaOwes, tobiCredit, efeLeft], { term: TERM_1 });
 
     await screen.findAllByRole('row', { name: /Brought forward/ });
 
@@ -520,7 +520,7 @@ describe('ChildrenPage term filter', () => {
 
   it('reports the picked term and the whole history', async () => {
     const onTerm = vi.fn();
-    renderFees([adaOwes, tobiCredit], { onTerm, term: TERM_1 });
+    showFees([adaOwes, tobiCredit], { onTerm, term: TERM_1 });
 
     const select = await screen.findByRole('combobox', { name: 'Term' });
     fireEvent.change(select, { target: { value: TERM_2 } });
@@ -531,7 +531,7 @@ describe('ChildrenPage term filter', () => {
   });
 
   it('has no Term select without invoice:readOwn', async () => {
-    renderFees([adaOwes], { held: ['student:readOwn'] });
+    showFees([adaOwes], { held: ['student:readOwn'] });
 
     await screen.findByText('1 child at Greenfield College.');
 

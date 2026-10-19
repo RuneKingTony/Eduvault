@@ -180,7 +180,7 @@ describe('the portal routes', () => {
     api.portal.familyStatement.mockResolvedValue(
       portalFamilyStatement({ termOptions: [term] })
     );
-    renderAt(`/children?term=${TERM_ID}`, api);
+    openAt(`/children?term=${TERM_ID}`, api);
 
     expect(await screen.findByRole('combobox', { name: 'Term' })).toHaveValue(
       TERM_ID
@@ -203,7 +203,7 @@ describe('the portal routes', () => {
         termOptions: [{ id: TERM_ID, label: 'First term, 2026/2027' }],
       })
     );
-    const router = renderAt(`/children?child=${TOBI_ID}`, api);
+    const router = openAt(`/children?child=${TOBI_ID}`, api);
 
     fireEvent.change(await screen.findByRole('combobox', { name: 'Term' }), {
       target: { value: TERM_ID },
