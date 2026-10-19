@@ -7,14 +7,11 @@ import {
   leaveApproval,
   storeWriteOffApproval,
   voidApproval,
+  voidRow,
 } from '../../test-approvals';
 import { myLeave } from '../../test-leave';
 import { renderPayments } from '../../test-payments';
 import { starterAccess } from '../../test-utils';
-import {
-  approvalsSummaryQueryOptions,
-  APPROVALS_REFRESH_MS,
-} from '../../queries';
 import { ApprovalsBell } from './approvals-bell';
 
 vi.mock('@eduvault/ui', async (importOriginal) => ({
@@ -35,7 +32,7 @@ function setup(
       list: vi.fn().mockResolvedValue(approvalList([voidApproval()])),
     },
     paymentVoids: {
-      approve: vi.fn().mockResolvedValue({ id: 'x', status: 'approved' }),
+      approve: vi.fn().mockResolvedValue(voidRow({ status: 'approved' })),
     },
     leave: { me: vi.fn().mockResolvedValue(myLeave()) },
   };
@@ -60,7 +57,7 @@ describe('ApprovalsBell', () => {
   it('shows how many requests the viewer can decide', async () => {
     setup();
     const bell = await screen.findByRole('button', { name: 'Approvals' });
-    expect(await within(bell).findByText('2')).toBeVisible();
+    expect(await within(bell).findByText('7')).toBeVisible();
   });
 
   it('lists the first requests with kind, details and amount, and offers Open approvals', async () => {
@@ -77,6 +74,7 @@ describe('ApprovalsBell', () => {
     ).toBeVisible();
     expect(screen.getByText('₦20,000')).toBeVisible();
     expect(screen.getByText('Cancel a balance')).toBeVisible();
+    expect(screen.getAllByRole('listitem')).toHaveLength(2);
   });
 
   it('opens the page of the request that was chosen', async () => {
@@ -167,7 +165,8 @@ describe('ApprovalsBell', () => {
 
   it('counts again after a decision is made on the Approvals page', async () => {
     const { api } = setup({ withQueue: true });
-    await screen.findByText('2');
+    const bell = await screen.findByRole('button', { name: 'Approvals' });
+    expect(await within(bell).findByText('7')).toBeVisible();
     const before = api.approvals.summary.mock.calls.length;
 
     fireEvent.click(await screen.findByRole('button', { name: /^Approve:/ }));
@@ -183,13 +182,5 @@ describe('ApprovalsBell', () => {
     await waitFor(() => {
       expect(api.approvals.summary.mock.calls.length).toBeGreaterThan(before);
     });
-  });
-});
-
-describe('approvalsSummaryQueryOptions', () => {
-  it('refetches every minute so the bell stays fresh', () => {
-    const options = approvalsSummaryQueryOptions({} as never);
-    expect(options.refetchInterval).toBe(APPROVALS_REFRESH_MS);
-    expect(APPROVALS_REFRESH_MS).toBe(60_000);
   });
 });

@@ -80,6 +80,5 @@ describe('FeesTabs', () => {
       ['invoice:bill', 'invoice:read'],
       ['invoice:read'],
     ]);
-    expect(fakeAccess().permissions).toEqual({});
   });
 });

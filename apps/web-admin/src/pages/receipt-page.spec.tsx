@@ -1,6 +1,7 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { ApiError } from '@eduvault/api-contract';
 import { toast } from '@eduvault/ui';
+import { VOID_ID, voidRow } from '../test-approvals';
 import { PAYMENT_ID, payment, renderPayments } from '../test-payments';
 import { starterAccess } from '../test-utils';
 import { SALE_ID } from '../test-store';
@@ -68,24 +69,22 @@ describe('ReceiptPage', () => {
 
   it('lists each student’s share with their balance now, and the total', async () => {
     setup();
-    const ada = (
-      await screen.findByRole('link', { name: 'Ada Okeke' })
-    ).closest('tr');
-    expect(within(ada as HTMLElement).getByText('JSS 1 Gold')).toBeVisible();
-    expect(within(ada as HTMLElement).getByText('₦180,000')).toBeVisible();
-    expect(within(ada as HTMLElement).getByText('Paid up')).toBeVisible();
-    expect(ada?.querySelector('a')?.getAttribute('href')).toMatch(
-      /\/finance\/accounts\/.+/
-    );
+    const ada = await screen.findByRole('row', { name: /Ada Okeke/ });
+    expect(within(ada).getByText('JSS 1 Gold')).toBeVisible();
+    expect(within(ada).getByText('₦180,000')).toBeVisible();
+    expect(within(ada).getByText('Paid up')).toBeVisible();
+    expect(
+      within(ada).getByRole('link', { name: 'Ada Okeke' })
+    ).toHaveAttribute('href', expect.stringMatching(/\/finance\/accounts\/.+/));
     expect(screen.getAllByText('₦240,000').length).toBeGreaterThan(0);
   });
 
   it('names a student out of scope with no balance and no link', async () => {
     setup();
-    const chidi = (await screen.findByText('Chidi Okeke')).closest('tr');
-    expect(within(chidi as HTMLElement).queryByRole('link')).toBeNull();
-    expect(within(chidi as HTMLElement).getByText('₦60,000')).toBeVisible();
-    expect(within(chidi as HTMLElement).queryByText('Paid up')).toBeNull();
+    const chidi = await screen.findByRole('row', { name: /Chidi Okeke/ });
+    expect(within(chidi).queryByRole('link')).toBeNull();
+    expect(within(chidi).getByText('₦60,000')).toBeVisible();
+    expect(within(chidi).queryByText('Paid up')).toBeNull();
   });
 
   it('shows an owing student in red and a student in credit as extra paid', async () => {
@@ -213,7 +212,7 @@ const waiting = () =>
   payment({
     status: 'void_pending',
     void: {
-      id: 'void-1',
+      id: VOID_ID,
       status: 'submitted',
       reason: 'Keyed the wrong amount',
       createdBy: 'Chika Eze',
@@ -226,7 +225,7 @@ const cancelled = (approvedBy: string | null) =>
   payment({
     status: 'voided',
     void: {
-      id: 'void-1',
+      id: VOID_ID,
       status: 'approved',
       reason: 'Keyed the wrong amount',
       createdBy: 'Chika Eze',
@@ -250,7 +249,7 @@ function setupVoid(
       requestVoid: vi.fn().mockImplementation(() =>
         options.failWith === undefined
           ? Promise.resolve({
-              void: { id: 'void-1' },
+              void: voidRow({ status: 'submitted' }),
               autoApproved: options.autoApproved === true,
             })
           : Promise.reject(options.failWith)
@@ -276,9 +275,15 @@ describe('ReceiptPage cancellation', () => {
     ).toBeVisible();
   });
 
-  it('offers nothing to a member without payment:void, and nothing once it is waiting, cancelled or a store sale', async () => {
+  it('hides Request void from a member without payment:void', async () => {
     setupVoid({ access: starterAccess('principal') });
     await screen.findByRole('heading', { name: /Receipt RCT-2026-00088/ });
+    expect(screen.queryByRole('button', { name: 'Request void' })).toBeNull();
+  });
+
+  it('hides Request void once the receipt is cancelled', async () => {
+    setupVoid({ payment: cancelled('Grace Nwosu') });
+    await screen.findByText('Cancelled');
     expect(screen.queryByRole('button', { name: 'Request void' })).toBeNull();
   });
 
@@ -291,7 +296,7 @@ describe('ReceiptPage cancellation', () => {
   it('hides Request void for the payment of a store sale', async () => {
     setupVoid({
       payment: payment({
-        storeSale: { id: 'sale-1', number: 'ISS-2026-0001' },
+        storeSale: { id: SALE_ID, number: 'ISS-2026-0001' },
       }),
     });
     await screen.findByRole('heading', { name: /Receipt RCT-2026-00088/ });
@@ -455,7 +460,7 @@ describe('ReceiptPage cancellation', () => {
     setupVoid({
       payment: payment({
         void: {
-          id: 'void-1',
+          id: VOID_ID,
           status: 'rejected',
           reason: 'Keyed the wrong amount',
           createdBy: 'Chika Eze',

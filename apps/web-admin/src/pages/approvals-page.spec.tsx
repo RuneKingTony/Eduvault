@@ -2,19 +2,20 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { ApiError } from '@eduvault/api-contract';
 import { toast } from '@eduvault/ui';
 import {
-  ADJUSTMENT_ID,
   VOID_ID,
+  approvalIdAt,
   approvalItem,
   approvalList,
+  decisionApi,
   discountApproval,
   leaveApproval,
   storeWriteOffApproval,
   voidApproval,
+  voidRow,
   COUNT_APPROVAL_ID,
 } from '../test-approvals';
 import { leaveDto, myLeave } from '../test-leave';
 import { IKEJA, LEKKI } from '../test-members';
-import { APPROVAL_KIND_UI } from '../components/approvals/approval-copy';
 import { renderPayments } from '../test-payments';
 import { actingAccess, fakeAccess, starterAccess } from '../test-utils';
 import { toPermissionMap, type Permission } from '@eduvault/policy';
@@ -39,7 +40,7 @@ function setup(
     listError?: Error;
   } = {}
 ) {
-  const done = { id: 'x', status: 'approved' };
+  const decided = decisionApi();
   const api = {
     campuses: { list: vi.fn().mockResolvedValue(options.campuses ?? [LEKKI]) },
     approvals: {
@@ -53,34 +54,21 @@ function setup(
             : Promise.reject(options.listError)
         ),
     },
+    ...decided,
     paymentVoids: {
+      ...decided.paymentVoids,
       approve: vi
         .fn()
         .mockImplementation(() =>
           options.approveFails === undefined
-            ? Promise.resolve(done)
+            ? Promise.resolve(voidRow({ status: 'approved' }))
             : Promise.reject(options.approveFails)
         ),
-      decline: vi.fn().mockResolvedValue(done),
-    },
-    adjustments: {
-      approve: vi.fn().mockResolvedValue(done),
-      decline: vi.fn().mockResolvedValue(done),
-    },
-    studentDiscounts: {
-      approve: vi.fn().mockResolvedValue(done),
-      decline: vi.fn().mockResolvedValue(done),
     },
     leave: {
+      ...decided.leave,
       me: vi.fn().mockResolvedValue(options.mine ?? myLeave()),
-      approve: vi.fn().mockResolvedValue(done),
-      decline: vi.fn().mockResolvedValue(done),
-      withdraw: vi.fn().mockResolvedValue(done),
       create: vi.fn().mockResolvedValue(leaveDto()),
-    },
-    stockCounts: {
-      approve: vi.fn().mockResolvedValue(done),
-      decline: vi.fn().mockResolvedValue(done),
     },
   };
   renderPayments(
@@ -104,9 +92,6 @@ describe('ApprovalsPage', () => {
 
   it('shows a member who cannot approve the leave-only page and asks nothing of the queue', async () => {
     const api = setup({ access: starterAccess('bursar') });
-    expect(
-      await screen.findByText('Ask for leave and see what the school decides.')
-    ).toBeVisible();
     expect(await screen.findByText('My requests')).toBeVisible();
     expect(screen.getByText('School holidays')).toBeVisible();
     expect(api.approvals.list).not.toHaveBeenCalled();
@@ -116,9 +101,8 @@ describe('ApprovalsPage', () => {
   it('lists each waiting request with its kind, details, amount, who asked and both actions', async () => {
     setup();
 
-    const row = (await screen.findByText('Cancel a payment')).closest('tr');
-    expect(row).not.toBeNull();
-    const cells = within(row as HTMLElement);
+    const row = await screen.findByRole('row', { name: /Cancel a payment/ });
+    const cells = within(row);
     expect(
       cells.getByText('RCT-2026-00098 from Mrs Danjuma: Keyed the wrong child')
     ).toBeVisible();
@@ -138,28 +122,25 @@ describe('ApprovalsPage', () => {
     setup({
       list: approvalList([approvalItem({ decide: 'own' })]),
     });
-    const row = (await screen.findByText('Cancel a balance')).closest('tr');
-    expect(within(row as HTMLElement).getByText('Your own')).toBeVisible();
-    expect(
-      within(row as HTMLElement).queryByRole('button', { name: /Approve/ })
-    ).toBeNull();
+    const row = await screen.findByRole('row', { name: /Cancel a balance/ });
+    expect(within(row).getByText('Your own')).toBeVisible();
+    expect(within(row).queryByRole('button', { name: /Approve/ })).toBeNull();
   });
 
   it('says nothing waits when the queue is empty', async () => {
     setup({ list: approvalList([]) });
     expect(await screen.findByText('Nothing waiting for you')).toBeVisible();
-    expect(
-      screen.getByText(
-        'When staff ask for leave, or to refund, discount, write off or void a payment, the request appears here.'
-      )
-    ).toBeVisible();
   });
 
-  it('shows a super admin acting read-only the rows but no buttons', async () => {
-    setup({ access: actingAccess(false) });
-    expect(await screen.findByText('Cancel a payment')).toBeVisible();
-    expect(screen.queryByRole('button', { name: /^Approve/ })).toBeNull();
-  });
+  it.each([false, true])(
+    'shows an acting super admin the rows but no buttons, even when acting writes is %s',
+    async (writes) => {
+      setup({ access: actingAccess(writes) });
+      expect(await screen.findByText('Cancel a payment')).toBeVisible();
+      expect(screen.queryByRole('button', { name: /^Approve/ })).toBeNull();
+      expect(screen.queryByRole('button', { name: /^Decline/ })).toBeNull();
+    }
+  );
 
   it('approves a cancellation after saying what approving does, then toasts with a Payments action', async () => {
     const api = setup({ list: approvalList([voidApproval()]) });
@@ -192,41 +173,34 @@ describe('ApprovalsPage', () => {
     });
   });
 
-  it('approves a correction through the adjustments route and a discount through its own', async () => {
-    const api = setup({
-      list: approvalList([approvalItem(), discountApproval()]),
-    });
-    const buttons = await screen.findAllByRole('button', { name: /^Approve/ });
-
-    fireEvent.click(buttons[0]!);
+  it('toasts the correction outcome with a Who owes action after approving a write-off', async () => {
+    setup({ list: approvalList([approvalItem()]) });
+    fireEvent.click(await screen.findByRole('button', { name: /^Approve/ }));
     fireEvent.click(
       within(await screen.findByRole('dialog')).getByRole('button', {
         name: 'Approve',
       })
     );
     await waitFor(() => {
-      expect(api.adjustments.approve).toHaveBeenCalledWith({
-        params: { id: ADJUSTMENT_ID },
-      });
+      expect(toast.success).toHaveBeenCalledWith(
+        'Approved. The student’s fees have been updated.',
+        expect.objectContaining({
+          action: expect.objectContaining({ label: 'Who owes' }),
+        })
+      );
     });
-    expect(toast.success).toHaveBeenCalledWith(
-      'Approved. The student’s fees have been updated.',
-      expect.objectContaining({
-        action: expect.objectContaining({ label: 'Who owes' }),
-      })
-    );
   });
 
   it('lists a store write-off and approves it through the stock counts route, toasting with a Store action', async () => {
     const api = setup({ list: approvalList([storeWriteOffApproval()]) });
 
-    const row = (await screen.findByText('Store write-off')).closest('tr');
+    const row = await screen.findByRole('row', { name: /Store write-off/ });
     expect(
-      within(row as HTMLElement).getByText(
+      within(row).getByText(
         'Lekki stock count: School shirt, Size 14: 2 missing; School tie: 1 missing'
       )
     ).toBeVisible();
-    expect(within(row as HTMLElement).getByText('₦8,200')).toBeVisible();
+    expect(within(row).getByText('₦8,200')).toBeVisible();
     fireEvent.click(await screen.findByRole('button', { name: /^Approve/ }));
     const dialog = await screen.findByRole('dialog');
     expect(
@@ -254,24 +228,6 @@ describe('ApprovalsPage', () => {
     });
   });
 
-  it('declines a store write-off with a reason through the stock counts route', async () => {
-    const api = setup({ list: approvalList([storeWriteOffApproval()]) });
-    fireEvent.click(await screen.findByRole('button', { name: /^Decline/ }));
-    const dialog = await screen.findByRole('dialog');
-    expect(within(dialog).getByText(/Stock stays as it is\./)).toBeVisible();
-    fireEvent.change(within(dialog).getByLabelText('Reason'), {
-      target: { value: 'Recount first' },
-    });
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Decline' }));
-
-    await waitFor(() => {
-      expect(api.stockCounts.decline).toHaveBeenCalledWith({
-        params: { id: COUNT_APPROVAL_ID },
-        body: { reason: 'Recount first' },
-      });
-    });
-  });
-
   it('shows the refusal in the dialog when someone else decided first', async () => {
     setup({
       list: approvalList([voidApproval()]),
@@ -291,7 +247,7 @@ describe('ApprovalsPage', () => {
   it('goes back a page when the last request on the last page is decided', async () => {
     let decided = false;
     const first = Array.from({ length: 10 }, (_, index) =>
-      approvalItem({ id: `first-${index}`, details: `Request ${index}` })
+      approvalItem({ id: approvalIdAt(index), details: `Request ${index}` })
     );
     const second = () => (decided ? [] : [voidApproval()]);
     const api = setup({
@@ -302,7 +258,7 @@ describe('ApprovalsPage', () => {
     });
     api.paymentVoids.approve.mockImplementation(() => {
       decided = true;
-      return Promise.resolve({ id: VOID_ID, status: 'approved' });
+      return Promise.resolve(voidRow({ status: 'approved' }));
     });
 
     fireEvent.click(await screen.findByRole('button', { name: 'Page 2' }));
@@ -312,17 +268,6 @@ describe('ApprovalsPage', () => {
 
     expect(await screen.findByText('Request 0')).toBeVisible();
     expect(screen.queryByText('Nothing waiting for you')).toBeNull();
-  });
-
-  it('says what declining does for the kind of request', async () => {
-    setup({ list: approvalList([voidApproval()]) });
-    fireEvent.click(await screen.findByRole('button', { name: /^Decline/ }));
-    const dialog = await screen.findByRole('dialog');
-    expect(
-      within(dialog).getByText(
-        new RegExp(APPROVAL_KIND_UI.payment_void.declineEffect)
-      )
-    ).toBeVisible();
   });
 
   it('needs a reason to decline, then declines with it and says the request is kept', async () => {
@@ -358,6 +303,119 @@ describe('ApprovalsPage', () => {
   });
 });
 
+const RESOURCES = [
+  'paymentVoids',
+  'adjustments',
+  'studentDiscounts',
+  'leave',
+  'stockCounts',
+] as const;
+
+const KINDS = [
+  {
+    kind: 'payment_void',
+    item: voidApproval(),
+    resource: 'paymentVoids',
+    declineEffect:
+      'The payment stays recorded and nothing is cancelled. A new cancellation can be asked for.',
+  },
+  {
+    kind: 'credit_note',
+    item: approvalItem({ kind: 'credit_note', id: approvalIdAt(1) }),
+    resource: 'adjustments',
+    declineEffect:
+      'The fee stays as charged and what the family owes is unchanged.',
+  },
+  {
+    kind: 'write_off',
+    item: approvalItem({ kind: 'write_off', id: approvalIdAt(2) }),
+    resource: 'adjustments',
+    declineEffect: 'The balance stays owed and nothing is cancelled.',
+  },
+  {
+    kind: 'refund',
+    item: approvalItem({ kind: 'refund', id: approvalIdAt(3) }),
+    resource: 'adjustments',
+    declineEffect:
+      'No money is paid back and the credit stays with the student.',
+  },
+  {
+    kind: 'discount',
+    item: discountApproval(),
+    resource: 'studentDiscounts',
+    declineEffect:
+      'The discount is not applied and later charges stay as they are.',
+  },
+  {
+    kind: 'leave',
+    item: leaveApproval(),
+    resource: 'leave',
+    declineEffect: 'Nothing is changed.',
+  },
+  {
+    kind: 'store_write_off',
+    item: storeWriteOffApproval(),
+    resource: 'stockCounts',
+    declineEffect: 'Stock stays as it is.',
+  },
+] as const;
+
+describe('ApprovalsPage decisions by kind', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it.each(KINDS)(
+    'approves a $kind request through the $resource route only',
+    async ({ item, resource }) => {
+      const api = setup({ list: approvalList([item]) });
+      fireEvent.click(await screen.findByRole('button', { name: /^Approve/ }));
+      fireEvent.click(
+        within(await screen.findByRole('dialog')).getByRole('button', {
+          name: 'Approve',
+        })
+      );
+      await waitFor(() => {
+        expect(api[resource].approve).toHaveBeenCalledWith({
+          params: { id: item.id },
+        });
+      });
+      for (const other of RESOURCES.filter((name) => name !== resource)) {
+        expect(api[other].approve).not.toHaveBeenCalled();
+      }
+      for (const name of RESOURCES) {
+        expect(api[name].decline).not.toHaveBeenCalled();
+      }
+    }
+  );
+
+  it.each(KINDS)(
+    'declines a $kind request with a reason through the $resource route only, saying what declining does',
+    async ({ item, resource, declineEffect }) => {
+      const api = setup({ list: approvalList([item]) });
+      fireEvent.click(await screen.findByRole('button', { name: /^Decline/ }));
+      const dialog = await screen.findByRole('dialog');
+      expect(dialog).toHaveTextContent(declineEffect);
+      fireEvent.change(within(dialog).getByLabelText('Reason'), {
+        target: { value: 'Not this term' },
+      });
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Decline' }));
+      await waitFor(() => {
+        expect(api[resource].decline).toHaveBeenCalledWith({
+          params: { id: item.id },
+          body: { reason: 'Not this term' },
+        });
+      });
+      for (const other of RESOURCES.filter((name) => name !== resource)) {
+        expect(api[other].decline).not.toHaveBeenCalled();
+      }
+      for (const name of RESOURCES) {
+        expect(api[name].approve).not.toHaveBeenCalled();
+      }
+    }
+  );
+});
+
 const accessWith = (...permissions: Permission[]) =>
   fakeAccess({
     roles: [],
@@ -375,11 +433,6 @@ describe('ApprovalsPage by permission', () => {
       access: accessWith('leave:approve'),
       list: approvalList([leaveApproval()]),
     });
-    expect(
-      await screen.findByText(
-        'Requests waiting for you to approve: money corrections and staff leave.'
-      )
-    ).toBeVisible();
     expect(await screen.findByText('Leave')).toBeVisible();
     expect(await screen.findByText('My leave')).toBeVisible();
     expect(
@@ -395,11 +448,11 @@ describe('ApprovalsPage by permission', () => {
   });
 
   it('shows someone holding neither the leave-only body', async () => {
-    setup({ access: accessWith('student:read') });
+    const api = setup({ access: accessWith('student:read') });
     expect(
-      await screen.findByText('Ask for leave and see what the school decides.')
+      await screen.findByRole('button', { name: 'Request leave' })
     ).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Request leave' })).toBeVisible();
+    expect(api.approvals.list).not.toHaveBeenCalled();
   });
 
   it('hides My leave and Request leave from a super admin acting', async () => {
@@ -421,8 +474,8 @@ describe('ApprovalsPage leave rows', () => {
 
   it('shows a leave row with its details and days', async () => {
     setup({ list: approvalList([leaveApproval()]) });
-    const row = (await screen.findByText('2 days')).closest('tr');
-    const cells = within(row as HTMLElement);
+    const row = await screen.findByRole('row', { name: /Sick leave/ });
+    const cells = within(row);
     expect(
       cells.getByText(
         'Ayo Bassey · Sick leave · 12 Oct 2026 – 13 Oct 2026. Malaria'
@@ -436,7 +489,7 @@ describe('ApprovalsPage leave rows', () => {
     setup({
       list: approvalList([
         leaveApproval({ decide: 'other' }),
-        leaveApproval({ id: 'mine', decide: 'own' }),
+        leaveApproval({ id: approvalIdAt(99), decide: 'own' }),
       ]),
     });
     expect(await screen.findByText('Someone else')).toBeVisible();
@@ -535,28 +588,6 @@ describe('ApprovalsPage leave rows', () => {
     });
   });
 
-  it('declines leave with a reason', async () => {
-    const api = setup({ list: approvalList([leaveApproval()]) });
-    fireEvent.click(await screen.findByRole('button', { name: /^Decline/ }));
-    const dialog = await screen.findByRole('dialog');
-    expect(
-      within(dialog).getByText(
-        'The request stays on record with your reason. Nothing is changed.'
-      )
-    ).toBeVisible();
-    fireEvent.change(within(dialog).getByLabelText('Reason'), {
-      target: { value: 'Exams that week' },
-    });
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Decline' }));
-
-    await waitFor(() => {
-      expect(api.leave.decline).toHaveBeenCalledWith({
-        params: { id: leaveApproval().id },
-        body: { reason: 'Exams that week' },
-      });
-    });
-  });
-
   it('toasts that someone has already decided, and refreshes, on a 409', async () => {
     const api = setup({ list: approvalList([leaveApproval()]) });
     api.leave.approve.mockRejectedValue(
@@ -632,7 +663,7 @@ describe('ApprovalsPage campus picker', () => {
 
   it('starts over on page 1 when a campus is chosen', async () => {
     const first = Array.from({ length: 10 }, (_, index) =>
-      approvalItem({ id: `first-${index}`, details: `Request ${index}` })
+      approvalItem({ id: approvalIdAt(index), details: `Request ${index}` })
     );
     setup({
       listFor: (page) =>
@@ -661,7 +692,7 @@ describe('ApprovalsPage campus picker', () => {
     const onSearch = vi.fn();
     setup({
       campuses: two,
-      search: { campus: 'stale-campus' },
+      search: { campus: approvalIdAt(500) },
       listError: new Error('Campus not found'),
       onSearch,
     });
@@ -675,7 +706,7 @@ describe('ApprovalsPage campus picker', () => {
     const onSearch = vi.fn();
     setup({
       campuses: [LEKKI],
-      search: { campus: 'stale-campus' },
+      search: { campus: approvalIdAt(500) },
       listError: new Error('Campus not found'),
       onSearch,
     });

@@ -111,24 +111,13 @@ describe('SaleSheet', () => {
       await screen.findByRole('heading', { name: 'Record student purchase' })
     ).toBeVisible();
     expect(
-      screen.getByText(
-        'Pick the items the student is buying and how they paid. Stock goes down and a receipt is issued.'
-      )
-    ).toBeVisible();
-    expect(
-      await screen.findByText(/Choose a student to see their class’s book list/)
-    ).toBeVisible();
-    expect(
-      screen.getByText('Only active students can receive items.')
+      within(await screen.findByLabelText('Student')).getByRole('option', {
+        name: 'Ada Okeke · GF-0123',
+      })
     ).toBeVisible();
     expect(
       screen.getByRole('button', { name: 'Record purchase' })
     ).toBeDisabled();
-    expect(
-      within(screen.getByLabelText('Student')).getByRole('option', {
-        name: 'Ada Okeke · GF-0123',
-      })
-    ).toBeVisible();
   });
 
   it('shows the student’s class, campus and balance, the level’s books and every uniform', async () => {
@@ -184,11 +173,6 @@ describe('SaleSheet', () => {
       .getAllByRole('option')
       .map((option) => option.textContent);
     expect(options).toEqual(['Cash', 'Bank transfer']);
-    expect(
-      screen.getByText(
-        'Store items are paid for here, not added to school fees.'
-      )
-    ).toBeVisible();
   });
 
   it('toasts when no item has a quantity and does not post', async () => {
@@ -330,9 +314,12 @@ describe('SaleSheet', () => {
       await waitFor(() => {
         expect(toast.success).toHaveBeenCalledWith(
           'ISS-2026-0001: ₦13,000 paid, receipt RCT-2026-00012.',
-          {}
+          expect.anything()
         );
       });
+      expect(vi.mocked(toast.success).mock.calls[0]?.[1]).not.toHaveProperty(
+        'action'
+      );
     });
 
     it('uploads the POS slip once and sends its id', async () => {

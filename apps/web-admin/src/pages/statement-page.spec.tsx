@@ -114,19 +114,15 @@ describe('StatementPage (one child)', () => {
 
   it('lists the entries with their status, link and reference, and the footer', async () => {
     setup();
-    const charge = (
-      await screen.findByRole('link', {
-        name: 'Term fees, First term, 2026/2027',
-      })
-    ).closest('tr');
-    expect(
-      within(charge as HTMLElement).getByText('CHG-2026-00001')
-    ).toBeVisible();
-    expect(within(charge as HTMLElement).getByText('Charged')).toBeVisible();
-    const paid = screen
-      .getByRole('link', { name: /Payment RCT-2026-00088 from Ngozi Okeke/ })
-      .closest('tr');
-    expect(within(paid as HTMLElement).getByText('Paid')).toBeVisible();
+    const charge = await screen.findByRole('row', {
+      name: /Term fees, First term, 2026\/2027/,
+    });
+    expect(within(charge).getByText('CHG-2026-00001')).toBeVisible();
+    expect(within(charge).getByText('Charged')).toBeVisible();
+    const paid = screen.getByRole('row', {
+      name: /Payment RCT-2026-00088 from Ngozi Okeke/,
+    });
+    expect(within(paid).getByText('Paid')).toBeVisible();
     expect(screen.getByText('Owing now')).toBeVisible();
   });
 
@@ -319,7 +315,9 @@ describe('StatementPage term filter', () => {
     const select = await screen.findByRole('combobox', { name: 'Term' });
 
     expect(
-      [...select.querySelectorAll('option')].map((option) => option.textContent)
+      within(select)
+        .getAllByRole('option')
+        .map((option) => option.textContent)
     ).toEqual([
       'Whole history',
       'Second term, 2026/2027',
@@ -347,15 +345,13 @@ describe('StatementPage term filter', () => {
   it('puts the Brought forward row, with its tip and amount, first on page 1', async () => {
     setup({ statement: filtered(null), search: { term: TERM_ID } });
 
-    const row = (await screen.findByText('Brought forward')).closest('tr');
+    const row = await screen.findByRole('row', { name: /Brought forward/ });
 
     expect(row).toBe(screen.getAllByRole('row')[1]);
     expect(
-      within(row as HTMLElement).getByText(
-        'What the family already owed before this term.'
-      )
+      within(row).getByText('What the family already owed before this term.')
     ).toBeVisible();
-    expect(within(row as HTMLElement).getByText('₦15,000')).toBeVisible();
+    expect(within(row).getByText('₦15,000')).toBeVisible();
   });
 
   it('reads Owing at end of term in the footer of a term that has ended', async () => {

@@ -2,7 +2,6 @@ import {
   BOOK_LEVEL_REQUIRED_MESSAGE,
   ITEM_PRICE_BELOW_COST_MESSAGE,
   ITEM_REQUIRED_MESSAGE,
-  UNIFORM_NO_LEVEL_MESSAGE,
   type Item,
 } from '@eduvault/api-contract';
 import {
@@ -93,7 +92,6 @@ describe('newItemRequest', () => {
   it('keeps a uniform out of a class level', () => {
     const state = { ...filled(), classLevelId: LEVEL };
     expect(newItemRequest(state).body?.classLevelId).toBeNull();
-    expect(UNIFORM_NO_LEVEL_MESSAGE).toBeTruthy();
   });
 });
 

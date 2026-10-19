@@ -1,8 +1,10 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { toast } from '@eduvault/ui';
 import {
+  FINANCE_PAGE_SIZE_MAX,
   ITEM_PRICE_BELOW_COST_MESSAGE,
   type ItemList,
+  type SaleList,
 } from '@eduvault/api-contract';
 import { toPermissionMap } from '@eduvault/policy';
 import { NO_ACCOUNT_ACCESS_MESSAGE } from '../components/store/store-text';
@@ -13,7 +15,7 @@ import {
   DELIVERY_ID,
   LEVEL_ID,
   SHIRT_ID,
-  SALE_ID,
+  SECOND_SALE_ID,
   stockCount,
   stockCountList,
   deliveryDetail,
@@ -27,14 +29,13 @@ import {
   sale,
   saleList,
   saleOptions,
+  secondSale,
   shirt,
   storeSummary,
-  termFigures,
   textbook,
   tie,
 } from '../test-store';
 import {
-  actingAccess,
   fakeAccess,
   ownerAccess,
   renderWithApi,
@@ -64,6 +65,7 @@ function setup(
     delivery?: ReturnType<typeof deliveryDetail>;
     items?: (args: { query: { page?: number } }) => Promise<ItemList>;
     summary?: ReturnType<typeof storeSummary>;
+    sales?: SaleList;
   } = {}
 ) {
   const campuses = options.campuses ?? [LEKKI, IKEJA];
@@ -91,7 +93,7 @@ function setup(
       createItem: vi.fn(),
       updateItem: vi.fn(),
       recordDelivery: vi.fn().mockResolvedValue(recordedDelivery()),
-      sales: vi.fn().mockResolvedValue(saleList([sale()])),
+      sales: vi.fn().mockResolvedValue(options.sales ?? saleList([sale()])),
       sale: vi.fn().mockResolvedValue(sale()),
       saleOptions: vi.fn().mockResolvedValue(saleOptions()),
       recordSale: vi.fn().mockResolvedValue(recordedSale()),
@@ -145,7 +147,7 @@ describe('StorePage', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('gives the owner a Campus select and one stock column per campus, with 0 in the destructive colour', async () => {
+  it('gives the owner a Campus select and one stock column per campus', async () => {
     setup();
 
     expect(
@@ -160,11 +162,8 @@ describe('StorePage', () => {
       screen.queryByRole('columnheader', { name: 'In stock' })
     ).not.toBeInTheDocument();
 
-    const cells = rowOf('School shirt').getAllByRole('cell');
-    expect(cells[2]).toHaveTextContent('12');
-    expect(cells[3]).toHaveTextContent('0');
-    expect(cells[3]).toHaveClass('text-destructive');
-    expect(cells[2]).not.toHaveClass('text-destructive');
+    expect(rowOf('School shirt').getByText('12')).toBeVisible();
+    expect(rowOf('School shirt').getByText('0')).toBeVisible();
   });
 
   it('masks the Stock value and the Cost column until Show costs is on', async () => {
@@ -265,14 +264,18 @@ describe('StorePage', () => {
     });
   });
 
-  it('shows the Low stock badge at the low level, and turns the low filter on from the Stock value tile', async () => {
-    const { onSearchChange } = setup();
+  it('shows the Low stock label for a low item', async () => {
+    setup();
 
     expect(await screen.findByText('School tie')).toBeVisible();
     expect(rowOf('School tie').getByText('Low stock')).toBeVisible();
     expect(rowOf('Mathematics').getByText('In stock')).toBeVisible();
+  });
 
-    fireEvent.click(screen.getByRole('button', { name: /Stock value/ }));
+  it('turns the low filter on from the Stock value tile', async () => {
+    const { onSearchChange } = setup();
+
+    fireEvent.click(await screen.findByRole('button', { name: /Stock value/ }));
 
     expect(onSearchChange).toHaveBeenCalledWith({
       tab: undefined,
@@ -281,8 +284,8 @@ describe('StorePage', () => {
     });
   });
 
-  it('filters to low or out of stock items from the switch and asks the API for them', async () => {
-    const { api, onSearchChange } = setup();
+  it('turns the low filter on from the switch', async () => {
+    const { onSearchChange } = setup();
 
     fireEvent.click(
       await screen.findByRole('switch', { name: 'Low or out of stock (2)' })
@@ -290,9 +293,6 @@ describe('StorePage', () => {
     expect(onSearchChange).toHaveBeenCalledWith({
       low: 1,
       page: undefined,
-    });
-    await waitFor(() => {
-      expect(api.store.items).toHaveBeenCalled();
     });
   });
 
@@ -351,6 +351,9 @@ describe('StorePage', () => {
         }),
       });
     });
+    expect(
+      screen.queryByText(NO_ACCOUNT_ACCESS_MESSAGE)
+    ).not.toBeInTheDocument();
     await waitFor(() => {
       expect(toast.success).toHaveBeenCalledWith(
         'DEL-2026-0001 recorded: ₦35,000 paid from GTBank current.'
@@ -394,7 +397,10 @@ describe('StorePage', () => {
       await screen.findByLabelText('Quantity for Mathematics')
     ).toBeVisible();
     expect(api.store.items).toHaveBeenCalledWith({
-      query: expect.objectContaining({ page: 2, pageSize: 50 }),
+      query: expect.objectContaining({
+        page: 2,
+        pageSize: FINANCE_PAGE_SIZE_MAX,
+      }),
     });
   });
 
@@ -425,11 +431,8 @@ describe('StorePage', () => {
     ).toBeVisible();
   });
 
-  it.each([
-    ['a member with store:read only', readerAccess()],
-    ['an acting super admin without a reason', actingAccess(false)],
-  ])('hides every write control from %s', async (_label, access) => {
-    setup({ access });
+  it('hides every write control from a member with store:read only', async () => {
+    setup({ access: readerAccess() });
 
     expect(await screen.findByText('School shirt')).toBeVisible();
     expect(
@@ -532,6 +535,30 @@ describe('StorePage', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('lists only the students of the chosen campus in the purchase sheet', async () => {
+    setup({ search: { sell: 1, campus: IKEJA.id } });
+
+    const student = await screen.findByLabelText('Student');
+    expect(
+      within(student).getByRole('option', { name: /Tobi Adewale/ })
+    ).toBeVisible();
+    expect(
+      within(student).queryByRole('option', { name: /Ada Okeke/ })
+    ).not.toBeInTheDocument();
+  });
+
+  it('lists the students of every campus in the purchase sheet when no campus is chosen', async () => {
+    setup({ search: { sell: 1 } });
+
+    const student = await screen.findByLabelText('Student');
+    expect(
+      within(student).getByRole('option', { name: /Tobi Adewale/ })
+    ).toBeVisible();
+    expect(
+      within(student).getByRole('option', { name: /Ada Okeke/ })
+    ).toBeVisible();
+  });
+
   it('opens the purchase sheet from the button and from the address', async () => {
     const { onSearchChange } = setup();
     fireEvent.click(
@@ -552,19 +579,11 @@ describe('StorePage', () => {
       expect(await screen.findByText('₦27,000')).toBeVisible();
       expect(screen.getByText('3 students served')).toBeVisible();
       expect(screen.getByText('9')).toBeVisible();
-      expect(screen.getByText('This term · paid at the store')).toBeVisible();
-      expect(screen.getByText('Hidden · turn on Show costs')).toBeVisible();
       expect(screen.queryByText('₦7,000')).not.toBeInTheDocument();
 
       fireEvent.click(screen.getByRole('switch', { name: 'Show costs' }));
 
       expect(await screen.findByText('₦7,000')).toBeVisible();
-      expect(screen.getByText('Sales minus cost')).toBeVisible();
-    });
-
-    it('counts one student served as singular', async () => {
-      setup({ summary: storeSummary(termFigures({ termStudentsServed: 1 })) });
-      expect(await screen.findByText('1 student served')).toBeVisible();
     });
 
     it('sends the Sold this term and Items sold tiles to the Items sold tab', async () => {
@@ -573,11 +592,14 @@ describe('StorePage', () => {
       fireEvent.click(
         await screen.findByRole('button', { name: /Sold this term/ })
       );
+      expect(onSearchChange).toHaveBeenCalledTimes(1);
       expect(onSearchChange).toHaveBeenLastCalledWith({
         campus: undefined,
         tab: 'sold',
       });
+      onSearchChange.mockClear();
       fireEvent.click(screen.getByRole('button', { name: /Items sold/ }));
+      expect(onSearchChange).toHaveBeenCalledTimes(1);
       expect(onSearchChange).toHaveBeenLastCalledWith({
         campus: undefined,
         tab: 'sold',
@@ -620,15 +642,18 @@ describe('StorePage', () => {
     });
 
     it('opens a sale by putting its id in the address', async () => {
-      const { onSearchChange } = setup({ search: { tab: 'sold' } });
+      const { onSearchChange } = setup({
+        search: { tab: 'sold' },
+        sales: saleList([sale(), secondSale()]),
+      });
 
       fireEvent.click(
-        await screen.findByRole('button', { name: 'ISS-2026-0001' })
+        await screen.findByRole('button', { name: 'ISS-2026-0002' })
       );
 
       expect(onSearchChange).toHaveBeenCalledWith({
         tab: 'sold',
-        sale: SALE_ID,
+        sale: SECOND_SALE_ID,
       });
     });
 

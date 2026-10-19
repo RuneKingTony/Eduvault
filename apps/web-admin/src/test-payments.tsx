@@ -25,6 +25,7 @@ import { parseStoreSearch } from './store-search';
 import { parseAccountsSearch, parseStatementSearch } from './accounts-search';
 import { parseAdjustmentsSearch } from './adjustments-search';
 import { ApiProvider, type Api } from './api';
+import { checked } from './test-api';
 import { parseBillingSearch } from './billing-search';
 import { parseFeesSearch } from './fees-search';
 import { parseInvoicesSearch } from './invoices-search';
@@ -286,7 +287,7 @@ export function renderPayments(
   const root = createRootRoute({
     component: () => (
       <QueryClientProvider client={queryClient}>
-        <ApiProvider api={api as unknown as Api}>
+        <ApiProvider api={checked(api)}>
           <PermissionsProvider value={access}>
             <TooltipProvider>{page}</TooltipProvider>
           </PermissionsProvider>

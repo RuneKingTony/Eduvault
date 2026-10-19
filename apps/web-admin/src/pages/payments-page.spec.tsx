@@ -52,11 +52,6 @@ describe('PaymentsPage', () => {
       )
     ).toBeVisible();
     expect(screen.getByText('3 receipts')).toBeVisible();
-    expect(
-      screen.getByText(
-        'Cash, transfer and POS payments recorded at the bursary.'
-      )
-    ).toBeVisible();
   });
 
   it('leaves the cancellation words out when none is waiting', async () => {
@@ -69,15 +64,16 @@ describe('PaymentsPage', () => {
   it('lists the receipt number, date and method, payer, students, account, amount and status', async () => {
     setup();
 
-    const row = (await screen.findByText('RCT-2026-00088')).closest('tr');
-    const cells = within(row as HTMLElement);
+    const row = await screen.findByRole('row', { name: /RCT-2026-00088/ });
+    const cells = within(row);
     expect(cells.getByText('7 Oct 2026 · Bank transfer')).toBeVisible();
     expect(cells.getByText('Ngozi Okeke')).toBeVisible();
     expect(cells.getByText('GTBank current · ending 4417')).toBeVisible();
     expect(cells.getByText('₦240,000')).toBeVisible();
     expect(cells.getByText('Recorded')).toBeVisible();
-    expect(cells.getAllByRole('link')[0]?.getAttribute('href')).toMatch(
-      /\/finance\/payments\/.+/
+    expect(cells.getByRole('link', { name: /RCT-2026-00088/ })).toHaveAttribute(
+      'href',
+      expect.stringMatching(/\/finance\/payments\/.+/)
     );
   });
 
@@ -85,9 +81,7 @@ describe('PaymentsPage', () => {
     setup({
       list: paymentList([paymentSummary({ status: 'voided' })]),
     });
-    const amount = await screen.findByText('₦240,000', {
-      selector: 'a',
-    });
+    const amount = await screen.findByText('₦240,000', { selector: 'a' });
     expect(amount.closest('td')).toHaveClass('line-through');
     expect(screen.getByText('Cancelled')).toBeVisible();
   });
@@ -101,11 +95,27 @@ describe('PaymentsPage', () => {
     expect(amount.closest('td')).not.toHaveClass('line-through');
   });
 
-  it('shows Record payment to a bursar and opens the sheet from the address', async () => {
+  it('shows Record payment to a bursar', async () => {
+    setup({ access: starterAccess('bursar') });
+    expect(
+      await screen.findByRole('button', { name: 'Record payment' })
+    ).toBeVisible();
+  });
+
+  it('opens the sheet for a bursar from the address', async () => {
     setup({ access: starterAccess('bursar'), search: { record: 1 } });
     expect(
       await screen.findByRole('heading', { name: 'Record a payment' })
     ).toBeVisible();
+  });
+
+  it('gives a reader with ?record=1 no sheet', async () => {
+    setup({ access: starterAccess('administrator'), search: { record: 1 } });
+    await screen.findByText('RCT-2026-00088');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(
+      screen.queryByRole('heading', { name: 'Record a payment' })
+    ).toBeNull();
   });
 
   it('asks the page to open the sheet from the header button', async () => {

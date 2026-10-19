@@ -95,7 +95,7 @@ describe('SaleDetailSheet', () => {
     expect(screen.getByRole('button', { name: 'Statement' })).toBeVisible();
   });
 
-  it('shows the refusal for a sale that is not in view', async () => {
+  it("shows the API's refusal", async () => {
     setup({
       load: vi
         .fn()

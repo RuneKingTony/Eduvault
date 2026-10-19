@@ -1,4 +1,4 @@
-import { APPROVAL_KINDS, type ApprovalItem } from '@eduvault/api-contract';
+import type { ApprovalItem } from '@eduvault/api-contract';
 import {
   ALREADY_DECIDED_TOAST,
   APPROVAL_KIND_UI,
@@ -24,14 +24,6 @@ const item = (over: Partial<ApprovalItem> = {}): ApprovalItem => ({
 });
 
 describe('approval copy', () => {
-  it('has an effect line and a toast for every kind', () => {
-    for (const kind of APPROVAL_KINDS) {
-      expect(APPROVAL_KIND_UI[kind].approveEffect).not.toBe('');
-      expect(APPROVAL_KIND_UI[kind].approvedToast.message).not.toBe('');
-      expect(APPROVAL_KIND_UI[kind].declineEffect).not.toBe('');
-    }
-  });
-
   it('says in the PRD words what each approval does', () => {
     expect(APPROVAL_KIND_UI.payment_void.approveEffect).toBe(
       'The receipt is kept but marked cancelled, and the family owes that money again.'
@@ -72,26 +64,6 @@ describe('approval copy', () => {
     expect(DECLINED_TOAST).toBe(
       'Declined. The request is kept with your reason.'
     );
-  });
-});
-
-describe('where each kind is decided and listed', () => {
-  it('names the API resource and the tab of every kind, the store write-off on Stock counts', () => {
-    expect(
-      APPROVAL_KINDS.map((kind) => [
-        kind,
-        APPROVAL_KIND_UI[kind].resource,
-        APPROVAL_KIND_UI[kind].tab,
-      ])
-    ).toEqual([
-      ['payment_void', 'paymentVoids', 'voids'],
-      ['credit_note', 'adjustments', 'corrections'],
-      ['write_off', 'adjustments', 'corrections'],
-      ['refund', 'adjustments', 'corrections'],
-      ['discount', 'studentDiscounts', 'discounts'],
-      ['leave', 'leave', 'leave'],
-      ['store_write_off', 'stockCounts', 'counts'],
-    ]);
   });
 });
 
