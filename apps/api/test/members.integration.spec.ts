@@ -2018,6 +2018,94 @@ test.describe('members', () => {
       expect(full.classes).toHaveLength(2);
     });
 
+    test('names the classes a subject-only teacher teaches, and none they no longer teach', async ({
+      api,
+      app,
+      createUser,
+      addMember,
+      schools: { orgA, owner, lekki },
+    }) => {
+      await createSchoolYear(app, owner);
+      const teacher = await addMember(orgA, await createUser(), {
+        roles: ['teacher'],
+        campuses: [lekki],
+      });
+      const gold = await createClass(app, owner, {
+        campusId: lekki.id,
+        name: 'Gold',
+      });
+      const old = await createClass(app, owner, {
+        campusId: lekki.id,
+        name: 'Old',
+      });
+      const maths = await createSubject(app, owner, MATHS);
+      for (const arm of [gold, old]) {
+        await assignSubjectTeacher(app, owner, {
+          arm,
+          subjectId: maths.id,
+          userId: teacher.id,
+        });
+      }
+      await api(owner)
+        .patch(`/classes/${old.id}`)
+        .send({ archived: true })
+        .expect(200);
+
+      const id = await idOf(api, owner, teacher.id);
+      const detail = (await api(owner).get(`/members/${id}`).expect(200))
+        .body as MemberDetail;
+
+      expect(detail.classes).toEqual([
+        { id: gold.id, displayName: gold.displayName },
+      ]);
+      expect(detail.classScope).toEqual([gold.id]);
+    });
+
+    test('lists an arm once when taught as class and subject, and keeps a Lekki-only viewer to Lekki', async ({
+      api,
+      app,
+      createUser,
+      addMember,
+      withPermissions,
+      schools: { orgA, owner, lekki, ikeja },
+    }) => {
+      await createSchoolYear(app, owner);
+      const viewer = await withPermissions(orgA, ['member:read'], {
+        campuses: [lekki],
+      });
+      const teacher = await addMember(orgA, await createUser(), {
+        roles: ['teacher'],
+        campuses: [lekki, ikeja],
+      });
+      const atLekki = await createClass(app, owner, { campusId: lekki.id });
+      const atIkeja = await createClass(app, owner, { campusId: ikeja.id });
+      await assignClassTeacher(app, owner, {
+        classId: atLekki.id,
+        userId: teacher.id,
+      });
+      const maths = await createSubject(app, owner, MATHS);
+      for (const arm of [atLekki, atIkeja]) {
+        await assignSubjectTeacher(app, owner, {
+          arm,
+          subjectId: maths.id,
+          userId: teacher.id,
+        });
+      }
+
+      const id = await idOf(api, owner, teacher.id);
+      const seen = (await api(viewer).get(`/members/${id}`).expect(200))
+        .body as MemberDetail;
+      expect(seen.classes.map((row) => row.id)).toEqual([atLekki.id]);
+      expect(seen.classScope).toEqual([atLekki.id]);
+      const full = (await api(owner).get(`/members/${id}`).expect(200))
+        .body as MemberDetail;
+      expect(
+        full.classes.map((row) => row.id).toSorted((a, b) => a.localeCompare(b))
+      ).toEqual(
+        [atLekki.id, atIkeja.id].toSorted((a, b) => a.localeCompare(b))
+      );
+    });
+
     test('another school’s owner gets 404, never the classes', async ({
       api,
       app,
