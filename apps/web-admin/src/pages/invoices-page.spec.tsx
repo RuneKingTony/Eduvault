@@ -1,6 +1,11 @@
 import { fireEvent, screen, within } from '@testing-library/react';
 import { ApiError } from '@eduvault/api-contract';
-import { billingApi, invoiceSummary, renderBilling } from '../test-billing';
+import {
+  billingApi,
+  INVOICE_TWO_ID,
+  invoiceSummary,
+  renderBilling,
+} from '../test-billing';
 import { currentCalendar } from '../test-calendar';
 import { studentList, studentRow } from '../test-students';
 import { ownerAccess, starterAccess } from '../test-utils';
@@ -27,7 +32,7 @@ describe('InvoicesPage', () => {
         invoices: [
           invoiceSummary(),
           invoiceSummary({
-            id: 'inv-2',
+            id: INVOICE_TWO_ID,
             number: null,
             status: 'draft',
             studentName: 'Tobi Adewale',
@@ -63,7 +68,7 @@ describe('InvoicesPage', () => {
         invoices: [
           invoiceSummary(),
           invoiceSummary({
-            id: 'inv-2',
+            id: INVOICE_TWO_ID,
             number: null,
             status: 'draft',
             studentName: 'Tobi Adewale',

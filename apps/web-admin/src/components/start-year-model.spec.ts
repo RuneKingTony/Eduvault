@@ -1,4 +1,10 @@
-import { ARM_J3, newSchoolYearPreview } from '../test-students';
+import {
+  ARM_J3,
+  EFE_ID,
+  STUDENT_ID,
+  TOBI_ID,
+  newSchoolYearPreview,
+} from '../test-students';
 import {
   EMPTY_SELECTION,
   canStart,
@@ -38,7 +44,7 @@ describe('summary', () => {
   });
 
   it('counts an unticked student as repeating', () => {
-    expect(summarize(preview, repeating('s2'))).toEqual({
+    expect(summarize(preview, repeating(TOBI_ID))).toEqual({
       moveUp: 1,
       repeat: 1,
       graduate: 1,
@@ -77,7 +83,7 @@ describe('targets and errors', () => {
       ...gold,
       fromClass: gold.fromClass && { ...gold.fromClass, archived: true },
     };
-    const selection = repeating('s2');
+    const selection = repeating(TOBI_ID);
     expect(repeatTarget(archived, selection)).toBeNull();
     expect(groupErrors(archived, selection).repeat).toBe(
       'Choose a class for those repeating in JSS 2 Gold (Lekki).'
@@ -103,10 +109,10 @@ describe('targets and errors', () => {
 
 describe('request rows', () => {
   it('builds a move, a repeat and a graduate row', () => {
-    expect(startRows(preview, repeating('s2'))).toEqual([
-      { studentId: 's1', outcome: 'move', classArmId: ARM_J3 },
-      { studentId: 's2', outcome: 'repeat', classArmId: gold.fromClass?.id },
-      { studentId: 's3', outcome: 'graduate' },
+    expect(startRows(preview, repeating(TOBI_ID))).toEqual([
+      { studentId: STUDENT_ID, outcome: 'move', classArmId: ARM_J3 },
+      { studentId: TOBI_ID, outcome: 'repeat', classArmId: gold.fromClass?.id },
+      { studentId: EFE_ID, outcome: 'graduate' },
     ]);
   });
 
@@ -115,7 +121,7 @@ describe('request rows', () => {
       startRows({ ...preview, canGraduate: false }, EMPTY_SELECTION).map(
         (row) => row.studentId
       )
-    ).toEqual(['s1', 's2']);
+    ).toEqual([STUDENT_ID, TOBI_ID]);
   });
 });
 

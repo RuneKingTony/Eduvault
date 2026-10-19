@@ -25,19 +25,23 @@ import { parseStoreSearch } from './store-search';
 import { parseAccountsSearch, parseStatementSearch } from './accounts-search';
 import { parseAdjustmentsSearch } from './adjustments-search';
 import { ApiProvider, type Api } from './api';
-import { checked } from './test-api';
+import { checked, testId } from './test-api';
 import { parseBillingSearch } from './billing-search';
 import { parseFeesSearch } from './fees-search';
 import { parseInvoicesSearch } from './invoices-search';
 import { parsePaymentsSearch, parseReceiptSearch } from './payments-search';
 import { ownerAccess } from './test-utils';
 
-export const PAYMENT_ID = '00000000-0000-4000-8000-0000000c0001';
-export const ADA = '00000000-0000-4000-8000-0000000d0001';
-export const CHIDI = '00000000-0000-4000-8000-0000000d0002';
-export const TOBI = '00000000-0000-4000-8000-0000000d0003';
-export const NGOZI = '00000000-0000-4000-8000-0000000e0001';
-export const ACCOUNT = '00000000-0000-4000-8000-0000000f0001';
+export const PAYMENT_ID = testId(0x1_60_01);
+export const ADA = testId(0x1_60_11);
+export const CHIDI = testId(0x1_60_12);
+export const TOBI = testId(0x1_60_13);
+export const NGOZI = testId(0x1_60_21);
+export const ACCOUNT = testId(0x1_60_31);
+export const PROOF_FILE_ID = '00000000-0000-4000-8000-0000000a0a01';
+export const STATEMENT_INVOICE_ID = testId(0x1_60_51);
+const INVOICE_ENTRY_ID = testId(0x1_60_61);
+const PAYMENT_ENTRY_ID = testId(0x1_60_62);
 
 const child = (studentId: string, name: string, owesMinor: number) => ({
   studentId,
@@ -148,7 +152,7 @@ export const payment = (over: Partial<Payment> = {}): Payment => ({
   recordedBy: 'Chika Eze',
   recordedAt: '2026-10-07T09:00:00.000Z',
   proof: {
-    fileId: '00000000-0000-4000-8000-0000000a0a01',
+    fileId: PROOF_FILE_ID,
     fileName: 'alert.pdf',
   },
   allocations: [
@@ -205,7 +209,7 @@ export const balanceList = (
   items,
   total: items.length,
   summary: {
-    totalOwedMinor: 18_000_000,
+    totalOwedMinor: 31_500_000,
     studentsOwing: 1,
     studentsInScope: 12,
     receivedThisTermMinor: 40_000_000,
@@ -235,16 +239,16 @@ export const statement = (
   },
   rows: [
     {
-      entryId: '00000000-0000-4000-8000-0000000b0001',
+      entryId: INVOICE_ENTRY_ID,
       effectiveOn: '2026-09-01',
       reference: 'CHG-2026-00001',
       description: 'Term fees, First term, 2026/2027',
       status: 'charged',
       amountMinor: 22_000_000,
-      link: { type: 'invoice', id: '00000000-0000-4000-8000-0000000b0001' },
+      link: { type: 'invoice', id: STATEMENT_INVOICE_ID },
     },
     {
-      entryId: '00000000-0000-4000-8000-0000000b0002',
+      entryId: PAYMENT_ENTRY_ID,
       effectiveOn: '2026-09-20',
       reference: 'TRF-20260920-K3Q7ZA',
       description: 'Payment RCT-2026-00088 from Ngozi Okeke (Bank transfer)',
@@ -260,7 +264,7 @@ export const statement = (
     {
       reference: 'CHG-2026-00001',
       outstandingMinor: 18_000_000,
-      link: { type: 'invoice', id: '00000000-0000-4000-8000-0000000b0001' },
+      link: { type: 'invoice', id: STATEMENT_INVOICE_ID },
     },
   ],
   family: { guardianId: NGOZI, guardianName: 'Ngozi Okeke', childCount: 3 },

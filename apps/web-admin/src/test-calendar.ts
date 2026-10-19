@@ -4,18 +4,31 @@ import type {
   SchoolYear,
   Term,
 } from '@eduvault/api-contract';
+import { testId } from './test-api';
+
+export const YEAR_1 = testId(0xa0_01);
+export const YEAR_2 = testId(0xa0_02);
+export const TERM_1 = testId(0xa0_11);
+export const TERM_2 = testId(0xa0_12);
+export const TERM_3 = testId(0xa0_13);
+export const TERM_4 = testId(0xa0_14);
+export const TERM_5 = testId(0xa0_15);
+export const TERM_6 = testId(0xa0_16);
+export const HOLIDAY_1 = testId(0xa0_21);
+export const HOLIDAY_2 = testId(0xa0_22);
+export const HOLIDAY_3 = testId(0xa0_23);
 
 const holiday = (overrides: Partial<Holiday> = {}): Holiday => ({
-  id: 'h1',
-  termId: 't1',
+  id: HOLIDAY_1,
+  termId: TERM_1,
   date: '2026-10-01',
   name: 'Independence Day',
   ...overrides,
 });
 
 export const term = (overrides: Partial<Term> = {}): Term => ({
-  id: 't1',
-  schoolYearId: 'y1',
+  id: TERM_1,
+  schoolYearId: YEAR_1,
   sequence: 1,
   name: 'First term',
   startsOn: '2026-09-07',
@@ -32,7 +45,7 @@ export const term = (overrides: Partial<Term> = {}): Term => ({
 export const schoolYear = (
   overrides: Partial<SchoolYear> = {}
 ): SchoolYear => ({
-  id: 'y1',
+  id: YEAR_1,
   name: '2026/2027',
   startsOn: '2026-09-07',
   endsOn: '2027-07-23',
@@ -54,12 +67,20 @@ export const currentYear = (): SchoolYear =>
         holidayCount: 3,
         holidays: [
           holiday(),
-          holiday({ id: 'h2', date: '2026-10-29', name: 'Mid-term break' }),
-          holiday({ id: 'h3', date: '2026-10-30', name: 'Mid-term break' }),
+          holiday({
+            id: HOLIDAY_2,
+            date: '2026-10-29',
+            name: 'Mid-term break',
+          }),
+          holiday({
+            id: HOLIDAY_3,
+            date: '2026-10-30',
+            name: 'Mid-term break',
+          }),
         ],
       }),
       term({
-        id: 't2',
+        id: TERM_2,
         sequence: 2,
         name: 'Second term',
         startsOn: '2027-01-04',
@@ -68,7 +89,7 @@ export const currentYear = (): SchoolYear =>
         canMakeCurrent: true,
       }),
       term({
-        id: 't3',
+        id: TERM_3,
         sequence: 3,
         name: 'Third term',
         startsOn: '2027-04-19',
@@ -81,29 +102,29 @@ export const currentYear = (): SchoolYear =>
 
 export const nextYear = (overrides: Partial<SchoolYear> = {}): SchoolYear =>
   schoolYear({
-    id: 'y2',
+    id: YEAR_2,
     name: '2027/2028',
     startsOn: '2027-09-06',
     endsOn: '2028-07-28',
     terms: [
       term({
-        id: 't4',
-        schoolYearId: 'y2',
+        id: TERM_4,
+        schoolYearId: YEAR_2,
         startsOn: '2027-09-06',
         endsOn: '2027-12-10',
         canMakeCurrent: true,
       }),
       term({
-        id: 't5',
-        schoolYearId: 'y2',
+        id: TERM_5,
+        schoolYearId: YEAR_2,
         sequence: 2,
         name: 'Second term',
         startsOn: '2028-01-03',
         endsOn: '2028-03-31',
       }),
       term({
-        id: 't6',
-        schoolYearId: 'y2',
+        id: TERM_6,
+        schoolYearId: YEAR_2,
         sequence: 3,
         name: 'Third term',
         startsOn: '2028-04-24',

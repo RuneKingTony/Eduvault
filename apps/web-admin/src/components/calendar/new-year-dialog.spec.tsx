@@ -1,13 +1,16 @@
 import { fireEvent, screen } from '@testing-library/react';
-import { ApiError } from '@eduvault/api-contract';
+import { ApiError, type CreateSchoolYearInput } from '@eduvault/api-contract';
 import { fakeAccess, renderWithApi, seedFeeSetup } from '../../test-utils';
-import { currentYear } from '../../test-calendar';
+import { currentYear, nextYear } from '../../test-calendar';
 import { NewYearDialog } from './new-year-dialog';
 
-function setup(
-  items = [currentYear()],
-  create = vi.fn().mockResolvedValue({ ...currentYear(), madeCurrent: false })
-) {
+const created = (madeCurrent: boolean) =>
+  vi.fn(({ body }: { body: CreateSchoolYearInput }) => ({
+    ...nextYear(body),
+    madeCurrent,
+  }));
+
+function setup(items = [currentYear()], create = created(false)) {
   const onOpenChange = vi.fn();
   const { queryClient } = renderWithApi(
     <NewYearDialog open onOpenChange={onOpenChange} />,
@@ -58,10 +61,10 @@ describe('NewYearDialog', () => {
   ])(
     'drops the cached fee setup only when the new year made a term current (madeCurrent: $madeCurrent)',
     async ({ madeCurrent, dropped }) => {
-      const create = vi
-        .fn()
-        .mockResolvedValue({ ...currentYear(), madeCurrent });
-      const { onOpenChange, queryClient } = setup([currentYear()], create);
+      const { onOpenChange, queryClient } = setup(
+        [currentYear()],
+        created(madeCurrent)
+      );
       const { key, setup: seeded } = seedFeeSetup(queryClient);
       await field('Year');
       fireEvent.click(

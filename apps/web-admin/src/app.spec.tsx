@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { EduvaultAuthClient } from '@eduvault/auth-client';
 import { ApiError, type Me } from '@eduvault/api-contract';
 import { ApiProvider, type Api } from './api';
+import { checked } from './test-api';
 import { clearActing, getActing, startActing } from './acting-store';
 import { App } from './app';
 
@@ -40,7 +41,7 @@ const clientWith = (
 const renderApp = (authClient: EduvaultAuthClient, api: Partial<Api> = {}) =>
   render(
     <QueryClientProvider client={new QueryClient()}>
-      <ApiProvider api={api as Api}>
+      <ApiProvider api={checked(api)}>
         <App authClient={authClient} />
       </ApiProvider>
     </QueryClientProvider>

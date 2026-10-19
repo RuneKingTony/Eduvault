@@ -6,27 +6,27 @@ import type {
   SubjectTeacherArm,
   SubjectTeachers,
 } from '@eduvault/api-contract';
-import { uuid } from './test-classes';
+import { testId } from './test-api';
 
 export const SUBJECT_IDS = {
-  maths: uuid(100),
-  english: uuid(101),
-  agr: uuid(102),
-  french: uuid(103),
-  music: uuid(104),
-  jss1: uuid(200),
-  jss2: uuid(201),
-  session: uuid(150),
-  ada: uuid(140),
-  bola: uuid(141),
-  chi: uuid(142),
-  gold: uuid(110),
-  silver: uuid(111),
-  lekki: uuid(10),
-  emeka: uuid(120),
-  ayo: uuid(121),
-  term: uuid(130),
-  previous: uuid(131),
+  maths: testId(0x1_00_64),
+  english: testId(0x1_00_65),
+  agr: testId(0x1_00_66),
+  french: testId(0x1_00_67),
+  music: testId(0x1_00_68),
+  jss1: testId(0x1_00_c8),
+  jss2: testId(0x1_00_c9),
+  session: testId(0x1_00_96),
+  ada: testId(0x1_00_8c),
+  bola: testId(0x1_00_8d),
+  chi: testId(0x1_00_8e),
+  gold: testId(0x1_00_6e),
+  silver: testId(0x1_00_6f),
+  lekki: testId(0x1_00_0a),
+  emeka: testId(0x1_00_78),
+  ayo: testId(0x1_00_79),
+  term: testId(0x1_00_82),
+  previous: testId(0x1_00_83),
 } as const;
 
 export const subject = (overrides: Partial<Subject> = {}): Subject => ({

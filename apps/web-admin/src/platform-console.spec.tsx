@@ -21,6 +21,7 @@ import { stubMatchMedia } from '@eduvault/ui/testing';
 import { ALL_PERMISSIONS, READ_PERMS, toPermissionMap } from '@eduvault/policy';
 import { clearActing, getActing, startActing } from './acting-store';
 import { ApiProvider, type Api } from './api';
+import { checked } from './test-api';
 import { NotFoundPage } from './components/page-fallbacks';
 import { routeTree } from './routeTree.gen';
 import {
@@ -117,7 +118,7 @@ async function renderAt(path: string, answer: Me) {
   });
   render(
     <QueryClientProvider client={queryClient}>
-      <ApiProvider api={api}>
+      <ApiProvider api={checked(api)}>
         <AuthClientProvider authClient={authClient}>
           <RouterProvider router={router} />
         </AuthClientProvider>
@@ -250,7 +251,7 @@ describe('platform console', () => {
       });
       render(
         <QueryClientProvider client={queryClient}>
-          <ApiProvider api={api}>
+          <ApiProvider api={checked(api)}>
             <AuthClientProvider authClient={authClient}>
               <RouterProvider router={router} />
             </AuthClientProvider>

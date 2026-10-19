@@ -10,11 +10,17 @@ import {
 } from '@eduvault/api-contract';
 import { toPermissionMap, type Permission } from '@eduvault/policy';
 import { toast } from '@eduvault/ui';
+import { testId } from '../test-api';
 import { currentCalendar } from '../test-calendar';
 import { classSummary } from '../test-classes';
 import { renderPayments, statement } from '../test-payments';
 import { actingAccess, fakeAccess } from '../test-utils';
-import { guardianLink, preview, studentDetail } from '../test-students';
+import {
+  STUDENT_ID,
+  guardianLink,
+  preview,
+  studentDetail,
+} from '../test-students';
 import { StudentPage } from './student-page';
 
 vi.mock('@eduvault/ui', async (importOriginal) => ({
@@ -29,7 +35,8 @@ const accessWith = (...permissions: Permission[]): MePermissions =>
     campusScope: 'all',
   });
 
-const STUDENT_ID = '5b0f1e1e-6e53-4c52-9f1c-0a1d7a7f9c11';
+const BUS_ID = testId(0x3_00_01);
+const TUNDE_ID = testId(0x3_00_02);
 
 type PageProps = Parameters<typeof StudentPage>[0];
 
@@ -94,7 +101,18 @@ function setup(
     calendar: { current: vi.fn().mockResolvedValue(currentCalendar()) },
     feeOptions: {
       list: vi.fn().mockResolvedValue(options.feeOptions ?? []),
-      set: vi.fn().mockResolvedValue({ feeTypeId: 'bus', optedIn: true }),
+      set: vi
+        .fn()
+        .mockImplementation(
+          (request: {
+            params: { feeTypeId: string };
+            body: { optedIn: boolean };
+          }) =>
+            Promise.resolve({
+              feeTypeId: request.params.feeTypeId,
+              optedIn: request.body.optedIn,
+            })
+        ),
     },
     studentAccounts: {
       statement: options.statementError
@@ -179,7 +197,7 @@ describe('StudentPage', () => {
     setup({
       student: {
         notSeenSince: '2026-10-01',
-        notSeenBy: { id: 'u1', name: 'Tunde Bakare' },
+        notSeenBy: { id: TUNDE_ID, name: 'Tunde Bakare' },
         notSeenNote: 'Phone calls unanswered',
         weeksAway: 1,
       },
@@ -194,7 +212,7 @@ describe('StudentPage', () => {
 });
 
 const busOption = (optedIn: boolean): FeeOption => ({
-  feeTypeId: 'bus',
+  feeTypeId: BUS_ID,
   name: 'School bus',
   optedIn,
 });
@@ -239,7 +257,7 @@ describe('StudentPage optional fees', () => {
     fireEvent.click(await screen.findByRole('switch', { name: 'School bus' }));
     await waitFor(() => {
       expect(api.feeOptions.set).toHaveBeenCalledWith({
-        params: { studentId: STUDENT_ID, feeTypeId: 'bus' },
+        params: { studentId: STUDENT_ID, feeTypeId: BUS_ID },
         body: { optedIn: true },
       });
     });
@@ -502,7 +520,7 @@ describe('StudentPage lifecycle callouts', () => {
           note: null,
           recordedOn: '2026-09-28',
         },
-        archivedBy: { id: 'u1', name: 'Tunde Bakare' },
+        archivedBy: { id: TUNDE_ID, name: 'Tunde Bakare' },
       },
     });
     expect(await callout()).toBe(

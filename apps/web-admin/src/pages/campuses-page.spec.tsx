@@ -1,6 +1,7 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { ApiError, type CampusSummary } from '@eduvault/api-contract';
 import { toast } from '@eduvault/ui';
+import { testId } from '../test-api';
 import { renderWithApi, starterAccess } from '../test-utils';
 import { CampusesPage, describeCampuses } from './campuses-page';
 
@@ -9,12 +10,18 @@ vi.mock('@eduvault/ui', async (importOriginal) => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
 
+const LEKKI_ID = testId(0x2_60_01);
+const IKEJA_ID = testId(0x2_60_02);
+const AJAH_ID = testId(0x2_60_03);
+const ORGANIZATION_ID = '9c0f1e1e-6e53-4c52-9f1c-0a1d7a7f9c22';
+
 const summary = (
+  id: string,
   name: string,
   overrides: Partial<CampusSummary> = {}
 ): CampusSummary => ({
-  id: `7d0f1e1e-6e53-4c52-9f1c-0a1d7a7f9c${name.length}${name.slice(0, 1)}`,
-  organizationId: '9c0f1e1e-6e53-4c52-9f1c-0a1d7a7f9c22',
+  id,
+  organizationId: ORGANIZATION_ID,
   name,
   address: null,
   createdAt: '2026-01-01T00:00:00.000Z',
@@ -23,12 +30,12 @@ const summary = (
   ...overrides,
 });
 
-const lekki = summary('Lekki', {
+const lekki = summary(LEKKI_ID, 'Lekki', {
   address: '12 Admiralty Way',
   principals: [{ userId: 'u1', name: 'Grace Nwosu' }],
   counts: { classes: 7, students: 120, staff: 14 },
 });
-const ikeja = summary('Ikeja');
+const ikeja = summary(IKEJA_ID, 'Ikeja');
 
 const apiWith = (campuses: CampusSummary[], extra: object = {}) => ({
   campuses: { summary: vi.fn().mockResolvedValue(campuses), ...extra },
@@ -133,7 +140,12 @@ describe('CampusesPage', () => {
   });
 
   it('creates a campus and says the creator was added to it', async () => {
-    const create = vi.fn().mockResolvedValue(summary('Ajah'));
+    const create = vi.fn(
+      ({ body }: { body: { name: string; address?: string | null } }) =>
+        Promise.resolve(
+          summary(AJAH_ID, body.name, { address: body.address ?? null })
+        )
+    );
     renderWithApi(
       <CampusesPage />,
       apiWith([lekki], { create }),
@@ -207,7 +219,14 @@ describe('CampusesPage', () => {
   });
 
   it('edits a campus with its fields filled in and says it was saved', async () => {
-    const update = vi.fn().mockResolvedValue(lekki);
+    const update = vi.fn(
+      ({
+        body,
+      }: {
+        params: { id: string };
+        body: { name?: string; address?: string | null };
+      }) => Promise.resolve({ ...lekki, ...body })
+    );
     renderWithApi(
       <CampusesPage />,
       apiWith([lekki], { update }),

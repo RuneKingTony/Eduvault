@@ -7,9 +7,17 @@ import {
   renderWithApi,
   starterAccess,
 } from '../test-utils';
-import { IKEJA, LEKKI } from '../test-members';
+import { testId } from '../test-api';
+import { classLevel, classSummary } from '../test-classes';
+import { currentCalendar } from '../test-calendar';
+import { IKEJA, IKEJA_ID, LEKKI } from '../test-members';
+import { profile, settings as schoolSettings } from '../test-school';
 import {
   ARM_ID,
+  STUDENT_ID,
+  TOBI_ID,
+  UCHE_ID,
+  YEAR_2027_ID,
   counts,
   guardianLink,
   newSchoolYearPreview,
@@ -19,9 +27,18 @@ import {
 } from '../test-students';
 import { StudentsPage } from './students-page';
 
+const LEVEL_ID = testId(0x2_00_01);
+const ZAINAB_ID = testId(0x2_00_02);
+const KUNLE_ID = testId(0x2_00_03);
+const BOLA_ID = testId(0x2_00_04);
+const CHIDI_ID = testId(0x2_00_05);
+const DARA_ID = testId(0x2_00_06);
+const BARE_ID = testId(0x2_00_07);
+const KID_ID = (index: number) => testId(0x2_01_00 + index);
+
 const ada = studentRow();
 const ifeoma = studentRow({
-  id: 'st-2',
+  id: TOBI_ID,
   firstName: 'Ifeoma',
   lastName: 'Nnaji',
   admissionNumber: 'GF-0140',
@@ -58,30 +75,25 @@ function setup(
     },
     classLevels: {
       list: vi.fn().mockResolvedValue([
-        {
-          id: 'lvl-1',
+        classLevel({
+          id: LEVEL_ID,
           code: 'JSS1',
           name: 'JSS 1',
           sequence: 7,
-          nextLevelId: null,
           isFinalYear: false,
-        },
+        }),
       ]),
     },
     classes: { list: vi.fn().mockResolvedValue(options.classes ?? []) },
     admissions: { preview: vi.fn().mockResolvedValue(preview()) },
     schoolAccount: {
-      get: vi.fn().mockResolvedValue({ admissionPrefix: 'GF' }),
+      get: vi.fn().mockResolvedValue(profile({ admissionPrefix: 'GF' })),
     },
     schoolSettings: {
-      get: vi
-        .fn()
-        .mockResolvedValue(
-          options.settings ?? { maxGuardians: 4, requireGuardian: true }
-        ),
+      get: vi.fn().mockResolvedValue(schoolSettings(options.settings)),
     },
     calendar: {
-      current: vi.fn().mockResolvedValue({ schoolYear: { name: '2026/2027' } }),
+      current: vi.fn().mockResolvedValue(currentCalendar()),
     },
     guardians: { list: vi.fn().mockResolvedValue([]) },
   };
@@ -135,8 +147,8 @@ describe('StudentsPage', () => {
         search: {
           tab: 'inactive',
           q: 'ada',
-          campusId: 'c1',
-          levelId: 'l1',
+          campusId: IKEJA_ID,
+          levelId: LEVEL_ID,
           page: 2,
         },
       },
@@ -146,8 +158,8 @@ describe('StudentsPage', () => {
       query: {
         tab: 'inactive',
         q: 'ada',
-        campusId: 'c1',
-        levelId: 'l1',
+        campusId: IKEJA_ID,
+        levelId: LEVEL_ID,
         page: 2,
       },
     });
@@ -182,10 +194,10 @@ describe('StudentsPage', () => {
       page: undefined,
     });
     fireEvent.change(await screen.findByLabelText('Level'), {
-      target: { value: 'lvl-1' },
+      target: { value: LEVEL_ID },
     });
     expect(onSearchChange).toHaveBeenCalledWith({
-      levelId: 'lvl-1',
+      levelId: LEVEL_ID,
       page: undefined,
     });
   });
@@ -349,7 +361,7 @@ describe('StudentsPage states', () => {
   it('shows the pager only above ten rows', async () => {
     const many = Array.from({ length: 10 }, (_, index) =>
       studentRow({
-        id: `st-${index}`,
+        id: KID_ID(index),
         firstName: `Kid${index}`,
         admissionNumber: `GF-${index}`,
       })
@@ -366,7 +378,7 @@ describe('StudentsPage states', () => {
     expect(screen.queryByText(/Showing 1 to/)).not.toBeInTheDocument();
   });
 
-  it('shows a loading state and an error', async () => {
+  it('shows a loading state', async () => {
     const { students } = setup();
     students.list.mockReturnValue(new Promise(() => undefined));
     expect(await screen.findAllByRole('status')).not.toHaveLength(0);
@@ -375,7 +387,7 @@ describe('StudentsPage states', () => {
   it('opens a student from the row', async () => {
     const { onOpenStudent } = setup();
     fireEvent.click(await screen.findByText('Ada Okeke', { exact: false }));
-    expect(onOpenStudent).toHaveBeenCalledWith(ada.id);
+    expect(onOpenStudent).toHaveBeenCalledWith(STUDENT_ID);
   });
 });
 
@@ -468,7 +480,7 @@ describe('StudentsPage columns per tab', () => {
       list: studentList([
         studentRow({ currentPlacement: null }),
         studentRow({
-          id: 'st-3',
+          id: ZAINAB_ID,
           firstName: 'Zainab',
           notSeenSince: '2026-10-01',
           weeksAway: 1,
@@ -503,7 +515,7 @@ describe('StudentsPage scope notes', () => {
         campusScope: [LEKKI.id],
         classScope: [ARM_ID],
       }),
-      classes: [{ id: ARM_ID, displayName: 'JSS 2 Gold' }],
+      classes: [classSummary({ id: ARM_ID, displayName: 'JSS 2 Gold' })],
     });
     expect(
       await screen.findByText(
@@ -539,7 +551,7 @@ describe('within a row', () => {
 
 describe('Start the school year', () => {
   const withStart = studentList([ada, ifeoma], {
-    startYear: { targetYearId: 'y2', name: '2027/2028' },
+    startYear: { targetYearId: YEAR_2027_ID, name: '2027/2028' },
   });
 
   it('shows Start {year} to a holder of enrollment:place while the action is offered', async () => {
@@ -550,7 +562,7 @@ describe('Start the school year', () => {
     expect(onSearchChange).toHaveBeenCalledWith({ dialog: 'start-year' });
   });
 
-  it('hides it when nothing is offered, without the permission and for a read-only acting super admin', async () => {
+  it('hides it when nothing is offered', async () => {
     setup();
     await screen.findByText('Ada Okeke', { exact: false });
     expect(
@@ -606,7 +618,7 @@ describe('Start the school year', () => {
 
 describe('Record leaving on the Inactive tab', () => {
   const due = studentRow({
-    id: 'st-due',
+    id: KUNLE_ID,
     firstName: 'Kunle',
     lastName: 'Ogun',
     admissionNumber: 'GF-0207',
@@ -616,7 +628,7 @@ describe('Record leaving on the Inactive tab', () => {
     weeksAway: 20,
   });
   const away = studentRow({
-    id: 'st-away',
+    id: UCHE_ID,
     firstName: 'Uche',
     lastName: 'Mba',
     admissionNumber: 'GF-0175',
@@ -638,7 +650,7 @@ describe('Record leaving on the Inactive tab', () => {
       screen.queryByRole('button', { name: 'Record leaving for Uche Mba' })
     ).not.toBeInTheDocument();
     fireEvent.click(button);
-    expect(onRecordLeaving).toHaveBeenCalledWith('st-due');
+    expect(onRecordLeaving).toHaveBeenCalledWith(KUNLE_ID);
     expect(onOpenStudent).not.toHaveBeenCalled();
   });
 
@@ -657,7 +669,7 @@ describe('Record leaving on the Inactive tab', () => {
 
 describe('StudentsPage balance columns', () => {
   const owing = studentRow({
-    id: 'st-owing',
+    id: BOLA_ID,
     firstName: 'Bola',
     lastName: 'Owing',
     balanceMinor: 500_000,
@@ -665,7 +677,7 @@ describe('StudentsPage balance columns', () => {
     paidThisTermMinor: 1_300_000,
   });
   const credit = studentRow({
-    id: 'st-credit',
+    id: CHIDI_ID,
     firstName: 'Chidi',
     lastName: 'Credit',
     balanceMinor: -200_000,
@@ -673,7 +685,7 @@ describe('StudentsPage balance columns', () => {
     paidThisTermMinor: null,
   });
   const clear = studentRow({
-    id: 'st-clear',
+    id: DARA_ID,
     firstName: 'Dara',
     lastName: 'Clear',
     balanceMinor: 0,
@@ -741,7 +753,7 @@ describe('StudentsPage balance columns', () => {
   );
 
   it('shows a dash for a row without a balance', async () => {
-    await openTab('active', [owing, studentRow({ id: 'st-bare' })]);
+    await openTab('active', [owing, studentRow({ id: BARE_ID })]);
     expect(screen.getAllByText('—').length).toBeGreaterThan(0);
     expect(screen.getAllByText('JSS 2 Gold', { selector: 'td' })).toHaveLength(
       2

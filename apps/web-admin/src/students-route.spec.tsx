@@ -13,6 +13,7 @@ import type { Me } from '@eduvault/api-contract';
 import { toast } from '@eduvault/ui';
 import { stubMatchMedia } from '@eduvault/ui/testing';
 import { ApiProvider, type Api } from './api';
+import { checked } from './test-api';
 import { NotFoundPage } from './components/page-fallbacks';
 import { routeTree } from './routeTree.gen';
 import { ownerAccess } from './test-utils';
@@ -91,7 +92,7 @@ function renderStudents() {
   vi.spyOn(router.history, 'push').mockImplementation(() => undefined);
   render(
     <QueryClientProvider client={queryClient}>
-      <ApiProvider api={api}>
+      <ApiProvider api={checked(api)}>
         <AuthClientProvider authClient={authClient}>
           <RouterProvider router={router} />
         </AuthClientProvider>

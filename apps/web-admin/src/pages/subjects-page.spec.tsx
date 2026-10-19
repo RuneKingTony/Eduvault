@@ -1,5 +1,5 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
-import type { Subject } from '@eduvault/api-contract';
+import type { SetElectiveTakersInput, Subject } from '@eduvault/api-contract';
 import { toast } from '@eduvault/ui';
 import {
   SUBJECT_IDS,
@@ -54,7 +54,7 @@ const apiFor = (overrides: Record<string, unknown> = {}) => ({
         id: SUBJECT_IDS.jss1,
         code: 'JSS1',
         name: 'JSS 1',
-        sequence: 0,
+        sequence: 1,
         nextLevelId: LEVEL_JSS2,
         isFinalYear: false,
       },
@@ -474,10 +474,15 @@ describe('SubjectsPage electives card', () => {
 
   it('filters the picker by name and by GF number and saves the ticked students', async () => {
     const api = apiFor();
-    api.electives.set.mockResolvedValue({
-      subjectId: SUBJECT_IDS.french,
-      studentIds: [SUBJECT_IDS.ada, SUBJECT_IDS.bola],
-    });
+    api.electives.set.mockImplementation(
+      ({
+        params,
+        body,
+      }: {
+        params: { subjectId: string };
+        body: SetElectiveTakersInput;
+      }) => ({ subjectId: params.subjectId, studentIds: body.studentIds })
+    );
     renderWithApi(page('by-level'), api);
     fireEvent.click(
       (await screen.findAllByRole('button', { name: 'Choose students' }))[0]!

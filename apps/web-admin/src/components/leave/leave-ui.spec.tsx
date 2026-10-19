@@ -1,5 +1,9 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
-import { ApiError, type LeaveDto } from '@eduvault/api-contract';
+import {
+  ApiError,
+  type CreateLeaveInput,
+  type LeaveDto,
+} from '@eduvault/api-contract';
 import { toPermissionMap } from '@eduvault/policy';
 import { toast } from '@eduvault/ui';
 import {
@@ -9,6 +13,7 @@ import {
   leaveDto,
   myLeave,
 } from '../../test-leave';
+import { testId } from '../../test-api';
 import { fakeAccess, ownerAccess, renderWithApi } from '../../test-utils';
 import { CancelLeaveDialog } from './cancel-leave-dialog';
 import { LeaveOnlyApprovalsPage } from './leave-only-approvals-page';
@@ -22,6 +27,19 @@ vi.mock('@eduvault/ui', async (importOriginal) => ({
 }));
 
 const TODAY = '2026-10-12';
+
+const LEAVE_IDS = Array.from({ length: 7 }, (_, index) =>
+  testId(0x2_10_01 + index)
+);
+const [
+  STARTED_TODAY,
+  STARTED_EARLIER,
+  WAITING,
+  DECLINED,
+  WITHDRAWN,
+  CANCELLED,
+  OWN,
+] = LEAVE_IDS as [string, string, string, string, string, string, string];
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -37,10 +55,28 @@ function cardApi(mine = myLeave()) {
   return {
     leave: {
       me: vi.fn().mockResolvedValue(mine),
-      withdraw: vi.fn().mockResolvedValue(leaveDto({ status: 'cancelled' })),
-      create: vi.fn().mockResolvedValue(leaveDto()),
+      withdraw: vi.fn(({ params }: { params: { id: string } }) =>
+        leaveDto({ id: params.id, status: 'cancelled' })
+      ),
+      create: vi.fn(({ body }: { body: CreateLeaveInput }) =>
+        leaveDto({
+          type: body.type,
+          startsOn: body.startsOn,
+          endsOn: body.endsOn ?? body.startsOn,
+          reason: body.reason,
+          cover: body.cover ?? null,
+        })
+      ),
       seen: vi.fn().mockResolvedValue({ seenAt: '2026-10-12T09:00:00.000Z' }),
-      cancel: vi.fn().mockResolvedValue(cancelledLeave()),
+      cancel: vi.fn(
+        ({
+          params,
+          body,
+        }: {
+          params: { id: string };
+          body: { reason: string };
+        }) => cancelledLeave({ id: params.id, cancellationReason: body.reason })
+      ),
     },
   };
 }
@@ -338,18 +374,22 @@ describe('MemberLeaveCard Cancel leave', () => {
 
   it('is left off started, waiting, declined, withdrawn, already cancelled and own leave', async () => {
     const items = [
-      ahead({ id: 'a', startsOn: TODAY, endsOn: TODAY }),
-      ahead({ id: 'b', startsOn: '2026-10-05', endsOn: '2026-10-05' }),
-      leaveDto({ id: 'c', isOwn: false, startsOn: '2026-10-22' }),
-      declinedLeave({ id: 'd', isOwn: false, startsOn: '2026-10-22' }),
+      ahead({ id: STARTED_TODAY, startsOn: TODAY, endsOn: TODAY }),
+      ahead({
+        id: STARTED_EARLIER,
+        startsOn: '2026-10-05',
+        endsOn: '2026-10-05',
+      }),
+      leaveDto({ id: WAITING, isOwn: false, startsOn: '2026-10-22' }),
+      declinedLeave({ id: DECLINED, isOwn: false, startsOn: '2026-10-22' }),
       leaveDto({
-        id: 'e',
+        id: WITHDRAWN,
         isOwn: false,
         status: 'cancelled',
         startsOn: '2026-10-22',
       }),
-      cancelledLeave({ id: 'f', isOwn: false, startsOn: '2026-10-22' }),
-      ahead({ id: 'g', isOwn: true }),
+      cancelledLeave({ id: CANCELLED, isOwn: false, startsOn: '2026-10-22' }),
+      ahead({ id: OWN, isOwn: true }),
     ];
     renderWithApi(<MemberLeaveCard userId="user-emeka" />, memberApi(items));
     expect(await screen.findAllByRole('listitem')).toHaveLength(items.length);
@@ -575,7 +615,17 @@ describe('RequestLeaveDialog', () => {
 
   it('sends the request and toasts the school days', async () => {
     const api = openDialog();
-    api.leave.create.mockResolvedValue(leaveDto({ days: 1 }));
+    api.leave.create.mockImplementation(
+      ({ body }: { body: CreateLeaveInput }) =>
+        leaveDto({
+          type: body.type,
+          startsOn: body.startsOn,
+          endsOn: body.startsOn,
+          reason: body.reason,
+          cover: body.cover ?? null,
+          days: 1,
+        })
+    );
     type('Type of leave', 'study');
     type('First day', '2026-10-22');
     type('Reason', '  Exam  ');

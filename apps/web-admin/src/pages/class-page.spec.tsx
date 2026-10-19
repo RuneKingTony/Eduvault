@@ -2,10 +2,13 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import {
   ApiError,
   type ClassDetail,
+  type GraduateClassInput,
   type MePermissions,
+  type UpdateClassInput,
 } from '@eduvault/api-contract';
 import { toast } from '@eduvault/ui';
 import { currentCalendar, noCalendar } from '../test-calendar';
+import { testId } from '../test-api';
 import { IDS, classDetail, teacher } from '../test-classes';
 import { actingAccess, renderWithApi, starterAccess } from '../test-utils';
 import { ClassPage } from './class-page';
@@ -17,6 +20,12 @@ vi.mock('@eduvault/ui', async (importOriginal) => ({
 
 type Access = MePermissions;
 
+const ADA_OBI = testId(0x2_10_01);
+const BOLA_ADE = testId(0x2_10_02);
+const ZAINAB_BELLO = testId(0x2_10_03);
+const ADA_ADAMS = testId(0x2_10_04);
+const TOBI_BELLO = testId(0x2_10_05);
+
 const GOLD = classDetail({
   displayName: 'JSS 2 Gold',
   name: 'Gold',
@@ -24,13 +33,13 @@ const GOLD = classDetail({
   classTeachers: [teacher('Ayo Bassey'), teacher('Claire Ade', 'assistant')],
   roster: [
     {
-      studentId: IDS.p1,
+      studentId: ADA_OBI,
       name: 'Ada Obi',
       admissionNumber: 'GF-0123',
       electives: ['French', 'Music'],
     },
     {
-      studentId: IDS.jss1,
+      studentId: BOLA_ADE,
       name: 'Bola Ade',
       admissionNumber: 'GF-0124',
       electives: [],
@@ -45,6 +54,13 @@ interface Options {
   calendar?: ReturnType<typeof currentCalendar> | 'pending';
 }
 
+const retiredAfter = (row: ClassDetail, body: UpdateClassInput) => {
+  if (body.archived === undefined) {
+    return row.retiredAt;
+  }
+  return body.archived ? '2026-07-24T09:00:00.000Z' : null;
+};
+
 function setup({
   access = starterAccess('administrator'),
   row = GOLD,
@@ -53,12 +69,18 @@ function setup({
 }: Options = {}) {
   const api = {
     classes: {
-      graduate: vi.fn().mockResolvedValue({ graduated: 2 }),
+      graduate: vi.fn(({ body }: { body: GraduateClassInput }) => ({
+        graduated: body.studentIds.length,
+      })),
       get:
         failure === undefined
           ? vi.fn().mockResolvedValue(row)
           : vi.fn().mockRejectedValue(failure),
-      update: vi.fn().mockResolvedValue(row),
+      update: vi.fn(({ body }: { body: UpdateClassInput }) => ({
+        ...row,
+        name: body.name ?? row.name,
+        retiredAt: retiredAfter(row, body),
+      })),
       removeTeacher: vi
         .fn()
         .mockResolvedValue({ classId: IDS.gold, userId: IDS.ayo }),
@@ -412,19 +434,19 @@ describe('ClassPage', () => {
       studentCount: 3,
       roster: [
         {
-          studentId: IDS.p1,
+          studentId: ZAINAB_BELLO,
           name: 'Zainab Bello',
           admissionNumber: 'GF-0131',
           electives: [],
         },
         {
-          studentId: IDS.jss1,
+          studentId: ADA_ADAMS,
           name: 'Ada Adams',
           admissionNumber: 'GF-0123',
           electives: [],
         },
         {
-          studentId: IDS.ss3,
+          studentId: TOBI_BELLO,
           name: 'Tobi Bello',
           admissionNumber: 'GF-0124',
           electives: [],
@@ -492,7 +514,7 @@ describe('ClassPage', () => {
       await waitFor(() => {
         expect(api.classes.graduate).toHaveBeenCalledWith({
           params: { id: IDS.gold },
-          body: { studentIds: [IDS.p1, IDS.jss1] },
+          body: { studentIds: [ZAINAB_BELLO, ADA_ADAMS] },
         });
       });
       await waitFor(() => {

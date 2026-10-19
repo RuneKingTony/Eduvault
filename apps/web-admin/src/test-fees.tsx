@@ -10,6 +10,7 @@ import {
 import { render } from '@testing-library/react';
 import type {
   Campus,
+  CreateFeeLineInput,
   FeeCopySource,
   FeeGrid,
   FeeGridCell,
@@ -40,7 +41,8 @@ export const JSS3 = uuid(0x2_03);
 export const FEE_LINE = uuid(0x4_01);
 export const FEE_LINE_LEKKI = uuid(0x4_02);
 export const FEE_LINE_RETIRED = uuid(0x4_03);
-const FEE_LINE_BUS = uuid(0x4_04);
+export const FEE_LINE_BUS = uuid(0x4_04);
+export const FEE_LINE_PTA = uuid(0x4_05);
 export const ADA = uuid(0x5_01);
 export const CHIDI = uuid(0x5_02);
 const NEW_FEE_TYPE = uuid(0x3_09);
@@ -206,8 +208,60 @@ const pickerApi = (campuses: Campus[]) => ({
   campuses: { list: vi.fn().mockResolvedValue(campuses) },
   feeOptions: {
     list: vi.fn().mockResolvedValue([]),
-    set: vi.fn().mockResolvedValue({ feeTypeId: BUS.id, optedIn: true }),
+    set: vi
+      .fn()
+      .mockImplementation(
+        ({
+          params,
+          body,
+        }: {
+          params: { feeTypeId: string };
+          body: { optedIn: boolean };
+        }) =>
+          Promise.resolve({
+            feeTypeId: params.feeTypeId,
+            optedIn: body.optedIn,
+          })
+      ),
   },
+});
+
+const feeLineWrites = () => ({
+  create: vi.fn().mockImplementation(({ body }: { body: CreateFeeLineInput }) =>
+    Promise.resolve(
+      feeLine({
+        termId: body.termId,
+        classLevelId: body.classLevelId,
+        feeTypeId: body.feeTypeId,
+        campusId: body.campusId,
+        name: body.name,
+        amountMinor: body.amountMinor,
+        appliesTo: body.appliesTo ?? 'all',
+        isOptional: body.isOptional ?? false,
+      })
+    )
+  ),
+  update: vi
+    .fn()
+    .mockImplementation(
+      ({
+        params,
+        body,
+      }: {
+        params: { id: string };
+        body: { amountMinor: number };
+      }) =>
+        Promise.resolve(
+          feeLine({ id: params.id, amountMinor: body.amountMinor })
+        )
+    ),
+  retire: vi
+    .fn()
+    .mockImplementation(({ params }: { params: { id: string } }) =>
+      Promise.resolve(
+        feeLine({ id: params.id, retiredAt: '2026-10-05T09:00:00.000Z' })
+      )
+    ),
 });
 
 export function feesApi(options: FeesApiOptions = {}) {
@@ -227,39 +281,15 @@ export function feesApi(options: FeesApiOptions = {}) {
         copied: 12,
         sourceTerm: copySource().sourceTerm,
       }),
-      create: vi
-        .fn()
-        .mockImplementation(
-          ({ body }: { body: { name: string; amountMinor: number } }) =>
-            Promise.resolve(
-              feeLine({ name: body.name, amountMinor: body.amountMinor })
-            )
-        ),
-      update: vi
-        .fn()
-        .mockImplementation(
-          ({
-            params,
-            body,
-          }: {
-            params: { id: string };
-            body: { amountMinor: number };
-          }) =>
-            Promise.resolve(
-              feeLine({ id: params.id, amountMinor: body.amountMinor })
-            )
-        ),
-      retire: vi
-        .fn()
-        .mockResolvedValue(feeLine({ retiredAt: '2026-10-05T09:00:00.000Z' })),
+      ...feeLineWrites(),
     },
     feeTypes: {
       list: vi.fn().mockResolvedValue(options.types ?? [TUITION, PTA, BUS]),
-      create: vi.fn().mockResolvedValue({
-        id: NEW_FEE_TYPE,
-        code: 4090,
-        name: 'Sports levy',
-      }),
+      create: vi
+        .fn()
+        .mockImplementation(({ body }: { body: { name: string } }) =>
+          Promise.resolve({ id: NEW_FEE_TYPE, code: 4090, name: body.name })
+        ),
     },
   };
 }

@@ -1,6 +1,11 @@
 import { fireEvent, screen } from '@testing-library/react';
 import { fakeAccess, renderWithApi, seedFeeSetup } from '../../test-utils';
-import { currentCalendar, currentYear, nextYear } from '../../test-calendar';
+import {
+  TERM_4,
+  currentCalendar,
+  currentYear,
+  nextYear,
+} from '../../test-calendar';
 import { findTerm } from './calendar-text';
 import { MakeCurrentDialog } from './make-current-dialog';
 
@@ -10,7 +15,7 @@ function setup(
 ) {
   const next = nextYear({ studentsWaiting });
   const makeCurrent = vi.fn().mockResolvedValue(next.terms[0]);
-  const target = findTerm([currentYear(), next], 't4');
+  const target = findTerm([currentYear(), next], TERM_4);
   if (target === undefined) {
     throw new Error('no target');
   }
@@ -93,7 +98,7 @@ describe('MakeCurrentDialog', () => {
       screen.getByRole('button', { name: 'Make current anyway' })
     );
     await vi.waitFor(() => {
-      expect(makeCurrent).toHaveBeenCalledWith({ params: { id: 't4' } });
+      expect(makeCurrent).toHaveBeenCalledWith({ params: { id: TERM_4 } });
       expect(onOpenChange).toHaveBeenCalledWith(false);
     });
   });

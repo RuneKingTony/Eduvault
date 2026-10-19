@@ -3,6 +3,7 @@ import { ApiError } from '@eduvault/api-contract';
 import { toast } from '@eduvault/ui';
 import {
   TERM_ONE,
+  RUN_TWO_ID,
   TERM_TWO,
   billingApi,
   billingTerm,
@@ -44,7 +45,7 @@ describe('BillingPage', () => {
         runs: [
           runSummary(),
           runSummary({
-            id: 'run-2',
+            id: RUN_TWO_ID,
             number: 'BR-2026-0002',
             termName: 'Second term, 2026/2027',
             scopeLabel: 'Campus: Lekki',

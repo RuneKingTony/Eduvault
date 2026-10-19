@@ -2,13 +2,19 @@ import { fireEvent, screen, within } from '@testing-library/react';
 import type { SchoolYear } from '@eduvault/api-contract';
 import { actingAccess, fakeAccess, renderWithApi } from '../test-utils';
 import {
+  HOLIDAY_2,
+  TERM_2,
   currentCalendar,
   currentYear,
   nextYear,
   schoolYear,
   term,
 } from '../test-calendar';
+import { testId } from '../test-api';
 import { CalendarPage } from './calendar-page';
+
+const OLD_YEAR = testId(0x2_00_01);
+const OLD_TERM = testId(0x2_00_02);
 
 const NEXT_YEAR_STARTS =
   'A school year that has already started cannot be deleted.';
@@ -30,7 +36,9 @@ function setup(
   }: SetupOptions = {}
 ) {
   const terms = {
-    makeCurrent: vi.fn().mockResolvedValue(term({ id: 't2' })),
+    makeCurrent: vi.fn(({ params }: { params: { id: string } }) =>
+      term({ id: params.id })
+    ),
     update: vi.fn(),
   };
   const api = {
@@ -265,7 +273,7 @@ describe('CalendarPage', () => {
       );
       await vi.waitFor(() => {
         expect(api.terms.makeCurrent).toHaveBeenCalledWith({
-          params: { id: 't2' },
+          params: { id: TERM_2 },
         });
       });
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
@@ -314,10 +322,12 @@ describe('CalendarPage', () => {
 
   it('opens the Holidays dialog from the count and removes a holiday', async () => {
     const { api } = setup();
-    api.holidays.remove.mockResolvedValue({
-      id: 'h2',
-      term: term({ schoolDays: 68 }),
-    });
+    api.holidays.remove.mockImplementation(
+      ({ params }: { params: { id: string } }) => ({
+        id: params.id,
+        term: term({ schoolDays: 68 }),
+      })
+    );
     const now = await cardOf('2026/2027');
     fireEvent.click(now.getByRole('button', { name: '3 days' }));
     const dialog = await screen.findByRole('dialog');
@@ -334,7 +344,7 @@ describe('CalendarPage', () => {
     );
     await vi.waitFor(() => {
       expect(api.holidays.remove).toHaveBeenCalledWith({
-        params: { id: 'h2' },
+        params: { id: HOLIDAY_2 },
       });
     });
   });
@@ -344,7 +354,9 @@ describe('CalendarPage', () => {
     const now = await cardOf('2026/2027');
     fireEvent.click(now.getByRole('button', { name: 'Add holiday' }));
     const dialog = await screen.findByRole('dialog');
-    expect(within(dialog).getByLabelText('Term')).toHaveValue('t1');
+    expect(within(dialog).getByLabelText('Term')).toHaveDisplayValue(
+      '2026/2027 · First term'
+    );
     expect(
       within(dialog)
         .getAllByRole('option')
@@ -405,7 +417,7 @@ describe('CalendarPage', () => {
     expect(onPageChange).toHaveBeenCalledWith(3);
   });
 
-  it('shows a skeleton while loading and the error when the list fails', async () => {
+  it('shows a skeleton while loading, then asks for the first page', async () => {
     const { api } = setup();
     expect(screen.getByRole('status', { name: 'Loading' })).toBeInTheDocument();
     await cardOf('2026/2027');
@@ -435,12 +447,12 @@ describe('CalendarPage', () => {
 
   it('collapses a year that is neither current nor next', async () => {
     const old = schoolYear({
-      id: 'y0',
+      id: OLD_YEAR,
       name: '2024/2025',
       startsOn: '2024-09-02',
       endsOn: '2025-07-25',
       deletable: { ok: false, reason: NEXT_YEAR_STARTS },
-      terms: [term({ id: 'o1', schoolYearId: 'y0', ended: true })],
+      terms: [term({ id: OLD_TERM, schoolYearId: OLD_YEAR, ended: true })],
     });
     setup(undefined, { items: [currentYear(), old] });
     await cardOf('2026/2027');

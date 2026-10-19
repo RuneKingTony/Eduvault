@@ -1,6 +1,8 @@
 import { screen } from '@testing-library/react';
 import { ApiError } from '@eduvault/api-contract';
 import {
+  NOTICE_ID,
+  SECOND_NOTICE_ID,
   announcementSummary,
   dashboardApi,
   renderInRouter,
@@ -12,9 +14,9 @@ describe('AnnouncementsCard', () => {
   it('asks for four items and lists each with its date and tag', async () => {
     const api = dashboardApi({
       announcements: [
-        announcementSummary({ id: 'n1', title: 'PTA meeting' }),
+        announcementSummary({ id: NOTICE_ID, title: 'PTA meeting' }),
         announcementSummary({
-          id: 'n2',
+          id: SECOND_NOTICE_ID,
           title: 'Fees due',
           tag: 'fees',
           publishedOn: '2026-10-01',

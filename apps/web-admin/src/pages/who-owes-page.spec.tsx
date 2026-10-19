@@ -1,4 +1,5 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { testId } from '../test-api';
 import { starterAccess } from '../test-utils';
 import {
   ADA,
@@ -9,6 +10,10 @@ import {
   renderPayments,
 } from '../test-payments';
 import { WhoOwesPage } from './who-owes-page';
+
+const BAYO = testId(0x2_00_01);
+const DAVID = testId(0x2_00_02);
+const TOBI_ADE = testId(0x2_00_03);
 
 function setup(
   options: {
@@ -42,7 +47,7 @@ describe('WhoOwesPage', () => {
     setup();
 
     expect(await screen.findByText('Total owed')).toBeVisible();
-    expect(screen.getAllByText('₦180,000').length).toBeGreaterThan(0);
+    expect(screen.getByText('₦315,000')).toBeVisible();
     expect(screen.getByText('Lekki campus')).toBeVisible();
     expect(screen.getByText('Students owing')).toBeVisible();
     expect(screen.getByText('out of 12 students')).toBeVisible();
@@ -138,14 +143,14 @@ describe('WhoOwesPage', () => {
           lifecycle: 'left',
           admissionNumber: 'GF-0002',
           name: 'Bayo Lawal',
-          studentId: 'b',
+          studentId: BAYO,
         }),
         balanceRow({
           balanceMinor: -500_000,
           name: 'David Eze',
-          studentId: 'd',
+          studentId: DAVID,
         }),
-        balanceRow({ balanceMinor: 0, name: 'Tobi Ade', studentId: 't' }),
+        balanceRow({ balanceMinor: 0, name: 'Tobi Ade', studentId: TOBI_ADE }),
       ]),
     });
     expect(await screen.findByText('GF-0002 · left')).toBeVisible();
@@ -168,7 +173,7 @@ describe('WhoOwesPage', () => {
       access: starterAccess('bursar'),
       list: balanceList([
         balanceRow(),
-        balanceRow({ studentId: 't', name: 'Tobi Ade', balanceMinor: 0 }),
+        balanceRow({ studentId: TOBI_ADE, name: 'Tobi Ade', balanceMinor: 0 }),
       ]),
     });
     expect(

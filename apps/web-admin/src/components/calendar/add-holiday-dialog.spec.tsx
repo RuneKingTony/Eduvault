@@ -1,7 +1,15 @@
 import { fireEvent, screen } from '@testing-library/react';
 import { ApiError } from '@eduvault/api-contract';
 import { toast } from '@eduvault/ui';
-import { currentYear, nextYear, term } from '../../test-calendar';
+import {
+  HOLIDAY_1,
+  TERM_1,
+  TERM_4,
+  currentYear,
+  nextYear,
+  noCalendar,
+  term,
+} from '../../test-calendar';
 import { renderWithApi } from '../../test-utils';
 import {
   AddHolidayDialog,
@@ -12,7 +20,7 @@ import {
 function setup(
   create: ReturnType<typeof vi.fn>,
   years = [currentYear(), nextYear()],
-  termId: string | null = 't1'
+  termId: string | null = TERM_1
 ) {
   const onOpenChange = vi.fn();
   renderWithApi(
@@ -24,7 +32,7 @@ function setup(
     {
       holidays: { create },
       schoolYears: { list: vi.fn().mockResolvedValue({ items: [], total: 0 }) },
-      calendar: { current: vi.fn() },
+      calendar: { current: vi.fn().mockResolvedValue(noCalendar()) },
     }
   );
   return onOpenChange;
@@ -58,20 +66,22 @@ describe('AddHolidayDialog', () => {
   });
 
   it('defaults the date to a week after today, or after a later term start', () => {
-    setup(vi.fn(), [currentYear(), nextYear()], 't1');
+    setup(vi.fn(), [currentYear(), nextYear()], TERM_1);
     expect(screen.getByLabelText('Date')).toHaveValue('2026-10-14');
     fireEvent.change(screen.getByLabelText('Term'), {
-      target: { value: 't4' },
+      target: { value: TERM_4 },
     });
     expect(screen.getByLabelText('Date')).toHaveValue('2027-09-13');
   });
 
   it('adds the holiday, toasts the new count and closes', async () => {
     const success = vi.spyOn(toast, 'success').mockReturnValue(1);
-    const create = vi.fn().mockResolvedValue({
-      holiday: {},
-      term: { schoolDays: 66 },
-    });
+    const create = vi.fn(
+      ({ body }: { body: { date: string; name: string } }) => ({
+        holiday: { id: HOLIDAY_1, termId: TERM_1, ...body },
+        term: term({ schoolDays: 66 }),
+      })
+    );
     const onOpenChange = setup(create);
     fireEvent.change(screen.getByLabelText('Name'), {
       target: { value: 'Sports day' },
@@ -79,7 +89,7 @@ describe('AddHolidayDialog', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add holiday' }));
     await vi.waitFor(() => {
       expect(create).toHaveBeenCalledWith({
-        params: { id: 't1' },
+        params: { id: TERM_1 },
         body: { date: '2026-10-14', name: 'Sports day' },
       });
       expect(onOpenChange).toHaveBeenCalledWith(false);

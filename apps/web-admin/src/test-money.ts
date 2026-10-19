@@ -5,18 +5,24 @@ import type {
   MoneyAccount,
   MoneyAccountList,
 } from '@eduvault/api-contract';
+import { testId } from './test-api';
+
+export const GTBANK_ID = testId(0x1_40_01);
+export const GTBANK_LEDGER_ID = testId(0x1_40_11);
+export const FEE_INCOME_ID = testId(0xe1);
+export const OPENING_ENTRY_ID = testId(0x1_40_31);
 
 export const moneyAccount = (
   overrides: Partial<MoneyAccount> = {}
 ): MoneyAccount => ({
-  id: '00000000-0000-4000-8000-0000000000c1',
+  id: GTBANK_ID,
   name: 'GTBank current',
   kind: 'bank',
   campusId: null,
   campusName: null,
   bankName: 'GTBank',
   last4: '4417',
-  ledgerAccountId: '00000000-0000-4000-8000-0000000000d1',
+  ledgerAccountId: GTBANK_LEDGER_ID,
   ledgerCode: 1210,
   balanceMinor: 9_500_000,
   retiredAt: null,
@@ -47,7 +53,7 @@ export const cashBook = (
 export const ledgerAccount = (
   overrides: Partial<LedgerAccount> = {}
 ): LedgerAccount => ({
-  id: '00000000-0000-4000-8000-0000000000e1',
+  id: FEE_INCOME_ID,
   code: 4000,
   name: 'Fee income',
   type: 'income',
@@ -60,7 +66,7 @@ export const ledgerAccount = (
 export const journalEntry = (
   overrides: Partial<JournalEntry> = {}
 ): JournalEntry => ({
-  entryId: '00000000-0000-4000-8000-0000000000f1',
+  entryId: OPENING_ENTRY_ID,
   effectiveOn: '2026-09-01',
   reference: 'OPEN-1',
   kind: 'opening',

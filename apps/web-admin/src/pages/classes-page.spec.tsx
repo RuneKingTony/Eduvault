@@ -6,6 +6,7 @@ import type {
 } from '@eduvault/api-contract';
 import { toPermissionMap } from '@eduvault/policy';
 import { currentCalendar, noCalendar } from '../test-calendar';
+import { testId } from '../test-api';
 import { IDS, classSummary, teacher } from '../test-classes';
 import {
   actingAccess,
@@ -20,6 +21,9 @@ vi.mock('../components/no-current-term-callout', () => ({
 }));
 
 type Access = MePermissions;
+
+const SS3_GOLD = testId(0x2_20_01);
+const RUBY_ID = testId(0x2_20_02);
 
 const ACTIVE = [
   classSummary({
@@ -36,7 +40,7 @@ const ACTIVE = [
     classTeachers: [teacher('Ayo Bassey'), teacher('Claire Ade', 'assistant')],
   }),
   classSummary({
-    id: '00000000-0000-4000-8000-000000000040',
+    id: SS3_GOLD,
     displayName: 'SS 3 Gold',
     name: 'Gold',
     level: { id: IDS.ss3, code: 'SS3', name: 'SS 3' },
@@ -45,7 +49,7 @@ const ACTIVE = [
 ];
 
 const RUBY = classSummary({
-  id: '00000000-0000-4000-8000-000000000041',
+  id: RUBY_ID,
   displayName: 'JSS 1 Ruby',
   name: 'Ruby',
   retiredAt: '2026-07-24T09:00:00.000Z',

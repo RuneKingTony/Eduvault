@@ -1,14 +1,25 @@
 import type {
   Campus,
+  Me,
   MemberDetail,
   MemberSummary,
   SchoolRole,
 } from '@eduvault/api-contract';
 import { toPermissionMap } from '@eduvault/policy';
+import { testId } from './test-api';
+
+export const SCHOOL_ID = testId(0xd0_01);
+export const LEKKI_ID = testId(0xd0_02);
+export const IKEJA_ID = testId(0xd0_03);
+export const ADA_ID = testId(0xd0_10);
+export const FUNMI_ID = testId(0xd0_11);
+export const TUNDE_ID = testId(0xd0_12);
+export const KEMI_ID = testId(0xd0_13);
+export const EMEKA_ID = testId(0xd0_14);
 
 export const LEKKI: Campus = {
-  id: '7d0f1e1e-6e53-4c52-9f1c-0a1d7a7f9c33',
-  organizationId: '9c0f1e1e-6e53-4c52-9f1c-0a1d7a7f9c22',
+  id: LEKKI_ID,
+  organizationId: SCHOOL_ID,
   name: 'Lekki',
   address: '1 Admiralty Way',
   createdAt: '2026-01-01T00:00:00.000Z',
@@ -16,7 +27,7 @@ export const LEKKI: Campus = {
 
 export const IKEJA: Campus = {
   ...LEKKI,
-  id: '8e0f1e1e-6e53-4c52-9f1c-0a1d7a7f9c44',
+  id: IKEJA_ID,
   name: 'Ikeja',
   address: null,
 };
@@ -51,7 +62,7 @@ export const CATALOGUE: SchoolRole[] = [
 export const summary = (
   overrides: Partial<MemberSummary> = {}
 ): MemberSummary => ({
-  id: '5b0f1e1e-6e53-4c52-9f1c-0a1d7a7f9c11',
+  id: ADA_ID,
   userId: 'user-1',
   name: 'Ada Obi',
   email: 'ada@example.test',
@@ -72,5 +83,16 @@ export const detail = (
   classScope: 'all',
   classes: [],
   lastOwner: false,
+  ...overrides,
+});
+
+export const signedIn = (overrides: Partial<Me> = {}): Me => ({
+  user: { id: 'user-1', email: 'ada@example.test', name: 'Ada Obi' },
+  activeOrganizationId: SCHOOL_ID,
+  activeCampusId: null,
+  mustChangePassword: false,
+  platformRole: null,
+  schoolCount: 1,
+  suspendedSchool: null,
   ...overrides,
 });

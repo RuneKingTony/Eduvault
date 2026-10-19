@@ -197,7 +197,7 @@ describe('BillingRunPage', () => {
     ).toBeVisible();
     expect(
       screen.getByText('Charges', { selector: 'div,h3,[data-slot]' })
-    ).toBeDefined();
+    ).toBeVisible();
     expect(screen.getByText('CHG-2026-00001')).toBeVisible();
     expect(
       screen.queryByRole('button', { name: 'Send charges' })

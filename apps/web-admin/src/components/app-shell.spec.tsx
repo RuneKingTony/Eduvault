@@ -34,6 +34,7 @@ import {
 import { stubMatchMedia } from '@eduvault/ui/testing';
 import { requireGate } from '../access';
 import { ApiProvider, type Api } from '../api';
+import { checked } from '../test-api';
 import { DashboardPage } from '../pages/dashboard-page';
 import { mePermissionsQueryOptions } from '../queries';
 import { createQueryClient } from '../query-client';
@@ -41,6 +42,7 @@ import { approvalSummary } from '../test-approvals';
 import { currentCalendar, noCalendar } from '../test-calendar';
 import { fakeAccess, ownerAccess, starterAccess } from '../test-utils';
 import { profile } from '../test-school';
+import { preview } from '../test-students';
 import { AppShell } from './app-shell';
 import { NotFoundPage } from './page-fallbacks';
 
@@ -104,7 +106,7 @@ async function renderAt(
     schoolAccount: { get: vi.fn().mockResolvedValue(profile({ logoUrl })) },
     calendar: { current: vi.fn().mockResolvedValue(calendar) },
     admissions: {
-      preview: vi.fn().mockResolvedValue({ maxGuardians: 4, requireGuardian }),
+      preview: vi.fn().mockResolvedValue(preview({ requireGuardian })),
     },
     approvals: { summary: vi.fn().mockResolvedValue(summary) },
   } as unknown as Api;
@@ -155,7 +157,7 @@ async function renderAt(
   });
   render(
     <QueryClientProvider client={queryClient}>
-      <ApiProvider api={api}>
+      <ApiProvider api={checked(api)}>
         <AuthClientProvider authClient={authClient}>
           <RouterProvider router={router} />
         </AuthClientProvider>

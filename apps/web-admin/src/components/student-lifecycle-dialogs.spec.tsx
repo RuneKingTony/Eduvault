@@ -5,7 +5,7 @@ import { toast } from '@eduvault/ui';
 import { currentCalendar } from '../test-calendar';
 import { IDS } from '../test-classes';
 import { fakeAccess, renderWithApi } from '../test-utils';
-import { ARM_ID, studentDetail } from '../test-students';
+import { ARM_ID, TERM_SECOND_ID, studentDetail } from '../test-students';
 import {
   LeaveDialog,
   MarkAwayDialog,
@@ -291,7 +291,7 @@ const campusAccess = (campusScope: 'all' | string[]): MePermissions =>
 
 describe('MoveDialog', () => {
   const movable = studentDetail({
-    nextTerm: { id: 't2', name: 'Second term' },
+    nextTerm: { id: TERM_SECOND_ID, name: 'Second term' },
     canMoveForNextTerm: true,
   });
 
@@ -354,7 +354,7 @@ describe('MoveDialog', () => {
     await waitFor(() => {
       expect(mocks.students.place).toHaveBeenCalledWith({
         params: { id: student.id },
-        body: { termId: 't2', classArmId: IDS.silver },
+        body: { termId: TERM_SECOND_ID, classArmId: IDS.silver },
       });
     });
     await waitFor(() => {

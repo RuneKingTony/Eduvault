@@ -3,11 +3,12 @@ import type {
   LeaveDto,
   MyLeave,
 } from '@eduvault/api-contract';
+import { testId } from './test-api';
 
-const id = (n: number) =>
-  `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
-
-const LEAVE_ID = id(901);
+export const LEAVE_ID = testId(0xf0_01);
+export const APPROVED_LEAVE_ID = testId(0xf0_02);
+export const DECLINED_LEAVE_ID = testId(0xf0_03);
+export const CANCELLED_LEAVE_ID = testId(0xf0_04);
 
 export const leaveDto = (over: Partial<LeaveDto> = {}): LeaveDto => ({
   id: LEAVE_ID,
@@ -41,7 +42,7 @@ export const approvedLeave = (
   over: DecidedOverrides = {}
 ): DecidedLeaveDto => ({
   ...leaveDto({
-    id: id(902),
+    id: APPROVED_LEAVE_ID,
     approvedBy: 'user-funmi',
     approvedAt: '2026-10-11T09:00:00.000Z',
     deciderName: 'Funmi Adeyemi',
@@ -54,7 +55,7 @@ export const declinedLeave = (
   over: DecidedOverrides = {}
 ): DecidedLeaveDto => ({
   ...leaveDto({
-    id: id(903),
+    id: DECLINED_LEAVE_ID,
     rejectedBy: 'user-funmi',
     rejectedAt: '2026-10-11T09:00:00.000Z',
     deciderName: 'Funmi Adeyemi',
@@ -68,7 +69,7 @@ export const cancelledLeave = (
   over: DecidedOverrides = {}
 ): DecidedLeaveDto => ({
   ...approvedLeave({
-    id: id(904),
+    id: CANCELLED_LEAVE_ID,
     cancelledBy: 'user-funmi',
     cancelledAt: '2026-10-12T09:00:00.000Z',
     cancellerName: 'Funmi Adeyemi',
