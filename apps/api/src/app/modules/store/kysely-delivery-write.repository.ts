@@ -4,6 +4,7 @@ import {
   OPENING_BALANCE_SYSTEM_KEY,
   STORE_STOCK_SYSTEM_KEY,
 } from '@eduvault/api-contract';
+import { SYSTEM_REFERENCE_PREFIXES } from '@eduvault/shared';
 import type { DB } from '../../../db/db-types';
 import type { ActivityWriter } from '../../common/activity';
 import { advisoryLock } from '../../common/db/advisory-lock';
@@ -69,7 +70,7 @@ export async function hasOpeningStock(
 
 async function numberFor(trx: Kysely<DB>, input: NewDelivery): Promise<string> {
   if (input.isOpening) {
-    return `OPEN-STORE-${input.store.campusId}`;
+    return `${SYSTEM_REFERENCE_PREFIXES.opening}-STORE-${input.store.campusId}`;
   }
   const value = await allocateDocumentNumber(trx, {
     organizationId: input.organizationId,
@@ -116,7 +117,7 @@ async function postEntry(
           supplierName: input.supplierName,
           moneyLedgerAccountId: input.moneyAccount.ledgerAccountId,
         });
-  const { entry } = await poster.post(trx, posting);
+  const entry = await poster.postOnce(trx, posting);
   return entry.id;
 }
 

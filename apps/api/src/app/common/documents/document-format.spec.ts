@@ -1,3 +1,4 @@
+import { isReservedReference } from '@eduvault/shared';
 import { documentYear, formatDocumentNumber } from './document-format';
 
 describe('formatDocumentNumber', () => {
@@ -14,6 +15,18 @@ describe('formatDocumentNumber', () => {
     expect(formatDocumentNumber('stock_count', 2027, 345)).toBe(
       'CNT-2027-0345'
     );
+  });
+
+  it.each([
+    'invoice',
+    'payment',
+    'billing_run',
+    'adjustment',
+    'store_sale',
+    'delivery',
+    'stock_count',
+  ] as const)('issues %s numbers a client reference cannot use', (kind) => {
+    expect(isReservedReference(formatDocumentNumber(kind, 2026, 1))).toBe(true);
   });
 
   it('widens past the padding instead of truncating', () => {
