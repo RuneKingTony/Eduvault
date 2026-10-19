@@ -17,6 +17,9 @@ describe('averageCost', () => {
     expect(averageCost(7, 3)).toBe(2);
     expect(averageCost(8, 3)).toBe(3);
     expect(averageCost(1, 3)).toBe(0);
+    expect(averageCost(1, 2)).toBe(1);
+    expect(averageCost(3, 2)).toBe(2);
+    expect(averageCost(0, 5)).toBe(0);
   });
 
   it('is 0 when nothing is on hand', () => {
