@@ -1,4 +1,4 @@
-import { fireEvent, screen, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import type { Permission } from '@eduvault/policy';
 import {
   ADA_ID,
@@ -36,6 +36,8 @@ describe('ChildrenPage', () => {
     renderWithApi(
       <ChildrenPage
         me={portalMe()}
+        term={undefined}
+        onTerm={vi.fn()}
         onOpenChild={vi.fn()}
         onSeeFees={vi.fn()}
       />,
@@ -53,6 +55,8 @@ describe('ChildrenPage', () => {
     renderWithApi(
       <ChildrenPage
         me={portalMe()}
+        term={undefined}
+        onTerm={vi.fn()}
         onOpenChild={vi.fn()}
         onSeeFees={vi.fn()}
       />,
@@ -67,6 +71,8 @@ describe('ChildrenPage', () => {
     renderWithApi(
       <ChildrenPage
         me={portalMe()}
+        term={undefined}
+        onTerm={vi.fn()}
         onOpenChild={vi.fn()}
         onSeeFees={vi.fn()}
       />,
@@ -92,6 +98,8 @@ describe('ChildrenPage', () => {
     renderWithApi(
       <ChildrenPage
         me={portalMe()}
+        term={undefined}
+        onTerm={vi.fn()}
         onOpenChild={onOpenChild}
         onSeeFees={vi.fn()}
       />,
@@ -105,6 +113,8 @@ describe('ChildrenPage', () => {
     renderWithApi(
       <ChildrenPage
         me={portalMe()}
+        term={undefined}
+        onTerm={vi.fn()}
         onOpenChild={vi.fn()}
         onSeeFees={vi.fn()}
       />,
@@ -123,6 +133,8 @@ describe('ChildrenPage', () => {
     renderWithApi(
       <ChildrenPage
         me={portalMe()}
+        term={undefined}
+        onTerm={vi.fn()}
         onOpenChild={vi.fn()}
         onSeeFees={vi.fn()}
       />,
@@ -139,6 +151,8 @@ describe('ChildrenPage', () => {
     renderWithApi(
       <ChildrenPage
         me={portalMe()}
+        term={undefined}
+        onTerm={vi.fn()}
         onOpenChild={vi.fn()}
         onSeeFees={vi.fn()}
       />,
@@ -202,26 +216,61 @@ const familyOf = (
     })),
   });
 
+const TERM_1 = '00000000-0000-4000-8000-0000000c0001';
+const TERM_2 = '00000000-0000-4000-8000-0000000c0002';
+const TERM_OPTIONS = [
+  { id: TERM_2, label: 'Second term, 2026/2027' },
+  { id: TERM_1, label: 'First term, 2026/2027' },
+];
+const FIRST_TERM = {
+  id: TERM_1,
+  label: 'First term, 2026/2027',
+  fromOn: '2026-09-07',
+  toOn: null,
+};
+
 const feesApi = (
   children: ReturnType<typeof portalChild>[],
   totals?: FamilyTotals
 ) => ({
   portal: {
     children: vi.fn().mockResolvedValue(children),
-    familyStatement: vi.fn().mockResolvedValue(familyOf(children, totals)),
-    statement: vi.fn(({ params }: { params: { studentId: string } }) => {
-      const child = children.find((item) => item.id === params.studentId);
-      const base = portalStatement();
-      return Promise.resolve({
-        ...base,
-        student: {
-          ...base.student,
-          id: params.studentId,
-          name: `${child?.firstName} Okeke`,
-          archived: child?.archived ?? false,
-        },
-      });
-    }),
+    familyStatement: vi.fn(({ query }: { query: { termId?: string } }) =>
+      Promise.resolve({
+        ...familyOf(children, totals),
+        termOptions: TERM_OPTIONS,
+        term: query.termId === TERM_1 ? FIRST_TERM : null,
+      })
+    ),
+    statement: vi.fn(
+      ({
+        params,
+        query,
+      }: {
+        params: { studentId: string };
+        query: { termId?: string };
+      }) => {
+        const child = children.find((item) => item.id === params.studentId);
+        const base = portalStatement();
+        return Promise.resolve({
+          ...base,
+          student: {
+            ...base.student,
+            id: params.studentId,
+            name: `${child?.firstName} Okeke`,
+            archived: child?.archived ?? false,
+          },
+          ...(query.termId === TERM_1
+            ? {
+                term: FIRST_TERM,
+                broughtForward: { amountMinor: 1_500_000 },
+                closingMinor: 6_000_000,
+                termOptions: TERM_OPTIONS,
+              }
+            : {}),
+        });
+      }
+    ),
   },
 });
 
@@ -231,17 +280,24 @@ const renderFees = (
     onSeeFees?: (id: string) => void;
     held?: Permission[];
     totals?: FamilyTotals;
+    term?: string;
+    onTerm?: (term: string | undefined) => void;
   } = {}
-) =>
+) => {
+  const api = feesApi(children, props.totals);
   renderWithApi(
     <ChildrenPage
       me={portalMe()}
+      term={props.term}
+      onTerm={props.onTerm ?? vi.fn()}
       onOpenChild={vi.fn()}
       onSeeFees={props.onSeeFees ?? vi.fn()}
     />,
-    feesApi(children, props.totals),
+    api,
     props.held ?? WITH_FEES
   );
+  return api;
+};
 
 const cardOf = (name: string) => {
   const card = screen.getAllByRole('listitem').find(
@@ -281,6 +337,8 @@ describe('ChildrenPage fees', () => {
     renderWithApi(
       <ChildrenPage
         me={portalMe()}
+        term={undefined}
+        onTerm={vi.fn()}
         onOpenChild={vi.fn()}
         onSeeFees={vi.fn()}
       />,
@@ -357,6 +415,8 @@ describe('ChildrenPage fees', () => {
     renderWithApi(
       <ChildrenPage
         me={portalMe()}
+        term={undefined}
+        onTerm={vi.fn()}
         onOpenChild={vi.fn()}
         onSeeFees={vi.fn()}
       />,
@@ -376,5 +436,107 @@ describe('ChildrenPage fees', () => {
     ).not.toBeInTheDocument();
     expect(api.portal.familyStatement).not.toHaveBeenCalled();
     expect(api.portal.statement).not.toHaveBeenCalled();
+  });
+});
+
+describe('ChildrenPage term filter', () => {
+  it('offers Whole history and the response’s terms, with the whole history picked', async () => {
+    renderFees([adaOwes, tobiCredit]);
+
+    const select = await screen.findByRole('combobox', { name: 'Term' });
+
+    expect(
+      within(select)
+        .getAllByRole('option')
+        .map((option) => option.textContent)
+    ).toEqual([
+      'Whole history',
+      'Second term, 2026/2027',
+      'First term, 2026/2027',
+    ]);
+    expect(select).toHaveValue('');
+    expect(screen.queryByText('Brought forward')).not.toBeInTheDocument();
+  });
+
+  it('asks for the family statement and each child’s statement with the term', async () => {
+    const api = renderFees([adaOwes, tobiCredit], { term: TERM_1 });
+
+    expect(await screen.findByRole('combobox', { name: 'Term' })).toHaveValue(
+      TERM_1
+    );
+    expect(api.portal.familyStatement).toHaveBeenCalledWith({
+      query: { termId: TERM_1 },
+    });
+    for (const studentId of [ADA_ID, TOBI_ID]) {
+      expect(api.portal.statement).toHaveBeenCalledWith({
+        params: { studentId },
+        query: { termId: TERM_1 },
+      });
+    }
+  });
+
+  it('sends no term for the whole history', async () => {
+    const api = renderFees([adaOwes, tobiCredit]);
+
+    await screen.findByRole('combobox', { name: 'Term' });
+
+    expect(api.portal.familyStatement).toHaveBeenCalledWith({ query: {} });
+    expect(api.portal.statement).toHaveBeenCalledWith({
+      params: { studentId: ADA_ID },
+      query: {},
+    });
+  });
+
+  it('shows Brought forward first on each child’s card under a term', async () => {
+    renderFees([adaOwes, tobiCredit], { term: TERM_1 });
+
+    await waitFor(() => {
+      expect(
+        screen.getAllByRole('row', { name: /Brought forward/ })
+      ).toHaveLength(2);
+    });
+    for (const table of screen.getAllByRole('table')) {
+      expect(within(table).getAllByRole('row')[1]).toHaveAccessibleName(
+        /Brought forward/
+      );
+    }
+  });
+
+  it('keeps Total owed, the tiles and the card balances whole-account under a term', async () => {
+    renderFees([adaOwes, tobiCredit, efeLeft], { term: TERM_1 });
+
+    await screen.findAllByRole('row', { name: /Brought forward/ });
+
+    expect(
+      screen.getByText('₦100,000', { selector: 'strong' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Owed across all children · ₦20,000 extra paid kept separately'
+      )
+    ).toBeInTheDocument();
+    expect(cardOf('Ada').getByText('₦60,000 owed')).toBeInTheDocument();
+  });
+
+  it('reports the picked term and the whole history', async () => {
+    const onTerm = vi.fn();
+    renderFees([adaOwes, tobiCredit], { onTerm, term: TERM_1 });
+
+    const select = await screen.findByRole('combobox', { name: 'Term' });
+    fireEvent.change(select, { target: { value: TERM_2 } });
+    fireEvent.change(select, { target: { value: '' } });
+
+    expect(onTerm).toHaveBeenNthCalledWith(1, TERM_2);
+    expect(onTerm).toHaveBeenNthCalledWith(2, undefined);
+  });
+
+  it('has no Term select without invoice:readOwn', async () => {
+    renderFees([adaOwes], { held: ['student:readOwn'] });
+
+    await screen.findByText('1 child at Greenfield College.');
+
+    expect(
+      screen.queryByRole('combobox', { name: 'Term' })
+    ).not.toBeInTheDocument();
   });
 });

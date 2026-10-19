@@ -18,3 +18,4 @@ export * from './payment-reference';
 export * from './payment-split';
 export * from './payment-proof';
 export * from './statement-copy';
+export * from './term-pick';

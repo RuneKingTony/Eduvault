@@ -245,6 +245,8 @@ export const portalFamilyStatement = (
       balanceMinor: 6_000_000,
     },
   ],
+  term: null,
+  termOptions: [],
   ...overrides,
 });
 

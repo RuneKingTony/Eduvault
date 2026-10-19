@@ -7,6 +7,7 @@ import {
   type BalanceList,
   type BalanceListQuery,
   type DashboardFinance,
+  type FamilyStatementQuery,
   type GuardianStatement,
   type StatementQuery,
   type StudentStatement,
@@ -43,6 +44,8 @@ interface StudentHistory {
   today: string;
 }
 
+export type FamilyTermFields = Pick<GuardianStatement, 'term' | 'termOptions'>;
+
 type TermFields = Pick<
   OwnStatement,
   'term' | 'broughtForward' | 'closingMinor'
@@ -57,6 +60,18 @@ function windowOf(
     throw new NotFoundException(TERM_NOT_FOUND_MESSAGE);
   }
   return found;
+}
+
+function familyTermOf(
+  terms: readonly TermStart[],
+  termId: string | undefined,
+  today: string
+): FamilyTermFields {
+  const windows = termWindowsOf(terms);
+  return {
+    term: windowOf(windows, termId) ?? null,
+    termOptions: termOptionsOf(windows, today),
+  };
 }
 
 function shownIn(
@@ -216,13 +231,21 @@ export class StudentAccountService {
     studentId: string,
     query: StatementQuery
   ): Promise<StudentStatement> {
+    return this.statementOf(ctx, studentId, { query });
+  }
+
+  private async statementOf(
+    ctx: OrgContext,
+    studentId: string,
+    { query, terms }: { query: StatementQuery; terms?: readonly TermStart[] }
+  ): Promise<StudentStatement> {
     const scope = this.scopeOf(ctx);
     const header = await this.accounts.studentHeader(scope, studentId);
     if (header === undefined) {
       throw new NotFoundException(STUDENT_ACCOUNT_NOT_FOUND_MESSAGE);
     }
     const [history, family] = await Promise.all([
-      this.history(ctx.organizationId, studentId),
+      this.history(ctx.organizationId, studentId, terms),
       this.accounts.family(scope, studentId),
     ]);
     return {
@@ -232,9 +255,21 @@ export class StudentAccountService {
     };
   }
 
+  async familyTerm(
+    ctx: OrgContext,
+    termId: string | undefined
+  ): Promise<FamilyTermFields> {
+    return familyTermOf(
+      await this.accounts.termWindows(ctx.organizationId),
+      termId,
+      this.clock.today()
+    );
+  }
+
   async guardianStatement(
     ctx: OrgContext,
-    guardianId: string
+    guardianId: string,
+    query: FamilyStatementQuery
   ): Promise<GuardianStatement> {
     const found = await this.accounts.guardianChildren(
       this.scopeOf(ctx),
@@ -243,11 +278,16 @@ export class StudentAccountService {
     if (found === undefined) {
       throw new NotFoundException(GUARDIAN_ACCOUNT_NOT_FOUND_MESSAGE);
     }
+    const terms = await this.accounts.termWindows(ctx.organizationId);
+    const termFields = familyTermOf(terms, query.termId, this.clock.today());
     const [currency, children] = await Promise.all([
       this.accounts.currency(ctx.organizationId),
       Promise.all(
         found.studentIds.map((studentId) =>
-          this.statement(ctx, studentId, { pageSize: FINANCE_PAGE_SIZE })
+          this.statementOf(ctx, studentId, {
+            query: { pageSize: FINANCE_PAGE_SIZE, termId: query.termId },
+            terms,
+          })
         )
       ),
     ]);
@@ -260,6 +300,7 @@ export class StudentAccountService {
       familyTotalMinor: owedMinor,
       creditMinor,
       children,
+      ...termFields,
     };
   }
 
@@ -302,12 +343,13 @@ export class StudentAccountService {
 
   private async history(
     organizationId: string,
-    studentId: string
+    studentId: string,
+    loadedTerms?: readonly TermStart[]
   ): Promise<StudentHistory> {
     const [currency, movements, terms] = await Promise.all([
       this.accounts.currency(organizationId),
       this.accounts.movements(organizationId, studentId),
-      this.accounts.termWindows(organizationId),
+      loadedTerms ?? this.accounts.termWindows(organizationId),
     ]);
     return { currency, movements, terms, today: this.clock.today() };
   }

@@ -13,6 +13,7 @@ import {
   adjustmentsQueryOptions,
   approvalsSummaryQueryOptions,
   balancesQueryOptions,
+  familyStatementQueryOptions,
   feeTypesQueryOptions,
   invalidateApprovals,
   invalidateFees,
@@ -303,6 +304,48 @@ describe('students queries', () => {
     for (const stop of unsubscribe) {
       stop();
     }
+  });
+});
+
+const observedFamily = async (guardianId: string) => {
+  const family = { currency: 'NGN', children: [] };
+  const guardianStatement = vi
+    .fn()
+    .mockResolvedValueOnce(family)
+    .mockReturnValueOnce(new Promise(() => undefined));
+  const api = {
+    studentAccounts: { guardianStatement },
+  } as unknown as Api;
+  const observer = new QueryObserver(
+    new QueryClient(),
+    familyStatementQueryOptions(api, guardianId)
+  );
+  const stop = observer.subscribe(() => undefined);
+  await vi.waitFor(() => {
+    expect(observer.getCurrentResult().data).toEqual(family);
+  });
+  return { api, observer, stop };
+};
+
+describe('family statement queries', () => {
+  it('keeps the family on screen while another term loads', async () => {
+    const { api, observer, stop } = await observedFamily('g1');
+
+    observer.setOptions(
+      familyStatementQueryOptions(api, 'g1', { termId: 't1' })
+    );
+
+    expect(observer.getCurrentResult().isPlaceholderData).toBe(true);
+    stop();
+  });
+
+  it('never shows one guardian’s family while another guardian’s loads', async () => {
+    const { api, observer, stop } = await observedFamily('g1');
+
+    observer.setOptions(familyStatementQueryOptions(api, 'g2'));
+
+    expect(observer.getCurrentResult().data).toBeUndefined();
+    stop();
   });
 });
 
