@@ -1,5 +1,5 @@
 import { STARTER_ROLES } from '@eduvault/policy';
-import { accessOfStarter } from './access-test-utils';
+import { accessOfStarter } from './access';
 
 describe('accessOfStarter', () => {
   it('gives a starter role the permissions the policy lists for it', () => {

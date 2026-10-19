@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import { accessOfStarter, fakeAccess } from './access-test-utils';
+import { accessOfStarter, fakeAccess } from './testing';
 import { MyAccessSheet } from './my-access-sheet';
 import { PermissionsProvider } from './permissions';
 import type { MePermissions } from '@eduvault/api-contract';

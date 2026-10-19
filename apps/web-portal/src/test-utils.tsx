@@ -16,7 +16,8 @@ import type {
   PortalPurchases,
   PortalStudent,
 } from '@eduvault/api-contract';
-import { PermissionsProvider, accessOfStarter } from '@eduvault/auth-client';
+import { PermissionsProvider } from '@eduvault/auth-client';
+import { accessOfStarter } from '@eduvault/auth-client/testing';
 import { toPermissionMap, type Permission } from '@eduvault/policy';
 import { ApiProvider, type Api } from './api';
 import { checked } from './test-api';

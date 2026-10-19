@@ -26,6 +26,9 @@
       "@eduvault/ui": ["./libs/ui/src/index.ts"],
       "@eduvault/ui/testing": ["./libs/ui/src/testing/index.ts"],
       "@eduvault/auth-client": ["./libs/auth-client/src/index.ts"],
+      "@eduvault/auth-client/testing": [
+        "./libs/auth-client/src/testing/index.ts"
+      ],
       "@eduvault/testcontainers": ["./libs/testcontainers/src/index.ts"]
     }
   },

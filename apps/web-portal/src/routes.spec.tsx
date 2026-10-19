@@ -13,10 +13,9 @@ import {
 } from '@testing-library/react';
 import {
   AuthClientProvider,
-  accessOfStarter,
-  fakeAccess,
   type EduvaultAuthClient,
 } from '@eduvault/auth-client';
+import { accessOfStarter, fakeAccess } from '@eduvault/auth-client/testing';
 import type { MePermissions } from '@eduvault/api-contract';
 import {
   ALL_PERMISSIONS,
