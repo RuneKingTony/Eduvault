@@ -5,7 +5,7 @@ import {
   type AdjustmentKind,
   type CreateAdjustmentInput,
 } from '@eduvault/api-contract';
-import { parseNaira } from '@eduvault/shared';
+import { nairaInputText, parseNaira } from '@eduvault/shared';
 
 export interface RequestState {
   kind: AdjustmentKind;
@@ -26,13 +26,6 @@ export interface RequestPrefill {
 export type RequestField = 'student' | 'amount' | 'reason' | 'account';
 export type RequestErrors = Partial<Record<RequestField, string>>;
 
-const KOBO = 100;
-
-export function amountText(minor: number): string {
-  const naira = minor / KOBO;
-  return Number.isInteger(naira) ? String(naira) : naira.toFixed(2);
-}
-
 export function initialRequest(
   prefill: RequestPrefill,
   firstAccountId: string
@@ -41,7 +34,9 @@ export function initialRequest(
     kind: prefill.kind ?? 'credit_note',
     studentId: prefill.studentId ?? '',
     amount:
-      prefill.amountMinor === undefined ? '' : amountText(prefill.amountMinor),
+      prefill.amountMinor === undefined
+        ? ''
+        : nairaInputText(prefill.amountMinor),
     reason: '',
     invoiceId: '',
     ledgerAccountId: '',

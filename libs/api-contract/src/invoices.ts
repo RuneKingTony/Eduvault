@@ -4,7 +4,12 @@ import {
   FINANCE_PAGE_SIZE_MAX,
   journalLineSchema,
 } from './finance';
-import { currencySchema, datedReference, idSchema } from './schemas';
+import {
+  currencySchema,
+  datedReference,
+  idSchema,
+  minorSchema,
+} from './schemas';
 
 export const INVOICE_KINDS = ['term', 'adhoc', 'store'] as const;
 export const INVOICE_STATUSES = ['draft', 'issued', 'cancelled'] as const;
@@ -45,7 +50,6 @@ export type InvoiceKind = z.infer<typeof invoiceKindSchema>;
 export const invoiceStatusSchema = z.enum(INVOICE_STATUSES);
 export type InvoiceStatus = z.infer<typeof invoiceStatusSchema>;
 
-const minorSchema = z.number().int();
 const countSchema = z.number().int().nonnegative();
 
 export const invoiceSummarySchema = z.object({

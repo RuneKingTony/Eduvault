@@ -48,3 +48,28 @@ export function parseNaira(input: string): number | undefined {
   const minor = whole * KOBO_PER_NAIRA + kobo;
   return Number.isSafeInteger(minor) ? minor : undefined;
 }
+
+function inputParts(minor: number) {
+  if (!Number.isSafeInteger(minor)) {
+    throw new RangeError(`Expected whole minor units, got ${minor}`);
+  }
+  const absolute = Math.abs(minor);
+  const kobo = absolute % KOBO_PER_NAIRA;
+  return {
+    sign: minor < 0 ? '-' : '',
+    whole: Math.trunc(absolute / KOBO_PER_NAIRA),
+    fraction: kobo === 0 ? '' : `.${String(kobo).padStart(2, '0')}`,
+  };
+}
+
+/** What `parseNaira` reads back to the same minor units: no grouping, kobo only when there are any. */
+export function nairaInputText(minor: number): string {
+  const { sign, whole, fraction } = inputParts(minor);
+  return `${sign}${whole}${fraction}`;
+}
+
+/** As `nairaInputText`, with thousands grouped, which `parseNaira` also reads. */
+export function groupedNairaInputText(minor: number): string {
+  const { sign, whole, fraction } = inputParts(minor);
+  return `${sign}${groupedNaira.format(whole)}${fraction}`;
+}

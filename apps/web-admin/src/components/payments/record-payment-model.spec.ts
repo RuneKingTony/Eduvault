@@ -5,7 +5,6 @@ import {
   SOMEONE_ELSE,
   childrenFor,
   initialState,
-  nairaText,
   splitTotal,
   toRequest,
   validate,
@@ -284,14 +283,5 @@ describe('toRequest', () => {
     expect(request).not.toHaveProperty('payerGuardianId');
     expect(request).not.toHaveProperty('proofFileId');
     expect(request).not.toHaveProperty('providerReference');
-  });
-});
-
-describe('nairaText', () => {
-  it('writes whole naira plainly and kobo with two digits', () => {
-    expect(nairaText(18_000_000)).toBe('180000');
-    expect(nairaText(150_050)).toBe('1500.50');
-    expect(nairaText(5)).toBe('0.05');
-    expect(nairaText(0)).toBe('0');
   });
 });

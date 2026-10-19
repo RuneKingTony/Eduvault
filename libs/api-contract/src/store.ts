@@ -7,14 +7,15 @@ import {
 } from './finance';
 import {
   RESERVED_REFERENCE_MESSAGE,
+  type PaymentMethod,
   datedReference,
   idSchema,
   memberRefSchema,
+  minorSchema,
   notReservedReference,
   paymentMethodSchema,
-  paymentMethodsSchema,
   paymentMethodWord,
-  type PaymentMethod,
+  paymentMethodsSchema,
 } from './schemas';
 
 export const ITEM_KINDS = ['uniform', 'book'] as const;
@@ -197,7 +198,6 @@ export type ItemKind = z.infer<typeof itemKindSchema>;
 export const stockStateSchema = z.enum(STOCK_STATES);
 export type StockState = z.infer<typeof stockStateSchema>;
 
-const minorSchema = z.number().int();
 const countSchema = z.number().int().nonnegative();
 
 export function itemDisplayName(item: {

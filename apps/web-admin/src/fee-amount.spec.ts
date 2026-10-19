@@ -1,4 +1,4 @@
-import { amountInputText, parseFeeAmount } from './fee-amount';
+import { parseFeeAmount } from './fee-amount';
 
 describe('parseFeeAmount', () => {
   it('reads naira with or without the sign and the grouping', () => {
@@ -26,12 +26,5 @@ describe('parseFeeAmount', () => {
     ]) {
       expect(parseFeeAmount(input)).toBeUndefined();
     }
-  });
-});
-
-describe('amountInputText', () => {
-  it('groups the naira and leaves the sign off', () => {
-    expect(amountInputText(1_500_000)).toBe('15,000');
-    expect(amountInputText(1_500_050)).toBe('15,000.50');
   });
 });

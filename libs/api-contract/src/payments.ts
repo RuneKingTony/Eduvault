@@ -12,6 +12,7 @@ import {
   currencySchema,
   RESERVED_REFERENCE_MESSAGE,
   idSchema,
+  minorSchema,
   notReservedReference,
   paymentMethodSchema,
   paymentMethodsSchema,
@@ -112,7 +113,6 @@ export const paymentReferenceSchema = z
   )
   .refine(notReservedReference, RESERVED_REFERENCE_MESSAGE);
 
-const minorSchema = z.number().int();
 const countSchema = z.number().int().nonnegative();
 
 export const paymentAllocationInputSchema = z.object({

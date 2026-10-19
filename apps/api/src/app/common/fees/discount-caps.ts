@@ -1,3 +1,5 @@
+import { roundHalfUp } from '@eduvault/shared';
+
 export type DiscountKind = 'percent' | 'fixed';
 export type DiscountStatus = 'submitted' | 'approved' | 'rejected';
 
@@ -46,7 +48,7 @@ export const termInRange = (
   (discount.to === null || compareTerms(term, discount.to) <= 0);
 
 export const percentOf = (base: number, percent: number): number =>
-  Math.floor((base * percent + 50) / 100);
+  roundHalfUp([base, percent], 100);
 
 export function discountDescription(
   discount: Pick<

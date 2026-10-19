@@ -19,6 +19,7 @@ import {
   PAYMENT_METHODS,
   generatePaymentReference,
   isProofFile,
+  nairaInputText,
   parseNaira,
   spreadAmount,
   totalOwed,
@@ -59,17 +60,6 @@ export const FIELD_ORDER: readonly SheetField[] = [
 
 export type SheetErrors = Partial<Record<SheetField, string>>;
 
-const KOBO = 100;
-
-export function nairaText(minor: number): string {
-  const whole = Math.trunc(minor / KOBO);
-  const kobo = minor % KOBO;
-  if (kobo === 0) {
-    return String(whole);
-  }
-  return `${whole}.${String(kobo).padStart(2, '0')}`;
-}
-
 const minorOf = (text: string): number => parseNaira(text) ?? 0;
 
 export function childrenFor(
@@ -96,10 +86,10 @@ function prefilled(
   const shares = Object.fromEntries(
     children.map((child) => [
       child.studentId,
-      nairaText(Math.max(0, child.owesMinor)),
+      nairaInputText(Math.max(0, child.owesMinor)),
     ])
   );
-  return { amount: nairaText(totalOwed(owedOf(children))), shares };
+  return { amount: nairaInputText(totalOwed(owedOf(children))), shares };
 }
 
 function firstMethod(methods: PaymentMethods): PaymentMethod {
@@ -180,7 +170,7 @@ export function withAmount(
     shares: Object.fromEntries(
       children.map((child, index) => [
         child.studentId,
-        nairaText(spread[index] ?? 0),
+        nairaInputText(spread[index] ?? 0),
       ])
     ),
   };

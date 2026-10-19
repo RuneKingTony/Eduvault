@@ -1,7 +1,7 @@
 import { useState, type SubmitEvent } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { FEE_LINE_AMOUNT_MESSAGE, type FeeLine } from '@eduvault/api-contract';
-import { money } from '@eduvault/shared';
+import { groupedNairaInputText, money } from '@eduvault/shared';
 import {
   Button,
   Dialog,
@@ -16,7 +16,7 @@ import {
   toast,
 } from '@eduvault/ui';
 import { useApi } from '../../api';
-import { amountInputText, parseFeeAmount } from '../../fee-amount';
+import { parseFeeAmount } from '../../fee-amount';
 import { invalidateFees } from '../../queries';
 import { amountChangedToast } from './fee-text';
 
@@ -72,7 +72,7 @@ function Form({
         name="amount"
         inputMode="decimal"
         autoComplete="off"
-        defaultValue={amountInputText(line.amountMinor)}
+        defaultValue={groupedNairaInputText(line.amountMinor)}
       />
       <p className="text-xs text-muted-foreground">
         Applies from the next round of charges. Charges already sent keep the

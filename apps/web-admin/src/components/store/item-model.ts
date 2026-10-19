@@ -8,8 +8,7 @@ import {
   type UpdateItem,
   type UpdateItemInput,
 } from '@eduvault/api-contract';
-import { parseNaira } from '@eduvault/shared';
-import { nairaText } from '../payments/record-payment-model';
+import { nairaInputText, parseNaira } from '@eduvault/shared';
 
 const CHECK_MESSAGE = 'Check the item details.';
 
@@ -41,8 +40,8 @@ export const itemFormOf = (item: Item): ItemFormState => ({
   name: item.name,
   size: item.variant ?? '',
   classLevelId: item.classLevel?.id ?? '',
-  cost: nairaText(item.costPriceMinor),
-  price: nairaText(item.sellPriceMinor),
+  cost: nairaInputText(item.costPriceMinor),
+  price: nairaInputText(item.sellPriceMinor),
   lowAt: String(item.lowStockLevel),
 });
 
