@@ -458,6 +458,5 @@ export const seedLife = (
   lifeOf({
     notSeenSince: row.notSeen?.since ?? null,
     exitKind: exitKindOf(row),
-    newInCurrentSession: false,
     today: PROTOTYPE_TODAY,
   });

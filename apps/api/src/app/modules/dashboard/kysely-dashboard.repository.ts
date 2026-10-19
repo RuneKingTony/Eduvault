@@ -6,9 +6,8 @@ import {
   type MyClass,
   type Scope,
 } from '@eduvault/api-contract';
-import { DUE_LEFT_AFTER_DAYS } from '@eduvault/shared';
 import { KYSELY_TOKEN, type Database } from '../../common/db/tokens';
-import { inScope, visibleStudentsCte } from '../../common/students';
+import { dueLeftSql, inScope, visibleStudentsCte } from '../../common/students';
 import {
   DashboardRepository,
   type DashboardScope,
@@ -142,7 +141,7 @@ export class KyselyDashboardRepository extends DashboardRepository {
       SELECT id, first_name, last_name, not_seen_since, count(*) OVER ()::int AS total
       FROM visible
       WHERE life = 'inactive'
-        AND (${scope.today}::date - not_seen_since::date) >= ${DUE_LEFT_AFTER_DAYS}
+        AND ${dueLeftSql(scope.today, 'not_seen_since')}
       ORDER BY not_seen_since, last_name, first_name, id
       LIMIT ${DASHBOARD_SAMPLE_SIZE}`.execute(this.db);
     return { count: countOf(rows), samples: rows.map((row) => fullName(row)) };
@@ -290,7 +289,7 @@ export class KyselyDashboardRepository extends DashboardRepository {
         (count(*) FILTER (WHERE life = 'inactive'))::int AS inactive,
         (count(*) FILTER (
           WHERE life = 'inactive'
-            AND (${scope.today}::date - not_seen_since::date) >= ${DUE_LEFT_AFTER_DAYS}
+            AND ${dueLeftSql(scope.today, 'not_seen_since')}
         ))::int AS due_left,
         (count(*) FILTER (WHERE life = 'left'))::int AS "left",
         (count(*) FILTER (

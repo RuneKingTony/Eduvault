@@ -5,50 +5,46 @@ import {
   type StudentLife,
 } from '@eduvault/api-contract';
 import {
-  DUE_LEFT_AFTER_DAYS,
-  INACTIVE_AFTER_DAYS,
+  daysAway,
   fmtDate,
+  isDueLeftByAbsence,
+  isInactiveByAbsence,
 } from '@eduvault/shared';
 
-const MS_PER_DAY = 86_400_000;
 const DAYS_PER_WEEK = 7;
 
-export interface LifecycleFacts {
+interface AbsenceFacts {
   notSeenSince: string | null;
   exitKind: 'left' | 'graduated' | null;
-  newInCurrentSession: boolean;
   today: string;
 }
 
-export const daysBetween = (from: string, to: string): number =>
-  Math.round((Date.parse(to) - Date.parse(from)) / MS_PER_DAY);
+export interface LifecycleFacts extends AbsenceFacts {
+  newInCurrentSession: boolean;
+}
 
-const daysAway = (facts: LifecycleFacts): number | null =>
-  facts.notSeenSince === null
-    ? null
-    : daysBetween(facts.notSeenSince, facts.today);
-
-export function lifeOf(facts: LifecycleFacts): StudentLife {
+export function lifeOf(facts: AbsenceFacts): StudentLife {
   if (facts.exitKind !== null) {
     return facts.exitKind;
   }
-  const days = daysAway(facts);
-  return days !== null && days >= INACTIVE_AFTER_DAYS ? 'inactive' : 'active';
+  return isInactiveByAbsence(facts.notSeenSince, facts.today)
+    ? 'inactive'
+    : 'active';
 }
 
-export function isDueToBeLeft(facts: LifecycleFacts): boolean {
-  const days = daysAway(facts);
-  return (
-    lifeOf(facts) === 'inactive' && days !== null && days >= DUE_LEFT_AFTER_DAYS
-  );
-}
+export const isDueToBeLeft = (facts: AbsenceFacts): boolean =>
+  lifeOf(facts) === 'inactive' &&
+  isDueLeftByAbsence(facts.notSeenSince, facts.today);
 
 export const isNewIntake = (facts: LifecycleFacts): boolean =>
   lifeOf(facts) === 'active' && facts.newInCurrentSession;
 
-export function weeksAway(facts: LifecycleFacts): number | null {
-  const days = daysAway(facts);
-  return days === null ? null : Math.floor(Math.max(days, 0) / DAYS_PER_WEEK);
+export function weeksAway(facts: AbsenceFacts): number | null {
+  return facts.notSeenSince === null
+    ? null
+    : Math.floor(
+        Math.max(daysAway(facts.notSeenSince, facts.today), 0) / DAYS_PER_WEEK
+      );
 }
 
 interface MarkAwayDateFacts {
@@ -81,6 +77,3 @@ export const canUndoLeaving = (facts: UndoFacts): boolean =>
   facts.exitKind !== null &&
   facts.archivedTermId !== null &&
   facts.archivedTermId === facts.currentTermId;
-
-export const inactiveAtOnce = (date: string, today: string): boolean =>
-  daysBetween(date, today) >= INACTIVE_AFTER_DAYS;
