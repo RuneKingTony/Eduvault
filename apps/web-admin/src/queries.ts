@@ -665,6 +665,20 @@ export const feeOptionsQueryOptions = (api: Api, studentId: string) =>
     queryFn: () => api.feeOptions.list({ params: { studentId }, query: {} }),
   });
 
+export const feeOptInsQueryOptions = (
+  api: Api,
+  query: { feeTypeId: string; termId: string; q: string }
+) =>
+  queryOptions({
+    queryKey: [...FEES_KEY, 'opt-ins', query.feeTypeId, query.termId, query.q],
+    queryFn: () =>
+      api.feeOptIns.list({
+        params: { feeTypeId: query.feeTypeId },
+        query: { termId: query.termId, q: query.q },
+      }),
+    placeholderData: keepPreviousData,
+  });
+
 export async function invalidateFees(queryClient: QueryClient): Promise<void> {
   await queryClient.invalidateQueries({ queryKey: FEES_KEY });
 }

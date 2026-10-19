@@ -17,6 +17,7 @@ import type {
   FeeGridRow,
   FeeLine,
   FeeCandidates,
+  FeeOptIns,
   FeePreview,
   FeeSetup,
   FeeType,
@@ -195,8 +196,33 @@ export const preview = (overrides: Partial<FeePreview> = {}): FeePreview => ({
   ...overrides,
 });
 
+export const optInRoster = (overrides: Partial<FeeOptIns> = {}): FeeOptIns => ({
+  schoolYearName: '2026/2027',
+  items: [
+    {
+      studentId: ADA,
+      name: 'Ada Okeke',
+      admissionNumber: 'GF-0123',
+      levelName: 'JSS 2',
+      campusName: 'Lekki',
+      optedIn: true,
+    },
+    {
+      studentId: CHIDI,
+      name: 'Chidi Eze',
+      admissionNumber: 'GF-0124',
+      levelName: 'JSS 2',
+      campusName: 'Ikeja',
+      optedIn: false,
+    },
+  ],
+  total: 2,
+  ...overrides,
+});
+
 interface FeesApiOptions {
   lines?: FeeLine[];
+  optIns?: FeeOptIns;
   grid?: FeeGrid;
   types?: FeeType[];
   preview?: FeePreview;
@@ -224,6 +250,27 @@ const pickerApi = (campuses: Campus[]) => ({
           })
       ),
   },
+});
+
+const optInWrites = (roster: FeeOptIns) => ({
+  list: vi.fn().mockResolvedValue(roster),
+  set: vi
+    .fn()
+    .mockImplementation(
+      ({
+        params,
+        body,
+      }: {
+        params: { feeTypeId: string };
+        body: { studentIds: string[]; optedIn: boolean };
+      }) =>
+        Promise.resolve({
+          feeTypeId: params.feeTypeId,
+          optedIn: body.optedIn,
+          changed: body.studentIds.length,
+          unchanged: 0,
+        })
+    ),
 });
 
 const feeLineWrites = () => ({
@@ -283,6 +330,7 @@ export function feesApi(options: FeesApiOptions = {}) {
       }),
       ...feeLineWrites(),
     },
+    feeOptIns: optInWrites(options.optIns ?? optInRoster()),
     feeTypes: {
       list: vi.fn().mockResolvedValue(options.types ?? [TUITION, PTA, BUS]),
       create: vi

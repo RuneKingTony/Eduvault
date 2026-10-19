@@ -39,6 +39,7 @@ import { AllFeesCard } from './all-fees-card';
 import { ChangeAmountDialog } from './change-amount-dialog';
 import { CopyFeesDialog } from './copy-fees-dialog';
 import { FeeGridCard } from './fee-grid-card';
+import { FeeOptInsCard } from './fee-opt-ins-card';
 import { FeePreviewCard } from './fee-preview-card';
 import { FEES_TIP } from './fee-text';
 import { FeeTypeChips } from './fee-type-chips';
@@ -196,6 +197,38 @@ interface BodyProps {
   chipId: string | undefined;
 }
 
+const shownLines = (
+  group: FeeGroup,
+  chipId: string | undefined,
+  lines: readonly FeeLine[]
+): readonly FeeLine[] =>
+  group === 'other' && chipId !== undefined
+    ? lines.filter((line) => line.feeTypeId === chipId)
+    : lines;
+
+function OptIns({
+  chipId,
+  chipName,
+  termId,
+}: {
+  chipId: string | undefined;
+  chipName: string | undefined;
+  termId: string;
+}) {
+  if (chipId === undefined || chipName === undefined) {
+    return null;
+  }
+  return (
+    <Can permission="student:read">
+      <FeeOptInsCard
+        feeTypeId={chipId}
+        feeTypeName={chipName}
+        termId={termId}
+      />
+    </Can>
+  );
+}
+
 function Cards({
   group,
   term,
@@ -208,16 +241,12 @@ function Cards({
   lines: readonly FeeLine[];
   setEditor: (editor: Editor) => void;
 }) {
-  const shown =
-    group === 'other' && chipId !== undefined
-      ? lines.filter((line) => line.feeTypeId === chipId)
-      : lines;
   const chipName = grid.feeTypes.find((type) => type.id === chipId)?.name;
   const scope = `${term.id}-${chipId ?? 'all'}`;
   const allFees = (
     <AllFeesCard
       key={`all-${scope}`}
-      lines={shown}
+      lines={shownLines(group, chipId, lines)}
       currency={grid.currency}
       emptyTitle={COPY[group].emptyAll}
       onEdit={(line) => {
@@ -245,7 +274,15 @@ function Cards({
           </Can>
         </div>
       ) : (
-        allFees
+        <>
+          {allFees}
+          <OptIns
+            key={`opt-ins-${scope}`}
+            chipId={chipId}
+            chipName={chipName}
+            termId={term.id}
+          />
+        </>
       )}
     </>
   );
