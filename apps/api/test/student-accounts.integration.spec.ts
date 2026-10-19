@@ -336,7 +336,7 @@ test.describe('balances and statements over the books', () => {
     const paged = await balancesOf(api, owner, '?pageSize=1&page=2');
     expect(paged.total).toBe(2);
     expect(paged.items.map((row) => row.studentId)).toEqual([studentLekki.id]);
-    expect(paged.items[0]?.guardian?.name).toBeDefined();
+    expect(paged.items[0]?.guardian?.name).toEqual(expect.any(String));
   });
 
   test('received this term counts only the in-scope allocations of a split payment', async ({
@@ -710,15 +710,7 @@ test.describe('isolation', () => {
   test('a family view lists only in-scope children and answers 404 when none are in reach', async ({
     api,
     app,
-    schools: {
-      owner,
-      ownerB,
-      lekkiOnly,
-      lekki,
-      ikeja,
-      studentLekki,
-      studentIkeja,
-    },
+    schools: { owner, ownerB, lekkiOnly, ikeja, studentLekki, studentIkeja },
   }) => {
     const [ikejaGuardian] = studentIkeja.guardians ?? [];
     const [lekkiGuardian] = studentLekki.guardians ?? [];
@@ -748,7 +740,6 @@ test.describe('isolation', () => {
     expect(family.children.map((child) => child.student.id)).toEqual([
       studentLekki.id,
     ]);
-    expect(lekki.id).toBeDefined();
     const wide = (
       await api(owner)
         .get(`/finance/guardians/${lekkiGuardian?.guardianId}/statement`)

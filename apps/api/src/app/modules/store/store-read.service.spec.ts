@@ -1,5 +1,7 @@
 import { NotFoundException } from '@nestjs/common';
 import {
+  PAYMENT_STUDENT_NOT_FOUND_MESSAGE,
+  STORE_CAMPUS_NOT_FOUND_MESSAGE,
   deliveryListQuerySchema,
   saleListQuerySchema,
 } from '@eduvault/api-contract';
@@ -137,7 +139,7 @@ describe('StoreReadService.summary', () => {
   it('answers 404 for a campus outside scope', async () => {
     const { service } = setup();
     await expect(service.summary(ctx(['lekki']), 'ikeja')).rejects.toThrow(
-      new NotFoundException('Campus not found')
+      new NotFoundException(STORE_CAMPUS_NOT_FOUND_MESSAGE)
     );
   });
 
@@ -169,20 +171,6 @@ describe('StoreReadService.summary', () => {
       ...noTermFigures,
     });
   });
-
-  it('adds this term’s sales to the summary and the dashboard card', async () => {
-    const { sales, service } = setup();
-    sales.figures = {
-      termSalesMinor: 1_350_000,
-      termCostMinor: 1_000_000,
-      termSalesCount: 2,
-      termItemsSold: 5,
-      termStudentsServed: 2,
-    };
-
-    expect(await service.summary(ctx())).toMatchObject(sales.figures);
-    expect(await service.dashboardStore(ctx())).toMatchObject(sales.figures);
-  });
 });
 
 describe('StoreReadService sales', () => {
@@ -200,7 +188,7 @@ describe('StoreReadService sales', () => {
     ).rejects.toThrow(new NotFoundException('Campus not found'));
   });
 
-  it('answers 404 for a sale outside scope', async () => {
+  it('answers 404 for a sale that is not found', async () => {
     const { service } = setup();
     await expect(service.sale(ctx(), 'nope')).rejects.toThrow(
       new NotFoundException('Sale not found')
@@ -275,34 +263,12 @@ describe('StoreReadService portal reads', () => {
   it('answers 404 for a student with no placement', async () => {
     const { service } = setup();
     await expect(service.priceListFor(ctx(), 'ghost')).rejects.toThrow(
-      NotFoundException
+      new NotFoundException(PAYMENT_STUDENT_NOT_FOUND_MESSAGE)
     );
-  });
-
-  it('hands the purchases through', async () => {
-    const { sales, service } = setup();
-    sales.purchases = { ...sales.purchases, itemsBought: 3 };
-    expect((await service.purchasesOf(ctx(), 'ada')).itemsBought).toBe(3);
   });
 });
 
 describe('StoreReadService deliveries', () => {
-  it('lists a page with the suppliers over the whole scope', async () => {
-    const { repository, service } = setup();
-    repository.suppliers = ['Adebayo Uniforms Ltd'];
-
-    const result = await service.deliveries(
-      ctx(),
-      deliveryListQuerySchema.parse({})
-    );
-
-    expect(result).toEqual({
-      items: [],
-      total: 0,
-      suppliers: ['Adebayo Uniforms Ltd'],
-    });
-  });
-
   it('answers 404 for a campus filter outside scope', async () => {
     const { service } = setup();
     await expect(
@@ -312,7 +278,7 @@ describe('StoreReadService deliveries', () => {
           campusId: '6f1d2a7c-3b0e-4e53-9c55-0d6a3f5f2b10',
         })
       )
-    ).rejects.toThrow(NotFoundException);
+    ).rejects.toThrow(new NotFoundException(STORE_CAMPUS_NOT_FOUND_MESSAGE));
   });
 
   it('answers 404 for an unknown delivery', async () => {

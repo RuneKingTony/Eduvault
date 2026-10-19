@@ -1,6 +1,10 @@
 import { fireEvent, screen, within } from '@testing-library/react';
 import type { Permission } from '@eduvault/policy';
 import {
+  ADA_ID,
+  EFE_ID,
+  NNE_ID,
+  TOBI_ID,
   portalChild,
   portalFamilyStatement,
   portalMe,
@@ -9,15 +13,15 @@ import {
 } from '../test-utils';
 import { ChildrenPage } from './children-page';
 
-const ada = portalChild({ id: 'ada', firstName: 'Ada' });
+const ada = portalChild({ id: ADA_ID, firstName: 'Ada' });
 const tobi = portalChild({
-  id: 'tobi',
+  id: TOBI_ID,
   firstName: 'Tobi',
   className: null,
   campusName: 'Ikeja',
 });
 const efe = portalChild({
-  id: 'efe',
+  id: EFE_ID,
   firstName: 'Efe',
   campusName: 'Lekki',
   archived: true,
@@ -94,7 +98,7 @@ describe('ChildrenPage', () => {
       apiWith([ada, tobi])
     );
     fireEvent.click(await screen.findByRole('button', { name: /Tobi Okeke/ }));
-    expect(onOpenChild).toHaveBeenCalledWith('tobi');
+    expect(onOpenChild).toHaveBeenCalledWith(TOBI_ID);
   });
 
   it('says so when no children are linked', async () => {
@@ -155,28 +159,39 @@ const WITH_FEES: Permission[] = ['student:readOwn', 'invoice:readOwn'];
 const owing = (balanceMinor: number) => ({ balanceMinor });
 
 const adaOwes = portalChild({
-  id: 'ada',
+  id: ADA_ID,
   firstName: 'Ada',
   ...owing(6_000_000),
 });
 const tobiCredit = portalChild({
-  id: 'tobi',
+  id: TOBI_ID,
   firstName: 'Tobi',
   ...owing(-2_000_000),
 });
 const efeLeft = portalChild({
-  id: 'efe',
+  id: EFE_ID,
   firstName: 'Efe',
   archived: true,
   ...owing(4_000_000),
 });
-const paidUp = portalChild({ id: 'nne', firstName: 'Nne', ...owing(0) });
+const paidUp = portalChild({ id: NNE_ID, firstName: 'Nne', ...owing(0) });
 
-const familyOf = (children: ReturnType<typeof portalChild>[]) => {
-  const balances = children.map((child) => child.balanceMinor ?? 0);
-  return portalFamilyStatement({
-    totalOwedMinor: balances.reduce((sum, b) => sum + Math.max(0, b), 0),
-    creditMinor: balances.reduce((sum, b) => sum + Math.max(0, -b), 0),
+interface FamilyTotals {
+  totalOwedMinor: number;
+  creditMinor: number;
+}
+
+const THREE_CHILD_TOTALS: FamilyTotals = {
+  totalOwedMinor: 10_000_000,
+  creditMinor: 2_000_000,
+};
+
+const familyOf = (
+  children: ReturnType<typeof portalChild>[],
+  totals: FamilyTotals = THREE_CHILD_TOTALS
+) =>
+  portalFamilyStatement({
+    ...totals,
     children: children.map((child) => ({
       studentId: child.id,
       name: `${child.firstName} ${child.lastName}`,
@@ -186,12 +201,14 @@ const familyOf = (children: ReturnType<typeof portalChild>[]) => {
       balanceMinor: child.balanceMinor ?? 0,
     })),
   });
-};
 
-const feesApi = (children: ReturnType<typeof portalChild>[]) => ({
+const feesApi = (
+  children: ReturnType<typeof portalChild>[],
+  totals?: FamilyTotals
+) => ({
   portal: {
     children: vi.fn().mockResolvedValue(children),
-    familyStatement: vi.fn().mockResolvedValue(familyOf(children)),
+    familyStatement: vi.fn().mockResolvedValue(familyOf(children, totals)),
     statement: vi.fn(({ params }: { params: { studentId: string } }) => {
       const child = children.find((item) => item.id === params.studentId);
       const base = portalStatement();
@@ -210,7 +227,11 @@ const feesApi = (children: ReturnType<typeof portalChild>[]) => ({
 
 const renderFees = (
   children: ReturnType<typeof portalChild>[],
-  props: { onSeeFees?: (id: string) => void; held?: Permission[] } = {}
+  props: {
+    onSeeFees?: (id: string) => void;
+    held?: Permission[];
+    totals?: FamilyTotals;
+  } = {}
 ) =>
   renderWithApi(
     <ChildrenPage
@@ -218,16 +239,22 @@ const renderFees = (
       onOpenChild={vi.fn()}
       onSeeFees={props.onSeeFees ?? vi.fn()}
     />,
-    feesApi(children),
+    feesApi(children, props.totals),
     props.held ?? WITH_FEES
   );
 
-const cardOf = (name: string) =>
-  within(
-    screen
-      .getByRole('button', { name: new RegExp(`^${name} Okeke`) })
-      .closest('li') as HTMLElement
+const cardOf = (name: string) => {
+  const card = screen.getAllByRole('listitem').find(
+    (item) =>
+      within(item).queryByRole('button', {
+        name: new RegExp(`^${name} Okeke`),
+      }) !== null
   );
+  if (card === undefined) {
+    throw new Error(`No card for ${name}`);
+  }
+  return within(card);
+};
 
 describe('ChildrenPage fees', () => {
   it('adds Here is what each one owes to the description', async () => {
@@ -272,10 +299,10 @@ describe('ChildrenPage fees', () => {
     renderFees([adaOwes, tobiCredit], { onSeeFees });
     await screen.findByRole('heading', { name: 'Family statement' });
     fireEvent.click(cardOf('Tobi').getByRole('button', { name: 'See fees' }));
-    expect(onSeeFees).toHaveBeenCalledWith('tobi');
+    expect(onSeeFees).toHaveBeenCalledWith(TOBI_ID);
   });
 
-  it('adds only the positive balances to Total owed and shows credit apart', async () => {
+  it('shows the family total and credit the server reports', async () => {
     renderFees([adaOwes, tobiCredit, efeLeft]);
     expect(
       await screen.findByRole('heading', { name: 'Family statement' })
@@ -315,7 +342,9 @@ describe('ChildrenPage fees', () => {
   });
 
   it('shows only Total owed, with no tiles, for a single child', async () => {
-    renderFees([adaOwes]);
+    renderFees([adaOwes], {
+      totals: { totalOwedMinor: 6_000_000, creditMinor: 0 },
+    });
     await screen.findByRole('heading', { name: 'Family statement' });
     expect(screen.queryByText('Family total')).not.toBeInTheDocument();
     expect(

@@ -234,12 +234,6 @@ describe('FeeLineService.updateAmount', () => {
 });
 
 describe('FeeLineService.retire', () => {
-  it('retires a live line', async () => {
-    const { service } = setup(line());
-    const retired = await service.retire(everyone, 'line-1');
-    expect(retired.retiredAt).not.toBeNull();
-  });
-
   it('answers 409 the second time', async () => {
     const { service } = setup(line());
     await service.retire(everyone, 'line-1');

@@ -3,6 +3,8 @@ import { profile, settings } from '../test-school';
 import { PAYMENT_ID, payment, renderPayments } from '../test-payments';
 import { ReceiptPrintPage } from './receipt-print-page';
 
+const LOGO_ID = '00000000-0000-4000-8000-0000000a0b01';
+
 function setup(
   over: Partial<ReturnType<typeof settings>> = {},
   receipt = payment()
@@ -15,7 +17,7 @@ function setup(
       get: vi
         .fn()
         .mockResolvedValue(
-          profile({ logoUrl: '/files/logo-1', logoFileId: 'logo-1' })
+          profile({ logoUrl: `/files/${LOGO_ID}`, logoFileId: LOGO_ID })
         ),
     },
     schoolSettings: {
@@ -49,7 +51,7 @@ describe('ReceiptPrintPage', () => {
     expect(within(slip).getByText('Greenfield College')).toBeVisible();
     expect(
       within(slip).getByAltText('Greenfield College logo')
-    ).toHaveAttribute('src', expect.stringContaining('/files/logo-1'));
+    ).toHaveAttribute('src', expect.stringContaining(`/files/${LOGO_ID}`));
     expect(
       within(slip).getByText('1 Palm Road · Lagos · 08012345678')
     ).toBeInTheDocument();
@@ -77,7 +79,7 @@ describe('ReceiptPrintPage', () => {
     }
   });
 
-  it('marks a cancelled receipt on the print sheet and leaves a recorded one unmarked', async () => {
+  it('marks a cancelled receipt on the print sheet', async () => {
     setup({}, payment({ status: 'voided' }));
     const slip = await waitForSlip();
     expect(within(slip).getByText('Cancelled')).toBeVisible();

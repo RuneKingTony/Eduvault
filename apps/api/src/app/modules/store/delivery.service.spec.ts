@@ -226,7 +226,7 @@ describe('DeliveryService.record replay', () => {
     expect(repository.inserted).toHaveLength(0);
   });
 
-  it('answers a bare 409 when the earlier delivery is outside the caller’s scope', async () => {
+  it('answers a bare 409 when the earlier delivery cannot be seen', async () => {
     const { repository, service } = setup();
     repository.existing = {
       id: 'elsewhere',

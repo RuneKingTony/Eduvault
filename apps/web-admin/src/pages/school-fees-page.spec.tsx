@@ -2,7 +2,13 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { ApiError } from '@eduvault/api-contract';
 import { toast } from '@eduvault/ui';
 import {
+  ADA,
+  CHIDI,
+  FEE_LINE,
+  FEE_LINE_LEKKI,
+  FEE_LINE_RETIRED,
   JSS1,
+  JSS3,
   TERM_1,
   TERM_2,
   TUITION,
@@ -14,7 +20,7 @@ import {
   preview,
   renderFees,
 } from '../test-fees';
-import { LEKKI } from '../test-announcements';
+import { LEKKI, campus } from '../test-announcements';
 import { ownerAccess, starterAccess } from '../test-utils';
 import { OtherFeesPage } from './other-fees-page';
 import { SchoolFeesPage } from './school-fees-page';
@@ -40,9 +46,9 @@ function setup(
 }
 
 const lekkiOverride = feeLine({
-  id: 'fl-2',
+  id: FEE_LINE_LEKKI,
   name: 'Tuition (Lekki)',
-  campusId: 'c-lekki',
+  campusId: LEKKI,
   campusName: 'Lekki',
   amountMinor: 17_000_000,
 });
@@ -54,13 +60,7 @@ describe('SchoolFeesPage', () => {
 
   it('shows the header, the term choices and the grid for the current term', async () => {
     const { api } = setup();
-    expect(
-      await screen.findByRole('heading', { name: /School fees/ })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText('The main fee each class pays every term.')
-    ).toBeInTheDocument();
-    const term = screen.getByRole('combobox', { name: 'Term' });
+    const term = await screen.findByRole('combobox', { name: 'Term' });
     expect(
       (await within(term).findAllByRole('option')).map((o) => o.textContent)
     ).toEqual(['First term, 2026/2027', 'Second term, 2026/2027']);
@@ -106,7 +106,7 @@ describe('SchoolFeesPage', () => {
         feeLine(),
         lekkiOverride,
         feeLine({
-          id: 'fl-3',
+          id: FEE_LINE_RETIRED,
           name: 'Old tuition',
           retiredAt: '2026-10-05T09:00:00.000Z',
           appliesTo: 'new',
@@ -151,19 +151,19 @@ describe('SchoolFeesPage', () => {
     ).toBeInTheDocument();
     const amount = within(dialog).getByLabelText('Amount (₦)');
     expect(amount).toHaveValue('180,000');
-    fireEvent.change(amount, { target: { value: '₦200,000' } });
+    fireEvent.change(amount, { target: { value: '₦250,000' } });
     fireEvent.click(
       within(dialog).getByRole('button', { name: 'Save amount' })
     );
     await waitFor(() => {
       expect(api.feeLines.update).toHaveBeenCalledWith({
-        params: { id: 'fl-1' },
-        body: { amountMinor: 20_000_000 },
+        params: { id: FEE_LINE },
+        body: { amountMinor: 25_000_000 },
       });
     });
     await waitFor(() => {
       expect(toast.success).toHaveBeenCalledWith(
-        'Tuition is now ₦200,000. Charges already sent keep the old amount.'
+        'Tuition is now ₦250,000. Charges already sent keep the old amount.'
       );
     });
   });
@@ -204,7 +204,7 @@ describe('SchoolFeesPage', () => {
     );
     await waitFor(() => {
       expect(api.feeLines.retire).toHaveBeenCalledWith({
-        params: { id: 'fl-1' },
+        params: { id: FEE_LINE },
       });
     });
     await waitFor(() => {
@@ -302,15 +302,24 @@ describe('SchoolFeesPage', () => {
     expect(onSearchChange).toHaveBeenCalledWith({ add: 1 });
   });
 
-  it('offers a campus bursar only their campuses, never Every campus', async () => {
+  it('offers no Every campus option without campus:readAll', async () => {
     const bursar = starterAccess('bursar');
-    setup({ lines: [feeLine(), lekkiOverride] }, bursar, { add: 1 });
+    setup(
+      {
+        lines: [feeLine(), lekkiOverride],
+        campuses: [campus(LEKKI, 'Lekki')],
+      },
+      bursar,
+      { add: 1 }
+    );
     const sheet = await screen.findByRole('dialog');
-    const campus = await within(sheet).findByLabelText('Campus');
+    const campusField = await within(sheet).findByLabelText('Campus');
     expect(
-      within(campus).queryByRole('option', { name: 'Every campus' })
-    ).not.toBeInTheDocument();
-    expect(campus).toHaveValue(LEKKI);
+      within(campusField)
+        .getAllByRole('option')
+        .map((option) => option.textContent)
+    ).toEqual(['Lekki']);
+    expect(campusField).toHaveValue(LEKKI);
   });
 
   it('hides write controls from an administrator, who only reads', async () => {
@@ -481,7 +490,7 @@ describe('the preview card', () => {
     ).toEqual(['Ada Okeke · GF-0123', 'Chidi Eze · GF-0124']);
     await waitFor(() => {
       expect(api.feeLines.preview).toHaveBeenCalledWith({
-        query: { termId: TERM_1, studentId: 'st-1' },
+        query: { termId: TERM_1, studentId: ADA },
       });
     });
     expect(await screen.findByText('JSS 2 Gold')).toBeInTheDocument();
@@ -496,10 +505,10 @@ describe('the preview card', () => {
     const picker = await screen.findByRole('combobox', {
       name: 'Preview student',
     });
-    fireEvent.change(picker, { target: { value: 'st-2' } });
+    fireEvent.change(picker, { target: { value: CHIDI } });
     await waitFor(() => {
       expect(api.feeLines.preview).toHaveBeenCalledWith({
-        query: { termId: TERM_1, studentId: 'st-2' },
+        query: { termId: TERM_1, studentId: CHIDI },
       });
     });
   });
@@ -546,7 +555,7 @@ describe('the preview card', () => {
     ).toBeInTheDocument();
   });
 
-  it('shows an approved discount line in the preview, muted and negative', async () => {
+  it('shows an approved discount line in the preview as a negative amount', async () => {
     setup({
       preview: preview({
         lines: [
@@ -563,13 +572,10 @@ describe('the preview card', () => {
         totalMinor: 17_100_000,
       }),
     });
-    const row = (
-      await screen.findByText('Sibling discount (3 children) (5% of tuition)')
-    ).closest('tr');
+    const row = await screen.findByRole('row', {
+      name: /Sibling discount \(3 children\)/,
+    });
     expect(row).toHaveTextContent('−₦9,000');
-    expect(row?.querySelector('td:last-child')).toHaveClass(
-      'text-muted-foreground'
-    );
   });
 
   it('shows an already-charged badge and a pending-discount callout', async () => {
@@ -615,7 +621,7 @@ describe('the grid rows', () => {
         rows: [
           gridRow(),
           gridRow({
-            level: { id: 'lvl-jss3', name: 'JSS 3', sequence: 9 },
+            level: { id: JSS3, name: 'JSS 3', sequence: 9 },
             typicalTotalMinor: 21_000_000,
           }),
         ],

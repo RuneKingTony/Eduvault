@@ -45,9 +45,11 @@ describe('SchoolSwitcher', () => {
     ).toBeInTheDocument();
   });
 
-  it('shows no subtitle by default', () => {
-    setup();
-    expect(screen.queryByText(/term/)).not.toBeInTheDocument();
+  it('shows only the school name by default', () => {
+    setup('o1', { renderCrest: undefined });
+    expect(screen.getByRole('button')).toHaveTextContent(
+      /^Greenfield College$/
+    );
   });
 
   it('adds extra items under the school list', () => {

@@ -997,9 +997,10 @@ describe('AppShell access', () => {
   it('shows the approvals bell with its count on every page, and the counts on Approvals and Payments', async () => {
     await renderAt('/finance/payments', { access: starterAccess('principal') });
     const bell = await screen.findByRole('button', { name: 'Approvals' });
-    expect(await within(bell).findByText('2')).toBeVisible();
+    expect(await within(bell).findByText('7')).toBeVisible();
     const nav = within(sidebarNav());
-    expect(await nav.findAllByLabelText('2 waiting for you')).toHaveLength(2);
+    expect(await nav.findAllByLabelText('3 waiting for you')).toHaveLength(1);
+    expect(await nav.findAllByLabelText('4 waiting for you')).toHaveLength(1);
   });
 
   it('lists Approval rules in the settings frame after Admissions rules', async () => {

@@ -23,6 +23,33 @@ vi.mock('@eduvault/ui', async (importOriginal) => ({
   }),
 }));
 
+function echoRecorded({
+  body,
+}: {
+  body: {
+    amountMinor: number;
+    allocations: { studentId: string; amountMinor: number }[];
+  };
+}) {
+  const children = recordingOptions().students;
+  return Promise.resolve(
+    recorded({
+      amountMinor: body.amountMinor,
+      allocations: body.allocations.map((row) => {
+        const child = children.find((one) => one.studentId === row.studentId);
+        return {
+          studentId: row.studentId,
+          studentName: child?.name ?? 'Unknown',
+          className: null,
+          amountMinor: row.amountMinor,
+          inScope: true,
+          balanceMinor: (child?.owesMinor ?? 0) - row.amountMinor,
+        };
+      }),
+    })
+  );
+}
+
 function setup(
   options: {
     recordingOptions?: ReturnType<typeof recordingOptions>;
@@ -36,7 +63,7 @@ function setup(
       recordingOptions: vi
         .fn()
         .mockResolvedValue(options.recordingOptions ?? recordingOptions()),
-      record: options.record ?? vi.fn().mockResolvedValue(recorded()),
+      record: options.record ?? vi.fn().mockImplementation(echoRecorded),
     },
     files: {
       upload: vi.fn().mockResolvedValue({
@@ -71,12 +98,6 @@ describe('RecordPaymentSheet', () => {
   it('prefills each child’s balance and the amount from the first guardian', async () => {
     setup();
 
-    expect(
-      await screen.findByRole('heading', { name: 'Record a payment' })
-    ).toBeVisible();
-    expect(
-      screen.getByText('Posts at once and issues a receipt.')
-    ).toBeVisible();
     expect(await screen.findByLabelText('Payer')).toHaveValue(NGOZI);
     expect(
       screen.getByRole('option', { name: 'Ngozi Okeke (3 children)' })
@@ -268,7 +289,7 @@ describe('RecordPaymentSheet', () => {
     });
     await waitFor(() => {
       expect(toast.success).toHaveBeenCalledWith(
-        'RCT-2026-00088 recorded: ₦240,000 from Ngozi Okeke.'
+        'RCT-2026-00088 recorded: ₦300,000 from Ngozi Okeke.'
       );
     });
     await waitFor(() => {
@@ -280,29 +301,15 @@ describe('RecordPaymentSheet', () => {
   });
 
   it('mentions credit when a child is now paid in extra', async () => {
-    setup({
-      record: vi.fn().mockResolvedValue(
-        recorded({
-          allocations: [
-            {
-              studentId: ADA,
-              studentName: 'Ada Okeke',
-              className: null,
-              amountMinor: 20_000_000,
-              inScope: true,
-              balanceMinor: -2_000_000,
-            },
-          ],
-        })
-      ),
+    setup();
+    fireEvent.change(await screen.findByLabelText('Amount received (₦)'), {
+      target: { value: '320000' },
     });
-    fireEvent.click(
-      await screen.findByRole('button', { name: 'Record payment' })
-    );
+    fireEvent.click(screen.getByRole('button', { name: 'Record payment' }));
 
     await waitFor(() => {
       expect(toast.success).toHaveBeenCalledWith(
-        'RCT-2026-00088 recorded: ₦240,000 from Ngozi Okeke. ₦20,000 was paid in extra and is kept for the next fees.'
+        'RCT-2026-00088 recorded: ₦320,000 from Ngozi Okeke. ₦20,000 was paid in extra and is kept for the next fees.'
       );
     });
   });

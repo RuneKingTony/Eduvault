@@ -300,7 +300,7 @@ test.describe('invoice constraints', () => {
       /invoice_term_student_live_key/
     );
     await api(owner).post(`/billing-runs/${runId}/cancel`).expect(201);
-    await expect(insertDraft(pool, twin)).resolves.toBeDefined();
+    await insertDraft(pool, twin);
   });
 
   test('refuses a charge line that is negative without a discount, or a discount that is not negative', async ({

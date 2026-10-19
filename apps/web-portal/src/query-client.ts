@@ -1,5 +1,5 @@
 import { createEduvaultQueryClient } from '@eduvault/auth-client';
 
-export const createQueryClient = () => createEduvaultQueryClient();
+const createQueryClient = () => createEduvaultQueryClient();
 
 export const queryClient = createQueryClient();

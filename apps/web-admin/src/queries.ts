@@ -852,7 +852,7 @@ export const familyStatementQueryOptions = (api: Api, guardianId: string) =>
 const APPROVALS_KEY = ['approvals'] as const;
 const ADJUSTMENTS_KEY = ['adjustments'] as const;
 
-export const APPROVALS_REFRESH_MS = 60_000;
+const APPROVALS_REFRESH_MS = 60_000;
 
 interface ApprovalsView {
   includeOthers: boolean;

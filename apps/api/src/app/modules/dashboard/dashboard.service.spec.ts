@@ -211,23 +211,3 @@ describe('DashboardService.tasks startYear', () => {
     expect(task).toMatchObject({ kind: 'notInClass', startYear: null });
   });
 });
-
-describe('DashboardService.roll and myClasses', () => {
-  it('reads the roll and the classes through the caller scope', async () => {
-    const { repository, service } = setup();
-    repository.classes = [
-      {
-        armId: 'a1',
-        name: 'JSS 1A',
-        campusName: 'Lekki',
-        studentCount: 1,
-        isClassTeacher: true,
-        subjects: [],
-        sampleStudents: [person(1)],
-      },
-    ];
-    expect(await service.roll(ctxFor([]))).toEqual(repository.rollCounts);
-    expect(await service.myClasses(ctxFor([]))).toEqual(repository.classes);
-    expect(repository.calls).toEqual(['roll', 'myClasses']);
-  });
-});

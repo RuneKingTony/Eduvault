@@ -15,6 +15,7 @@ import { ALL_PERMISSIONS, READ_PERMS, toPermissionMap } from '@eduvault/policy';
 import { TooltipProvider } from '@eduvault/ui';
 import { ApiProvider, type Api } from './api';
 import { feeSetupQueryOptions } from './queries';
+import { checked } from './test-api';
 
 export const platformSchool = (
   overrides: Partial<PlatformSchool> = {}
@@ -98,7 +99,7 @@ export function renderWithApi(
   return {
     ...render(
       <QueryClientProvider client={queryClient}>
-        <ApiProvider api={api as unknown as Api}>
+        <ApiProvider api={checked(api)}>
           <PermissionsProvider value={access}>
             <TooltipProvider>{ui}</TooltipProvider>
           </PermissionsProvider>

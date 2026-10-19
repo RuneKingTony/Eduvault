@@ -531,7 +531,12 @@ test.describe('starter roles', () => {
       subject: ['read'],
     });
     expect(permissionOf('bursar')).toBe('{}');
-    expect(permissionOf('guardian')).toBeDefined();
+    expect(parsePermissionMap(permissionOf('guardian') ?? '')).toEqual({
+      student: ['readOwn'],
+      invoice: ['readOwn'],
+      feeLine: ['readOwn'],
+      payment: ['readOwn'],
+    });
     expect(rows).toHaveLength(STARTER_ROLES.length);
   });
   test('syncAllStarterRoles gives every existing school the six roles and is safe to repeat', async ({

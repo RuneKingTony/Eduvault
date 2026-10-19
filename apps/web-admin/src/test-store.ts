@@ -28,6 +28,7 @@ export const TIE_ID = '00000000-0000-4000-8000-0000000f0302';
 const BOOK_ID = '00000000-0000-4000-8000-0000000f0303';
 const COUNT_ID = '00000000-0000-4000-8000-0000000f0901';
 export const SALE_ID = '00000000-0000-4000-8000-0000000f0601';
+export const SECOND_SALE_ID = '00000000-0000-4000-8000-0000000f0605';
 export const ADA_ID = '00000000-0000-4000-8000-0000000f0701';
 export const TOBI_ID = '00000000-0000-4000-8000-0000000f0702';
 export const PROOF_ID = '00000000-0000-4000-8000-0000000f0603';
@@ -269,6 +270,27 @@ export const sale = (over: Partial<Sale> = {}): Sale => ({
   proof: { fileId: PROOF_ID, fileName: 'pos-slip.pdf' },
   ...over,
 });
+
+export const secondSale = (): Sale =>
+  sale({
+    id: SECOND_SALE_ID,
+    number: 'ISS-2026-0002',
+    reference: 'STORE-20260923-CD34EF56',
+    lines: [
+      {
+        itemId: TIE_ID,
+        displayName: 'School tie',
+        quantity: 3,
+        unitPriceMinor: 200_000,
+        amountMinor: 600_000,
+        costMinor: 360_000,
+        unitCostMinor: 120_000,
+      },
+    ],
+    totalMinor: 600_000,
+    costMinor: 360_000,
+    receiptNumber: 'RCT-2026-00013',
+  });
 
 export const saleList = (items: Sale[] = [sale()]): SaleList => ({
   items,

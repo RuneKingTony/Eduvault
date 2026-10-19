@@ -359,9 +359,7 @@ describe('AdmissionService.admit permission matrix', () => {
     await expect(service.admit(linkOnly, input())).rejects.toBeInstanceOf(
       ForbiddenException
     );
-    await expect(
-      service.admit(linkOnly, input({}, [existing]))
-    ).resolves.toBeDefined();
+    await service.admit(linkOnly, input({}, [existing]));
     expect(admissions.writes).toHaveLength(1);
   });
 

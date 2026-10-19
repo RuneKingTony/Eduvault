@@ -26,6 +26,7 @@ import { TooltipProvider } from '@eduvault/ui';
 import { parseStoreSearch } from './store-search';
 import { parseStatementSearch } from './accounts-search';
 import { ApiProvider, type Api } from './api';
+import { checked } from './test-api';
 import { parseBillingSearch, parseRunSearch } from './billing-search';
 import { parseFeesSearch } from './fees-search';
 import { parseInvoicesSearch } from './invoices-search';
@@ -292,7 +293,7 @@ export function renderBilling(
   const root = createRootRoute({
     component: () => (
       <QueryClientProvider client={queryClient}>
-        <ApiProvider api={api as unknown as Api}>
+        <ApiProvider api={checked(api)}>
           <PermissionsProvider value={access}>
             <TooltipProvider>{page}</TooltipProvider>
           </PermissionsProvider>

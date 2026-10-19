@@ -63,6 +63,19 @@ const edited = (current: ItemRecord, change: ItemChange): ItemRecord => {
   };
 };
 
+// Mirrors the item_active_key unique index: kind, name, variant and class level among active items.
+const sameActiveKey = (
+  item: ItemRecord,
+  key: Pick<ItemRecord, 'kind' | 'name' | 'variant'> & {
+    classLevelId: string | null;
+  }
+): boolean =>
+  item.retiredAt === null &&
+  item.kind === key.kind &&
+  item.name === key.name &&
+  item.variant === key.variant &&
+  (item.classLevel?.id ?? null) === key.classLevelId;
+
 const priceDiffers = (before: ItemRecord, after: ItemRecord): boolean =>
   before.costPriceMinor !== after.costPriceMinor ||
   before.sellPriceMinor !== after.sellPriceMinor;
@@ -77,6 +90,10 @@ interface PriceChangeRecord {
 
 export class FakeStoreRepository extends StoreRepository {
   levels = new Map<string, string>();
+  /** The school each level, store and inserted item belongs to; anything not recorded here belongs to whichever school asks. */
+  levelSchools = new Map<string, string>();
+  storeSchools = new Map<string, string>();
+  private readonly itemSchools = new Map<string, string>();
   items: ItemRecord[] = [];
   stores: StoreRef[] = [];
   totals: StockTotals[] = [];
@@ -89,51 +106,69 @@ export class FakeStoreRepository extends StoreRepository {
   priceChanges: PriceChangeRecord[] = [];
   suppliers: string[] = [];
 
+  private belongs(
+    schools: Map<string, string>,
+    id: string,
+    organizationId: string
+  ): boolean {
+    return (schools.get(id) ?? organizationId) === organizationId;
+  }
+
+  private itemsOf(organizationId: string): ItemRecord[] {
+    return this.items.filter((item) =>
+      this.belongs(this.itemSchools, item.id, organizationId)
+    );
+  }
+
   classLevel(
-    _organizationId: string,
+    organizationId: string,
     id: string
   ): Promise<{ id: string; name: string } | undefined> {
     const name = this.levels.get(id);
-    return Promise.resolve(name === undefined ? undefined : { id, name });
+    return Promise.resolve(
+      name === undefined || !this.belongs(this.levelSchools, id, organizationId)
+        ? undefined
+        : { id, name }
+    );
   }
 
-  listItems(
-    _organizationId: string,
-    filter: ItemFilter
-  ): Promise<ItemRecord[]> {
+  listItems(organizationId: string, filter: ItemFilter): Promise<ItemRecord[]> {
+    const q = filter.q?.toLowerCase();
     return Promise.resolve(
-      this.items.filter(
+      this.itemsOf(organizationId).filter(
         (item) =>
           (filter.includeRetired || item.retiredAt === null) &&
           (filter.kind === undefined || item.kind === filter.kind) &&
-          (filter.q === undefined ||
-            item.displayName.toLowerCase().includes(filter.q.toLowerCase()))
+          (q === undefined ||
+            [item.name, item.variant, item.classLevel?.name].some(
+              (text) => text?.toLowerCase().includes(q) === true
+            ))
       )
     );
   }
 
   findItem(
-    _organizationId: string,
+    organizationId: string,
     id: string
   ): Promise<ItemRecord | undefined> {
-    return Promise.resolve(this.items.find((item) => item.id === id));
+    return Promise.resolve(
+      this.itemsOf(organizationId).find((item) => item.id === id)
+    );
   }
 
   findItems(
-    _organizationId: string,
+    organizationId: string,
     ids: readonly string[]
   ): Promise<ItemRecord[]> {
-    return Promise.resolve(this.items.filter((item) => ids.includes(item.id)));
+    return Promise.resolve(
+      this.itemsOf(organizationId).filter((item) => ids.includes(item.id))
+    );
   }
 
   insertItem(input: NewItem): Promise<ItemInsertOutcome> {
     const name = itemDisplayName(input);
-    const clash = this.items.some(
-      (item) =>
-        item.retiredAt === null &&
-        item.kind === input.kind &&
-        item.displayName === name &&
-        item.classLevel?.id === (input.classLevelId ?? undefined)
+    const clash = this.itemsOf(input.organizationId).some((item) =>
+      sameActiveKey(item, input)
     );
     if (clash) {
       return Promise.resolve({ status: 'duplicate' });
@@ -157,20 +192,24 @@ export class FakeStoreRepository extends StoreRepository {
       retiredAt: null,
     };
     this.items.push(item);
+    this.itemSchools.set(item.id, input.organizationId);
     return Promise.resolve({ status: 'created', item });
   }
 
   updateItem(change: ItemChange): Promise<ItemUpdateOutcome> {
     const index = this.items.findIndex((item) => item.id === change.itemId);
     const current = this.items[index];
-    if (current === undefined) {
+    if (
+      current === undefined ||
+      !this.belongs(this.itemSchools, current.id, change.organizationId)
+    ) {
       return Promise.resolve({ status: 'missing' });
     }
     if (current.retiredAt !== null) {
       return Promise.resolve({ status: 'retired' });
     }
     const updated = edited(current, change);
-    if (this.clashes(updated)) {
+    if (this.clashes(updated, change.organizationId)) {
       return Promise.resolve({ status: 'duplicate' });
     }
     if (priceDiffers(current, updated)) {
@@ -186,13 +225,14 @@ export class FakeStoreRepository extends StoreRepository {
     return Promise.resolve({ status: 'updated', item: updated });
   }
 
-  private clashes(candidate: ItemRecord): boolean {
-    return this.items.some(
+  private clashes(candidate: ItemRecord, organizationId: string): boolean {
+    return this.itemsOf(organizationId).some(
       (item) =>
         item.id !== candidate.id &&
-        item.retiredAt === null &&
-        item.kind === candidate.kind &&
-        item.displayName === candidate.displayName
+        sameActiveKey(item, {
+          ...candidate,
+          classLevelId: candidate.classLevel?.id ?? null,
+        })
     );
   }
 
@@ -200,8 +240,9 @@ export class FakeStoreRepository extends StoreRepository {
     return Promise.resolve(
       this.stores.filter(
         (store) =>
-          scope.campusScope === 'all' ||
-          scope.campusScope.includes(store.campusId)
+          this.belongs(this.storeSchools, store.id, scope.organizationId) &&
+          (scope.campusScope === 'all' ||
+            scope.campusScope.includes(store.campusId))
       )
     );
   }

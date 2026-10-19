@@ -18,9 +18,12 @@ export function accessOfStarter(
   campusScope: MePermissions['campusScope'] = 'all'
 ): MePermissions {
   const role = STARTER_ROLES.find((candidate) => candidate.slug === slug);
+  if (role === undefined) {
+    throw new Error(`No starter role called ${slug}`);
+  }
   return fakeAccess({
     roles: [slug],
-    permissions: toPermissionMap(role?.permissions ?? []),
+    permissions: toPermissionMap(role.permissions),
     campusScope,
   });
 }

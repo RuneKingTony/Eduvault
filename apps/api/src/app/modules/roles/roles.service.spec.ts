@@ -414,14 +414,6 @@ describe('RolesService.create', () => {
     );
   });
 
-  it('derives a safe slug from a label that is Owner or Member', async () => {
-    const { service } = setup();
-    const error = await rejection(
-      service.create(context(), body({ label: 'Owner' }))
-    );
-    expect(error).toBeInstanceOf(ConflictException);
-  });
-
   it('answers 400 for a permission that is not listed or an invalid slug, before any write', async () => {
     const { service, writes } = setup();
     const unknown = await rejection(

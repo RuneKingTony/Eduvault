@@ -20,3 +20,4 @@ export * from './students';
 export * from './subjects';
 export * from './contract';
 export * from './client';
+export * from './checked-fake';
