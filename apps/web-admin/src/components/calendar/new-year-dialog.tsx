@@ -20,7 +20,11 @@ import {
   toast,
 } from '@eduvault/ui';
 import { useApi } from '../../api';
-import { invalidateCalendar, schoolYearsQueryOptions } from '../../queries';
+import {
+  invalidateCalendar,
+  refreshForCurrentTerm,
+  schoolYearsQueryOptions,
+} from '../../queries';
 import { useToday } from './use-today';
 
 const MISSING_FIELDS = 'Fill in the year and both dates.';
@@ -35,7 +39,9 @@ function useCreateYear(onCreated: () => void) {
     mutationFn: (body: { name: string; startsOn: string; endsOn: string }) =>
       api.schoolYears.create({ body }),
     onSuccess: async (created) => {
-      await invalidateCalendar(queryClient);
+      await (created.madeCurrent
+        ? refreshForCurrentTerm(queryClient)
+        : invalidateCalendar(queryClient));
       toast.success(createdYearToast(created));
       onCreated();
     },

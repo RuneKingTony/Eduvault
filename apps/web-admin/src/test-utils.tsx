@@ -14,6 +14,7 @@ import {
 import { ALL_PERMISSIONS, READ_PERMS, toPermissionMap } from '@eduvault/policy';
 import { TooltipProvider } from '@eduvault/ui';
 import { ApiProvider, type Api } from './api';
+import { feeSetupQueryOptions } from './queries';
 
 export const platformSchool = (
   overrides: Partial<PlatformSchool> = {}
@@ -109,3 +110,10 @@ export function renderWithApi(
 }
 
 export { fakeAccess } from '@eduvault/auth-client';
+
+export function seedFeeSetup(queryClient: QueryClient) {
+  const key = feeSetupQueryOptions({} as Api).queryKey;
+  const setup = { terms: [], levels: [] };
+  queryClient.setQueryData(key, setup);
+  return { key, setup };
+}

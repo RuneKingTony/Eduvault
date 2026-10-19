@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from '@eduvault/ui';
 import { useApi } from '../../api';
-import { invalidateCalendar } from '../../queries';
+import { refreshForCurrentTerm } from '../../queries';
 import { termTitle, type TermInYear } from './calendar-text';
 
 export function useMakeCurrent(onDone?: () => void) {
@@ -11,7 +11,7 @@ export function useMakeCurrent(onDone?: () => void) {
     mutationFn: ({ term }: TermInYear) =>
       api.terms.makeCurrent({ params: { id: term.id } }),
     onSuccess: async (_made, { term, year }) => {
-      await invalidateCalendar(queryClient);
+      await refreshForCurrentTerm(queryClient);
       toast.success(`${termTitle(term, year)} is now the current term.`);
       onDone?.();
     },
