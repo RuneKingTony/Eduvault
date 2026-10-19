@@ -57,5 +57,3 @@ export const optionToast = (
   optedIn
     ? `${firstName} now takes ${feeType} from the next round of charges.`
     : `${firstName} no longer takes ${feeType} from the next round of charges.`;
-
-export const ENTER_AMOUNT = 'Enter an amount.';

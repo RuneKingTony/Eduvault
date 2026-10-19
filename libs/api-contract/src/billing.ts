@@ -11,7 +11,6 @@ export const BILLING_TERM_MESSAGE = 'Choose the current term or the next term.';
 export const BILLING_CAMPUS_REQUIRED_MESSAGE = 'Choose a campus.';
 export const BILLING_LEVEL_REQUIRED_MESSAGE = 'Choose a level.';
 export const BILLING_RUN_NOT_FOUND_MESSAGE = 'Charge round not found';
-export const BILLING_CAMPUS_NOT_FOUND_MESSAGE = 'Campus not found';
 export const BILLING_ALREADY_SENT_MESSAGE = 'This round has already been sent.';
 export const BILLING_CANCELLED_MESSAGE = 'This round was cancelled.';
 export const BILLING_ONLY_DRAFTS_MESSAGE = 'Only drafts can be cancelled.';
