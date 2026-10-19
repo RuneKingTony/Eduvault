@@ -14,17 +14,6 @@ import {
 } from '../test-utils';
 import { PurchasesPage } from './purchases-page';
 
-const CARD = '[data-slot="card"]';
-
-function cardAround(text: string): HTMLElement {
-  const node = screen.getByText(text);
-  const found = node.closest<HTMLElement>(CARD);
-  if (found === null) {
-    throw new Error(`No card around ${node.textContent}`);
-  }
-  return found;
-}
-
 function tileOf(name: string): HTMLElement {
   const tile = screen
     .getAllByRole('listitem')
@@ -98,13 +87,13 @@ describe('PurchasesPage', () => {
     setup();
 
     await screen.findByText('Spent this term');
-    const spent = cardAround('Spent this term');
+    const spent = screen.getByRole('group', { name: 'Spent this term' });
     expect(within(spent).getByText('₦13,000')).toBeVisible();
     expect(within(spent).getByText('1 purchase in first term')).toBeVisible();
-    const bought = cardAround('Items bought');
+    const bought = screen.getByRole('group', { name: 'Items bought' });
     expect(within(bought).getByText('3')).toBeVisible();
     expect(within(bought).getByText('Books and uniforms')).toBeVisible();
-    const last = cardAround('Last purchase');
+    const last = screen.getByRole('group', { name: 'Last purchase' });
     expect(within(last).getByText('8 Sep 2026')).toBeVisible();
     expect(within(last).getByText('₦13,000 · paid at the store')).toBeVisible();
   });
@@ -136,13 +125,17 @@ describe('PurchasesPage', () => {
     });
 
     expect(await screen.findByText('Purchase history')).toBeVisible();
-    const first = cardAround('Lekki campus store · receipt RCT-2026-00012');
+    const first = screen.getByRole('group', {
+      name: 'Purchase RCT-2026-00012',
+    });
     expect(within(first).getByText('Paid by POS')).toBeVisible();
     expect(within(first).getByText('School shirt, Size 12')).toBeVisible();
     expect(within(first).getByText('₦4,500')).toBeVisible();
     expect(within(first).getByText('₦9,000')).toBeVisible();
     expect(within(first).getByText('Total')).toBeVisible();
-    const older = cardAround('Lekki campus store · receipt RCT-2026-00005');
+    const older = screen.getByRole('group', {
+      name: 'Purchase RCT-2026-00005',
+    });
     expect(within(older).getByText('Paid by cash')).toBeVisible();
     const cards = screen.getAllByText(/campus store · receipt/);
     expect(cards.map((card) => card.textContent)).toEqual([

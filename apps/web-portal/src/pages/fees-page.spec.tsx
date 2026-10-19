@@ -65,23 +65,16 @@ describe('FeesPage', () => {
 
   it('reads Owing, the amount and Still to pay when owing', async () => {
     renderFees(apiWith());
-    const stat = (await screen.findByText('Still to pay')).closest('div');
-    expect(stat).not.toBeNull();
-    expect(within(stat as HTMLElement).getByText('Owing')).toBeInTheDocument();
-    expect(
-      within(stat as HTMLElement).getByText('₦60,000')
-    ).toBeInTheDocument();
+    const stat = await screen.findByRole('group', { name: 'Owing' });
+    expect(within(stat).getByText('₦60,000')).toBeInTheDocument();
+    expect(within(stat).getByText('Still to pay')).toBeInTheDocument();
   });
 
   it('reads School fees, Paid up and the extra when in credit, with the callout and no refund button', async () => {
     renderFees(apiWith(withBalance(-500_000)));
-    const stat = (await screen.findByText('₦5,000 extra')).closest('div');
-    expect(
-      within(stat as HTMLElement).getByText('School fees')
-    ).toBeInTheDocument();
-    expect(
-      within(stat as HTMLElement).getByText('Paid up')
-    ).toBeInTheDocument();
+    const stat = await screen.findByRole('group', { name: 'School fees' });
+    expect(within(stat).getByText('Paid up')).toBeInTheDocument();
+    expect(within(stat).getByText('₦5,000 extra')).toBeInTheDocument();
     expect(
       screen.getByText(
         '₦5,000 was paid in extra. It is taken off the next fees automatically.'
@@ -92,13 +85,9 @@ describe('FeesPage', () => {
 
   it('reads Paid up and Nothing owed at zero', async () => {
     renderFees(apiWith(withBalance(0)));
-    const stat = (await screen.findByText('Nothing owed')).closest('div');
-    expect(
-      within(stat as HTMLElement).getByText('School fees')
-    ).toBeInTheDocument();
-    expect(
-      within(stat as HTMLElement).getByText('Paid up')
-    ).toBeInTheDocument();
+    const stat = await screen.findByRole('group', { name: 'School fees' });
+    expect(within(stat).getByText('Paid up')).toBeInTheDocument();
+    expect(within(stat).getByText('Nothing owed')).toBeInTheDocument();
   });
 
   it('shows plain rows with no reference note and no links', async () => {
@@ -269,7 +258,9 @@ describe('FeesPage term filter', () => {
     const select = await screen.findByRole('combobox', { name: 'Term' });
 
     expect(
-      [...select.querySelectorAll('option')].map((option) => option.textContent)
+      within(select)
+        .getAllByRole('option')
+        .map((option) => option.textContent)
     ).toEqual([
       'Whole history',
       'Second term, 2026/2027',
