@@ -54,12 +54,15 @@ function setup(
     },
   };
   const onOpenChange = vi.fn();
-  const router = renderBilling(
-    <NewChargeSheet open onOpenChange={onOpenChange} />,
+  return {
     api,
-    { path: '/finance/invoices?new=1' }
-  );
-  return { api, onOpenChange, router };
+    onOpenChange,
+    router: renderBilling(
+      <NewChargeSheet open onOpenChange={onOpenChange} />,
+      api,
+      { path: '/finance/invoices?new=1' }
+    ),
+  };
 }
 
 const field = async (label: string, index = 0) =>

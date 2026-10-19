@@ -285,7 +285,7 @@ describe('StudentAccountService.guardianStatement', () => {
   it('answers 404 when no child is in reach', async () => {
     const { service } = setup();
     await expect(
-      service.guardianStatement(lekkiOnly, 'g1')
+      service.guardianStatement(lekkiOnly, 'g1', {})
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 
@@ -310,7 +310,7 @@ describe('StudentAccountService.guardianStatement', () => {
       ]);
     }
 
-    const family = await service.guardianStatement(everyone, 'g1');
+    const family = await service.guardianStatement(everyone, 'g1', {});
 
     expect(family.guardian).toEqual({ id: 'g1', name: 'Ngozi Okeke' });
     expect(family.familyTotalMinor).toBe(8_000_000);
@@ -550,6 +550,32 @@ describe('StudentAccountService term filter', () => {
     return kit;
   };
 
+  const seedFamily = () => {
+    const kit = seed();
+    kit.accounts.guardian = {
+      guardian: { id: 'g1', name: 'Ngozi Okeke' },
+      studentIds: ['s1', 's2'],
+    };
+    kit.accounts.headers.set('s2', header('s2'));
+    kit.accounts.history.set('s2', [
+      movement({
+        kind: 'invoice',
+        entryId: 'f1',
+        reference: 'CHG-9',
+        effectiveOn: '2026-02-10',
+        debitMinor: 700,
+      }),
+      movement({
+        kind: 'invoice',
+        entryId: 'f2',
+        reference: 'CHG-10',
+        effectiveOn: '2026-09-10',
+        debitMinor: 900,
+      }),
+    ]);
+    return kit;
+  };
+
   it('reconciles the latest term’s brought forward and rows to the balance', async () => {
     const { service } = seed();
 
@@ -693,20 +719,101 @@ describe('StudentAccountService term filter', () => {
     ]);
   });
 
-  it('gives the family view no term filter', async () => {
-    const { accounts, service } = seed();
-    accounts.guardian = {
-      guardian: { id: 'g1', name: 'Ngozi Okeke' },
-      studentIds: ['s1'],
-    };
+  describe('family statement', () => {
+    it('gives each child that term’s rows, brought forward and closing', async () => {
+      const { service } = seedFamily();
 
-    const family = await service.guardianStatement(everyone, 'g1');
+      const statement = await service.guardianStatement(everyone, 'g1', {
+        termId: 'second',
+      });
 
-    expect(family.children[0]).toMatchObject({
-      term: null,
-      broughtForward: null,
-      closingMinor: null,
+      expect(statement.children.map((child) => child.student.id)).toEqual([
+        's1',
+        's2',
+      ]);
+      expect(statement.children.map((child) => child.broughtForward)).toEqual([
+        { amountMinor: 1500 },
+        { amountMinor: 700 },
+      ]);
+      expect(
+        statement.children.map((child) =>
+          child.rows.map((row) => row.reference)
+        )
+      ).toEqual([['CHG-2', 'RCT-2'], ['CHG-10']]);
+      for (const child of statement.children) {
+        expect(child.term?.id).toBe('second');
+        expect(child.closingMinor).toBe(child.totals.balanceMinor);
+      }
     });
-    expect(family.children[0]?.total).toBe(5);
+
+    it('keeps the family total, credit, totals and unpaid whole-account under a term', async () => {
+      const { service } = seedFamily();
+
+      const whole = await service.guardianStatement(everyone, 'g1', {});
+      const filtered = await service.guardianStatement(everyone, 'g1', {
+        termId: 'first',
+      });
+
+      expect(filtered.familyTotalMinor).toBe(whole.familyTotalMinor);
+      expect(filtered.creditMinor).toBe(whole.creditMinor);
+      expect(filtered.children.map((child) => child.totals)).toEqual(
+        whole.children.map((child) => child.totals)
+      );
+      expect(filtered.children.map((child) => child.unpaid)).toEqual(
+        whole.children.map((child) => child.unpaid)
+      );
+    });
+
+    it('returns the term and the term options at the top level', async () => {
+      const { service } = seedFamily();
+
+      const whole = await service.guardianStatement(everyone, 'g1', {});
+      const filtered = await service.guardianStatement(everyone, 'g1', {
+        termId: 'first',
+      });
+
+      expect(whole.term).toBeNull();
+      expect(filtered.term).toEqual({
+        id: 'first',
+        label: 'First term, 2025/2026',
+        fromOn: '2026-01-05',
+        toOn: '2026-08-31',
+      });
+      expect(whole.termOptions).toEqual([
+        { id: 'second', label: 'Second term, 2025/2026' },
+        { id: 'first', label: 'First term, 2025/2026' },
+      ]);
+      expect(filtered.termOptions).toEqual(whole.termOptions);
+      expect(whole.children.every((child) => child.term === null)).toBe(true);
+    });
+
+    it('answers 404 for a term the school does not have', async () => {
+      const { service } = seedFamily();
+
+      await expect(
+        service.guardianStatement(everyone, 'g1', { termId: 'elsewhere' })
+      ).rejects.toThrow(new NotFoundException('Term not found'));
+    });
+
+    it('loads the school’s term windows once for the whole family', async () => {
+      const { accounts, service } = seedFamily();
+      const loads = vi.spyOn(accounts, 'termWindows');
+
+      await service.guardianStatement(everyone, 'g1', { termId: 'second' });
+
+      expect(loads).toHaveBeenCalledTimes(1);
+    });
+
+    it('checks the guardian before the term', async () => {
+      const { accounts, service } = seedFamily();
+      accounts.guardian = undefined;
+
+      await expect(
+        service.guardianStatement(lekkiOnly, 'g1', { termId: 'second' })
+      ).rejects.toThrow(new NotFoundException('Family account not found'));
+      await expect(
+        service.guardianStatement(lekkiOnly, 'g1', { termId: 'elsewhere' })
+      ).rejects.toThrow(new NotFoundException('Family account not found'));
+    });
   });
 });

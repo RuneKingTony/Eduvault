@@ -3,13 +3,17 @@ import type {
   AnnouncementList,
   Campus,
 } from '@eduvault/api-contract';
+import { testId } from './test-api';
 
-export const LEKKI = '00000000-0000-4000-8000-0000000000a1';
-export const IKEJA = '00000000-0000-4000-8000-0000000000a2';
+export const LEKKI = testId(0x1_30_01);
+export const IKEJA = testId(0x1_30_02);
+const SCHOOL_ID = testId(0x1_30_03);
+const ANNOUNCEMENT_ID = testId(0x1_30_11);
+const AUTHOR_ID = testId(0x1_30_21);
 
 export const campus = (id: string, name: string): Campus => ({
   id,
-  organizationId: '00000000-0000-4000-8000-0000000000aa',
+  organizationId: SCHOOL_ID,
   name,
   address: null,
   createdAt: '2026-01-01T00:00:00.000Z',
@@ -18,7 +22,7 @@ export const campus = (id: string, name: string): Campus => ({
 export const announcement = (
   overrides: Partial<Announcement> = {}
 ): Announcement => ({
-  id: '00000000-0000-4000-8000-0000000000b1',
+  id: ANNOUNCEMENT_ID,
   title: 'PTA meeting',
   body: 'Saturday at ten.',
   tag: 'event',
@@ -28,7 +32,7 @@ export const announcement = (
   pinned: false,
   publishedOn: '2026-10-09',
   withdrawnAt: null,
-  createdBy: { id: 'u1', name: 'Tunde Bakare' },
+  createdBy: { id: AUTHOR_ID, name: 'Tunde Bakare' },
   updatedBy: null,
   updatedAt: '2026-10-09T09:00:00.000Z',
   ...overrides,

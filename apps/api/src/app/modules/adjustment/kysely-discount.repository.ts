@@ -240,6 +240,7 @@ class KyselyDiscountTx implements DiscountTx {
       .where('organization_id', '=', this.who.scope.organizationId)
       .where('id', '=', id)
       .where('status', '=', 'approved')
+      .where('ended_at', 'is', null)
       .executeTakeFirst();
     return result.numUpdatedRows > 0n;
   }

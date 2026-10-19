@@ -9,6 +9,7 @@ import {
   type PortalFamilyStatement,
   type PortalMe,
   type PortalStatement,
+  type PortalFamilyStatementQuery,
   type PortalStatementQuery,
   type PortalStudent,
 } from '@eduvault/api-contract';
@@ -80,13 +81,23 @@ export class PortalService {
     return toPortalStatement(record, own);
   }
 
-  async familyStatement(ctx: OrgContext): Promise<PortalFamilyStatement> {
+  async familyStatement(
+    ctx: OrgContext,
+    query: PortalFamilyStatementQuery
+  ): Promise<PortalFamilyStatement> {
     const children = await this.portal.children(scopeOf(ctx));
-    const { currency, balances } = await this.accounts.ownBalances(
-      ctx,
-      children.map((child) => child.id)
-    );
-    return toPortalFamilyStatement(currency, children, balances);
+    const [{ currency, balances }, termFields] = await Promise.all([
+      this.accounts.ownBalances(
+        ctx,
+        children.map((child) => child.id)
+      ),
+      this.accounts.familyTerm(ctx, query.termId),
+    ]);
+    return toPortalFamilyStatement(children, {
+      currency,
+      balances,
+      ...termFields,
+    });
   }
 
   async student(ctx: OrgContext, studentId: string): Promise<PortalStudent> {

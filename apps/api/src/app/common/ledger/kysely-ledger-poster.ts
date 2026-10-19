@@ -3,6 +3,7 @@ import { sql, type Kysely } from 'kysely';
 import { journalKindSchema } from '@eduvault/api-contract';
 import type { DB } from '../../../db/db-types';
 import {
+  ReferenceClashError,
   assertBalancedLines,
   type PostInput,
   type PostResult,
@@ -70,5 +71,14 @@ export class LedgerPoster {
       )
       .execute();
     return { entry: toEntry(inserted), replayed: false };
+  }
+
+  /** For a posting that happens once per request: a reference already in the journal is a clash, never a replay. */
+  async postOnce(trx: Kysely<DB>, input: PostInput): Promise<PostedEntry> {
+    const { entry, replayed } = await this.post(trx, input);
+    if (replayed) {
+      throw new ReferenceClashError(input.reference);
+    }
+    return entry;
   }
 }

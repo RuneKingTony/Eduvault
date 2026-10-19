@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { sql, type RawBuilder } from 'kysely';
+import { sql, type ExpressionBuilder, type RawBuilder } from 'kysely';
 import {
   DEFAULT_MEMBER_TITLE,
   MEMBER_PAGE_SIZE,
@@ -18,12 +18,74 @@ import { campusIdsByUser } from '../../common/db/campus-ids-by-user';
 import { escapeLike } from '../../common/db/escape-like';
 import { inCampusScope } from '../../common/db/in-campus-scope';
 import { KYSELY_TOKEN, type Database } from '../../common/db/tokens';
+import type { DB } from '../../../db/db-types';
 import {
   MembersRepository,
   type MemberListQuery,
   type MemberRecord,
   type Viewer,
 } from './members.repository';
+
+interface Teacher {
+  organizationId: string;
+  userId: string;
+}
+
+const classTeacherArms = (
+  eb: ExpressionBuilder<DB, 'class_arm'>,
+  { organizationId, userId }: Teacher
+) =>
+  eb
+    .selectFrom('class_arm_teacher')
+    .innerJoin('term', (join) =>
+      join
+        .onRef('term.session_id', '=', 'class_arm_teacher.session_id')
+        .onRef('term.organization_id', '=', 'class_arm_teacher.organization_id')
+    )
+    .where('class_arm_teacher.organization_id', '=', organizationId)
+    .where('class_arm_teacher.user_id', '=', userId)
+    .where('term.is_current', '=', true)
+    .select('class_arm_teacher.class_arm_id as class_arm_id');
+
+/** The same arms `listTaughtClassIds` counts: the subject must still be on the arm's level. */
+const subjectTeacherArms = (
+  eb: ExpressionBuilder<DB, 'class_arm'>,
+  { organizationId, userId }: Teacher
+) =>
+  eb
+    .selectFrom('subject_teacher')
+    .innerJoin('term', (join) =>
+      join
+        .onRef('term.id', '=', 'subject_teacher.term_id')
+        .onRef('term.organization_id', '=', 'subject_teacher.organization_id')
+    )
+    .innerJoin('class_arm as subject_arm', (join) =>
+      join
+        .onRef('subject_arm.id', '=', 'subject_teacher.class_arm_id')
+        .onRef(
+          'subject_arm.organization_id',
+          '=',
+          'subject_teacher.organization_id'
+        )
+    )
+    .innerJoin('level_subject', (join) =>
+      join
+        .onRef(
+          'level_subject.class_level_id',
+          '=',
+          'subject_arm.class_level_id'
+        )
+        .onRef('level_subject.subject_id', '=', 'subject_teacher.subject_id')
+        .onRef(
+          'level_subject.organization_id',
+          '=',
+          'subject_teacher.organization_id'
+        )
+    )
+    .where('subject_teacher.organization_id', '=', organizationId)
+    .where('subject_teacher.user_id', '=', userId)
+    .where('term.is_current', '=', true)
+    .select('subject_teacher.class_arm_id as class_arm_id');
 
 interface Row {
   id: string;
@@ -293,16 +355,7 @@ export class KyselyMembersRepository extends MembersRepository {
     viewer: Viewer
   ): Promise<TaughtClass[]> {
     const rows = await this.db
-      .selectFrom('class_arm_teacher')
-      .innerJoin('class_arm', (join) =>
-        join
-          .onRef('class_arm.id', '=', 'class_arm_teacher.class_arm_id')
-          .onRef(
-            'class_arm.organization_id',
-            '=',
-            'class_arm_teacher.organization_id'
-          )
-      )
+      .selectFrom('class_arm')
       .innerJoin('class_level', (join) =>
         join
           .onRef('class_level.id', '=', 'class_arm.class_level_id')
@@ -312,19 +365,13 @@ export class KyselyMembersRepository extends MembersRepository {
             'class_arm.organization_id'
           )
       )
-      .innerJoin('term', (join) =>
-        join
-          .onRef('term.session_id', '=', 'class_arm_teacher.session_id')
-          .onRef(
-            'term.organization_id',
-            '=',
-            'class_arm_teacher.organization_id'
-          )
-      )
-      .where('class_arm_teacher.organization_id', '=', organizationId)
-      .where('class_arm_teacher.user_id', '=', userId)
-      .where('term.is_current', '=', true)
+      .where('class_arm.organization_id', '=', organizationId)
       .where('class_arm.retired_at', 'is', null)
+      .where('class_arm.id', 'in', (eb) =>
+        classTeacherArms(eb, { organizationId, userId }).union(
+          subjectTeacherArms(eb, { organizationId, userId })
+        )
+      )
       .where((eb) =>
         inCampusScope(eb, 'class_arm.campus_id', { scope: viewer.campusScope })
       )

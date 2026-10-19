@@ -33,6 +33,13 @@ function setup(
   return { api, onSearchChange };
 }
 
+async function amountCell() {
+  const headers = await screen.findAllByRole('columnheader');
+  const column = headers.findIndex((header) => header.textContent === 'Amount');
+  const row = await screen.findByRole('row', { name: /RCT-2026-00088/ });
+  return within(row).getAllByRole('cell')[column];
+}
+
 describe('PaymentsPage', () => {
   it('shows the summary line and the receipt count', async () => {
     setup({
@@ -81,8 +88,7 @@ describe('PaymentsPage', () => {
     setup({
       list: paymentList([paymentSummary({ status: 'voided' })]),
     });
-    const amount = await screen.findByText('₦240,000', { selector: 'a' });
-    expect(amount.closest('td')).toHaveClass('line-through');
+    expect(await amountCell()).toHaveClass('line-through');
     expect(screen.getByText('Cancelled')).toBeVisible();
   });
 
@@ -91,8 +97,7 @@ describe('PaymentsPage', () => {
       list: paymentList([paymentSummary({ status: 'void_pending' })]),
     });
     expect(await screen.findByText('Cancellation waiting')).toBeVisible();
-    const amount = await screen.findByText('₦240,000', { selector: 'a' });
-    expect(amount.closest('td')).not.toHaveClass('line-through');
+    expect(await amountCell()).not.toHaveClass('line-through');
   });
 
   it('shows Record payment to a bursar', async () => {

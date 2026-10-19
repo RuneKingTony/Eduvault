@@ -260,6 +260,7 @@ export class MembersService {
     title: string
   ): Promise<MemberDetail> {
     const record = await this.visible(ctx, id);
+    await this.assertHoldsRoles(ctx, record, 'change the title of');
     await this.members.updateTitle(
       ctx.organizationId,
       record.id,
@@ -275,6 +276,7 @@ export class MembersService {
   ): Promise<MemberDetail> {
     return this.admin.underSchoolLock(ctx.organizationId, async () => {
       const record = await this.visible(ctx, id);
+      await this.assertHoldsRoles(ctx, record, 'change the campuses of');
       for (const campusId of input.campusIds) {
         await this.campuses.assertInScope(ctx, campusId);
       }
@@ -575,6 +577,15 @@ export class MembersService {
         `You can’t ${verb} ${record.name}: they also work on campuses you can’t see.`
       );
     }
+    await this.assertHoldsRoles(ctx, record, verb);
+  }
+
+  /** Changing the campuses leaves the ones an editor cannot see alone, so only the roles gate it. */
+  private async assertHoldsRoles(
+    ctx: OrgContext,
+    record: MemberRecord,
+    verb: string
+  ): Promise<void> {
     const entries = await this.loadCatalogue(ctx);
     const blocked = record.roles
       .map((slug) => entries.find((entry) => entry.slug === slug))

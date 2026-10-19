@@ -42,10 +42,10 @@ const rowOf = async (name: string) => {
 };
 
 const openMenu = async (name: string) => {
-  const row = await rowOf(name);
-  fireEvent.keyDown(row.getByRole('button', { name: `Actions for ${name}` }), {
-    key: 'Enter',
-  });
+  fireEvent.keyDown(
+    (await rowOf(name)).getByRole('button', { name: `Actions for ${name}` }),
+    { key: 'Enter' }
+  );
 };
 
 describe('LevelsPage', () => {

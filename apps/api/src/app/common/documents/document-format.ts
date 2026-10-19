@@ -1,18 +1,18 @@
+import { SYSTEM_REFERENCE_PREFIXES } from '@eduvault/shared';
 import type { Clock } from '../clock';
 import type { DocumentKind } from './document-sequence';
 
 type YearlyDocumentKind = Exclude<DocumentKind, 'admission'>;
 
-const FORMATS: Record<YearlyDocumentKind, { prefix: string; digits: number }> =
-  {
-    invoice: { prefix: 'CHG', digits: 5 },
-    payment: { prefix: 'RCT', digits: 5 },
-    billing_run: { prefix: 'BR', digits: 4 },
-    adjustment: { prefix: 'ADJ', digits: 4 },
-    store_sale: { prefix: 'ISS', digits: 4 },
-    delivery: { prefix: 'DEL', digits: 4 },
-    stock_count: { prefix: 'CNT', digits: 4 },
-  };
+const DIGITS: Record<YearlyDocumentKind, number> = {
+  invoice: 5,
+  payment: 5,
+  billing_run: 4,
+  adjustment: 4,
+  store_sale: 4,
+  delivery: 4,
+  stock_count: 4,
+};
 
 /** Numbers widen past the padding, never truncate. */
 export function formatDocumentNumber(
@@ -20,8 +20,8 @@ export function formatDocumentNumber(
   year: number,
   value: number
 ): string {
-  const { prefix, digits } = FORMATS[kind];
-  return `${prefix}-${year}-${String(value).padStart(digits, '0')}`;
+  const prefix = SYSTEM_REFERENCE_PREFIXES[kind];
+  return `${prefix}-${year}-${String(value).padStart(DIGITS[kind], '0')}`;
 }
 
 export const documentYear = (clock: Pick<Clock, 'today'>): number =>

@@ -1,6 +1,6 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { PermissionsProvider } from './permissions';
-import { accessOfStarter, fakeAccess } from './access-test-utils';
+import { accessOfStarter, fakeAccess } from './testing';
 import { UserMenu } from './user-menu';
 import { fakeClient, openMenu, renderInSidebar } from './menu-test-utils';
 

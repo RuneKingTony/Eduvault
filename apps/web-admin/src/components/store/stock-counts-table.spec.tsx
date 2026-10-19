@@ -28,14 +28,21 @@ function setup(
   return { onApprovals, onPage };
 }
 
-const rowOf = (text: string) =>
-  within(screen.getByText(text).closest('tr') as HTMLElement);
+const rowWith = (text: string): HTMLElement => {
+  const row = screen
+    .getAllByRole('row')
+    .find((candidate) => within(candidate).queryByText(text) !== null);
+  if (row === undefined) {
+    throw new Error(`No row contains ${text}`);
+  }
+  return row;
+};
 
 describe('StockCountsTable', () => {
   it('lists the count with its date, differences, value, counter and a Waiting status', () => {
     setup();
 
-    const row = rowOf('CNT-2026-0001');
+    const row = within(rowWith('CNT-2026-0001'));
     expect(row.getByText('16 Oct 2026')).toBeVisible();
     expect(
       row.getByText('School shirt, Size 12: 2 missing; School tie: 1 missing')
@@ -49,7 +56,9 @@ describe('StockCountsTable', () => {
     const { onApprovals } = setup();
 
     fireEvent.click(
-      rowOf('CNT-2026-0001').getByRole('button', { name: 'Approvals' })
+      within(rowWith('CNT-2026-0001')).getByRole('button', {
+        name: 'Approvals',
+      })
     );
 
     expect(onApprovals).toHaveBeenCalledOnce();
@@ -74,16 +83,10 @@ describe('StockCountsTable', () => {
     ]) {
       expect(screen.getByRole('columnheader', { name })).toBeVisible();
     }
-    const shirt = within(
-      screen
-        .getAllByText('School shirt, Size 12')[0]
-        ?.closest('tr') as HTMLElement
-    );
+    const shirt = within(rowWith('School shirt, Size 12'));
     expect(shirt.getByText('−2')).toHaveClass('text-destructive');
     expect(shirt.getByText('₦7,000')).toBeVisible();
-    const book = within(
-      screen.getByText('Mathematics').closest('tr') as HTMLElement
-    );
+    const book = within(rowWith('Mathematics'));
     expect(book.getByText('matches')).toHaveClass('text-muted-foreground');
     expect(book.getByText('—')).toBeVisible();
     expect(
@@ -128,9 +131,9 @@ describe('StockCountsTable', () => {
   it('masks the value until Show costs is on, and keeps it masked on the lines', () => {
     setup({ showCosts: false });
 
-    expect(rowOf('CNT-2026-0001').getByLabelText('Hidden')).toHaveTextContent(
-      '₦ ••••'
-    );
+    expect(
+      within(rowWith('CNT-2026-0001')).getByLabelText('Hidden')
+    ).toHaveTextContent('₦ ••••');
     expect(screen.queryByText('₦8,200')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Show counted items' }));
     expect(screen.queryByText('₦7,000')).not.toBeInTheDocument();
@@ -149,7 +152,7 @@ describe('StockCountsTable', () => {
       ]),
     });
 
-    const row = rowOf('CNT-2026-0001');
+    const row = within(rowWith('CNT-2026-0001'));
     expect(row.getByText('Matched')).toBeVisible();
     expect(row.getByText('—')).toBeVisible();
     expect(row.getByText('matches')).toBeVisible();
@@ -171,10 +174,16 @@ describe('StockCountsTable', () => {
       ]),
     });
 
-    expect(rowOf('CNT-2026-0002').getByText('Approved')).toBeVisible();
-    expect(rowOf('CNT-2026-0003').getByText('Declined')).toBeVisible();
+    expect(
+      within(rowWith('CNT-2026-0002')).getByText('Approved')
+    ).toBeVisible();
+    expect(
+      within(rowWith('CNT-2026-0003')).getByText('Declined')
+    ).toBeVisible();
     fireEvent.click(
-      rowOf('CNT-2026-0003').getByRole('button', { name: 'Show counted items' })
+      within(rowWith('CNT-2026-0003')).getByRole('button', {
+        name: 'Show counted items',
+      })
     );
     expect(screen.getByText('Declined: Recount the shelf first')).toBeVisible();
   });
@@ -193,7 +202,7 @@ describe('StockCountsTable', () => {
       {}
     );
     expect(screen.getByRole('columnheader', { name: 'Campus' })).toBeVisible();
-    expect(rowOf('CNT-2026-0001').getByText('Lekki')).toBeVisible();
+    expect(within(rowWith('CNT-2026-0001')).getByText('Lekki')).toBeVisible();
     unmount();
     setup();
     expect(

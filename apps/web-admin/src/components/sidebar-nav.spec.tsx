@@ -41,12 +41,16 @@ function setup(
   return api;
 }
 
-const countOn = (label: string) =>
-  within(
-    screen
-      .getByRole('link', { name: new RegExp(`^${label}`) })
-      .closest('li') as HTMLElement
-  );
+const countOn = (label: string) => {
+  const link = new RegExp(`^${label}`);
+  const item = screen
+    .getAllByRole('listitem')
+    .find((candidate) => within(candidate).queryByRole('link', { name: link }));
+  if (item === undefined) {
+    throw new Error(`No nav item for ${label}`);
+  }
+  return within(item);
+};
 
 describe('SidebarNav counts', () => {
   it('shows what the viewer can decide on Approvals and on Payments', async () => {

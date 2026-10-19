@@ -6,6 +6,8 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
+import { JOURNAL_REFERENCE_CLASH_MESSAGE } from '@eduvault/api-contract';
+import { ReferenceClashError } from '../ledger/ledger-lines';
 import { ErrorFilter } from './error.filter';
 
 function run(exception: unknown) {
@@ -178,6 +180,13 @@ describe('ErrorFilter', () => {
     expect(run(error)).toEqual({
       status: 403,
       body: { code: 'Forbidden', message: 'Banned' },
+    });
+  });
+
+  it('answers a journal reference clash with a plain 409', () => {
+    expect(run(new ReferenceClashError('ADJ-2026-0001'))).toEqual({
+      status: 409,
+      body: { code: 'Conflict', message: JOURNAL_REFERENCE_CLASH_MESSAGE },
     });
   });
 

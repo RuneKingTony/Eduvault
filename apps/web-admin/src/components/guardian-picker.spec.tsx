@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { toast } from '@eduvault/ui';
 import { newDraft, type GuardianDraftState } from '../guardian-draft';
+import { testId } from '../test-api';
+import { GUARDIAN_ID, OTHER_GUARDIAN_ID, STUDENT_ID } from '../test-students';
 import { renderWithApi } from '../test-utils';
 import { GuardianPicker, optionLabel } from './guardian-picker';
 import { PhotoField, photoProblem } from './photo-field';
@@ -11,16 +13,19 @@ vi.mock('@eduvault/ui', async (importOriginal) => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
 
+const OUTSIDE_GUARDIAN_ID = testId(0x2_20_01);
+const PHOTO_FILE_ID = testId(0x2_20_02);
+
 const GUARDIANS = [
   {
-    id: 'g1',
+    id: GUARDIAN_ID,
     fullName: 'Ngozi Okeke',
     phone: '0803 456 7890',
     childFirstNames: ['Ada', 'Chidi'],
     outsideScope: false,
   },
   {
-    id: 'g2',
+    id: OTHER_GUARDIAN_ID,
     fullName: 'Bayo Adewale',
     phone: '0807 890 1234',
     outsideScope: false,
@@ -41,7 +46,7 @@ function Harness({
     <GuardianPicker
       idPrefix="test"
       draft={draft}
-      studentId="st-1"
+      studentId={STUDENT_ID}
       takenIds={taken}
       canCreate={canCreate}
       errors={{}}
@@ -62,7 +67,17 @@ function setup(node: React.ReactElement, list = GUARDIANS) {
     guardians: {
       list: vi.fn().mockResolvedValue(list),
     },
-    files: { upload: vi.fn().mockResolvedValue({ id: 'file-1' }) },
+    files: {
+      upload: vi.fn(({ body }: { body: FormData }) => {
+        const photo = body.get('file') as File;
+        return Promise.resolve({
+          id: PHOTO_FILE_ID,
+          contentType: photo.type,
+          byteSize: photo.size,
+          originalName: photo.name,
+        });
+      }),
+    },
   };
   renderWithApi(node, api);
   return api;
@@ -75,14 +90,18 @@ describe('optionLabel', () => {
     );
     expect(optionLabel(GUARDIANS[1]!)).toBe('Bayo Adewale · 0807 890 1234');
     expect(
-      optionLabel({ id: 'g3', fullName: 'Ifeanyi Okeke', outsideScope: true })
+      optionLabel({
+        id: OUTSIDE_GUARDIAN_ID,
+        fullName: 'Ifeanyi Okeke',
+        outsideScope: true,
+      })
     ).toBe('Ifeanyi Okeke (another campus)');
   });
 });
 
 describe('GuardianPicker existing mode', () => {
   it('lists the guardians, hides the ones chosen elsewhere and keeps the hint', async () => {
-    setup(<Harness start={existing()} taken={['g2']} />);
+    setup(<Harness start={existing()} taken={[OTHER_GUARDIAN_ID]} />);
     expect(
       await screen.findByRole('option', {
         name: 'Ngozi Okeke · 0803 456 7890 · Ada, Chidi',
@@ -116,7 +135,7 @@ describe('GuardianPicker existing mode', () => {
     });
     await waitFor(() => {
       expect(api.guardians.list).toHaveBeenCalledWith({
-        query: { q: '0803', excludeStudentId: 'st-1' },
+        query: { q: '0803', excludeStudentId: STUDENT_ID },
       });
     });
   });
@@ -124,9 +143,9 @@ describe('GuardianPicker existing mode', () => {
   it('clears the chosen guardian when the mode switches', async () => {
     setup(<Harness start={existing()} />);
     fireEvent.change(await screen.findByLabelText('Guardian'), {
-      target: { value: 'g1' },
+      target: { value: GUARDIAN_ID },
     });
-    expect(screen.getByLabelText('Guardian')).toHaveValue('g1');
+    expect(screen.getByLabelText('Guardian')).toHaveValue(GUARDIAN_ID);
     fireEvent.click(screen.getByLabelText('New guardian'));
     fireEvent.click(await screen.findByLabelText('Existing guardian'));
     expect(await screen.findByLabelText('Guardian')).toHaveValue('');
@@ -224,12 +243,12 @@ describe('PhotoField', () => {
     choose(new File(['x'], 'a.png', { type: 'image/png' }));
     await waitFor(() => {
       expect(onChange).toHaveBeenCalledWith({
-        fileId: 'file-1',
+        fileId: PHOTO_FILE_ID,
         preview: 'blob:preview',
       });
     });
-    const body = api.files.upload.mock.calls[0]?.[0].body as FormData;
-    expect(body.get('kind')).toBe('guardian_photo');
+    const [call] = api.files.upload.mock.calls;
+    expect(call?.[0].body.get('kind')).toBe('guardian_photo');
   });
 
   it('offers Change photo and Remove once a photo is chosen', () => {

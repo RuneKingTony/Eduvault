@@ -1,6 +1,11 @@
 import { fireEvent, screen, within } from '@testing-library/react';
 import { ApiError } from '@eduvault/api-contract';
-import { billingApi, invoiceSummary, renderBilling } from '../test-billing';
+import {
+  billingApi,
+  INVOICE_TWO_ID,
+  invoiceSummary,
+  renderBilling,
+} from '../test-billing';
 import { currentCalendar } from '../test-calendar';
 import { studentList, studentRow } from '../test-students';
 import { ownerAccess, starterAccess } from '../test-utils';
@@ -27,7 +32,7 @@ describe('InvoicesPage', () => {
         invoices: [
           invoiceSummary(),
           invoiceSummary({
-            id: 'inv-2',
+            id: INVOICE_TWO_ID,
             number: null,
             status: 'draft',
             studentName: 'Tobi Adewale',
@@ -63,7 +68,7 @@ describe('InvoicesPage', () => {
         invoices: [
           invoiceSummary(),
           invoiceSummary({
-            id: 'inv-2',
+            id: INVOICE_TWO_ID,
             number: null,
             status: 'draft',
             studentName: 'Tobi Adewale',
@@ -71,15 +76,13 @@ describe('InvoicesPage', () => {
         ],
       })
     );
-    const sent = (await screen.findByText('Ada Okeke')).closest('tr');
-    expect(
-      within(sent as HTMLElement).getByText('CHG-2026-00001')
-    ).toBeVisible();
-    expect(within(sent as HTMLElement).getByText('Term fees')).toBeVisible();
-    expect(within(sent as HTMLElement).getByText('Sent')).toBeVisible();
-    const draft = screen.getByText('Tobi Adewale').closest('tr');
-    expect(within(draft as HTMLElement).getByText('Draft')).toBeVisible();
-    expect(within(draft as HTMLElement).getByText('Prepared')).toBeVisible();
+    const sent = within(await screen.findByRole('row', { name: /Ada Okeke/ }));
+    expect(sent.getByText('CHG-2026-00001')).toBeVisible();
+    expect(sent.getByText('Term fees')).toBeVisible();
+    expect(sent.getByText('Sent')).toBeVisible();
+    const draft = within(screen.getByRole('row', { name: /Tobi Adewale/ }));
+    expect(draft.getByText('Draft')).toBeVisible();
+    expect(draft.getByText('Prepared')).toBeVisible();
   });
 
   it('opens a charge from its row', async () => {

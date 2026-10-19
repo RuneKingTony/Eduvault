@@ -1,5 +1,4 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { textOf } from '@eduvault/shared';
 import { FeesPage } from '../pages/fees-page';
 import {
   calendarCurrentQueryOptions,
@@ -8,15 +7,13 @@ import {
 } from '../queries';
 import { redirectHomeWithout } from '../redirect-to';
 import { selectChild } from '../selected-child';
+import { termSearchOf } from '../term-search';
 
 export const Route = createFileRoute('/fees')({
   beforeLoad: ({ context: { access }, search }) => {
     redirectHomeWithout(access.permissions, 'invoice:readOwn', search.child);
   },
-  validateSearch: (search: Record<string, unknown>) => {
-    const term = textOf(search['term']);
-    return term === undefined ? {} : { term };
-  },
+  validateSearch: termSearchOf,
   loaderDeps: ({ search }) => ({ child: search.child, term: search.term }),
   loader: async ({ context: { queryClient, api, portal }, deps }) => {
     const selected =

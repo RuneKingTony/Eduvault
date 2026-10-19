@@ -1,7 +1,7 @@
 import { fireEvent, screen } from '@testing-library/react';
 import { ApiError } from '@eduvault/api-contract';
 import { toast } from '@eduvault/ui';
-import { nextYear } from '../../test-calendar';
+import { YEAR_2, nextYear } from '../../test-calendar';
 import { renderWithApi } from '../../test-utils';
 import { DeleteYearDialog } from './delete-year-dialog';
 
@@ -32,11 +32,13 @@ describe('DeleteYearDialog', () => {
 
   it('deletes with a success toast', async () => {
     const success = vi.spyOn(toast, 'success').mockReturnValue(1);
-    const remove = vi.fn().mockResolvedValue({ id: 'y2' });
+    const remove = vi.fn(({ params }: { params: { id: string } }) => ({
+      id: params.id,
+    }));
     const onOpenChange = setup(remove);
     fireEvent.click(screen.getByRole('button', { name: 'Delete school year' }));
     await vi.waitFor(() => {
-      expect(remove).toHaveBeenCalledWith({ params: { id: 'y2' } });
+      expect(remove).toHaveBeenCalledWith({ params: { id: YEAR_2 } });
       expect(onOpenChange).toHaveBeenCalledWith(false);
     });
     expect(success).toHaveBeenCalledWith('2027/2028 deleted.');

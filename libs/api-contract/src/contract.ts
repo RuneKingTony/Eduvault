@@ -106,6 +106,10 @@ import {
   feeSetupSchema,
   feeLineListQuerySchema,
   feeLineSchema,
+  feeOptInParamsSchema,
+  feeOptInsQuerySchema,
+  feeOptInsResultSchema,
+  feeOptInsSchema,
   feeOptionParamsSchema,
   feeOptionResultSchema,
   feeOptionSchema,
@@ -124,6 +128,7 @@ import {
   moneyAccountSchema,
   openingBalancesResultSchema,
   openingBalancesSchema,
+  setFeeOptInsSchema,
   setFeeOptionSchema,
   updateFeeLineSchema,
   updateMoneyAccountSchema,
@@ -170,6 +175,7 @@ import {
   portalChildSchema,
   portalFamilyStatementSchema,
   portalMeSchema,
+  portalFamilyStatementQuerySchema,
   portalStatementQuerySchema,
   portalStatementSchema,
   portalPriceListSchema,
@@ -181,6 +187,7 @@ import { defineContract, defineRoute } from './route';
 import {
   balanceListQuerySchema,
   balanceListSchema,
+  familyStatementQuerySchema,
   guardianStatementParamsSchema,
   guardianStatementSchema,
   statementParamsSchema,
@@ -958,6 +965,22 @@ export const contract = defineContract({
       response: feeOptionResultSchema,
     }),
   },
+  feeOptIns: {
+    list: defineRoute({
+      method: 'GET',
+      path: '/fee-types/:feeTypeId/opt-ins',
+      params: feeOptInParamsSchema,
+      query: feeOptInsQuerySchema,
+      response: feeOptInsSchema,
+    }),
+    set: defineRoute({
+      method: 'PUT',
+      path: '/fee-types/:feeTypeId/opt-ins',
+      params: feeOptInParamsSchema,
+      body: setFeeOptInsSchema,
+      response: feeOptInsResultSchema,
+    }),
+  },
   billingRuns: {
     list: defineRoute({
       method: 'GET',
@@ -1324,6 +1347,7 @@ export const contract = defineContract({
       method: 'GET',
       path: '/finance/guardians/:guardianId/statement',
       params: guardianStatementParamsSchema,
+      query: familyStatementQuerySchema,
       response: guardianStatementSchema,
     }),
   },
@@ -1368,6 +1392,7 @@ export const contract = defineContract({
     familyStatement: defineRoute({
       method: 'GET',
       path: '/portal/family-statement',
+      query: portalFamilyStatementQuerySchema,
       response: portalFamilyStatementSchema,
     }),
     purchases: defineRoute({

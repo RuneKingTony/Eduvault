@@ -59,6 +59,7 @@
     "eslint-plugin-react-hooks": "catalog:eslint",
     "eslint-plugin-regexp": "catalog:eslint",
     "eslint-plugin-sonarjs": "catalog:eslint",
+    "eslint-plugin-testing-library": "catalog:eslint",
     "eslint-plugin-unicorn": "catalog:eslint",
     "eslint-plugin-unused-imports": "catalog:eslint",
     "husky": "catalog:git-hooks",

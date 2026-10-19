@@ -25,7 +25,7 @@ describe('DeliveriesTable', () => {
   it('opens the delivery from the number and the other text cells', () => {
     const { onOpen } = setup();
     const row = within(
-      screen.getByText(`OPEN-STORE-${LEKKI.id}`).closest('tr') as HTMLElement
+      screen.getByRole('row', { name: new RegExp(`OPEN-STORE-${LEKKI.id}`) })
     );
 
     fireEvent.click(

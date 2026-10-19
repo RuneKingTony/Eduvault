@@ -400,12 +400,12 @@ describe('DiscountService.end', () => {
     expect(repo.recorded).toEqual([]);
   });
 
-  it('records a row when an earlier last term replaces the one it ended at', async () => {
+  it('refuses to move the end of a discount that has already ended', async () => {
     const { repo, service, id } = await approved();
     await service.end(chika, id, { lastTermId: 't2' });
     repo.recorded = [];
-    await service.end(chika, id, { lastTermId: 't1' });
-    expect(repo.recorded).toHaveLength(1);
+    await rejected(service.end(chika, id, { lastTermId: 't1' }));
+    expect(repo.recorded).toEqual([]);
   });
 
   it('records nothing when the discount is not approved', async () => {

@@ -1,7 +1,7 @@
 import type { MoneyAccount, MoneyAccountList } from '@eduvault/api-contract';
 import type { OrgContext } from '../../common/auth';
 import type { BillingPlanService } from '../billing/billing-plan.service';
-import type { TermInfo } from '../billing/billing.repository';
+import type { TermInfo } from '../billing/billing-plan.repository';
 import type { InvoiceService } from '../invoice/invoice.service';
 import type { MoneyAccountService } from '../money-account/money-account.service';
 import { DashboardMoneyService } from './dashboard-money.service';

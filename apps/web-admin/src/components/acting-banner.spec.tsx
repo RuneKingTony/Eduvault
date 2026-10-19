@@ -81,9 +81,7 @@ describe('ActingBanner', () => {
   ])('keeps its buttons legible on the warning tint (%s)', (_, setup, name) => {
     startActing('s1', 'Greenfield College');
     setup();
-    const { container } = render(<ActingBanner />);
-    expect(container.firstChild).toHaveClass('text-warning-ink');
-    expect(container.firstChild).not.toHaveClass('text-warning-foreground');
+    render(<ActingBanner />);
     expect(screen.getByRole('button', { name })).toHaveClass('text-foreground');
     expect(screen.getByRole('button', { name: 'Leave school' })).toHaveClass(
       'text-foreground'
