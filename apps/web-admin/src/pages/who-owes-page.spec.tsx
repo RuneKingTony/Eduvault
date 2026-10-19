@@ -1,4 +1,5 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { testId } from '../test-api';
 import { starterAccess } from '../test-utils';
 import {
   ADA,
@@ -9,6 +10,10 @@ import {
   renderPayments,
 } from '../test-payments';
 import { WhoOwesPage } from './who-owes-page';
+
+const BAYO = testId(0x2_00_01);
+const DAVID = testId(0x2_00_02);
+const TOBI_ADE = testId(0x2_00_03);
 
 function setup(
   options: {
@@ -42,7 +47,7 @@ describe('WhoOwesPage', () => {
     setup();
 
     expect(await screen.findByText('Total owed')).toBeVisible();
-    expect(screen.getAllByText('₦180,000').length).toBeGreaterThan(0);
+    expect(screen.getByText('₦315,000')).toBeVisible();
     expect(screen.getByText('Lekki campus')).toBeVisible();
     expect(screen.getByText('Students owing')).toBeVisible();
     expect(screen.getByText('out of 12 students')).toBeVisible();
@@ -116,8 +121,7 @@ describe('WhoOwesPage', () => {
 
   it('lists the student, class, guardian, owing, paid and total', async () => {
     setup();
-    const row = (await screen.findByText('Ada Okeke')).closest('tr');
-    const cells = within(row as HTMLElement);
+    const cells = within(await screen.findByRole('row', { name: /Ada Okeke/ }));
     expect(cells.getByText('GF-0001')).toBeVisible();
     expect(cells.getByText('JSS 1 Gold')).toBeVisible();
     expect(cells.getByText('Ngozi Okeke')).toBeVisible();
@@ -138,21 +142,25 @@ describe('WhoOwesPage', () => {
           lifecycle: 'left',
           admissionNumber: 'GF-0002',
           name: 'Bayo Lawal',
-          studentId: 'b',
+          studentId: BAYO,
         }),
         balanceRow({
           balanceMinor: -500_000,
           name: 'David Eze',
-          studentId: 'd',
+          studentId: DAVID,
         }),
-        balanceRow({ balanceMinor: 0, name: 'Tobi Ade', studentId: 't' }),
+        balanceRow({ balanceMinor: 0, name: 'Tobi Ade', studentId: TOBI_ADE }),
       ]),
     });
     expect(await screen.findByText('GF-0002 · left')).toBeVisible();
-    expect(screen.getByText('₦5,000 extra paid')).toBeVisible();
     expect(
-      screen.getAllByText('Paid up').some((node) => node.closest('tr') !== null)
-    ).toBe(true);
+      within(screen.getByRole('row', { name: /David Eze/ })).getByText(
+        '₦5,000 extra paid'
+      )
+    ).toBeVisible();
+    expect(
+      within(screen.getByRole('row', { name: /Tobi Ade/ })).getByText('Paid up')
+    ).toBeVisible();
   });
 
   it('shows a dash for a student with no guardian or class', async () => {
@@ -168,7 +176,7 @@ describe('WhoOwesPage', () => {
       access: starterAccess('bursar'),
       list: balanceList([
         balanceRow(),
-        balanceRow({ studentId: 't', name: 'Tobi Ade', balanceMinor: 0 }),
+        balanceRow({ studentId: TOBI_ADE, name: 'Tobi Ade', balanceMinor: 0 }),
       ]),
     });
     expect(

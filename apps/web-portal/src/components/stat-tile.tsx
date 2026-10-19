@@ -13,7 +13,7 @@ export function StatTile({
   tone?: 'destructive' | 'success';
 }) {
   return (
-    <Card>
+    <Card role="group" aria-label={label}>
       <CardContent className="flex flex-col gap-1">
         <span className="text-sm text-muted-foreground">{label}</span>
         <span

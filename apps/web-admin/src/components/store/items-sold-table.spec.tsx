@@ -1,8 +1,8 @@
 import { fireEvent, screen, within } from '@testing-library/react';
 import { IKEJA, LEKKI } from '../../test-members';
-import { SALE_ID, sale, saleList } from '../../test-store';
+import { SECOND_SALE_ID, sale, saleList, secondSale } from '../../test-store';
 import { renderWithApi } from '../../test-utils';
-import { ItemsSoldTable, itemsText } from './items-sold-table';
+import { ItemsSoldTable } from './items-sold-table';
 
 function setup(
   options: {
@@ -30,9 +30,7 @@ describe('ItemsSoldTable', () => {
   it('lists the sale with its student and class, items, total and paid receipt', () => {
     setup();
 
-    const row = within(
-      screen.getByText('ISS-2026-0001').closest('tr') as HTMLElement
-    );
+    const row = within(screen.getByRole('row', { name: /ISS-2026-0001/ }));
     expect(row.getByText('Ada Okeke')).toBeVisible();
     expect(row.getByText('JSS 1 Gold')).toBeVisible();
     expect(
@@ -71,17 +69,15 @@ describe('ItemsSoldTable', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('opens the sale from the reference and from the other cells', () => {
-    const { onOpen } = setup();
+  it('opens the clicked sale from the reference and from the other cells', () => {
+    const { onOpen } = setup({ data: saleList([sale(), secondSale()]) });
 
-    fireEvent.click(screen.getByRole('button', { name: 'ISS-2026-0001' }));
-    fireEvent.click(
-      screen.getByText('School shirt, Size 12 × 2, School tie × 1')
-    );
+    fireEvent.click(screen.getByRole('button', { name: 'ISS-2026-0002' }));
+    fireEvent.click(screen.getByText('School tie × 3'));
 
     expect(onOpen).toHaveBeenCalledTimes(2);
-    expect(onOpen).toHaveBeenNthCalledWith(1, SALE_ID);
-    expect(onOpen).toHaveBeenNthCalledWith(2, SALE_ID);
+    expect(onOpen).toHaveBeenNthCalledWith(1, SECOND_SALE_ID);
+    expect(onOpen).toHaveBeenNthCalledWith(2, SECOND_SALE_ID);
   });
 
   it('says Nothing sold yet when there are no sales', () => {
@@ -89,9 +85,5 @@ describe('ItemsSoldTable', () => {
 
     expect(screen.getByText('Nothing sold yet')).toBeVisible();
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
-  });
-
-  it('words the items of a sale', () => {
-    expect(itemsText(sale())).toBe('School shirt, Size 12 × 2, School tie × 1');
   });
 });

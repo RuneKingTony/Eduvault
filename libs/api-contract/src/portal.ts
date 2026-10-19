@@ -7,6 +7,8 @@ import {
 import { FINANCE_PAGE_SIZE, FINANCE_PAGE_SIZE_MAX } from './finance';
 import { currencySchema, idSchema, paymentMethodSchema } from './schemas';
 import {
+  familyStatementQuerySchema,
+  familyTermFields,
   statementRowStatusSchema,
   statementTermFields,
   statementTotalsSchema,
@@ -157,6 +159,11 @@ export const portalStatementSchema = z.object({
 });
 export type PortalStatement = z.infer<typeof portalStatementSchema>;
 
+export const portalFamilyStatementQuerySchema = familyStatementQuerySchema;
+export type PortalFamilyStatementQuery = z.output<
+  typeof portalFamilyStatementQuerySchema
+>;
+
 export const portalFamilyStatementSchema = z.object({
   currency: currencySchema,
   totalOwedMinor: z.number().int().nonnegative(),
@@ -171,6 +178,7 @@ export const portalFamilyStatementSchema = z.object({
       balanceMinor: z.number().int(),
     })
   ),
+  ...familyTermFields,
 });
 export type PortalFamilyStatement = z.infer<typeof portalFamilyStatementSchema>;
 

@@ -1,13 +1,13 @@
 import { fireEvent, screen } from '@testing-library/react';
 import { ApiError } from '@eduvault/api-contract';
 import { toast } from '@eduvault/ui';
-import { currentYear } from '../../test-calendar';
+import { TERM_2, currentYear, noCalendar, term } from '../../test-calendar';
 import { renderWithApi } from '../../test-utils';
 import { findTerm } from './calendar-text';
 import { EditDatesDialog } from './edit-dates-dialog';
 
 function setup(update: ReturnType<typeof vi.fn>) {
-  const target = findTerm([currentYear()], 't2');
+  const target = findTerm([currentYear()], TERM_2);
   if (target === undefined) {
     throw new Error('no target');
   }
@@ -17,7 +17,7 @@ function setup(update: ReturnType<typeof vi.fn>) {
     {
       terms: { update },
       schoolYears: { list: vi.fn().mockResolvedValue({ items: [], total: 0 }) },
-      calendar: { current: vi.fn() },
+      calendar: { current: vi.fn().mockResolvedValue(noCalendar()) },
     }
   );
   return onOpenChange;
@@ -42,7 +42,10 @@ describe('EditDatesDialog', () => {
 
   it('saves the dates, toasts the new school days and closes', async () => {
     const success = vi.spyOn(toast, 'success').mockReturnValue(1);
-    const update = vi.fn().mockResolvedValue({ schoolDays: 55 });
+    const update = vi.fn(
+      ({ body }: { body: { startsOn?: string; endsOn?: string } }) =>
+        term({ id: TERM_2, ...body, schoolDays: 55 })
+    );
     const onOpenChange = setup(update);
     fireEvent.change(screen.getByLabelText('Starts'), {
       target: { value: '2027-01-11' },
@@ -50,7 +53,7 @@ describe('EditDatesDialog', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save dates' }));
     await vi.waitFor(() => {
       expect(update).toHaveBeenCalledWith({
-        params: { id: 't2' },
+        params: { id: TERM_2 },
         body: { startsOn: '2027-01-11', endsOn: '2027-03-26' },
       });
       expect(onOpenChange).toHaveBeenCalledWith(false);

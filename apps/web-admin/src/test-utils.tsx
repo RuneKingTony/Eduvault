@@ -6,15 +6,13 @@ import type {
   MePermissions,
   PlatformSchool,
 } from '@eduvault/api-contract';
-import {
-  PermissionsProvider,
-  accessOfStarter,
-  fakeAccess,
-} from '@eduvault/auth-client';
+import { PermissionsProvider } from '@eduvault/auth-client';
+import { accessOfStarter, fakeAccess } from '@eduvault/auth-client/testing';
 import { ALL_PERMISSIONS, READ_PERMS, toPermissionMap } from '@eduvault/policy';
 import { TooltipProvider } from '@eduvault/ui';
 import { ApiProvider, type Api } from './api';
 import { feeSetupQueryOptions } from './queries';
+import { checked } from './test-api';
 
 export const platformSchool = (
   overrides: Partial<PlatformSchool> = {}
@@ -98,7 +96,7 @@ export function renderWithApi(
   return {
     ...render(
       <QueryClientProvider client={queryClient}>
-        <ApiProvider api={api as unknown as Api}>
+        <ApiProvider api={checked(api)}>
           <PermissionsProvider value={access}>
             <TooltipProvider>{ui}</TooltipProvider>
           </PermissionsProvider>
@@ -109,7 +107,7 @@ export function renderWithApi(
   };
 }
 
-export { fakeAccess } from '@eduvault/auth-client';
+export { fakeAccess } from '@eduvault/auth-client/testing';
 
 export function seedFeeSetup(queryClient: QueryClient) {
   const key = feeSetupQueryOptions({} as Api).queryKey;

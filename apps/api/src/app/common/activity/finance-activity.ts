@@ -3,6 +3,7 @@ import {
   type AdjustmentKind,
   type DiscountKind,
   type FeeLine,
+  type FeeType,
 } from '@eduvault/api-contract';
 import { countOf, money } from '@eduvault/shared';
 import type { StudentIdentity } from '../students';
@@ -16,9 +17,12 @@ type FinanceSubject =
   | 'adjustment'
   | 'student_discount'
   | 'fee_line'
+  | 'fee_type'
+  | 'student'
   | 'term'
   | 'store_sale'
   | 'stock_count'
+  | 'stock_delivery'
   | 'invoice';
 
 export interface FinanceActor {
@@ -90,6 +94,17 @@ export interface StoreWriteOffFacts {
   storeId: string;
   campusId: string;
   campusName: string;
+}
+
+export interface StoreDeliveryFacts {
+  id: string;
+  number: string;
+  storeId: string;
+  campusId: string;
+  campusName: string;
+  supplierName: string;
+  lines: number;
+  totalMinor: number;
 }
 
 export const financeActor = (
@@ -336,6 +351,45 @@ export function storeWriteOffDeclinedActivity(
   ];
 }
 
+export const storeDeliveryReceivedActivity = (
+  actor: FinanceActor,
+  delivery: StoreDeliveryFacts
+): ActivityInput[] => [
+  finance(actor, {
+    campusId: delivery.campusId,
+    kind: 'store_delivery.received',
+    subject: { type: 'stock_delivery', id: delivery.id },
+    text: `${actor.name} received delivery ${delivery.number} from ${delivery.supplierName} at the ${delivery.campusName} store: ${countOf(delivery.lines, 'item', 'items')}, ${money(delivery.totalMinor, actor.currency)}.`,
+    data: {
+      deliveryId: delivery.id,
+      number: delivery.number,
+      storeId: delivery.storeId,
+      supplierName: delivery.supplierName,
+      items: delivery.lines,
+      totalMinor: delivery.totalMinor,
+    },
+  }),
+];
+
+export const storeOpeningStockRecordedActivity = (
+  actor: FinanceActor,
+  delivery: StoreDeliveryFacts
+): ActivityInput[] => [
+  finance(actor, {
+    campusId: delivery.campusId,
+    kind: 'store_opening_stock.recorded',
+    subject: { type: 'stock_delivery', id: delivery.id },
+    text: `${actor.name} recorded opening stock at the ${delivery.campusName} store: ${countOf(delivery.lines, 'item', 'items')}, ${money(delivery.totalMinor, actor.currency)}.`,
+    data: {
+      deliveryId: delivery.id,
+      number: delivery.number,
+      storeId: delivery.storeId,
+      items: delivery.lines,
+      totalMinor: delivery.totalMinor,
+    },
+  }),
+];
+
 export function paymentCancelledActivity(
   actor: FinanceActor,
   payment: PaymentFacts,
@@ -506,6 +560,48 @@ export function discountDeclinedActivity(
     }),
   ];
 }
+
+export const feeTypeCreatedActivity = (
+  actor: FinanceActor,
+  feeType: FeeType
+): ActivityInput[] => [
+  finance(actor, {
+    campusId: null,
+    kind: FEE_SCHEDULE_KINDS.feeTypeCreated,
+    subject: { type: 'fee_type', id: feeType.id },
+    text: `${actor.name} added the fee type ${feeType.name} (${feeType.code}).`,
+    data: {
+      feeTypeId: feeType.id,
+      code: feeType.code,
+      name: feeType.name,
+    },
+  }),
+];
+
+interface FeeOptionFacts {
+  student: StudentIdentity;
+  feeType: { id: string; name: string };
+  enrollmentId: string;
+  optedIn: boolean;
+}
+
+export const feeOptionChangedActivity = (
+  actor: FinanceActor,
+  { student, feeType, enrollmentId, optedIn }: FeeOptionFacts
+): ActivityInput[] => [
+  finance(actor, {
+    campusId: student.campusId,
+    kind: optedIn ? 'fee_option.opted_in' : 'fee_option.opted_out',
+    subject: { type: 'student', id: student.id },
+    text: `${actor.name} opted ${student.name} ${optedIn ? 'into' : 'out of'} ${feeType.name}.`,
+    data: {
+      studentId: student.id,
+      feeTypeId: feeType.id,
+      enrollmentId,
+      optedIn,
+    },
+  }),
+];
 
 interface CopiedTerm {
   id: string;

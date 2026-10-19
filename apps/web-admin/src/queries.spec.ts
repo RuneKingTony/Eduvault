@@ -10,6 +10,18 @@ import {
   currentTermQueryOptions,
   daysOffQueryOptions,
   forgetMember,
+  adjustmentsQueryOptions,
+  approvalsSummaryQueryOptions,
+  balancesQueryOptions,
+  familyStatementQueryOptions,
+  feeTypesQueryOptions,
+  invalidateApprovals,
+  invalidateFees,
+  invalidatePayments,
+  ledgerAccountsQueryOptions,
+  moneyAccountsQueryOptions,
+  paymentsQueryOptions,
+  statementQueryOptions,
   invalidateCalendar,
   invalidateAfterRemoval,
   invalidateBilling,
@@ -162,7 +174,6 @@ describe('class queries', () => {
     expect(teacherCandidatesQueryOptions(api, 'a').queryKey).not.toEqual(
       classQueryOptions(api, 'a').queryKey
     );
-    expect(classLevelsQueryOptions(api).queryKey).toEqual(['class-levels']);
   });
 
   async function observe() {
@@ -240,18 +251,32 @@ describe('students queries', () => {
     const plain = studentsQueryOptions(api, {});
 
     expect(first.queryKey).not.toEqual(other.queryKey);
-    expect(plain.queryKey).toEqual([
-      'students',
-      'list',
-      {
-        tab: 'active',
-        q: undefined,
-        campusId: undefined,
-        levelId: undefined,
-        page: 1,
-      },
-    ]);
-    expect(first.placeholderData).toBeDefined();
+    expect(plain.queryKey).toEqual(
+      studentsQueryOptions(api, { tab: 'active', page: 1 }).queryKey
+    );
+  });
+
+  it('keeps the last page on screen while the next one loads', async () => {
+    const pageTwo = { items: [{ id: 'a' }], total: 30 };
+    const list = vi
+      .fn()
+      .mockResolvedValueOnce(pageTwo)
+      .mockReturnValueOnce(new Promise(() => undefined));
+    const api = { students: { list } } as unknown as Api;
+    const observer = new QueryObserver(
+      new QueryClient(),
+      studentsQueryOptions(api, { page: 2 })
+    );
+    const stop = observer.subscribe(() => undefined);
+    await vi.waitFor(() => {
+      expect(observer.getCurrentResult().data).toEqual(pageTwo);
+    });
+
+    observer.setOptions(studentsQueryOptions(api, { page: 3 }));
+
+    expect(observer.getCurrentResult().data).toEqual(pageTwo);
+    expect(observer.getCurrentResult().isPlaceholderData).toBe(true);
+    stop();
   });
 
   it('refreshes the list, one student and the guardians after a student write', async () => {
@@ -279,6 +304,48 @@ describe('students queries', () => {
     for (const stop of unsubscribe) {
       stop();
     }
+  });
+});
+
+const observedFamily = async (guardianId: string) => {
+  const family = { currency: 'NGN', children: [] };
+  const guardianStatement = vi
+    .fn()
+    .mockResolvedValueOnce(family)
+    .mockReturnValueOnce(new Promise(() => undefined));
+  const api = {
+    studentAccounts: { guardianStatement },
+  } as unknown as Api;
+  const observer = new QueryObserver(
+    new QueryClient(),
+    familyStatementQueryOptions(api, guardianId)
+  );
+  const stop = observer.subscribe(() => undefined);
+  await vi.waitFor(() => {
+    expect(observer.getCurrentResult().data).toEqual(family);
+  });
+  return { api, observer, stop };
+};
+
+describe('family statement queries', () => {
+  it('keeps the family on screen while another term loads', async () => {
+    const { api, observer, stop } = await observedFamily('g1');
+
+    observer.setOptions(
+      familyStatementQueryOptions(api, 'g1', { termId: 't1' })
+    );
+
+    expect(observer.getCurrentResult().isPlaceholderData).toBe(true);
+    stop();
+  });
+
+  it('never shows one guardian’s family while another guardian’s loads', async () => {
+    const { api, observer, stop } = await observedFamily('g1');
+
+    observer.setOptions(familyStatementQueryOptions(api, 'g2'));
+
+    expect(observer.getCurrentResult().data).toBeUndefined();
+    stop();
   });
 });
 
@@ -353,5 +420,96 @@ describe('billing queries', () => {
     for (const stop of unsubscribe) {
       stop();
     }
+  });
+});
+
+async function observeMoney() {
+  const fns = {
+    balances: vi.fn().mockResolvedValue({ items: [] }),
+    statement: vi.fn().mockResolvedValue({ items: [] }),
+    payments: vi.fn().mockResolvedValue({ items: [] }),
+    adjustments: vi.fn().mockResolvedValue({ items: [] }),
+    invoices: vi.fn().mockResolvedValue({ items: [] }),
+    moneyAccounts: vi.fn().mockResolvedValue({ items: [] }),
+    ledger: vi.fn().mockResolvedValue({ items: [] }),
+    approvals: vi.fn().mockResolvedValue({ items: [] }),
+    feeTypes: vi.fn().mockResolvedValue([]),
+    levels: vi.fn().mockResolvedValue([]),
+  };
+  const api = {
+    studentAccounts: { balances: fns.balances, statement: fns.statement },
+    payments: { list: fns.payments },
+    adjustments: { list: fns.adjustments },
+    invoices: { list: fns.invoices },
+    moneyAccounts: { list: fns.moneyAccounts },
+    ledgerAccounts: { list: fns.ledger },
+    approvals: { summary: fns.approvals },
+    feeTypes: { list: fns.feeTypes },
+    classLevels: { list: fns.levels },
+  } as unknown as Api;
+  const queryClient = new QueryClient();
+  const unsubscribe = [
+    new QueryObserver(queryClient, balancesQueryOptions(api)),
+    new QueryObserver(queryClient, statementQueryOptions(api, 's1')),
+    new QueryObserver(queryClient, paymentsQueryOptions(api)),
+    new QueryObserver(queryClient, adjustmentsQueryOptions(api, 1)),
+    new QueryObserver(queryClient, invoicesQueryOptions(api)),
+    new QueryObserver(queryClient, moneyAccountsQueryOptions(api)),
+    new QueryObserver(queryClient, ledgerAccountsQueryOptions(api)),
+    new QueryObserver(queryClient, approvalsSummaryQueryOptions(api)),
+    new QueryObserver(queryClient, feeTypesQueryOptions(api)),
+    new QueryObserver(queryClient, classLevelsQueryOptions(api)),
+  ].map((observer) => observer.subscribe(() => undefined));
+  await vi.waitFor(() => {
+    expect(queryClient.isFetching()).toBe(0);
+    for (const fn of Object.values(fns)) {
+      expect(fn).toHaveBeenCalledTimes(1);
+    }
+  });
+  const { feeTypes, levels, ...money } = fns;
+  return {
+    money: Object.values(money),
+    feeTypes,
+    levels,
+    queryClient,
+    stop: () => {
+      for (const unsubscribeOne of unsubscribe) {
+        unsubscribeOne();
+      }
+    },
+  };
+}
+
+describe('money invalidators', () => {
+  it('refetches every money view after a payment and leaves unrelated queries alone', async () => {
+    const { money, levels, queryClient, stop } = await observeMoney();
+    await invalidatePayments(queryClient);
+    for (const fn of money) {
+      expect(fn).toHaveBeenCalledTimes(2);
+    }
+    expect(levels).toHaveBeenCalledTimes(1);
+    stop();
+  });
+
+  it('refetches every money view and the fees after an approval decision, but not unrelated queries', async () => {
+    const { money, feeTypes, levels, queryClient, stop } = await observeMoney();
+    await invalidateApprovals(queryClient);
+    for (const fn of money) {
+      expect(fn).toHaveBeenCalledTimes(2);
+    }
+    expect(feeTypes).toHaveBeenCalledTimes(2);
+    expect(levels).toHaveBeenCalledTimes(1);
+    stop();
+  });
+
+  it('refetches the fees after a fee change and leaves the money views and unrelated queries alone', async () => {
+    const { money, feeTypes, levels, queryClient, stop } = await observeMoney();
+    await invalidateFees(queryClient);
+    expect(feeTypes).toHaveBeenCalledTimes(2);
+    for (const fn of money) {
+      expect(fn).toHaveBeenCalledTimes(1);
+    }
+    expect(levels).toHaveBeenCalledTimes(1);
+    stop();
   });
 });

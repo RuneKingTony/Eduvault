@@ -25,9 +25,11 @@ const hashOf = (change: Partial<RecordPayment> = {}) =>
   paymentRequestHash({ ...base, ...change });
 
 describe('paymentRequestHash', () => {
-  it('is the same for the same request, a hex SHA-256', () => {
-    expect(hashOf()).toBe(hashOf());
-    expect(hashOf()).toMatch(/^[0-9a-f]{64}$/);
+  // requestHash is stored on the payment, so changing the canonical form would turn replays of old references into 409s.
+  it('is the SHA-256 of the canonical request, as stored on earlier payments', () => {
+    expect(hashOf()).toBe(
+      'e40be9d20b002aba8f6fb8e2bd50ebc9a1814a29ce12a6e88a6a30a7adfb1615'
+    );
   });
 
   it('ignores the order of the allocations', () => {

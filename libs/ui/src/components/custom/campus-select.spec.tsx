@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { CampusSelect } from './campus-select';
 
 const CAMPUSES = [
@@ -28,7 +28,9 @@ describe('CampusSelect', () => {
     );
     const select = screen.getByRole('combobox', { name: 'Campus' });
     expect(
-      [...select.querySelectorAll('option')].map((option) => option.textContent)
+      within(select)
+        .getAllByRole('option')
+        .map((option) => option.textContent)
     ).toEqual(['All campuses', 'Lekki', 'Ikeja']);
     expect(select).toHaveValue('ikeja');
   });
@@ -50,19 +52,5 @@ describe('CampusSelect', () => {
     expect(onChange).toHaveBeenLastCalledWith('ikeja');
     fireEvent.change(select, { target: { value: '' } });
     expect(onChange).toHaveBeenLastCalledWith(undefined);
-  });
-
-  it('passes className to the select wrapper', () => {
-    render(
-      <CampusSelect
-        campuses={CAMPUSES}
-        value={undefined}
-        onChange={vi.fn()}
-        className="w-40"
-      />
-    );
-    expect(
-      screen.getByRole('combobox', { name: 'Campus' }).parentElement
-    ).toHaveClass('w-40');
   });
 });

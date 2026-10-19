@@ -5,9 +5,9 @@ import type { OrgContext } from '../src/app/common/auth';
 import { BillingPlanService } from '../src/app/modules/billing/billing-plan.service';
 import { scopeOf } from '../src/app/modules/billing/billing-scope';
 import {
-  BillingRepository,
+  BillingPlanRepository,
   type TermInfo,
-} from '../src/app/modules/billing/billing.repository';
+} from '../src/app/modules/billing/billing-plan.repository';
 import { expect, type TestUser } from './support/base-test';
 import {
   addDiscount,
@@ -66,7 +66,7 @@ async function levelIdsOn(pool: Pool, ctx: OrgContext, term: TermInfo) {
 
 async function termInfos(app: INestApplication, owner: TestUser) {
   const ctx = await orgContextFor(app, owner);
-  const repo = app.get(BillingRepository, { strict: false });
+  const repo = app.get(BillingPlanRepository, { strict: false });
   return repo.termsToCharge(ctx.organizationId);
 }
 
@@ -319,7 +319,7 @@ test.describe('chargeSummary equals the round plan', () => {
     expect(namesOf.has(studentIkeja.id)).toBe(true);
 
     const plans = app.get(BillingPlanService, { strict: false });
-    const repo = app.get(BillingRepository, { strict: false });
+    const repo = app.get(BillingPlanRepository, { strict: false });
     const expectedCreated = {
       owner: { first: 12, second: 13 },
       bursar: { first: 8, second: 9 },

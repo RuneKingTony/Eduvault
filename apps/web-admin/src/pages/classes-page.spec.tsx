@@ -6,6 +6,7 @@ import type {
 } from '@eduvault/api-contract';
 import { toPermissionMap } from '@eduvault/policy';
 import { currentCalendar, noCalendar } from '../test-calendar';
+import { testId } from '../test-api';
 import { IDS, classSummary, teacher } from '../test-classes';
 import {
   actingAccess,
@@ -20,6 +21,9 @@ vi.mock('../components/no-current-term-callout', () => ({
 }));
 
 type Access = MePermissions;
+
+const SS3_GOLD = testId(0x2_20_01);
+const RUBY_ID = testId(0x2_20_02);
 
 const ACTIVE = [
   classSummary({
@@ -36,7 +40,7 @@ const ACTIVE = [
     classTeachers: [teacher('Ayo Bassey'), teacher('Claire Ade', 'assistant')],
   }),
   classSummary({
-    id: '00000000-0000-4000-8000-000000000040',
+    id: SS3_GOLD,
     displayName: 'SS 3 Gold',
     name: 'Gold',
     level: { id: IDS.ss3, code: 'SS3', name: 'SS 3' },
@@ -45,7 +49,7 @@ const ACTIVE = [
 ];
 
 const RUBY = classSummary({
-  id: '00000000-0000-4000-8000-000000000041',
+  id: RUBY_ID,
   displayName: 'JSS 1 Ruby',
   name: 'Ruby',
   retiredAt: '2026-07-24T09:00:00.000Z',
@@ -86,15 +90,17 @@ function setup({
   return { api, ...handlers };
 }
 
-const cardOf = async (title: string) => {
-  const heading = await screen.findByText(title, {
+const tableOf = async (title: string) => {
+  const titles = await screen.findAllByText(/^.+$/, {
     selector: '[data-slot="card-title"]',
   });
-  const card = heading.closest<HTMLElement>('[data-slot="card"]');
-  if (card === null) {
-    throw new Error(`no card for ${title}`);
+  const table = screen
+    .getAllByRole('table')
+    .at(titles.findIndex((candidate) => candidate.textContent === title));
+  if (table === undefined) {
+    throw new Error(`no table for ${title}`);
   }
-  return within(card);
+  return table;
 };
 
 describe('describeClasses', () => {
@@ -123,9 +129,10 @@ describe('ClassesPage', () => {
     expect(
       await screen.findByText('3 classes in 2026/2027')
     ).toBeInTheDocument();
-    const card = await cardOf('JSS 1');
-    expect(card.getByText('JSS 1 Ruby')).toBeInTheDocument();
-    expect(card.queryByText('JSS 1 Gold')).not.toBeInTheDocument();
+    const level = within(await tableOf('JSS 1'));
+    expect(level.getByText('JSS 1 Ruby')).toBeInTheDocument();
+    expect(level.queryByText('JSS 1 Gold')).not.toBeInTheDocument();
+    expect(screen.queryByText('JSS 1 Gold')).not.toBeInTheDocument();
   });
 
   it('shows a card per level in order with its classes, campus, teachers, students and status', async () => {
@@ -138,29 +145,29 @@ describe('ClassesPage', () => {
       .map((title) => title.textContent);
     expect(titles).toEqual(['JSS 1', 'SS 3']);
 
-    const jss = await cardOf('JSS 1');
-    expect(jss.getByText('2 classes')).toBeInTheDocument();
+    const jss = within(await tableOf('JSS 1'));
+    expect(jss.getAllByRole('row')).toHaveLength(3);
+    expect(screen.getByText('2 classes')).toBeInTheDocument();
     for (const header of ['Class', 'Class teacher', 'Students', 'Status']) {
       expect(
         jss.getByRole('columnheader', { name: header })
       ).toBeInTheDocument();
     }
-    const gold = within(
-      jss.getByText('JSS 1 Gold').closest('tr') as HTMLElement
-    );
+    const gold = within(jss.getByRole('row', { name: /JSS 1 Gold/ }));
     expect(gold.getByText('Lekki')).toBeInTheDocument();
     expect(gold.getByText('Ayo Bassey')).toBeInTheDocument();
     expect(gold.getByText('Active')).toBeInTheDocument();
-    const last = await cardOf('SS 3');
-    expect(last.getByText('1 class')).toBeInTheDocument();
+    const last = within(await tableOf('SS 3'));
+    expect(last.getAllByRole('row')).toHaveLength(2);
+    expect(screen.getByText('1 class')).toBeInTheDocument();
     expect(last.getByText('Not assigned')).toBeInTheDocument();
-    expect(last.getByText('4')).toHaveClass('text-right');
+    expect(last.getByRole('cell', { name: '4' })).toHaveClass('text-right');
   });
 
   it('shows several teachers as a count with the roles in a tooltip', async () => {
     setup();
     const silver = within(
-      (await screen.findByText('JSS 1 Silver')).closest('tr') as HTMLElement
+      await screen.findByRole('row', { name: /JSS 1 Silver/ })
     );
     expect(silver.getByText('Ikeja')).toBeInTheDocument();
     fireEvent.focus(silver.getByRole('button', { name: '2 teachers' }));
@@ -172,9 +179,7 @@ describe('ClassesPage', () => {
 
   it('shows Archived on an archived class', async () => {
     setup({ status: 'all' });
-    const row = within(
-      (await screen.findByText('JSS 1 Ruby')).closest('tr') as HTMLElement
-    );
+    const row = within(await screen.findByRole('row', { name: /JSS 1 Ruby/ }));
     expect(row.getByText('Archived')).toBeInTheDocument();
   });
 
@@ -274,8 +279,7 @@ describe('ClassesPage', () => {
     fireEvent.click(name);
     expect(onOpenClass).toHaveBeenCalledWith(IDS.gold);
     onOpenClass.mockClear();
-    const row = (await screen.findByText('JSS 1 Silver')).closest('tr');
-    fireEvent.click(row as HTMLElement);
+    fireEvent.click(await screen.findByRole('row', { name: /JSS 1 Silver/ }));
     expect(onOpenClass).toHaveBeenCalledWith(IDS.silver);
   });
 
@@ -293,7 +297,7 @@ describe('ClassesPage', () => {
       await screen.findByText('Create the first school year')
     ).toBeInTheDocument();
     expect(screen.getByText('3 classes')).toBeInTheDocument();
-    const last = await cardOf('SS 3');
+    const last = within(await tableOf('SS 3'));
     expect(last.queryByText('4')).not.toBeInTheDocument();
     expect(last.getByText('—')).toBeInTheDocument();
   });
@@ -307,11 +311,11 @@ describe('ClassesPage', () => {
       })
     );
     setup({ byStatus: { active: many } });
-    const card = await cardOf('JSS 1');
-    expect(card.getAllByRole('row')).toHaveLength(11);
-    expect(card.getByText('Showing 1 to 10 of 12')).toBeInTheDocument();
-    fireEvent.click(card.getByRole('button', { name: 'Page 2' }));
-    expect(card.getAllByRole('row')).toHaveLength(3);
-    expect(card.getByText('JSS 1 Arm 12')).toBeInTheDocument();
+    const level = within(await tableOf('JSS 1'));
+    expect(level.getAllByRole('row')).toHaveLength(11);
+    expect(screen.getByText('Showing 1 to 10 of 12')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Page 2' }));
+    expect(level.getAllByRole('row')).toHaveLength(3);
+    expect(level.getByText('JSS 1 Arm 12')).toBeInTheDocument();
   });
 });

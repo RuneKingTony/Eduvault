@@ -24,5 +24,5 @@ Money is the one place a quiet bug costs a school real naira, and a ledger that 
 
 - Fixing an error takes a reversing entry and a new posting, so every correction stays visible.
 - Tests and tooling that reset data must `TRUNCATE`, which fires no row trigger; a row delete in a test fails by design.
-- Posting code must give every entry a stable reference, and a caller that reuses one for a different entry gets the first entry back and a `replayed` flag, so it must check the flag.
+- Posting code must give every entry a stable reference, and a caller that reuses one for a different entry gets the first entry back and a `replayed` flag, so it must check the flag, or post through `postOnce`, which throws instead. A client-chosen reference shares this namespace with the numbers the system issues, so a payment or sale reference may not start with a reserved prefix (D-360).
 - A school cannot be deleted once it has a journal entry (D-206).

@@ -5,10 +5,10 @@ import type { CampusService } from '../campus/campus.service';
 import type { RoundFilter } from './billing-round';
 import { BillingPlanService } from './billing-plan.service';
 import type {
-  BillingRepository,
+  BillingPlanRepository,
   ChargeSummary,
   TermInfo,
-} from './billing.repository';
+} from './billing-plan.repository';
 import type { RoundCandidate } from './round-plan';
 
 const termOf = (id: string, sequence: number): TermInfo => ({
@@ -49,7 +49,7 @@ function setup(summaries: Record<string, ChargeSummary>) {
   const clock = new Clock();
   clock.set('2026-10-07');
   const service = new BillingPlanService(
-    billing as unknown as BillingRepository,
+    billing as unknown as BillingPlanRepository,
     {} as CampusService,
     clock
   );

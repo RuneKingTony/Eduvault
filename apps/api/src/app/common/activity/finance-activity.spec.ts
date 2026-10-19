@@ -10,12 +10,16 @@ import {
   feeLineCreatedActivity,
   feeLineRetiredActivity,
   feeLinesCopiedActivity,
+  feeOptionChangedActivity,
+  feeTypeCreatedActivity,
   oneOffChargeActivity,
   paymentCancellationDeclinedActivity,
   paymentCancelledActivity,
   paymentRecordedActivity,
   roundCancelledActivity,
   roundSentActivity,
+  storeDeliveryReceivedActivity,
+  storeOpeningStockRecordedActivity,
   storeSaleRecordedActivity,
   storeWriteOffApprovedActivity,
   storeWriteOffDeclinedActivity,
@@ -24,6 +28,7 @@ import {
   type FinanceActor,
   type OneOffChargeFacts,
   type PaymentFacts,
+  type StoreDeliveryFacts,
   type StoreSaleFacts,
   type StoreWriteOffFacts,
 } from './finance-activity';
@@ -277,6 +282,100 @@ describe('storeSaleRecordedActivity', () => {
       sale
     );
     expect(row?.text).toContain('for GHS 13,500 (sale');
+  });
+});
+
+describe('store delivery activity', () => {
+  const delivery: StoreDeliveryFacts = {
+    id: 'delivery-1',
+    number: 'DEL-2026-0003',
+    storeId: 'store-1',
+    campusId: LEKKI,
+    campusName: 'Lekki',
+    supplierName: 'Adebayo Uniforms Ltd',
+    lines: 2,
+    totalMinor: 3_980_000,
+  };
+
+  it('writes one finance row on the store campus for a delivery', () => {
+    expect(storeDeliveryReceivedActivity(actor, delivery)).toEqual([
+      {
+        organizationId: 'org-1',
+        campusId: LEKKI,
+        pillar: 'finance',
+        kind: 'store_delivery.received',
+        actorUserId: 'user-1',
+        subjectType: 'stock_delivery',
+        subjectId: 'delivery-1',
+        text: 'Tunde Bakare received delivery DEL-2026-0003 from Adebayo Uniforms Ltd at the Lekki store: 2 items, ₦39,800.',
+        data: {
+          deliveryId: 'delivery-1',
+          number: 'DEL-2026-0003',
+          storeId: 'store-1',
+          supplierName: 'Adebayo Uniforms Ltd',
+          items: 2,
+          totalMinor: 3_980_000,
+        },
+      },
+    ]);
+  });
+
+  it('says "1 item" for a single-line delivery', () => {
+    const [row] = storeDeliveryReceivedActivity(actor, {
+      ...delivery,
+      lines: 1,
+    });
+    expect(row?.text).toContain('at the Lekki store: 1 item, ₦39,800.');
+  });
+
+  it('writes one finance row on the store campus for opening stock', () => {
+    expect(
+      storeOpeningStockRecordedActivity(actor, {
+        ...delivery,
+        number: 'OPEN-STORE-campus-lekki',
+        supplierName: 'Opening stock count',
+        lines: 3,
+      })
+    ).toEqual([
+      {
+        organizationId: 'org-1',
+        campusId: LEKKI,
+        pillar: 'finance',
+        kind: 'store_opening_stock.recorded',
+        actorUserId: 'user-1',
+        subjectType: 'stock_delivery',
+        subjectId: 'delivery-1',
+        text: 'Tunde Bakare recorded opening stock at the Lekki store: 3 items, ₦39,800.',
+        data: {
+          deliveryId: 'delivery-1',
+          number: 'OPEN-STORE-campus-lekki',
+          storeId: 'store-1',
+          items: 3,
+          totalMinor: 3_980_000,
+        },
+      },
+    ]);
+  });
+
+  it('says "1 item" for single-line opening stock', () => {
+    const [row] = storeOpeningStockRecordedActivity(actor, {
+      ...delivery,
+      lines: 1,
+    });
+    expect(row?.text).toContain('at the Lekki store: 1 item, ₦39,800.');
+  });
+
+  it('formats the amount in the school currency', () => {
+    const [received] = storeDeliveryReceivedActivity(
+      { ...actor, currency: 'GHS' },
+      delivery
+    );
+    const [opening] = storeOpeningStockRecordedActivity(
+      { ...actor, currency: 'GHS' },
+      delivery
+    );
+    expect(received?.text).toContain('2 items, GHS 39,800.');
+    expect(opening?.text).toContain('2 items, GHS 39,800.');
   });
 });
 
@@ -875,5 +974,83 @@ describe('oneOffChargeActivity', () => {
     expect(row?.text).toBe(
       `Charged Bola Ade ${money(1_750_000, 'GHS')} (CHG-2026-0031)`
     );
+  });
+});
+
+describe('feeTypeCreatedActivity', () => {
+  it('writes one school-wide finance row naming the type and its code', () => {
+    expect(
+      feeTypeCreatedActivity(actor, {
+        id: 'type-9',
+        code: 4090,
+        name: 'Sports levy',
+      })
+    ).toEqual([
+      {
+        organizationId: 'org-1',
+        campusId: null,
+        pillar: 'finance',
+        kind: 'fee_type.created',
+        actorUserId: 'user-1',
+        subjectType: 'fee_type',
+        subjectId: 'type-9',
+        text: 'Tunde Bakare added the fee type Sports levy (4090).',
+        data: { feeTypeId: 'type-9', code: 4090, name: 'Sports levy' },
+      },
+    ]);
+  });
+});
+
+describe('feeOptionChangedActivity', () => {
+  const facts = {
+    student: { id: 'student-1', name: 'Bola Ade', campusId: LEKKI },
+    feeType: { id: 'type-bus', name: 'School bus' },
+    enrollmentId: 'enrol-1',
+  };
+
+  it('writes an opt-in row on the student’s campus', () => {
+    expect(
+      feeOptionChangedActivity(actor, { ...facts, optedIn: true })
+    ).toEqual([
+      {
+        organizationId: 'org-1',
+        campusId: LEKKI,
+        pillar: 'finance',
+        kind: 'fee_option.opted_in',
+        actorUserId: 'user-1',
+        subjectType: 'student',
+        subjectId: 'student-1',
+        text: 'Tunde Bakare opted Bola Ade into School bus.',
+        data: {
+          studentId: 'student-1',
+          feeTypeId: 'type-bus',
+          enrollmentId: 'enrol-1',
+          optedIn: true,
+        },
+      },
+    ]);
+  });
+
+  it('writes an opt-out row on the student’s campus', () => {
+    expect(
+      feeOptionChangedActivity(actor, { ...facts, optedIn: false })
+    ).toEqual([
+      {
+        organizationId: 'org-1',
+        campusId: LEKKI,
+        pillar: 'finance',
+        kind: 'fee_option.opted_out',
+        actorUserId: 'user-1',
+        subjectType: 'student',
+        subjectId: 'student-1',
+        text: 'Tunde Bakare opted Bola Ade out of School bus.',
+        data: {
+          studentId: 'student-1',
+          feeTypeId: 'type-bus',
+          enrollmentId: 'enrol-1',
+          optedIn: false,
+        },
+      },
+    ]);
   });
 });

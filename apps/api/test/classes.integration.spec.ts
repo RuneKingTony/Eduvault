@@ -1544,7 +1544,7 @@ test.describe('graduate class', () => {
       status: 'active',
       has_member: true,
     });
-    expect(chukwu?.id).toBeDefined();
+    expect(chukwu).toMatchObject({ id: expect.any(String) });
 
     const tab = (
       await api(schools.owner).get('/students?tab=graduated').expect(200)

@@ -1,7 +1,11 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
-import { ApiError } from '@eduvault/api-contract';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { ApiError, type SchoolSettings } from '@eduvault/api-contract';
+import { PermissionsProvider } from '@eduvault/auth-client';
 import { toast } from '@eduvault/ui';
-import { renderWithApi, starterAccess } from '../test-utils';
+import { ApiProvider } from '../api';
+import { checked } from '../test-api';
+import { ownerAccess, renderWithApi, starterAccess } from '../test-utils';
 import { settings } from '../test-school';
 import { AdmissionsPage } from './admissions-page';
 
@@ -14,11 +18,36 @@ function setup(access?: ReturnType<typeof starterAccess>) {
   const api = {
     schoolSettings: {
       get: vi.fn().mockResolvedValue(settings()),
-      update: vi.fn().mockResolvedValue(settings({ maxGuardians: 3 })),
+      update: vi.fn(({ body }: { body: Partial<SchoolSettings> }) =>
+        Promise.resolve(settings(body))
+      ),
     },
   };
   renderWithApi(<AdmissionsPage />, api, access);
   return api;
+}
+
+// The out-of-range number is a request the contract rejects, so only the server's refusal can answer it.
+function setupRefusal(update: ReturnType<typeof vi.fn>) {
+  const guarded = checked({
+    schoolSettings: { get: vi.fn().mockResolvedValue(settings()) },
+  });
+  const api = { schoolSettings: { get: guarded.schoolSettings.get, update } };
+  render(
+    <QueryClientProvider
+      client={
+        new QueryClient({ defaultOptions: { queries: { retry: false } } })
+      }
+    >
+      <ApiProvider
+        api={api as unknown as Parameters<typeof ApiProvider>[0]['api']}
+      >
+        <PermissionsProvider value={ownerAccess()}>
+          <AdmissionsPage />
+        </PermissionsProvider>
+      </ApiProvider>
+    </QueryClientProvider>
+  );
 }
 
 describe('AdmissionsPage (editable)', () => {
@@ -57,7 +86,6 @@ describe('AdmissionsPage (editable)', () => {
 
   it('waits for typing to pause and saves only the final number', async () => {
     const api = setup();
-    api.schoolSettings.update.mockResolvedValue(settings({ maxGuardians: 5 }));
     const input = await screen.findByLabelText('Most guardians per student');
 
     fireEvent.change(input, { target: { value: '1' } });
@@ -75,8 +103,7 @@ describe('AdmissionsPage (editable)', () => {
   });
 
   it('says "1 guardian" in the singular', async () => {
-    const api = setup();
-    api.schoolSettings.update.mockResolvedValue(settings({ maxGuardians: 1 }));
+    setup();
     const input = await screen.findByLabelText('Most guardians per student');
 
     fireEvent.change(input, { target: { value: '1' } });
@@ -89,15 +116,16 @@ describe('AdmissionsPage (editable)', () => {
   });
 
   it('shows the 400 message and puts the number back when the limit is out of range', async () => {
-    const api = setup();
-    api.schoolSettings.update.mockRejectedValue(
-      new ApiError(400, {
-        code: 'ValidationError',
-        message: 'Request validation failed',
-        issues: [
-          { path: 'maxGuardians', message: 'Choose a number from 1 to 6.' },
-        ],
-      })
+    setupRefusal(
+      vi.fn().mockRejectedValue(
+        new ApiError(400, {
+          code: 'ValidationError',
+          message: 'Request validation failed',
+          issues: [
+            { path: 'maxGuardians', message: 'Choose a number from 1 to 6.' },
+          ],
+        })
+      )
     );
     const input = await screen.findByLabelText('Most guardians per student');
 
@@ -116,9 +144,6 @@ describe('AdmissionsPage (editable)', () => {
   it('saves the switch with the matching toast each way', async () => {
     const api = setup();
     const toggle = await screen.findByRole('switch');
-    api.schoolSettings.update.mockResolvedValueOnce(
-      settings({ requireGuardian: false })
-    );
 
     fireEvent.click(toggle);
 

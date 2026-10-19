@@ -13,6 +13,7 @@ import type { Me } from '@eduvault/api-contract';
 import { toast } from '@eduvault/ui';
 import { stubMatchMedia } from '@eduvault/ui/testing';
 import { ApiProvider, type Api } from './api';
+import { checked } from './test-api';
 import { NotFoundPage } from './components/page-fallbacks';
 import { routeTree } from './routeTree.gen';
 import { ownerAccess } from './test-utils';
@@ -91,14 +92,14 @@ function renderStudents() {
   vi.spyOn(router.history, 'push').mockImplementation(() => undefined);
   render(
     <QueryClientProvider client={queryClient}>
-      <ApiProvider api={api}>
+      <ApiProvider api={checked(api)}>
         <AuthClientProvider authClient={authClient}>
           <RouterProvider router={router} />
         </AuthClientProvider>
       </ApiProvider>
     </QueryClientProvider>
   );
-  return navigate;
+  return { navigate };
 }
 
 describe('the students route', () => {
@@ -111,7 +112,7 @@ describe('the students route', () => {
   });
 
   it('sends "Charge this student" to the billing page with the prepare sheet open', async () => {
-    const navigate = renderStudents();
+    const { navigate } = renderStudents();
     fireEvent.click(await screen.findByRole('button', { name: 'Admit' }));
 
     const options = vi

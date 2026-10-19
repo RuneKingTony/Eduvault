@@ -1,13 +1,14 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { sql } from 'kysely';
 import type { DeliveryDetail } from '@eduvault/api-contract';
+import { ActivityWriter } from '../../common/activity';
 import { inCampusScope } from '../../common/db/in-campus-scope';
 import { KYSELY_TOKEN, type Database } from '../../common/db/tokens';
 import {
   usableMoneyAccount,
   type UsableMoneyAccount,
 } from '../../common/money-accounts';
-import { LedgerPoster } from '../../common/ledger';
+import { LedgerPoster, schoolCurrency } from '../../common/ledger';
 import {
   findDelivery,
   listDeliveries,
@@ -26,6 +27,7 @@ import {
 } from './kysely-item.repository';
 import {
   StoreRepository,
+  type DeliveryActivity,
   type DeliveryOutcome,
   type DeliveryPage,
   type DeliveryPageQuery,
@@ -70,7 +72,8 @@ const toStockTotals = (row: {
 export class KyselyStoreRepository extends StoreRepository {
   constructor(
     @Inject(KYSELY_TOKEN) private readonly db: Database,
-    private readonly poster: LedgerPoster
+    private readonly poster: LedgerPoster,
+    private readonly activity: ActivityWriter
   ) {
     super();
   }
@@ -173,8 +176,19 @@ export class KyselyStoreRepository extends StoreRepository {
     return hasOpeningStock(this.db, organizationId, storeId);
   }
 
-  insertDelivery(input: NewDelivery): Promise<DeliveryOutcome> {
-    return insertDelivery(this.db, this.poster, input);
+  currency(organizationId: string): Promise<string> {
+    return schoolCurrency(this.db, organizationId);
+  }
+
+  insertDelivery(
+    input: NewDelivery,
+    activity: DeliveryActivity
+  ): Promise<DeliveryOutcome> {
+    return insertDelivery(
+      this.db,
+      { poster: this.poster, activity: this.activity, record: activity },
+      input
+    );
   }
 
   listDeliveries(

@@ -26,16 +26,27 @@ import { TooltipProvider } from '@eduvault/ui';
 import { parseStoreSearch } from './store-search';
 import { parseStatementSearch } from './accounts-search';
 import { ApiProvider, type Api } from './api';
+import { checked, testId } from './test-api';
 import { parseBillingSearch, parseRunSearch } from './billing-search';
 import { parseFeesSearch } from './fees-search';
 import { parseInvoicesSearch } from './invoices-search';
-import { JSS1, feesApi } from './test-fees';
+import { FEE_LINE, JSS1, feesApi } from './test-fees';
 import { ownerAccess } from './test-utils';
 
-export const RUN_ID = '00000000-0000-4000-8000-0000000a0001';
-export const INVOICE_ID = '00000000-0000-4000-8000-0000000b0001';
-export const TERM_ONE = '00000000-0000-4000-8000-000000000101';
-export const TERM_TWO = '00000000-0000-4000-8000-000000000102';
+export const RUN_ID = testId(0x1_50_01);
+export const RUN_TWO_ID = testId(0x1_50_02);
+export const INVOICE_ID = testId(0x1_50_11);
+export const INVOICE_TWO_ID = testId(0x1_50_12);
+export const TERM_ONE = testId(0x1_50_21);
+export const TERM_TWO = testId(0x1_50_22);
+const INVOICE_STUDENT_ID = testId(0x1_50_31);
+const INVOICE_STUDENT_TWO_ID = testId(0x1_50_32);
+const INVOICE_CAMPUS_ID = testId(0x1_50_41);
+const LINE_TUITION_ID = testId(0x1_50_51);
+const LINE_DISCOUNT_ID = testId(0x1_50_52);
+const LEDGER_TUITION_ID = testId(0x1_50_61);
+const LEDGER_DISCOUNT_ID = testId(0x1_50_62);
+const STUDENT_DISCOUNT_ID = testId(0x1_50_71);
 
 export const billingTerm = (over: Partial<BillingTerm> = {}): BillingTerm => ({
   termId: TERM_ONE,
@@ -69,7 +80,7 @@ export const invoiceSummary = (
 ): InvoiceSummary => ({
   id: INVOICE_ID,
   number: 'CHG-2026-00001',
-  studentId: 'st-1',
+  studentId: INVOICE_STUDENT_ID,
   studentName: 'Ada Okeke',
   admissionNumber: 'GF-0123',
   armName: 'JSS 2 Gold',
@@ -96,7 +107,8 @@ export const billingRun = (over: Partial<BillingRun> = {}): BillingRun => ({
   charges: [
     invoiceSummary(),
     invoiceSummary({
-      id: 'inv-2',
+      id: INVOICE_TWO_ID,
+      studentId: INVOICE_STUDENT_TWO_ID,
       number: 'CHG-2026-00002',
       studentName: 'Tobi Adewale',
       admissionNumber: 'GF-0124',
@@ -108,15 +120,24 @@ export const billingRun = (over: Partial<BillingRun> = {}): BillingRun => ({
 export const draftRun = (over: Partial<BillingRun> = {}): BillingRun =>
   billingRun({
     number: 'BR-2026-0002',
+    termId: TERM_TWO,
     termName: 'Second term, 2026/2027',
     status: 'draft',
     issuedAt: null,
     issuedBy: null,
     sentCount: 0,
     charges: [
-      invoiceSummary({ number: null, status: 'draft' }),
       invoiceSummary({
-        id: 'inv-2',
+        number: null,
+        status: 'draft',
+        termId: TERM_TWO,
+        termName: 'Second term, 2026/2027',
+      }),
+      invoiceSummary({
+        id: INVOICE_TWO_ID,
+        termId: TERM_TWO,
+        termName: 'Second term, 2026/2027',
+        studentId: INVOICE_STUDENT_TWO_ID,
         number: null,
         status: 'draft',
         studentName: 'Tobi Adewale',
@@ -151,20 +172,20 @@ const sentJournal = (): InvoiceJournal => ({
 
 const invoiceLines = (): InvoiceLine[] => [
   {
-    id: 'l1',
+    id: LINE_TUITION_ID,
     description: 'JSS 2 Tuition',
     amountMinor: 18_000_000,
-    ledgerAccountId: 'a1',
-    feeLineId: 'f1',
+    ledgerAccountId: LEDGER_TUITION_ID,
+    feeLineId: FEE_LINE,
     studentDiscountId: null,
   },
   {
-    id: 'l2',
+    id: LINE_DISCOUNT_ID,
     description: 'Sibling discount (3 children) (5% of tuition)',
     amountMinor: -900_000,
-    ledgerAccountId: 'a2',
+    ledgerAccountId: LEDGER_DISCOUNT_ID,
     feeLineId: null,
-    studentDiscountId: 'd1',
+    studentDiscountId: STUDENT_DISCOUNT_ID,
   },
 ];
 
@@ -175,14 +196,14 @@ export const invoice = (over: Partial<Invoice> = {}): Invoice => ({
   kind: 'term',
   status: 'issued',
   student: {
-    id: 'st-1',
+    id: INVOICE_STUDENT_ID,
     name: 'Ada Okeke',
     admissionNumber: 'GF-0123',
     armName: 'JSS 2 Gold',
   },
   termId: TERM_ONE,
   termName: 'First term, 2026/2027',
-  campusId: 'c1',
+  campusId: INVOICE_CAMPUS_ID,
   campusName: 'Lekki',
   lines: invoiceLines(),
   totalMinor: 17_100_000,
@@ -253,13 +274,34 @@ function runsApi(options: BillingApiOptions) {
     list: vi.fn().mockResolvedValue(list),
     terms: vi.fn().mockResolvedValue(options.terms ?? defaultTerms()),
     get: vi.fn().mockResolvedValue(run),
-    prepare: vi.fn().mockResolvedValue(prepareResult()),
-    issue: vi.fn().mockResolvedValue({
-      ...run,
-      status: 'issued',
-      sentCount: run.chargeCount,
-    }),
-    cancel: vi.fn().mockResolvedValue({ ...run, status: 'cancelled' }),
+    prepare: vi
+      .fn()
+      .mockImplementation(({ body }: { body: { termId: string } }) =>
+        Promise.resolve(prepareResult({ termId: body.termId }))
+      ),
+    issue: vi
+      .fn()
+      .mockImplementation(({ params }: { params: { id: string } }) =>
+        Promise.resolve({
+          ...run,
+          id: params.id,
+          status: 'issued',
+          issuedAt: '2026-10-15T09:00:00.000Z',
+          issuedBy: 'Chika Eze',
+          sentCount: run.chargeCount,
+        })
+      ),
+    cancel: vi
+      .fn()
+      .mockImplementation(({ params }: { params: { id: string } }) =>
+        Promise.resolve({
+          ...run,
+          id: params.id,
+          status: 'cancelled',
+          cancelledBy: 'Chika Eze',
+          cancelledAt: '2026-10-15T09:00:00.000Z',
+        })
+      ),
   };
 }
 
@@ -292,7 +334,7 @@ export function renderBilling(
   const root = createRootRoute({
     component: () => (
       <QueryClientProvider client={queryClient}>
-        <ApiProvider api={api as unknown as Api}>
+        <ApiProvider api={checked(api)}>
           <PermissionsProvider value={access}>
             <TooltipProvider>{page}</TooltipProvider>
           </PermissionsProvider>

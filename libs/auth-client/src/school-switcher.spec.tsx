@@ -21,7 +21,7 @@ function setup(
   renderInSidebar(
     <SchoolSwitcher
       authClient={authClient}
-      renderCrest={(name) => <span data-testid="crest">{name}</span>}
+      renderCrest={(name) => <span>Crest of {name}</span>}
       onSwitched={onSwitched}
       {...extra}
     />
@@ -35,7 +35,7 @@ describe('SchoolSwitcher', () => {
     expect(
       screen.getByRole('button', { name: /Greenfield College/ })
     ).toBeInTheDocument();
-    expect(screen.getByTestId('crest')).toHaveTextContent('Greenfield College');
+    expect(screen.getByText('Crest of Greenfield College')).toBeInTheDocument();
   });
 
   it('shows a subtitle under the school name when given one', () => {
@@ -45,9 +45,11 @@ describe('SchoolSwitcher', () => {
     ).toBeInTheDocument();
   });
 
-  it('shows no subtitle by default', () => {
-    setup();
-    expect(screen.queryByText(/term/)).not.toBeInTheDocument();
+  it('shows only the school name by default', () => {
+    setup('o1', { renderCrest: undefined });
+    expect(screen.getByRole('button')).toHaveTextContent(
+      /^Greenfield College$/
+    );
   });
 
   it('adds extra items under the school list', () => {

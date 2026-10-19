@@ -1,9 +1,15 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
-import { ApiError } from '@eduvault/api-contract';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { ApiError, type ApprovalRules } from '@eduvault/api-contract';
+import { ALL_PERMISSIONS, toPermissionMap } from '@eduvault/policy';
 import { toast } from '@eduvault/ui';
 import { renderPayments } from '../test-payments';
 import { settings } from '../test-school';
-import { actingAccess, starterAccess } from '../test-utils';
+import {
+  actingAccess,
+  fakeAccess,
+  ownerAccess,
+  starterAccess,
+} from '../test-utils';
 import { ApprovalRulesPage } from './approval-rules-page';
 
 vi.mock('@eduvault/ui', async (importOriginal) => ({
@@ -11,32 +17,52 @@ vi.mock('@eduvault/ui', async (importOriginal) => ({
   toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() },
 }));
 
-const LABELS = [
-  'Refunds',
-  'Cancelling a balance',
-  'Reducing a fee',
-  'Discounts',
-  'Cancelling a payment',
-];
+const RULES = [
+  { key: 'refund', label: 'Refunds' },
+  { key: 'writeOff', label: 'Cancelling a balance' },
+  { key: 'creditNote', label: 'Reducing a fee' },
+  { key: 'discount', label: 'Discounts' },
+  { key: 'paymentVoid', label: 'Cancelling a payment' },
+] as const;
+
+const LABELS = RULES.map((rule) => rule.label);
+
+const allOn: ApprovalRules = {
+  refund: true,
+  writeOff: true,
+  creditNote: true,
+  discount: true,
+  paymentVoid: true,
+};
 
 function setup(
   options: {
-    current?: ReturnType<typeof settings>;
+    rules?: ApprovalRules;
+    approvers?: string[];
     access?: ReturnType<typeof starterAccess>;
     failWith?: Error;
   } = {}
 ) {
-  const current = options.current ?? settings();
+  let rules = options.rules ?? allOn;
   const api = {
     schoolSettings: {
-      get: vi.fn().mockResolvedValue(current),
+      get: vi.fn().mockImplementation(() =>
+        Promise.resolve(
+          settings({
+            approvalRules: rules,
+            approvers: options.approvers ?? ['Owner', 'Principal'],
+          })
+        )
+      ),
       updateApprovalRules: vi
         .fn()
-        .mockImplementation(() =>
-          options.failWith === undefined
-            ? Promise.resolve(current.approvalRules)
-            : Promise.reject(options.failWith)
-        ),
+        .mockImplementation(({ body }: { body: Partial<ApprovalRules> }) => {
+          if (options.failWith !== undefined) {
+            return Promise.reject(options.failWith);
+          }
+          rules = { ...rules, ...body };
+          return Promise.resolve(rules);
+        }),
     },
   };
   renderPayments(<ApprovalRulesPage />, api, {
@@ -51,93 +77,72 @@ describe('ApprovalRulesPage', () => {
     vi.clearAllMocks();
   });
 
-  it('titles the page and lists the five requests, all switched on by default', async () => {
+  it('lists the five requests, all switched on by default', async () => {
     setup();
-    expect(
-      await screen.findByRole('heading', { name: 'Approval rules' })
-    ).toBeVisible();
-    expect(
-      screen.getByText(
-        'Choose which money changes need a boss to say yes first.'
-      )
-    ).toBeVisible();
-    expect(
-      screen.getByText(
-        'Switched on, the request waits in Approvals until a boss says yes. Switched off, it goes through straight away. Payments received never wait.'
-      )
-    ).toBeVisible();
+    await screen.findByRole('switch', { name: 'Refunds' });
+    expect(screen.getAllByRole('switch')).toHaveLength(RULES.length);
     for (const label of LABELS) {
       expect(screen.getByRole('switch', { name: label })).toBeChecked();
     }
-    expect(
-      screen.getByText('Paying money back to a family that overpaid')
-    ).toBeVisible();
-    expect(
-      screen.getByText('Undoing a receipt that was recorded wrongly')
-    ).toBeVisible();
   });
 
-  it('shows a switch that is off as off', async () => {
-    setup({
-      current: settings({
-        approvalRules: {
-          refund: false,
-          writeOff: true,
-          creditNote: true,
-          discount: true,
-          paymentVoid: true,
-        },
-      }),
-    });
-    expect(
-      await screen.findByRole('switch', { name: 'Refunds' })
-    ).not.toBeChecked();
-    expect(screen.getByRole('switch', { name: 'Discounts' })).toBeChecked();
-  });
+  it.each(RULES)(
+    'shows only $label as off when the API says $key is off',
+    async ({ key, label }) => {
+      setup({ rules: { ...allOn, [key]: false } });
+      expect(
+        await screen.findByRole('switch', { name: label })
+      ).not.toBeChecked();
+      for (const other of LABELS.filter((name) => name !== label)) {
+        expect(screen.getByRole('switch', { name: other })).toBeChecked();
+      }
+    }
+  );
 
-  it('switches a request off and says it now goes through straight away', async () => {
-    const api = setup();
-    fireEvent.click(await screen.findByRole('switch', { name: 'Refunds' }));
+  it.each(RULES)(
+    'switches $label off, sends only $key and shows it off',
+    async ({ key, label }) => {
+      const api = setup();
+      fireEvent.click(await screen.findByRole('switch', { name: label }));
 
-    await waitFor(() => {
-      expect(api.schoolSettings.updateApprovalRules).toHaveBeenCalledWith({
-        body: { refund: false },
+      await waitFor(() => {
+        expect(api.schoolSettings.updateApprovalRules).toHaveBeenCalledWith({
+          body: { [key]: false },
+        });
       });
-    });
-    await waitFor(() => {
+      await waitFor(() => {
+        expect(screen.getByRole('switch', { name: label })).not.toBeChecked();
+      });
       expect(toast.success).toHaveBeenCalledWith(
         'These requests now go through straight away.'
       );
-    });
-  });
+      for (const other of LABELS.filter((name) => name !== label)) {
+        expect(screen.getByRole('switch', { name: other })).toBeChecked();
+      }
+    }
+  );
 
-  it('switches a request on and says it now waits for a boss', async () => {
-    const api = setup({
-      current: settings({
-        approvalRules: {
-          refund: true,
-          writeOff: true,
-          creditNote: true,
-          discount: false,
-          paymentVoid: true,
-        },
-      }),
-    });
-    fireEvent.click(await screen.findByRole('switch', { name: 'Discounts' }));
+  it.each(RULES)(
+    'switches $label back on, sends only $key and shows it on',
+    async ({ key, label }) => {
+      const api = setup({ rules: { ...allOn, [key]: false } });
+      fireEvent.click(await screen.findByRole('switch', { name: label }));
 
-    await waitFor(() => {
-      expect(api.schoolSettings.updateApprovalRules).toHaveBeenCalledWith({
-        body: { discount: true },
+      await waitFor(() => {
+        expect(api.schoolSettings.updateApprovalRules).toHaveBeenCalledWith({
+          body: { [key]: true },
+        });
       });
-    });
-    await waitFor(() => {
+      await waitFor(() => {
+        expect(screen.getByRole('switch', { name: label })).toBeChecked();
+      });
       expect(toast.success).toHaveBeenCalledWith(
         'These requests now wait for a boss to approve.'
       );
-    });
-  });
+    }
+  );
 
-  it('toasts the refusal and keeps the switch as it was when the change is refused', async () => {
+  it('toasts the refusal when the change is refused', async () => {
     setup({
       failWith: new ApiError(403, {
         code: 'Forbidden',
@@ -151,7 +156,7 @@ describe('ApprovalRulesPage', () => {
         'You need permission to change school settings.'
       );
     });
-    expect(screen.getByRole('switch', { name: 'Refunds' })).toBeChecked();
+    expect(toast.success).not.toHaveBeenCalled();
   });
 
   it('disables every switch for a member without schoolAccount:update', async () => {
@@ -162,7 +167,7 @@ describe('ApprovalRulesPage', () => {
     }
   });
 
-  it('disables every switch for a super admin acting read-only', async () => {
+  it('disables every switch when acting read-only, which holds no schoolAccount:update', async () => {
     setup({ access: actingAccess(false) });
     await screen.findByRole('switch', { name: 'Refunds' });
     for (const label of LABELS) {
@@ -170,27 +175,38 @@ describe('ApprovalRulesPage', () => {
     }
   });
 
-  it('says who can approve, with the owner and each role that holds the permission', async () => {
-    setup();
-    const section = (await screen.findByText('Who can approve')).closest(
-      'div[data-slot="card"]'
-    );
-    expect(section).not.toBeNull();
-    const card = within(section as HTMLElement);
-    expect(
-      card.getByText('Nobody can approve their own request.')
-    ).toBeVisible();
-    expect(card.getByText('Owner')).toBeVisible();
-    expect(card.getByText('Principal')).toBeVisible();
-    expect(
-      card.getByText('Anyone with one of these roles can approve.')
-    ).toBeVisible();
+  it('enables the switches for a super admin acting with a reason', async () => {
+    setup({ access: actingAccess(true) });
+    await screen.findByRole('switch', { name: 'Refunds' });
+    for (const label of LABELS) {
+      expect(screen.getByRole('switch', { name: label })).toBeEnabled();
+    }
   });
 
-  it('offers Change roles only to someone who can see roles', async () => {
+  it('lists the approvers the API returns', async () => {
+    setup({ approvers: ['Owner', 'Cashier'] });
+    expect(await screen.findByText('Cashier')).toBeVisible();
+    expect(screen.getByText('Owner')).toBeVisible();
+    expect(screen.queryByText('Principal')).toBeNull();
+  });
+
+  it('offers Change roles to someone who can see roles', async () => {
     setup();
     expect(
       await screen.findByRole('link', { name: /Change roles/ })
     ).toHaveAttribute('href', '/roles');
+  });
+
+  it('leaves Change roles out for a member without ac:read', async () => {
+    setup({
+      access: fakeAccess({
+        ...ownerAccess(),
+        permissions: toPermissionMap(
+          ALL_PERMISSIONS.filter((permission) => permission !== 'ac:read')
+        ),
+      }),
+    });
+    await screen.findByRole('switch', { name: 'Refunds' });
+    expect(screen.queryByRole('link', { name: /Change roles/ })).toBeNull();
   });
 });

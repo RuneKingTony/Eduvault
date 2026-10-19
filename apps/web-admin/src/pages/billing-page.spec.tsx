@@ -3,6 +3,7 @@ import { ApiError } from '@eduvault/api-contract';
 import { toast } from '@eduvault/ui';
 import {
   TERM_ONE,
+  RUN_TWO_ID,
   TERM_TWO,
   billingApi,
   billingTerm,
@@ -44,7 +45,7 @@ describe('BillingPage', () => {
         runs: [
           runSummary(),
           runSummary({
-            id: 'run-2',
+            id: RUN_TWO_ID,
             number: 'BR-2026-0002',
             termName: 'Second term, 2026/2027',
             scopeLabel: 'Campus: Lekki',
@@ -56,9 +57,9 @@ describe('BillingPage', () => {
         ],
       })
     );
-    const row = (await screen.findByText('BR-2026-0002')).closest('tr');
-    expect(row).not.toBeNull();
-    const cells = within(row as HTMLElement);
+    const cells = within(
+      await screen.findByRole('row', { name: /BR-2026-0002/ })
+    );
     expect(
       cells.getByText('Second term, 2026/2027 · Campus: Lekki')
     ).toBeVisible();

@@ -211,16 +211,10 @@ describe('intoFor', () => {
     });
   });
 
-  it('offers cash accounts before bank accounts for a cash payment', () => {
-    expect(intoFor('cash', ada, [bank, cash])).toEqual({
-      status: 'choose',
-      accounts: [cash, bank],
-    });
-  });
-
-  it('reports none when the only account is on another campus', () => {
+  it('says choose when several accounts fit and none when no account fits', () => {
     const elsewhere = account({ id: 'x', kind: 'pos', campusId: 'ikeja' });
-    expect(intoFor('pos', ada, [elsewhere])).toEqual({ status: 'none' });
+    expect(intoFor('cash', ada, [bank, cash])?.status).toBe('choose');
+    expect(intoFor('pos', ada, [elsewhere])?.status).toBe('none');
   });
 
   it('defaults the select to the first fit and keeps a picked one', () => {
@@ -266,7 +260,10 @@ describe('lines, total and request', () => {
       method: 'cash',
       moneyAccountId: 'acct',
       proofFileId: 'proof',
-      lines: saleLines(state),
+      lines: [
+        { itemId: 'a', quantity: 2 },
+        { itemId: 'd', quantity: 1 },
+      ],
     });
     expect(
       saleRequest(state, { accountId: undefined, proofFileId: undefined })

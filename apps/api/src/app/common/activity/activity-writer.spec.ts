@@ -69,6 +69,36 @@ describe('ActivityWriter', () => {
     }
   );
 
+  it.each(['store_delivery.received', 'store_opening_stock.recorded'])(
+    'refuses a school-wide finance row of kind %s',
+    async (kind) => {
+      await expect(
+        run({
+          ...base,
+          pillar: 'finance',
+          campusId: null,
+          kind,
+          subjectType: 'stock_delivery',
+        })
+      ).rejects.toThrow('A finance activity row needs a campus');
+    }
+  );
+
+  it.each(['fee_option.opted_in', 'fee_option.opted_out'])(
+    'refuses a school-wide finance row of kind %s',
+    async (kind) => {
+      await expect(
+        run({
+          ...base,
+          pillar: 'finance',
+          campusId: null,
+          kind,
+          subjectType: 'student',
+        })
+      ).rejects.toThrow('A finance activity row needs a campus');
+    }
+  );
+
   it('refuses a school-wide finance row of a fee-line subject with a money kind', async () => {
     await expect(
       run({

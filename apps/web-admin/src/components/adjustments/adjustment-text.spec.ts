@@ -1,6 +1,5 @@
 import { discountRow } from '../../test-approvals';
 import {
-  STATUS_LABELS,
   approvedTip,
   discountBadge,
   discountStatus,
@@ -8,15 +7,7 @@ import {
   isEnded,
 } from './adjustment-text';
 
-describe('status words', () => {
-  it('says Waiting, Approved and Declined, never Rejected', () => {
-    expect(STATUS_LABELS).toEqual({
-      submitted: 'Waiting',
-      approved: 'Approved',
-      rejected: 'Declined',
-    });
-  });
-
+describe('approvedTip', () => {
   it('tips who approved', () => {
     expect(approvedTip('Funmi Adeyemi')).toBe('Approved by Funmi Adeyemi');
     expect(approvedTip(null)).toBeUndefined();

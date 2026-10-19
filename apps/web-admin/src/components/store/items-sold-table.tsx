@@ -35,7 +35,7 @@ interface ItemsSoldTableProps {
   onOpen: (saleId: string) => void;
 }
 
-export const itemsText = (sale: Pick<Sale, 'lines'>): string =>
+const itemsText = (sale: Pick<Sale, 'lines'>): string =>
   sale.lines.map((line) => `${line.displayName} × ${line.quantity}`).join(', ');
 
 function NothingSold() {

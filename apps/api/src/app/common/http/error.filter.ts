@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import {
   ALREADY_DECIDED_MESSAGE,
+  JOURNAL_REFERENCE_CLASH_MESSAGE,
   LEAVE_OVERLAP_MESSAGE,
   SELF_APPROVAL_MESSAGE,
   STORE_PAYMENT_VOID_MESSAGE,
@@ -17,6 +18,7 @@ import {
   type ApiErrorCode,
 } from '@eduvault/api-contract';
 import type { Response } from 'express';
+import { ReferenceClashError } from '../ledger/ledger-lines';
 
 const CODES: Partial<Record<number, ApiErrorCode>> = {
   400: 'BadRequest',
@@ -151,6 +153,10 @@ export class ErrorFilter implements ExceptionFilter {
   } {
     if (exception instanceof HttpException) {
       return this.describeHttp(exception);
+    }
+
+    if (exception instanceof ReferenceClashError) {
+      return conflict(JOURNAL_REFERENCE_CLASH_MESSAGE);
     }
 
     const upstream = betterAuthStatus(exception);

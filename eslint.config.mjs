@@ -13,6 +13,7 @@ import unicorn from 'eslint-plugin-unicorn';
 import importX from 'eslint-plugin-import-x';
 import regexp from 'eslint-plugin-regexp';
 import vitest from '@vitest/eslint-plugin';
+import testingLibrary from 'eslint-plugin-testing-library';
 import betterTailwindcss from 'eslint-plugin-better-tailwindcss';
 import { createTypeScriptImportResolver } from 'eslint-import-resolver-typescript';
 
@@ -123,6 +124,15 @@ export const reactConfig = [
       ],
     },
   },
+  {
+    ...asErrors(testingLibrary.configs['flat/react']),
+    files: ['**/*.spec.{ts,tsx}'],
+    rules: {
+      ...asErrors(testingLibrary.configs['flat/react']).rules,
+      'testing-library/no-test-id-queries': 'error',
+      'testing-library/prefer-query-matchers': 'error',
+    },
+  },
 ];
 
 const importMetaEnv = {
@@ -187,6 +197,21 @@ export const spaConfig = [
     },
   },
 ];
+
+// Backend projects add this to their own config; a pattern in the root config would be re-based to each project.
+export const noWeakMatchers = {
+  files: ['**/*.spec.ts', '**/test/**/*.ts'],
+  rules: {
+    'vitest/no-restricted-matchers': [
+      'error',
+      {
+        toBeDefined: 'Assert the value, not that it exists.',
+        toBeTruthy: 'Assert the value, not that it is truthy.',
+        toBeFalsy: 'Assert the value, not that it is falsy.',
+      },
+    ],
+  },
+};
 
 export default [
   ...nx.configs['flat/base'],
@@ -423,6 +448,20 @@ export default [
       '@typescript-eslint/no-unsafe-member-access': 'off',
       '@typescript-eslint/no-unsafe-return': 'off',
       '@typescript-eslint/unbound-method': 'off',
+    },
+  },
+  {
+    // A contract runner registers each scenario under the contract's own title, so the title is not a literal; runScenario carries the assertions.
+    files: [
+      '**/store-repository.integration.spec.ts',
+      '**/fee-option-repository.integration.spec.ts',
+    ],
+    rules: {
+      'vitest/expect-expect': [
+        'error',
+        { assertFunctionNames: ['expect', 'runScenario'] },
+      ],
+      'vitest/valid-title': 'off',
     },
   },
   {

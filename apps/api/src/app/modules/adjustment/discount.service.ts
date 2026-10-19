@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import {
   ADJUSTMENT_STUDENT_NOT_FOUND_MESSAGE,
+  DISCOUNT_ALREADY_ENDED_MESSAGE,
   DISCOUNT_FEE_TYPE_MESSAGE,
   DISCOUNT_FEE_TYPE_NOT_FOUND_MESSAGE,
   DISCOUNT_NOT_APPROVED_MESSAGE,
@@ -210,6 +211,9 @@ export class DiscountService {
       }
       if (locked.ended && locked.toTermId === input.lastTermId) {
         return;
+      }
+      if (locked.ended) {
+        throw new ConflictException(DISCOUNT_ALREADY_ENDED_MESSAGE);
       }
       const ended = await tx.end(id, {
         userId: ctx.user.id,

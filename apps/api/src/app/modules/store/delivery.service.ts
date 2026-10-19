@@ -21,10 +21,16 @@ import {
 } from '@eduvault/api-contract';
 import type { OrgContext } from '../../common/auth';
 import { Clock } from '../../common/clock';
+import {
+  financeActorIn,
+  storeDeliveryReceivedActivity,
+  storeOpeningStockRecordedActivity,
+} from '../../common/activity';
 import { documentYear } from '../../common/documents';
 import { deliveryRequestHash } from './delivery-request-hash';
 import {
   StoreRepository,
+  type DeliveryActivity,
   type ExistingDelivery,
   type StoreRef,
   type StoreScope,
@@ -57,19 +63,23 @@ export class DeliveryService {
       return this.replay(ctx, existing, { input, requestHash });
     }
     const checked = await this.validate(ctx, input);
-    const outcome = await this.store.insertDelivery({
-      organizationId: ctx.organizationId,
-      userId: ctx.user.id,
-      year: documentYear(this.clock),
-      reference: input.reference,
-      requestHash,
-      store: checked.store,
-      supplierName: input.supplierName,
-      isOpening: input.isOpening === true,
-      receivedOn: checked.receivedOn,
-      moneyAccount: checked.moneyAccount,
-      lines: input.lines,
-    });
+    const isOpening = input.isOpening === true;
+    const outcome = await this.store.insertDelivery(
+      {
+        organizationId: ctx.organizationId,
+        userId: ctx.user.id,
+        year: documentYear(this.clock),
+        reference: input.reference,
+        requestHash,
+        store: checked.store,
+        supplierName: input.supplierName,
+        isOpening,
+        receivedOn: checked.receivedOn,
+        moneyAccount: checked.moneyAccount,
+        lines: input.lines,
+      },
+      await this.activityFor(ctx, input, checked.store)
+    );
     switch (outcome.status) {
       case 'recorded':
       case 'replayed': {
@@ -87,6 +97,29 @@ export class DeliveryService {
         );
       }
     }
+  }
+
+  private async activityFor(
+    ctx: OrgContext,
+    input: RecordDelivery,
+    store: StoreRef
+  ): Promise<DeliveryActivity> {
+    const actor = await financeActorIn(ctx, {
+      currency: () => this.store.currency(ctx.organizationId),
+    });
+    const build =
+      input.isOpening === true
+        ? storeOpeningStockRecordedActivity
+        : storeDeliveryReceivedActivity;
+    return (delivery) =>
+      build(actor, {
+        ...delivery,
+        storeId: store.id,
+        campusId: store.campusId,
+        campusName: store.campusName,
+        supplierName: input.supplierName,
+        lines: input.lines.length,
+      });
   }
 
   private async replay(

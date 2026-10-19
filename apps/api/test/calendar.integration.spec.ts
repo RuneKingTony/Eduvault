@@ -87,7 +87,7 @@ test.describe('create', () => {
   test('a second year leaves the current term where it is', async ({
     api,
     clock,
-    schools: { owner, orgA, owner: actor },
+    schools: { owner, owner: actor },
     app,
   }) => {
     clock.set(TODAY);
@@ -105,7 +105,6 @@ test.describe('create', () => {
     ]);
     expect(termOf(list.items[1]!, 1).isCurrent).toBe(true);
     expect(first.id).toBe(list.items[1]?.id);
-    expect(orgA.id).toBeDefined();
   });
 
   test('refuses bad names, dates and lengths with the PRD copy', async ({

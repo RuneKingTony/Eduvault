@@ -7,6 +7,7 @@ import {
   FEE_LINE_ALREADY_RETIRED_MESSAGE,
   FEE_LINE_AMOUNT_MESSAGE,
   FEE_LINE_RETIRED_MESSAGE,
+  FEE_OPT_IN_LIMIT,
   FEE_TERM_ENDED_MESSAGE,
   FEE_TYPE_INVALID_MESSAGE,
   FEE_TYPE_NOT_FOUND_MESSAGE,
@@ -16,6 +17,8 @@ import {
   type FeeCopySource,
   type FeeGrid,
   type FeeLine,
+  type FeeOptIns,
+  type FeeOptInsResult,
   type FeePreview,
   type FeeSetup,
   type FeeType,
@@ -44,6 +47,33 @@ const levelOf = async (pool: Pool, studentId: string): Promise<string> => {
   }
   return row.class_level_id;
 };
+
+const offerBus = async (
+  as: { app: INestApplication; pool: Pool; actor: TestUser },
+  fixture: Awaited<ReturnType<typeof feeFixture>>,
+  students: { id: string }[]
+) => {
+  const levels = new Set(
+    await Promise.all(students.map((student) => levelOf(as.pool, student.id)))
+  );
+  for (const classLevelId of levels) {
+    await createFeeLine({ app: as.app, actor: as.actor }, fixture, {
+      classLevelId,
+      name: 'School bus',
+      feeType: 'School bus',
+      amountMinor: 4_500_000,
+      isOptional: true,
+    });
+  }
+};
+
+const optInRows = async (pool: Pool, feeTypeId: string): Promise<number> =>
+  (
+    await pool.query(
+      'SELECT 1 FROM student_fee_option WHERE ledger_account_id = $1',
+      [feeTypeId]
+    )
+  ).rowCount ?? 0;
 
 const insertRaw = (
   pool: Pool,
@@ -92,6 +122,21 @@ const scheduleRows = async (
        WHERE organization_id = $1 AND subject_type IN ('fee_line', 'term')
        ORDER BY occurred_at, id`,
       [organizationId]
+    )
+  ).rows;
+
+const optionRows = async (
+  pool: Pool,
+  organizationId: string,
+  kindPrefix: 'fee_type' | 'fee_option'
+): Promise<ScheduleRow[]> =>
+  (
+    await pool.query<ScheduleRow>(
+      `SELECT kind, pillar, campus_id, organization_id, subject_type, subject_id, text, data
+       FROM activity_event
+       WHERE organization_id = $1 AND kind LIKE $2
+       ORDER BY occurred_at, id`,
+      [organizationId, `${kindPrefix}.%`]
     )
   ).rows;
 
@@ -205,6 +250,18 @@ test.describe('fee lines', () => {
         )
         .send({ optedIn: true })
         .expect(404);
+      await api(ownerB)
+        .get(`/fee-types/${fixture.feeTypeId('School bus')}/opt-ins`)
+        .query({ termId: fixture.termId })
+        .expect(404);
+      await api(ownerB)
+        .put(`/fee-types/${fixture.feeTypeId('School bus')}/opt-ins`)
+        .send({
+          termId: fixture.termId,
+          studentIds: [studentLekki.id],
+          optedIn: true,
+        })
+        .expect(404);
 
       const unchanged = (
         await api(owner).get(`/fee-lines?termId=${fixture.termId}`).expect(200)
@@ -284,6 +341,40 @@ test.describe('fee lines', () => {
         .expect(404);
     });
 
+    test('3 and 4: a Lekki-only bursar lists no Ikeja student for a fee type and gets 404 on a bulk opt-in naming one', async ({
+      api,
+      app,
+      pool,
+      schools: { owner, lekkiOnly, studentLekki, studentIkeja },
+    }) => {
+      const fixture = await feeFixture(app, api, owner);
+      await offerBus({ app, pool, actor: owner }, fixture, [
+        studentLekki,
+        studentIkeja,
+      ]);
+      const busId = fixture.feeTypeId('School bus');
+      const url = `/fee-types/${busId}/opt-ins`;
+
+      const listed = (
+        await api(lekkiOnly)
+          .get(url)
+          .query({ termId: fixture.termId })
+          .expect(200)
+      ).body as FeeOptIns;
+      const ids = listed.items.map((row) => row.studentId);
+      expect(ids).toContain(studentLekki.id);
+      expect(ids).not.toContain(studentIkeja.id);
+      await api(lekkiOnly)
+        .put(url)
+        .send({
+          termId: fixture.termId,
+          studentIds: [studentLekki.id, studentIkeja.id],
+          optedIn: true,
+        })
+        .expect(404);
+      expect(await optInRows(pool, busId)).toBe(0);
+    });
+
     test('3 and 4: copy-source gives a Lekki-only bursar the source term but no school-wide counts', async ({
       api,
       app,
@@ -326,6 +417,8 @@ test.describe('fee lines', () => {
         ['post', '/fee-types'],
         ['get', `/students/${id}/fee-options`],
         ['put', `/students/${id}/fee-options/${id}`],
+        ['get', `/fee-types/${id}/opt-ins?termId=${id}`],
+        ['put', `/fee-types/${id}/opt-ins`],
       ] as const;
       for (const [method, path] of routes) {
         const res = await api(noPermission)[method](path).send({});
@@ -391,6 +484,8 @@ test.describe('fee lines', () => {
         ['post', '/fee-types'],
         ['get', `/students/${id}/fee-options`],
         ['put', `/students/${id}/fee-options/${id}`],
+        ['get', `/fee-types/${id}/opt-ins?termId=${id}`],
+        ['put', `/fee-types/${id}/opt-ins`],
       ] as const;
       for (const [method, path] of routes) {
         await api()[method](path).send({}).expect(401);
@@ -541,6 +636,15 @@ test.describe('fee lines', () => {
             .put(`/students/${randomUUID()}/fee-options/${randomUUID()}`)
             .set(acting(orgA.id))
             .send({ optedIn: true }),
+        () =>
+          api(admin)
+            .put(`/fee-types/${randomUUID()}/opt-ins`)
+            .set(acting(orgA.id))
+            .send({
+              termId: fixture.termId,
+              studentIds: [randomUUID()],
+              optedIn: true,
+            }),
       ];
       for (const write of writes) {
         const res = await write().expect(403);
@@ -973,6 +1077,128 @@ test.describe('fee lines', () => {
         .post(`/fee-lines/${ikejaLine.body.id}/retire`)
         .expect(400);
       expect(await scheduleRows(pool, orgA.id)).toHaveLength(written + 1);
+    });
+
+    test('creating a fee type writes one school-wide row, and a duplicate name writes none', async ({
+      api,
+      pool,
+      schools: { owner, orgA, orgB },
+    }) => {
+      const created = await api(owner)
+        .post('/fee-types')
+        .send({ name: 'Sports levy' })
+        .expect(201);
+      await api(owner)
+        .post('/fee-types')
+        .send({ name: 'SPORTS LEVY' })
+        .expect(409);
+
+      const rows = await optionRows(pool, orgA.id, 'fee_type');
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({
+        kind: 'fee_type.created',
+        pillar: 'finance',
+        campus_id: null,
+        subject_id: created.body.id,
+        data: {
+          feeTypeId: created.body.id,
+          code: 4090,
+          name: 'Sports levy',
+        },
+      });
+      expect(rows[0]?.text).toMatch(
+        /^.+ added the fee type Sports levy \(4090\)\.$/
+      );
+      expect(await optionRows(pool, orgB.id, 'fee_type')).toEqual([]);
+    });
+
+    test('opting a student in and out writes one row each on the student’s campus, and a repeat writes none', async ({
+      api,
+      app,
+      pool,
+      withPermissions,
+      schools: { owner, ownerB, orgA, orgB, lekki, ikeja, studentLekki },
+    }) => {
+      const fixture = await feeFixture(app, api, owner);
+      await createFeeLine({ app, actor: owner }, fixture, {
+        classLevelId: await levelOf(pool, studentLekki.id),
+        name: 'School bus',
+        feeType: 'School bus',
+        amountMinor: 4_500_000,
+        isOptional: true,
+      });
+      const busId = fixture.feeTypeId('School bus');
+      const optionUrl = `/students/${studentLekki.id}/fee-options/${busId}`;
+      const optIn = () =>
+        api(owner).put(optionUrl).send({ optedIn: true }).expect(200);
+      const optOut = () =>
+        api(owner).put(optionUrl).send({ optedIn: false }).expect(200);
+
+      await optOut();
+      expect(await optionRows(pool, orgA.id, 'fee_option')).toEqual([]);
+      await optIn();
+      await optIn();
+      const [opted, ...extra] = await optionRows(pool, orgA.id, 'fee_option');
+      expect(extra).toEqual([]);
+      expect(opted).toMatchObject({
+        kind: 'fee_option.opted_in',
+        pillar: 'finance',
+        campus_id: lekki.id,
+        subject_id: studentLekki.id,
+        data: {
+          studentId: studentLekki.id,
+          feeTypeId: busId,
+          optedIn: true,
+        },
+      });
+      expect(opted?.text).toMatch(/^.+ opted .+ into School bus\.$/);
+
+      const ikejaReader = await withPermissions(orgA, ['payment:read'], {
+        campuses: [ikeja],
+      });
+      const lekkiReader = await withPermissions(orgA, ['payment:read'], {
+        campuses: [lekki],
+      });
+      expect(await financeTexts(api, lekkiReader)).toContain(opted?.text);
+      expect(await financeTexts(api, ikejaReader)).not.toContain(opted?.text);
+
+      await optOut();
+      await optOut();
+      const rows = await optionRows(pool, orgA.id, 'fee_option');
+      expect(rows.map((row) => [row.kind, row.campus_id])).toEqual([
+        ['fee_option.opted_in', lekki.id],
+        ['fee_option.opted_out', lekki.id],
+      ]);
+      expect(rows[1]?.text).toMatch(/^.+ opted .+ out of School bus\.$/);
+      expect(rows[1]?.data).toMatchObject({ optedIn: false });
+      expect(await optionRows(pool, orgB.id, 'fee_option')).toEqual([]);
+      expect(await financeTexts(api, ownerB)).toEqual([]);
+    });
+
+    test('a refused opt-in and an out-of-scope student write no row', async ({
+      api,
+      app,
+      pool,
+      schools: { owner, orgA, lekkiOnly, studentLekki, studentIkeja },
+    }) => {
+      const fixture = await feeFixture(app, api, owner);
+      const busId = fixture.feeTypeId('School bus');
+      await api(owner)
+        .put(`/students/${studentLekki.id}/fee-options/${busId}`)
+        .send({ optedIn: true })
+        .expect(400);
+      await createFeeLine({ app, actor: owner }, fixture, {
+        classLevelId: await levelOf(pool, studentIkeja.id),
+        name: 'School bus',
+        feeType: 'School bus',
+        amountMinor: 4_500_000,
+        isOptional: true,
+      });
+      await api(lekkiOnly)
+        .put(`/students/${studentIkeja.id}/fee-options/${busId}`)
+        .send({ optedIn: true })
+        .expect(404);
+      expect(await optionRows(pool, orgA.id, 'fee_option')).toEqual([]);
     });
 
     test('a copy writes one row per campus share about the target term, and a refused copy writes none', async ({
@@ -1943,6 +2169,321 @@ test.describe('fee lines', () => {
         )
         .send({ optedIn: true })
         .expect(404);
+    });
+
+    test.describe('bulk', () => {
+      test('opts several students in at once, shows the line in the preview and replays without a new row', async ({
+        api,
+        app,
+        pool,
+        schools: { owner, orgA, studentLekki, studentIkeja },
+      }) => {
+        const fixture = await feeFixture(app, api, owner);
+        const students = [studentLekki, studentIkeja];
+        await offerBus({ app, pool, actor: owner }, fixture, students);
+        const busId = fixture.feeTypeId('School bus');
+        const url = `/fee-types/${busId}/opt-ins`;
+        const body = {
+          termId: fixture.termId,
+          studentIds: students.map((student) => student.id),
+          optedIn: true,
+        };
+
+        const before = (
+          await api(owner)
+            .get(url)
+            .query({ termId: fixture.termId })
+            .expect(200)
+        ).body as FeeOptIns;
+        expect(before.schoolYearName).toEqual(expect.any(String));
+        expect(before.items).toEqual(
+          expect.arrayContaining(
+            students.map((student) =>
+              expect.objectContaining({
+                studentId: student.id,
+                admissionNumber: student.admissionNumber,
+                optedIn: false,
+              })
+            )
+          )
+        );
+        expect(before.total).toBe(before.items.length);
+
+        const done = await api(owner).put(url).send(body).expect(200);
+        expect(done.body as FeeOptInsResult).toEqual({
+          feeTypeId: busId,
+          optedIn: true,
+          changed: 2,
+          unchanged: 0,
+        });
+        expect(await optInRows(pool, busId)).toBe(2);
+        expect(await optionRows(pool, orgA.id, 'fee_option')).toHaveLength(2);
+        const after = (
+          await api(owner)
+            .get(url)
+            .query({ termId: fixture.termId })
+            .expect(200)
+        ).body as FeeOptIns;
+        expect(
+          after.items.filter((row) => row.optedIn).map((row) => row.studentId)
+        ).toEqual(expect.arrayContaining(body.studentIds));
+        const preview = (
+          await api(owner)
+            .get('/fee-lines/preview')
+            .query({ termId: fixture.termId, studentId: studentLekki.id })
+            .expect(200)
+        ).body as FeePreview;
+        expect(preview.lines).toEqual([
+          expect.objectContaining({ description: 'School bus', optedIn: true }),
+        ]);
+
+        const replay = await api(owner).put(url).send(body).expect(200);
+        expect(replay.body).toMatchObject({ changed: 0, unchanged: 2 });
+        expect(await optInRows(pool, busId)).toBe(2);
+        expect(await optionRows(pool, orgA.id, 'fee_option')).toHaveLength(2);
+
+        const off = await api(owner)
+          .put(url)
+          .send({ ...body, optedIn: false })
+          .expect(200);
+        expect(off.body).toMatchObject({ optedIn: false, changed: 2 });
+        expect(await optInRows(pool, busId)).toBe(0);
+        expect(await optionRows(pool, orgA.id, 'fee_option')).toHaveLength(4);
+      });
+
+      test('lists students who already opted in after the line is retired, and narrows by search', async ({
+        api,
+        app,
+        pool,
+        schools: { owner, studentLekki, studentIkeja },
+      }) => {
+        const fixture = await feeFixture(app, api, owner);
+        const classLevelId = await levelOf(pool, studentLekki.id);
+        const line = await createFeeLine({ app, actor: owner }, fixture, {
+          classLevelId,
+          name: 'School bus',
+          feeType: 'School bus',
+          amountMinor: 4_500_000,
+          isOptional: true,
+        });
+        const busId = fixture.feeTypeId('School bus');
+        const url = `/fee-types/${busId}/opt-ins`;
+        const ids = async (q?: string) =>
+          (
+            (
+              await api(owner)
+                .get(url)
+                .query({
+                  termId: fixture.termId,
+                  ...(q === undefined ? {} : { q }),
+                })
+                .expect(200)
+            ).body as FeeOptIns
+          ).items.map((row) => row.studentId);
+
+        await api(owner)
+          .put(url)
+          .send({
+            termId: fixture.termId,
+            studentIds: [studentLekki.id],
+            optedIn: true,
+          })
+          .expect(200);
+        expect(await ids(studentLekki.admissionNumber)).toEqual([
+          studentLekki.id,
+        ]);
+        await api(owner).post(`/fee-lines/${line.id}/retire`).expect(201);
+
+        const listed = await ids();
+        expect(listed).toContain(studentLekki.id);
+        expect(listed).not.toContain(studentIkeja.id);
+        await api(owner)
+          .put(url)
+          .send({
+            termId: fixture.termId,
+            studentIds: [studentIkeja.id],
+            optedIn: true,
+          })
+          .expect(400);
+      });
+
+      test('answers 404 to another school on both routes and saves nothing', async ({
+        api,
+        app,
+        pool,
+        schools: { owner, ownerB, studentLekki, studentIkeja },
+      }) => {
+        const fixture = await feeFixture(app, api, owner);
+        const fixtureB = await feeFixture(app, api, ownerB);
+        await offerBus({ app, pool, actor: owner }, fixture, [
+          studentLekki,
+          studentIkeja,
+        ]);
+        const busId = fixture.feeTypeId('School bus');
+        const busB = fixtureB.feeTypeId('School bus');
+        const studentIds = [studentLekki.id, studentIkeja.id];
+
+        await api(ownerB)
+          .get(`/fee-types/${busId}/opt-ins`)
+          .query({ termId: fixture.termId })
+          .expect(404);
+        await api(ownerB)
+          .get(`/fee-types/${busB}/opt-ins`)
+          .query({ termId: fixture.termId })
+          .expect(404);
+        await api(ownerB)
+          .put(`/fee-types/${busId}/opt-ins`)
+          .send({ termId: fixture.termId, studentIds, optedIn: true })
+          .expect(404);
+        await api(ownerB)
+          .put(`/fee-types/${busB}/opt-ins`)
+          .send({ termId: fixtureB.termId, studentIds, optedIn: true })
+          .expect(404);
+        await api(owner)
+          .put(`/fee-types/${busId}/opt-ins`)
+          .send({ termId: fixtureB.termId, studentIds, optedIn: true })
+          .expect(404);
+        await api(owner)
+          .get(`/fee-types/${busB}/opt-ins`)
+          .query({ termId: fixture.termId })
+          .expect(404);
+        expect(await optInRows(pool, busId)).toBe(0);
+        expect(await optInRows(pool, busB)).toBe(0);
+      });
+
+      test('keeps other campuses out of the list and answers 404 with nothing saved when one student is out of scope', async ({
+        api,
+        app,
+        pool,
+        schools: { owner, lekkiOnly, studentLekki, studentIkeja },
+      }) => {
+        const fixture = await feeFixture(app, api, owner);
+        await offerBus({ app, pool, actor: owner }, fixture, [
+          studentLekki,
+          studentIkeja,
+        ]);
+        const busId = fixture.feeTypeId('School bus');
+        const url = `/fee-types/${busId}/opt-ins`;
+
+        const scoped = (
+          await api(lekkiOnly)
+            .get(url)
+            .query({ termId: fixture.termId })
+            .expect(200)
+        ).body as FeeOptIns;
+        const scopedIds = scoped.items.map((row) => row.studentId);
+        expect(scopedIds).toContain(studentLekki.id);
+        expect(scopedIds).not.toContain(studentIkeja.id);
+
+        await api(lekkiOnly)
+          .put(url)
+          .send({
+            termId: fixture.termId,
+            studentIds: [studentLekki.id, studentIkeja.id],
+            optedIn: true,
+          })
+          .expect(404);
+        expect(await optInRows(pool, busId)).toBe(0);
+
+        const own = await api(lekkiOnly)
+          .put(url)
+          .send({
+            termId: fixture.termId,
+            studentIds: [studentLekki.id],
+            optedIn: true,
+          })
+          .expect(200);
+        expect(own.body).toMatchObject({ changed: 1, unchanged: 0 });
+      });
+
+      test('caps the list at the limit and reports the full total', async ({
+        api,
+        app,
+        pool,
+        schools: { owner, studentLekki },
+      }) => {
+        const fixture = await feeFixture(app, api, owner);
+        await offerBus({ app, pool, actor: owner }, fixture, [studentLekki]);
+        await pool.query(
+          `INSERT INTO student
+             (organization_id, campus_id, first_name, last_name, gender, date_of_birth, admission_number, admitted_on)
+           SELECT organization_id, campus_id, 'Clone' || g, 'Bulk', gender, date_of_birth, 'CL-' || g, admitted_on
+           FROM student, generate_series(1, $2::int) AS g
+           WHERE id = $1`,
+          [studentLekki.id, FEE_OPT_IN_LIMIT + 5]
+        );
+        await pool.query(
+          `INSERT INTO student_enrollment (organization_id, student_id, session_id, class_level_id)
+           SELECT e.organization_id, s.id, e.session_id, e.class_level_id
+           FROM student_enrollment e
+           JOIN student s ON s.organization_id = e.organization_id AND s.last_name = 'Bulk'
+           WHERE e.student_id = $1`,
+          [studentLekki.id]
+        );
+        const { rows } = await pool.query<{ count: number }>(
+          `SELECT count(*)::int AS count FROM student_enrollment
+           WHERE class_level_id = $1 AND status = 'active'`,
+          [await levelOf(pool, studentLekki.id)]
+        );
+
+        const listed = (
+          await api(owner)
+            .get(`/fee-types/${fixture.feeTypeId('School bus')}/opt-ins`)
+            .query({ termId: fixture.termId })
+            .expect(200)
+        ).body as FeeOptIns;
+
+        expect(listed.items).toHaveLength(FEE_OPT_IN_LIMIT);
+        expect(listed.total).toBe(rows[0]?.count);
+        expect(listed.total).toBeGreaterThan(FEE_OPT_IN_LIMIT);
+      });
+
+      test('answers 403 without the permissions and for an acting super admin without a reason', async ({
+        api,
+        app,
+        pool,
+        withPermissions,
+        makeSuperAdmin,
+        createUser,
+        schools: { owner, orgA, studentLekki },
+      }) => {
+        const fixture = await feeFixture(app, api, owner);
+        await offerBus({ app, pool, actor: owner }, fixture, [studentLekki]);
+        const busId = fixture.feeTypeId('School bus');
+        const url = `/fee-types/${busId}/opt-ins`;
+        const query = { termId: fixture.termId };
+        const body = {
+          termId: fixture.termId,
+          studentIds: [studentLekki.id],
+          optedIn: true,
+        };
+
+        const reader = await withPermissions(orgA, [
+          'feeLine:read',
+          'student:read',
+        ]);
+        await api(reader).get(url).query(query).expect(200);
+        await api(reader).put(url).send(body).expect(403);
+        const feeOnly = await withPermissions(orgA, ['feeLine:read']);
+        await api(feeOnly).get(url).query(query).expect(403);
+        const studentOnly = await withPermissions(orgA, ['student:read']);
+        await api(studentOnly).get(url).query(query).expect(403);
+        const writer = await withPermissions(orgA, [
+          'feeLine:update',
+          'campus:readAll',
+        ]);
+        await api(writer).put(url).send(body).expect(200);
+
+        const admin = await makeSuperAdmin(await createUser());
+        const refused = await api(admin)
+          .put(url)
+          .set(acting(orgA.id))
+          .send({ ...body, optedIn: false })
+          .expect(403);
+        expect(refused.body.code).toBe('ActingReadOnly');
+        await api(admin).get(url).query(query).set(acting(orgA.id)).expect(200);
+        expect(await optInRows(pool, busId)).toBe(1);
+      });
     });
   });
 

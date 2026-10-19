@@ -1,11 +1,13 @@
 import type {
   FeeCandidates,
   FeeLine,
+  FeeOptIns,
   FeeSetup,
   FeeType,
 } from '@eduvault/api-contract';
 import type { ActivityInput } from '../../common/activity';
 import { canSeeCampus } from '../../common/campus-scope';
+import type { StudentIdentity } from '../../common/students';
 import {
   FeeLineRepository,
   FeeOptionRepository,
@@ -23,9 +25,11 @@ import {
   type LevelRef,
   type LineActivity,
   type NewFeeLine,
+  type OptionActivity,
   type OptionChange,
   type StudentFeeContext,
   type TermRef,
+  type TypeActivity,
 } from './fee-line.repository';
 
 export class FakeFeeLineRepository extends FeeLineRepository {
@@ -218,19 +222,26 @@ export class FakeFeeTypeRepository extends FeeTypeRepository {
   types: FeeType[] = [];
   outcome: FeeTypeOutcome | undefined;
   createdNames: string[] = [];
+  recorded: ActivityInput[] = [];
 
   list(): Promise<FeeType[]> {
     return Promise.resolve(this.types);
   }
 
-  create(_organizationId: string, name: string): Promise<FeeTypeOutcome> {
+  create(
+    _organizationId: string,
+    name: string,
+    activity: TypeActivity
+  ): Promise<FeeTypeOutcome> {
     this.createdNames.push(name);
-    return Promise.resolve(
-      this.outcome ?? {
-        status: 'saved',
-        feeType: { id: 'new-type', code: 4090, name },
-      }
-    );
+    const outcome: FeeTypeOutcome = this.outcome ?? {
+      status: 'saved',
+      feeType: { id: 'new-type', code: 4090, name },
+    };
+    if (outcome.status === 'saved') {
+      this.recorded.push(...activity(outcome.feeType));
+    }
+    return Promise.resolve(outcome);
   }
 }
 
@@ -244,8 +255,17 @@ export class FakeFeeStudentRepository extends FeeStudentRepository {
     discountsAccountId: 'discounts-given',
   };
 
-  findStudent(): Promise<StudentFeeContext | undefined> {
-    return Promise.resolve(this.student);
+  byId = new Map<string, StudentFeeContext | undefined>();
+
+  findStudent(
+    _scope: FeeScope,
+    query: { studentId: string }
+  ): Promise<StudentFeeContext | undefined> {
+    return Promise.resolve(
+      this.byId.has(query.studentId)
+        ? this.byId.get(query.studentId)
+        : this.student
+    );
   }
 
   chargeFacts(): Promise<ChargeFacts> {
@@ -260,9 +280,29 @@ export class FakeFeeStudentRepository extends FeeStudentRepository {
 export class FakeFeeOptionRepository extends FeeOptionRepository {
   session: string | undefined = 'session-1';
   sessions = new Set(['session-1']);
-  optedIn: string[] = [];
+  held = new Map<string, string[]>();
   optional: { feeTypeId: string; name: string }[] = [];
+  optionalByLevel = new Map<string, { feeTypeId: string; name: string }[]>();
   changes: OptionChange[] = [];
+  student: StudentIdentity = {
+    id: 'ada',
+    name: 'Ada Okeke',
+    campusId: 'lekki',
+  };
+  identities = new Map<string, StudentIdentity>();
+  recorded: ActivityInput[] = [];
+  roster: Pick<FeeOptIns, 'items' | 'total'> = { items: [], total: 0 };
+  rosterQueries: {
+    scope: FeeScope;
+    query: { sessionId: string; feeTypeId: string; q: string | undefined };
+  }[] = [];
+
+  optIn(enrollmentId: string, ...feeTypeIds: string[]): void {
+    this.held.set(enrollmentId, [
+      ...(this.held.get(enrollmentId) ?? []),
+      ...feeTypeIds,
+    ]);
+  }
 
   hasSession(_organizationId: string, id: string): Promise<boolean> {
     return Promise.resolve(this.sessions.has(id));
@@ -272,16 +312,67 @@ export class FakeFeeOptionRepository extends FeeOptionRepository {
     return Promise.resolve(this.session);
   }
 
-  optedInFeeTypeIds(): Promise<string[]> {
-    return Promise.resolve(this.optedIn);
+  optedInFeeTypeIds(
+    _organizationId: string,
+    enrollmentId: string
+  ): Promise<string[]> {
+    return Promise.resolve(this.held.get(enrollmentId) ?? []);
   }
 
-  optionalFeeTypes(): Promise<{ feeTypeId: string; name: string }[]> {
-    return Promise.resolve(this.optional);
+  optionalFeeTypes(
+    _organizationId: string,
+    query: { classLevelId: string }
+  ): Promise<{ feeTypeId: string; name: string }[]> {
+    return Promise.resolve(
+      this.optionalByLevel.get(query.classLevelId) ?? this.optional
+    );
   }
 
-  setOption(change: OptionChange): Promise<void> {
+  optInRoster(
+    scope: FeeScope,
+    query: { sessionId: string; feeTypeId: string; q: string | undefined }
+  ): Promise<Pick<FeeOptIns, 'items' | 'total'>> {
+    this.rosterQueries.push({ scope, query });
+    return Promise.resolve(this.roster);
+  }
+
+  async setOptions(
+    changes: { change: OptionChange; activity: OptionActivity }[]
+  ): Promise<number> {
+    let changed = 0;
+    for (const { change, activity } of changes) {
+      if (await this.setOption(change, activity)) {
+        changed += 1;
+      }
+    }
+    return changed;
+  }
+
+  setOption(change: OptionChange, activity: OptionActivity): Promise<boolean> {
     this.changes.push(change);
-    return Promise.resolve();
+    const held = this.held.get(change.enrollmentId) ?? [];
+    if (held.includes(change.feeTypeId) === change.optedIn) {
+      return Promise.resolve(false);
+    }
+    this.held.set(
+      change.enrollmentId,
+      change.optedIn
+        ? [...held, change.feeTypeId]
+        : held.filter((id) => id !== change.feeTypeId)
+    );
+    const feeType = [
+      ...this.optional,
+      ...[...this.optionalByLevel.values()].flat(),
+    ].find((option) => option.feeTypeId === change.feeTypeId);
+    this.recorded.push(
+      ...activity({
+        student: this.identities.get(change.studentId) ?? this.student,
+        feeType: {
+          id: change.feeTypeId,
+          name: feeType?.name ?? change.feeTypeId,
+        },
+      })
+    );
+    return Promise.resolve(true);
   }
 }

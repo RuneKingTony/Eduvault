@@ -24,6 +24,7 @@ import {
 } from '@eduvault/auth-client';
 import type { DayOff } from '@eduvault/shared';
 import { MyAccessProvider } from './components/my-access';
+import { testId } from './test-api';
 import { currentCalendar } from './test-calendar';
 import { NO_SALES } from './test-store';
 import { ownerAccess, renderWithApi } from './test-utils';
@@ -40,6 +41,15 @@ const authClient = {
   }),
 } as unknown as EduvaultAuthClient;
 
+export const ARM_ID = testId(0x1_20_01);
+export const SECOND_ARM_ID = testId(0x1_20_02);
+export const MEMBER_ID = testId(0x1_20_11);
+export const ROUND_ID = testId(0x1_20_21);
+export const TERM_ID = testId(0x1_20_31);
+export const SECOND_TERM_ID = testId(0x1_20_32);
+export const NOTICE_ID = testId(0x1_20_41);
+export const SECOND_NOTICE_ID = testId(0x1_20_42);
+
 export const roll = (
   overrides: Partial<DashboardRoll> = {}
 ): DashboardRoll => ({
@@ -54,10 +64,13 @@ export const roll = (
   ...overrides,
 });
 
-export const person = (n: number) => ({ id: `s${n}`, name: `Student ${n}` });
+export const person = (n: number) => ({
+  id: testId(0x1_21_00 + n),
+  name: `Student ${n}`,
+});
 
 export const myClass = (overrides: Partial<MyClass> = {}): MyClass => ({
-  armId: 'a1',
+  armId: ARM_ID,
   name: 'JSS 3 Gold',
   campusName: 'Lekki',
   studentCount: 8,
@@ -79,7 +92,7 @@ export const dayOff = (overrides: Partial<DayOff> = {}): DayOff => ({
 export const announcementSummary = (
   overrides: Partial<AnnouncementSummary> = {}
 ): AnnouncementSummary => ({
-  id: 'n1',
+  id: NOTICE_ID,
   title: 'PTA meeting',
   body: 'Saturday at ten.',
   tag: 'event',

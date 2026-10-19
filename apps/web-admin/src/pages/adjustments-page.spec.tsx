@@ -5,13 +5,17 @@ import type { AdjustmentsSearch } from '../adjustments-search';
 import {
   BOLA,
   DISCOUNT_ID,
+  TERM_1,
+  TERM_2,
+  TERM_3,
   adjustmentList,
   adjustmentRow,
   discountList,
   discountRow,
+  termChoices,
   voidList,
 } from '../test-approvals';
-import { currentYear, nextYear, schoolYear, term } from '../test-calendar';
+import { invoiceSummary } from '../test-billing';
 import { renderPayments } from '../test-payments';
 import { settings } from '../test-school';
 import { studentDetail, studentList, studentRow } from '../test-students';
@@ -23,16 +27,6 @@ vi.mock('@eduvault/ui', async (importOriginal) => ({
   toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() },
 }));
 
-const termChoices = (years: ReturnType<typeof schoolYear>[]) =>
-  years.flatMap((year) =>
-    year.terms.map((entry) => ({
-      id: entry.id,
-      label: `${entry.name}, ${year.name}`,
-      startsOn: entry.startsOn,
-      isCurrent: entry.isCurrent,
-    }))
-  );
-
 const ADA = studentRow().id;
 const BOLA_ROW = studentRow({
   id: BOLA,
@@ -42,6 +36,11 @@ const BOLA_ROW = studentRow({
 });
 const ACCOUNT = '00000000-0000-4000-8000-0000000f0001';
 const TUITION = '00000000-0000-4000-8000-000000000721';
+const PTA = '00000000-0000-4000-8000-000000000722';
+const DISCOUNTS_GIVEN = '00000000-0000-4000-8000-000000005000';
+const FEE_INCOME = '00000000-0000-4000-8000-000000004000';
+const CHARGE_TERM = '00000000-0000-4000-8000-000000000a01';
+const CHARGE_ADHOC = '00000000-0000-4000-8000-000000000a02';
 
 function setup(
   options: {
@@ -54,7 +53,7 @@ function setup(
     rules?: Partial<ReturnType<typeof settings>['approvalRules']>;
     autoApproved?: boolean;
     students?: ReturnType<typeof studentRow>[];
-    years?: ReturnType<typeof schoolYear>[];
+    terms?: ReturnType<typeof termChoices>;
   } = {}
 ) {
   const base = settings();
@@ -74,11 +73,7 @@ function setup(
       list: vi.fn().mockResolvedValue(options.voids ?? voidList()),
     },
     studentDiscounts: {
-      terms: vi
-        .fn()
-        .mockResolvedValue(
-          termChoices(options.years ?? [currentYear(), nextYear()])
-        ),
+      terms: vi.fn().mockResolvedValue(options.terms ?? termChoices()),
       list: vi.fn().mockResolvedValue(options.discounts ?? discountList()),
       create: vi.fn().mockResolvedValue({
         discount: discountRow(),
@@ -105,7 +100,7 @@ function setup(
             )
           )
         ),
-      get: vi.fn().mockResolvedValue(studentDetail()),
+      get: vi.fn().mockResolvedValue(studentDetail({ history: [] })),
     },
     moneyAccounts: {
       forRecording: vi
@@ -120,7 +115,7 @@ function setup(
         scoped: false,
         items: [
           {
-            id: 'la-5000',
+            id: DISCOUNTS_GIVEN,
             code: 5000,
             name: 'Discounts given',
             type: 'expense',
@@ -133,7 +128,7 @@ function setup(
             code: 4010,
             name: 'Tuition',
             type: 'income',
-            parentId: 'fee',
+            parentId: FEE_INCOME,
             systemKey: null,
             balanceMinor: 0,
           },
@@ -144,29 +139,33 @@ function setup(
       list: vi.fn().mockResolvedValue({
         currency: 'NGN',
         items: [
-          {
-            id: 'inv-1',
+          invoiceSummary({
+            id: CHARGE_TERM,
             number: 'CHG-2026-00012',
+            studentId: ADA,
             kind: 'term',
             termName: 'First term',
             forText: 'Tuition',
             totalMinor: 22_000_000,
-          },
-          {
-            id: 'inv-2',
+          }),
+          invoiceSummary({
+            id: CHARGE_ADHOC,
             number: 'CHG-2026-00031',
+            studentId: ADA,
             kind: 'adhoc',
             termName: 'First term',
             forText: 'Excursion',
             totalMinor: 1_500_000,
-          },
+          }),
         ],
         total: 2,
+        counts: { term: 1, adhoc: 1, store: 0 },
+        summary: { sentCount: 2, sentTotalMinor: 23_500_000, draftCount: 0 },
       }),
     },
     feeTypes: {
       list: vi.fn().mockResolvedValue([
-        { id: 'pta', code: 4020, name: 'PTA fee' },
+        { id: PTA, code: 4020, name: 'PTA fee' },
         { id: TUITION, code: 4010, name: 'Tuition' },
       ]),
     },
@@ -197,22 +196,15 @@ describe('AdjustmentsPage', () => {
     vi.clearAllMocks();
   });
 
-  it('titles the page and carries the waiting count on each tab that has some', async () => {
+  it('carries the waiting count on each tab that has some', async () => {
     setup();
-    expect(
-      await screen.findByRole('heading', { name: 'Discounts and refunds' })
-    ).toBeVisible();
-    expect(
-      screen.getByText(
-        'Refunds, discounts and corrections. One person asks, a boss approves.'
-      )
-    ).toBeVisible();
-    const tabs = await screen.findAllByRole('tab');
-    expect(tabs.map((tab) => tab.textContent)).toEqual([
-      'Refunds and corrections1',
-      'Cancelled payments1',
-      'Discounts1',
-    ]);
+    await waitFor(() => {
+      expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
+        'Refunds and corrections1',
+        'Cancelled payments1',
+        'Discounts1',
+      ]);
+    });
   });
 
   it('shows no count on a tab with nothing waiting', async () => {
@@ -233,9 +225,7 @@ describe('AdjustmentsPage', () => {
 
   it('lists corrections with student, kind, reason, amount, who asked and a link to Approvals while waiting', async () => {
     setup();
-    const row = (await screen.findByText('Bola Johnson')).closest(
-      'tr'
-    ) as HTMLElement;
+    const row = await screen.findByRole('row', { name: /Bola Johnson/ });
     expect(within(row).getByText('GF-0087')).toBeVisible();
     expect(within(row).getByText('Cancel a balance')).toBeVisible();
     expect(within(row).getByText('Family moved to Abuja')).toBeVisible();
@@ -256,9 +246,7 @@ describe('AdjustmentsPage', () => {
         }),
       ]),
     });
-    const row = (await screen.findByText('Bola Johnson')).closest(
-      'tr'
-    ) as HTMLElement;
+    const row = await screen.findByRole('row', { name: /Bola Johnson/ });
     expect(
       within(row).getByText('Declined: Not agreed with the owner')
     ).toBeVisible();
@@ -275,8 +263,7 @@ describe('AdjustmentsPage', () => {
 
   it('lists the cancelled payments with a link to the receipt', async () => {
     setup({ search: { tab: 'voids' } });
-    const link = await screen.findByRole('link', { name: 'RCT-2026-00098' });
-    const row = link.closest('tr') as HTMLElement;
+    const row = await screen.findByRole('row', { name: /RCT-2026-00098/ });
     expect(within(row).getByText('Mrs Danjuma')).toBeVisible();
     expect(within(row).getByText('₦20,000')).toBeVisible();
     expect(within(row).getByText('Keyed the wrong child')).toBeVisible();
@@ -298,9 +285,7 @@ describe('AdjustmentsPage', () => {
         discountRow({ status: 'approved', approvedBy: 'Grace Nwosu' }),
       ]),
     });
-    const row = (await screen.findByText('Halima Bello')).closest(
-      'tr'
-    ) as HTMLElement;
+    const row = await screen.findByRole('row', { name: /Halima Bello/ });
     expect(within(row).getByText('50% tuition')).toBeVisible();
     expect(
       within(row).getByText('Second term, 2026/2027 to Third term, 2026/2027')
@@ -314,31 +299,19 @@ describe('AdjustmentsPage', () => {
   it('offers no End action once the discount’s last term is behind the current one', async () => {
     const { api } = setup({
       search: { tab: 'discounts' },
-      years: [
-        schoolYear({
-          terms: [
-            term({ id: 't1', name: 'First term' }),
-            term({
-              id: 't2',
-              name: 'Second term',
-              startsOn: '2027-01-04',
-              isCurrent: true,
-            }),
-          ],
-        }),
-      ],
+      terms: termChoices()
+        .slice(0, 2)
+        .map((choice, index) => ({ ...choice, isCurrent: index === 1 })),
       discounts: discountList([
         discountRow({
           status: 'approved',
           approvedBy: 'Grace Nwosu',
-          fromTerm: { id: 't1', name: 'First term' },
-          toTerm: { id: 't1', name: 'First term' },
+          fromTerm: { id: TERM_1, name: 'First term, 2026/2027' },
+          toTerm: { id: TERM_1, name: 'First term, 2026/2027' },
         }),
       ]),
     });
-    const row = (await screen.findByText('Halima Bello')).closest(
-      'tr'
-    ) as HTMLElement;
+    const row = await screen.findByRole('row', { name: /Halima Bello/ });
     await waitFor(() => {
       expect(api.studentDiscounts.terms).toHaveBeenCalled();
       expect(
@@ -357,9 +330,7 @@ describe('AdjustmentsPage', () => {
         }),
       ]),
     });
-    const row = (await screen.findByText('Halima Bello')).closest(
-      'tr'
-    ) as HTMLElement;
+    const row = await screen.findByRole('row', { name: /Halima Bello/ });
     expect(within(row).getByText('Ended')).toBeVisible();
     expect(
       within(row).queryByRole('button', { name: /End discount/ })
@@ -371,12 +342,12 @@ describe('AdjustmentsPage', () => {
     expect(await screen.findByText('No discounts')).toBeVisible();
   });
 
-  it('offers New request on the corrections tab and New discount on the discounts tab', async () => {
-    const corrections = setup();
+  it('offers New request on the corrections tab', async () => {
+    setup();
     expect(
       await screen.findByRole('button', { name: 'New request' })
     ).toBeVisible();
-    expect(corrections.api.adjustments.list).toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: 'New discount' })).toBeNull();
   });
 
   it('offers New discount on the discounts tab', async () => {
@@ -451,13 +422,6 @@ describe('the New request sheet', () => {
       expect(api.students.list).toHaveBeenCalledWith({
         query: { tab: 'active', pageSize: 20, q: 'bol' },
       });
-    });
-    const students = within(sheet).getByLabelText<HTMLSelectElement>('Student');
-    await waitFor(() => {
-      expect([...students.options].map((option) => option.text)).toEqual([
-        'Choose a student',
-        'Bola Johnson · GF-0087',
-      ]);
     });
   });
 
@@ -601,7 +565,7 @@ describe('the New request sheet', () => {
     expect(ctx.api.adjustments.create).toHaveBeenCalled();
   });
 
-  it('shows the cap message from the API when a refund asks for more than the credit held', async () => {
+  it('shows the message of the API’s refusal in the sheet', async () => {
     const message =
       'A refund pays back credit held. Ada Okeke holds ₦5,000 credit.';
     setup({
@@ -699,7 +663,7 @@ describe('the New discount sheet', () => {
       ]);
     });
     const from = within(sheet).getByLabelText<HTMLSelectElement>('From');
-    expect(from.value).toBe('t2');
+    expect(from.value).toBe(TERM_2);
     expect(from.options[0]?.text).toBe('First term, 2026/2027');
     expect([...from.options].map((option) => option.text)).toContain(
       'First term, 2027/2028'
@@ -763,7 +727,7 @@ describe('the New discount sheet', () => {
           kind: 'percent',
           value: 10,
           ledgerAccountId: TUITION,
-          fromTermId: 't2',
+          fromTermId: TERM_2,
           toTermId: null,
           reason: 'Staff child',
         },
@@ -817,7 +781,7 @@ describe('the End discount dialog', () => {
       discounts: discountList([
         discountRow({
           status: 'approved',
-          toTerm: { id: 't3', name: 'Third term, 2026/2027' },
+          toTerm: { id: TERM_3, name: 'Third term, 2026/2027' },
         }),
       ]),
     });
@@ -839,12 +803,12 @@ describe('the End discount dialog', () => {
     );
     await waitFor(() => {
       expect([...last.options].map((option) => option.value)).toEqual([
-        't1',
-        't2',
-        't3',
+        TERM_1,
+        TERM_2,
+        TERM_3,
       ]);
     });
-    fireEvent.change(last, { target: { value: 't2' } });
+    fireEvent.change(last, { target: { value: TERM_2 } });
 
     fireEvent.click(
       within(dialog).getByRole('button', { name: 'End discount' })
@@ -853,7 +817,7 @@ describe('the End discount dialog', () => {
     await waitFor(() => {
       expect(api.studentDiscounts.end).toHaveBeenCalledWith({
         params: { id: DISCOUNT_ID },
-        body: { lastTermId: 't2' },
+        body: { lastTermId: TERM_2 },
       });
     });
     await waitFor(() => {

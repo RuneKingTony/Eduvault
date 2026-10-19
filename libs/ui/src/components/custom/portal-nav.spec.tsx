@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { PortalBottomNav } from './portal-bottom-nav';
 import {
   PortalNav,
@@ -13,7 +13,7 @@ const items: PortalNavItem[] = [
     id: 'home',
     href: '/',
     label: 'Home',
-    icon: <svg data-testid="home-icon" />,
+    icon: <svg role="img" aria-hidden="true" />,
     current: true,
   },
   {
@@ -21,14 +21,14 @@ const items: PortalNavItem[] = [
     href: '/children',
     label: 'My children',
     shortLabel: 'Children',
-    icon: <svg data-testid="children-icon" />,
+    icon: <svg role="img" aria-hidden="true" />,
     current: false,
   },
   {
     id: 'fees',
     href: '/fees',
     label: 'Fees',
-    icon: <svg data-testid="fees-icon" />,
+    icon: <svg role="img" aria-hidden="true" />,
     current: false,
   },
 ];
@@ -78,7 +78,11 @@ describe('PortalBottomNav', () => {
       'bottom-0'
     );
     expect(screen.getAllByRole('link')).toHaveLength(3);
-    expect(screen.getByTestId('fees-icon')).toBeInTheDocument();
+    expect(
+      within(screen.getByRole('link', { name: 'Fees' })).getByRole('img', {
+        hidden: true,
+      })
+    ).toBeInTheDocument();
   });
 
   it('shows an item’s short label in place of its label', () => {

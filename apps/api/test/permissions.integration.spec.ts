@@ -105,6 +105,8 @@ test.describe('guard order', () => {
       ['post', '/fee-types'],
       ['get', `/students/${id}/fee-options`],
       ['put', `/students/${id}/fee-options/${id}`],
+      ['get', `/fee-types/${id}/opt-ins`],
+      ['put', `/fee-types/${id}/opt-ins`],
       ['get', '/campuses/summary'],
       ['patch', '/school-account'],
       ['put', '/school-account/logo'],
@@ -531,7 +533,12 @@ test.describe('starter roles', () => {
       subject: ['read'],
     });
     expect(permissionOf('bursar')).toBe('{}');
-    expect(permissionOf('guardian')).toBeDefined();
+    expect(parsePermissionMap(permissionOf('guardian') ?? '')).toEqual({
+      student: ['readOwn'],
+      invoice: ['readOwn'],
+      feeLine: ['readOwn'],
+      payment: ['readOwn'],
+    });
     expect(rows).toHaveLength(STARTER_ROLES.length);
   });
   test('syncAllStarterRoles gives every existing school the six roles and is safe to repeat', async ({

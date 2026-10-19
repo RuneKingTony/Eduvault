@@ -43,10 +43,15 @@ const statementOf = (api: Api, user: Signed, studentId: string) =>
 
 const familyOf = async (
   api: Api,
-  user: Signed
+  user: Signed,
+  termId?: string
 ): Promise<PortalFamilyStatement> =>
-  (await api(user).get('/portal/family-statement').expect(200))
-    .body as PortalFamilyStatement;
+  (
+    await api(user)
+      .get('/portal/family-statement')
+      .query(termId === undefined ? {} : { termId })
+      .expect(200)
+  ).body as PortalFamilyStatement;
 
 const childrenOf = async (api: Api, user: Signed): Promise<PortalChild[]> =>
   (await api(user).get('/portal/children').expect(200)).body as PortalChild[];
@@ -569,6 +574,53 @@ test.describe('GET /portal/family-statement', () => {
   });
 });
 
+test.describe('GET /portal/family-statement with a term', () => {
+  const YEAR = '2026/2027';
+
+  test('carries the term and the term options and keeps the totals and balances whole-account', async ({
+    api,
+    app,
+    clock,
+    pool,
+    schools,
+  }) => {
+    clock.set('2026-10-07');
+    const { ada, guardianLogin } = await family(app, schools);
+    const { owner, orgA } = schools;
+    const fixture = await chargeFixture(app, api, owner);
+    await owes(app, owner, { studentId: ada.id, amountMinor: ADA_OPENING });
+    const { runId } = await prepare(api, owner, {
+      termId: fixture.firstTermId,
+      scope: 'school',
+    });
+    await sendRun(api, owner, runId ?? '');
+    const guardian = await signInAs(api, guardianLogin);
+    const terms = await Promise.all(
+      [1, 2, 3].map((sequence) => termOf(api, owner, { year: YEAR, sequence }))
+    );
+    const before = await moneyFingerprint(pool, orgA.id);
+
+    const whole = await familyOf(api, guardian);
+    const views = await Promise.all(
+      terms.map((term) => familyOf(api, guardian, term.id))
+    );
+
+    expect(whole.term).toBeNull();
+    expect(whole.termOptions.map((option) => option.id)).toEqual([
+      terms[0]!.id,
+    ]);
+    for (const [index, view] of views.entries()) {
+      expect(view.term?.id).toBe(terms[index]!.id);
+      expect(view.termOptions).toEqual(whole.termOptions);
+      expect(view.totalOwedMinor).toBe(whole.totalOwedMinor);
+      expect(view.creditMinor).toBe(whole.creditMinor);
+      expect(view.children).toEqual(whole.children);
+    }
+    expect(whole.totalOwedMinor).toBeGreaterThanOrEqual(ADA_OPENING);
+    expect(await moneyFingerprint(pool, orgA.id)).toEqual(before);
+  });
+});
+
 test.describe('GET /portal/children balances', () => {
   test('adds balanceMinor only for a caller holding invoice:readOwn, and never on /portal/me', async ({
     api,
@@ -657,13 +709,65 @@ test.describe('isolation', () => {
     await api(schools.owner)
       .get(`/portal/students/${ada.id}/statement`)
       .expect(404);
-    expect(await familyOf(api, schools.owner)).toEqual({
+    expect(await familyOf(api, schools.owner)).toMatchObject({
       currency: 'NGN',
       totalOwedMinor: 0,
       creditMinor: 0,
       children: [],
+      term: null,
     });
     expect(await childrenOf(api, schools.owner)).toEqual([]);
+  });
+
+  test('an owner with no student links still gets the term options with a term, and 404 for a term that is not the school’s', async ({
+    api,
+    app,
+    clock,
+    schools: { owner, ownerB },
+  }) => {
+    clock.set('2026-10-07');
+    await chargeFixture(app, api, owner);
+    const own = await termOf(api, owner, { year: '2026/2027', sequence: 1 });
+    const foreign = await termOf(api, ownerB, {
+      year: '2026/2027',
+      sequence: 1,
+    });
+
+    const statement = await familyOf(api, owner, own.id);
+
+    expect(statement.children).toEqual([]);
+    expect(statement.term?.id).toBe(own.id);
+    expect(statement.termOptions.map((option) => option.id)).toEqual([own.id]);
+    await api(owner)
+      .get(`/portal/family-statement?termId=${foreign.id}`)
+      .expect(404);
+    await api(owner)
+      .get(`/portal/family-statement?termId=${crypto.randomUUID()}`)
+      .expect(404);
+  });
+
+  test('a guardian asking for the family statement with another school’s term gets 404', async ({
+    api,
+    app,
+    schools,
+  }) => {
+    const { guardianLogin } = await family(app, schools);
+    const { ownerB, owner } = schools;
+    await chargeFixture(app, api, owner);
+    const own = await termOf(api, owner, { year: '2026/2027', sequence: 1 });
+    const foreign = await termOf(api, ownerB, {
+      year: '2026/2027',
+      sequence: 1,
+    });
+    const guardian = await signInAs(api, guardianLogin);
+
+    await api(guardian)
+      .get(`/portal/family-statement?termId=${foreign.id}`)
+      .expect(404);
+    await api(guardian).get(`/portal/family-statement?termId=nope`).expect(400);
+    await api(guardian)
+      .get(`/portal/family-statement?termId=${own.id}`)
+      .expect(200);
   });
 
   test('the other school’s owner gets 404 for this school’s child', async ({

@@ -20,6 +20,15 @@ function setup(api = billingApi(), access?: ReturnType<typeof fakeAccess>) {
   return { api, onBack };
 }
 
+const definitions = () => {
+  const terms = screen.getAllByRole('term');
+  const values = screen.getAllByRole('definition');
+  expect(values).toHaveLength(terms.length);
+  return new Map(
+    terms.map((term, index) => [term.textContent, values[index]?.textContent])
+  );
+};
+
 const storeCharge = () =>
   invoice({
     kind: 'store',
@@ -36,12 +45,15 @@ describe('InvoicePage', () => {
     expect(screen.getByText(/^Term fees ·/)).toHaveTextContent(
       'Term fees · Ada Okeke · JSS 2 Gold'
     );
-    const discount = screen
-      .getByText('Sibling discount (3 children) (5% of tuition)')
-      .closest('tr');
+    const discount = screen.getByRole('row', { name: /Sibling discount/ });
     expect(discount).toHaveClass('bg-muted/40');
-    expect(within(discount as HTMLElement).getByText('−₦9,000')).toBeVisible();
-    expect(screen.getByText('Total').closest('tr')).toHaveTextContent(
+    expect(
+      within(discount).getByText(
+        'Sibling discount (3 children) (5% of tuition)'
+      )
+    ).toBeVisible();
+    expect(within(discount).getByText('−₦9,000')).toBeVisible();
+    expect(screen.getByRole('row', { name: /^Total/ })).toHaveTextContent(
       '₦171,000'
     );
   });
@@ -62,35 +74,30 @@ describe('InvoicePage', () => {
     setup();
     await screen.findByText('Due at issue');
     expect(screen.getByText('₦183,000')).toBeVisible();
-    const rows = (label: string) =>
-      screen.getByText(label, { selector: 'dt' }).parentElement;
-    expect(rows('This charge')).toHaveTextContent('₦171,000');
-    expect(rows('Brought forward')).toHaveTextContent('₦12,000');
-    expect(rows('Balance today')).toHaveTextContent('₦58,000');
+    const shown = definitions();
+    expect(shown.get('This charge')).toBe('₦171,000');
+    expect(shown.get('Brought forward')).toBe('₦12,000');
+    expect(shown.get('Balance today')).toBe('₦58,000');
   });
 
   it('shows the details: number, term, round link, issued and who is charged', async () => {
     setup();
-    const card = (await screen.findByText('Details')).closest(
-      '[data-slot="card"]'
-    );
-    const cardView = within(card as HTMLElement);
-    expect(cardView.getByText('CHG-2026-00001')).toBeVisible();
-    expect(cardView.getByText('First term, 2026/2027')).toBeVisible();
-    expect(cardView.getByRole('link', { name: 'BR-2026-0001' })).toBeVisible();
-    expect(cardView.getByText(/ by Chika Eze/)).toBeVisible();
-    expect(cardView.getByText('Ngozi Okeke (mother)')).toBeVisible();
+    await screen.findByText('Details');
+    const shown = definitions();
+    expect(shown.get('Number')).toBe('CHG-2026-00001');
+    expect(shown.get('Term')).toBe('First term, 2026/2027');
+    expect(shown.get('Sent with')).toBe('BR-2026-0001');
+    expect(screen.getByRole('link', { name: 'BR-2026-0001' })).toBeVisible();
+    expect(shown.get('Issued')).toMatch(/ by Chika Eze$/);
+    expect(shown.get('Charged to')).toBe('Ngozi Okeke (mother)');
   });
 
   it('links a store charge to its sale in the Items sold tab', async () => {
     setup(billingApi({ invoice: storeCharge() }));
-    const card = (await screen.findByText('Details')).closest(
-      '[data-slot="card"]'
-    );
+    await screen.findByText('Details');
 
-    const link = within(card as HTMLElement).getByRole('link', {
-      name: 'ISS-2026-0001',
-    });
+    expect(definitions().get('Source')).toBe('ISS-2026-0001');
+    const link = screen.getByRole('link', { name: 'ISS-2026-0001' });
     expect(link).toHaveAttribute(
       'href',
       expect.stringContaining(`/finance/store?tab=sold&sale=${SALE_ID}`)

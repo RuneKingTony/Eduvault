@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { render, renderHook, screen } from '@testing-library/react';
-import { accessOfStarter, fakeAccess } from './access-test-utils';
+import { accessOfStarter, fakeAccess } from './testing';
 import {
   Can,
   PermissionsProvider,

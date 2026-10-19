@@ -1,6 +1,5 @@
-import { ME_KEY } from '@eduvault/auth-client';
 import { ApiError } from '@eduvault/api-contract';
-import { createQueryClient } from './query-client';
+import { ME_KEY, createEduvaultQueryClient } from './me-gate';
 
 const suspended = () =>
   new ApiError(403, {
@@ -9,9 +8,9 @@ const suspended = () =>
       'Greenfield is paused on Eduvault. Contact the school for details.',
   });
 
-describe('portal query client', () => {
+describe('createEduvaultQueryClient', () => {
   it('refetches who the person is when a query answers SchoolSuspended', async () => {
-    const client = createQueryClient();
+    const client = createEduvaultQueryClient();
     const spy = vi.spyOn(client, 'invalidateQueries');
     await client
       .query({
@@ -26,7 +25,7 @@ describe('portal query client', () => {
   });
 
   it('does the same for a mutation', async () => {
-    const client = createQueryClient();
+    const client = createEduvaultQueryClient();
     const spy = vi.spyOn(client, 'invalidateQueries');
     await client
       .getMutationCache()
@@ -40,7 +39,7 @@ describe('portal query client', () => {
   });
 
   it('leaves other errors alone', async () => {
-    const client = createQueryClient();
+    const client = createEduvaultQueryClient();
     const spy = vi.spyOn(client, 'invalidateQueries');
     await client
       .query({
@@ -58,5 +57,23 @@ describe('portal query client', () => {
       })
       .catch(() => undefined);
     expect(spy).not.toHaveBeenCalled();
+  });
+
+  it('hands the failed query and the client to an app’s own error hook', async () => {
+    const onError = vi.fn();
+    const client = createEduvaultQueryClient(onError);
+    const error = new Error('Network down');
+    await client
+      .query({ queryKey: ['fees'], queryFn: () => Promise.reject(error) })
+      .catch(() => undefined);
+    expect(onError).toHaveBeenCalledOnce();
+    const [receivedError, receivedClient, query] = onError.mock.calls[0] as [
+      Error,
+      unknown,
+      { queryKey: unknown },
+    ];
+    expect(receivedError).toBe(error);
+    expect(receivedClient).toBe(client);
+    expect(query.queryKey).toEqual(['fees']);
   });
 });

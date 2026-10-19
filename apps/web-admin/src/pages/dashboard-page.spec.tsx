@@ -4,6 +4,10 @@ import type { DashboardTask } from '@eduvault/api-contract';
 import { currentCalendar, noCalendar } from '../test-calendar';
 import {
   announcementSummary,
+  MEMBER_ID,
+  ROUND_ID,
+  SECOND_TERM_ID,
+  TERM_ID,
   dashboardApi,
   dayOff,
   finance,
@@ -286,7 +290,7 @@ describe('DashboardPage tasks', () => {
           dueLeft(7, 5),
           {
             kind: 'noRole',
-            memberId: 'm1',
+            memberId: MEMBER_ID,
             name: 'Ada Obi',
           },
         ],
@@ -306,7 +310,7 @@ describe('DashboardPage tasks', () => {
     expect(screen.getByText('Ada Obi has no role yet')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Give a role' })).toHaveAttribute(
       'href',
-      '/members/m1'
+      `/members/${MEMBER_ID}`
     );
   });
 
@@ -328,7 +332,7 @@ describe('DashboardPage tasks', () => {
     ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Open' })).toHaveAttribute(
       'href',
-      '/students/s1'
+      `/students/${person(1).id}`
     );
   });
 
@@ -363,7 +367,7 @@ describe('DashboardPage tasks', () => {
 describe('DashboardPage Charged this term', () => {
   const charged = {
     currency: 'NGN',
-    termId: 't1',
+    termId: TERM_ID,
     termName: 'First term, 2026/2027',
     chargedMinor: 45_200_000,
     chargeCount: 2,
@@ -374,10 +378,9 @@ describe('DashboardPage Charged this term', () => {
     expect(await screen.findByText('Charged this term')).toBeInTheDocument();
     expect(screen.getByText('₦452,000')).toBeInTheDocument();
     expect(screen.getByText('First term, 2026/2027')).toBeInTheDocument();
-    expect(screen.getByText('Charged this term').closest('a')).toHaveAttribute(
-      'href',
-      '/finance/invoices'
-    );
+    expect(
+      screen.getByRole('link', { name: /Charged this term/ })
+    ).toHaveAttribute('href', '/finance/invoices');
   });
 
   it('asks for nothing and shows nothing without invoice:read', async () => {
@@ -407,7 +410,7 @@ describe('DashboardPage Charged this term', () => {
         tasks: [
           {
             kind: 'unsentRound',
-            runId: 'r1',
+            runId: ROUND_ID,
             number: 'BR-2026-0002',
             termName: 'Second term, 2026/2027',
             count: 3,
@@ -415,7 +418,7 @@ describe('DashboardPage Charged this term', () => {
           {
             kind: 'notCharged',
             count: 2,
-            termId: 't2',
+            termId: SECOND_TERM_ID,
             termName: 'Second term',
             students: [person(1), person(2)],
           },
@@ -429,7 +432,10 @@ describe('DashboardPage Charged this term', () => {
     ).toBeInTheDocument();
     expect(
       screen.getByRole('link', { name: /Check and send/ })
-    ).toHaveAttribute('href', expect.stringContaining('/finance/billing/r1'));
+    ).toHaveAttribute(
+      'href',
+      expect.stringContaining(`/finance/billing/${ROUND_ID}`)
+    );
     expect(
       screen.getByText('2 students not charged for Second term yet')
     ).toBeInTheDocument();

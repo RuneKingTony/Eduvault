@@ -109,6 +109,14 @@ export interface FinanceActivityRow {
   data: Record<string, unknown>;
 }
 
+const DELIVERY_KINDS: ReadonlySet<string> = new Set([
+  'store_delivery.received',
+  'store_opening_stock.recorded',
+]);
+
+export const isDeliveryRow = (row: Pick<FinanceActivityRow, 'kind'>): boolean =>
+  DELIVERY_KINDS.has(row.kind);
+
 export async function financeActivityRows(
   pool: Pool,
   organizationId: string
@@ -133,4 +141,13 @@ export async function financeTexts(
     .filter((item) => item.pillar === 'finance')
     .map((item) => item.text)
     .toSorted((a, b) => a.localeCompare(b));
+}
+
+export async function financeActivityRowsBesidesDeliveries(
+  pool: Pool,
+  organizationId: string
+): Promise<FinanceActivityRow[]> {
+  return (await financeActivityRows(pool, organizationId)).filter(
+    (row) => !isDeliveryRow(row)
+  );
 }

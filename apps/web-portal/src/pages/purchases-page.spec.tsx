@@ -1,28 +1,31 @@
 import { screen, within } from '@testing-library/react';
 import { ApiError } from '@eduvault/api-contract';
 import {
+  ADA_ID,
+  STRANGER_ID,
+  TOBI_ID,
   portalChild,
   portalMe,
   portalPriceList,
   portalPurchase,
   portalPurchases,
   renderWithApi,
+  testId,
 } from '../test-utils';
 import { PurchasesPage } from './purchases-page';
 
-const CARD = '[data-slot="card"]';
-
-function around(text: string | HTMLElement, selector: string): HTMLElement {
-  const node = typeof text === 'string' ? screen.getByText(text) : text;
-  const found = node.closest<HTMLElement>(selector);
-  if (found === null) {
-    throw new Error(`Nothing matching ${selector} around ${node.textContent}`);
+function tileOf(name: string): HTMLElement {
+  const tile = screen
+    .getAllByRole('listitem')
+    .find((item) => within(item).queryByText(name) !== null);
+  if (tile === undefined) {
+    throw new Error(`No list item for ${name}`);
   }
-  return found;
+  return tile;
 }
 
-const ada = portalChild({ id: 'ada', firstName: 'Ada' });
-const tobi = portalChild({ id: 'tobi', firstName: 'Tobi' });
+const ada = portalChild({ id: ADA_ID, firstName: 'Ada' });
+const tobi = portalChild({ id: TOBI_ID, firstName: 'Tobi' });
 const guardian = portalMe({ children: [ada, tobi] });
 
 function setup(
@@ -50,7 +53,7 @@ function setup(
 
 describe('PurchasesPage', () => {
   it('asks for the chosen child’s purchases and price list and names them in the header', async () => {
-    const api = setup({ childId: 'tobi' });
+    const api = setup({ childId: TOBI_ID });
 
     expect(
       await screen.findByRole('heading', { name: 'Purchases' })
@@ -61,22 +64,22 @@ describe('PurchasesPage', () => {
       )
     ).toBeVisible();
     expect(api.portal.purchases).toHaveBeenCalledWith({
-      params: { studentId: 'tobi' },
+      params: { studentId: TOBI_ID },
     });
     expect(api.portal.priceList).toHaveBeenCalledWith({
-      params: { studentId: 'tobi' },
+      params: { studentId: TOBI_ID },
     });
   });
 
   it('falls back to the first child for an id that is not linked', async () => {
-    const api = setup({ childId: 'another-family' });
+    const api = setup({ childId: STRANGER_ID });
 
     await screen.findByRole('heading', { name: 'Purchases' });
     expect(api.portal.purchases).toHaveBeenCalledWith({
-      params: { studentId: 'ada' },
+      params: { studentId: ADA_ID },
     });
     expect(api.portal.purchases).not.toHaveBeenCalledWith({
-      params: { studentId: 'another-family' },
+      params: { studentId: STRANGER_ID },
     });
   });
 
@@ -84,25 +87,25 @@ describe('PurchasesPage', () => {
     setup();
 
     await screen.findByText('Spent this term');
-    const spent = around('Spent this term', CARD);
+    const spent = screen.getByRole('group', { name: 'Spent this term' });
     expect(within(spent).getByText('₦13,000')).toBeVisible();
     expect(within(spent).getByText('1 purchase in first term')).toBeVisible();
-    const bought = around('Items bought', CARD);
+    const bought = screen.getByRole('group', { name: 'Items bought' });
     expect(within(bought).getByText('3')).toBeVisible();
     expect(within(bought).getByText('Books and uniforms')).toBeVisible();
-    const last = around('Last purchase', CARD);
+    const last = screen.getByRole('group', { name: 'Last purchase' });
     expect(within(last).getByText('8 Sep 2026')).toBeVisible();
     expect(within(last).getByText('₦13,000 · paid at the store')).toBeVisible();
   });
 
-  it('shows each purchase at its frozen prices with the campus store, receipt and how it was paid', async () => {
+  it('shows each sale’s lines and totals as given, with the campus store, receipt and how it was paid', async () => {
     setup({
       purchases: vi.fn().mockResolvedValue(
         portalPurchases({
           sales: [
             portalPurchase(),
             portalPurchase({
-              id: 'older',
+              id: testId(7),
               date: '2026-09-01',
               method: 'cash',
               receiptNumber: 'RCT-2026-00005',
@@ -122,13 +125,17 @@ describe('PurchasesPage', () => {
     });
 
     expect(await screen.findByText('Purchase history')).toBeVisible();
-    const first = around('Lekki campus store · receipt RCT-2026-00012', CARD);
+    const first = screen.getByRole('group', {
+      name: 'Purchase RCT-2026-00012',
+    });
     expect(within(first).getByText('Paid by POS')).toBeVisible();
     expect(within(first).getByText('School shirt, Size 12')).toBeVisible();
     expect(within(first).getByText('₦4,500')).toBeVisible();
     expect(within(first).getByText('₦9,000')).toBeVisible();
     expect(within(first).getByText('Total')).toBeVisible();
-    const older = around('Lekki campus store · receipt RCT-2026-00005', CARD);
+    const older = screen.getByRole('group', {
+      name: 'Purchase RCT-2026-00005',
+    });
     expect(within(older).getByText('Paid by cash')).toBeVisible();
     const cards = screen.getAllByText(/campus store · receipt/);
     expect(cards.map((card) => card.textContent)).toEqual([
@@ -171,7 +178,7 @@ describe('PurchasesPage', () => {
         )
       ).toBeVisible();
       expect(screen.getByText('Books for JSS 1')).toBeVisible();
-      const basic = around('Basic Science', 'li');
+      const basic = tileOf('Basic Science');
       expect(within(basic).getByText('Out of stock')).toBeVisible();
       expect(within(basic).getByText('₦3,400')).toBeVisible();
       const maths = screen
@@ -181,12 +188,12 @@ describe('PurchasesPage', () => {
       expect(
         within(maths[0]!).queryByText('Out of stock')
       ).not.toBeInTheDocument();
-      const shirt = around('School shirt', 'li');
+      const shirt = tileOf('School shirt');
       expect(
         within(shirt).getByText('Sizes Size 8, Size 10, Size 12')
       ).toBeVisible();
       expect(within(shirt).getByText('₦4,000 – ₦4,500')).toBeVisible();
-      const tie = around('School tie', 'li');
+      const tie = tileOf('School tie');
       expect(within(tie).getByText('One size')).toBeVisible();
       expect(within(tie).getByText('₦1,800')).toBeVisible();
       expect(within(tie).getByText('Out of stock')).toBeVisible();

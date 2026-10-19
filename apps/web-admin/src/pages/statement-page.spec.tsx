@@ -6,6 +6,7 @@ import {
   CHIDI,
   NGOZI,
   TOBI,
+  guardianStatement,
   recordingOptions,
   renderPayments,
   statement,
@@ -34,9 +35,16 @@ function childStatement(id: string, name: string, balanceMinor: number) {
   });
 }
 
+const familyChildren = () => [
+  childStatement(ADA, 'Ada Okeke', 6_000_000),
+  childStatement(CHIDI, 'Chidi Okeke', 2_000_000),
+  childStatement(TOBI, 'Tobi Ade', -500_000),
+];
+
 function setup(
   options: {
     statement?: ReturnType<typeof statement>;
+    family?: ReturnType<typeof guardianStatement>;
     failWith?: Error;
     search?: Parameters<typeof StatementPage>[0]['search'];
     access?: ReturnType<typeof starterAccess>;
@@ -47,22 +55,22 @@ function setup(
     studentAccounts: {
       statement: vi
         .fn()
-        .mockImplementation(() =>
+        .mockImplementation(({ params }: { params: { studentId: string } }) =>
           options.failWith === undefined
-            ? Promise.resolve(options.statement ?? statement())
+            ? Promise.resolve(
+                options.family?.children.find(
+                  (child) => child.student.id === params.studentId
+                ) ??
+                  options.statement ??
+                  statement()
+              )
             : Promise.reject(options.failWith)
         ),
-      guardianStatement: vi.fn().mockResolvedValue({
-        currency: 'NGN',
-        guardian: { id: NGOZI, name: 'Ngozi Okeke' },
-        familyTotalMinor: 8_000_000,
-        creditMinor: 500_000,
-        children: [
-          childStatement(ADA, 'Ada Okeke', 6_000_000),
-          childStatement(CHIDI, 'Chidi Okeke', 2_000_000),
-          childStatement(TOBI, 'Tobi Ade', -500_000),
-        ],
-      }),
+      guardianStatement: vi
+        .fn()
+        .mockResolvedValue(
+          options.family ?? guardianStatement(familyChildren())
+        ),
     },
     payments: {
       recordingOptions: vi.fn().mockResolvedValue(recordingOptions()),
@@ -114,19 +122,15 @@ describe('StatementPage (one child)', () => {
 
   it('lists the entries with their status, link and reference, and the footer', async () => {
     setup();
-    const charge = (
-      await screen.findByRole('link', {
-        name: 'Term fees, First term, 2026/2027',
-      })
-    ).closest('tr');
-    expect(
-      within(charge as HTMLElement).getByText('CHG-2026-00001')
-    ).toBeVisible();
-    expect(within(charge as HTMLElement).getByText('Charged')).toBeVisible();
-    const paid = screen
-      .getByRole('link', { name: /Payment RCT-2026-00088 from Ngozi Okeke/ })
-      .closest('tr');
-    expect(within(paid as HTMLElement).getByText('Paid')).toBeVisible();
+    const charge = await screen.findByRole('row', {
+      name: /Term fees, First term, 2026\/2027/,
+    });
+    expect(within(charge).getByText('CHG-2026-00001')).toBeVisible();
+    expect(within(charge).getByText('Charged')).toBeVisible();
+    const paid = screen.getByRole('row', {
+      name: /Payment RCT-2026-00088 from Ngozi Okeke/,
+    });
+    expect(within(paid).getByText('Paid')).toBeVisible();
     expect(screen.getByText('Owing now')).toBeVisible();
   });
 
@@ -319,7 +323,9 @@ describe('StatementPage term filter', () => {
     const select = await screen.findByRole('combobox', { name: 'Term' });
 
     expect(
-      [...select.querySelectorAll('option')].map((option) => option.textContent)
+      within(select)
+        .getAllByRole('option')
+        .map((option) => option.textContent)
     ).toEqual([
       'Whole history',
       'Second term, 2026/2027',
@@ -347,15 +353,13 @@ describe('StatementPage term filter', () => {
   it('puts the Brought forward row, with its tip and amount, first on page 1', async () => {
     setup({ statement: filtered(null), search: { term: TERM_ID } });
 
-    const row = (await screen.findByText('Brought forward')).closest('tr');
+    const row = await screen.findByRole('row', { name: /Brought forward/ });
 
     expect(row).toBe(screen.getAllByRole('row')[1]);
     expect(
-      within(row as HTMLElement).getByText(
-        'What the family already owed before this term.'
-      )
+      within(row).getByText('What the family already owed before this term.')
     ).toBeVisible();
-    expect(within(row as HTMLElement).getByText('₦15,000')).toBeVisible();
+    expect(within(row).getByText('₦15,000')).toBeVisible();
   });
 
   it('reads Owing at end of term in the footer of a term that has ended', async () => {
@@ -403,15 +407,148 @@ describe('StatementPage term filter', () => {
       page: undefined,
     });
   });
+});
 
-  it('has no Term select in the family view', async () => {
+describe('StatementPage family term filter', () => {
+  const TERM_ID = '00000000-0000-4000-8000-0000000c0001';
+  const OPTIONS = [
+    {
+      id: '00000000-0000-4000-8000-0000000c0002',
+      label: 'Second term, 2026/2027',
+    },
+    { id: TERM_ID, label: 'First term, 2026/2027' },
+  ];
+  const TERM = {
+    id: TERM_ID,
+    label: 'First term, 2026/2027',
+    fromOn: '2026-09-07',
+    toOn: null,
+  };
+  const inTerm = () =>
+    guardianStatement(
+      familyChildren().map((child) => ({
+        ...child,
+        rows: statement().rows.slice(0, 1),
+        total: 1,
+        term: TERM,
+        termOptions: OPTIONS,
+        broughtForward: { amountMinor: 1_500_000 },
+        closingMinor: child.totals.balanceMinor,
+      })),
+      { term: TERM, termOptions: OPTIONS }
+    );
+
+  it('offers Whole history and each term from the family response, with the whole history picked', async () => {
     setup({
-      statement: statement({ termOptions: OPTIONS }),
       search: { view: 'family' },
+      family: guardianStatement(familyChildren(), { termOptions: OPTIONS }),
     });
-    await screen.findByText('Family total');
+
+    const select = await screen.findByRole('combobox', { name: 'Term' });
+
     expect(
-      screen.queryByRole('combobox', { name: 'Term' })
-    ).not.toBeInTheDocument();
+      within(select)
+        .getAllByRole('option')
+        .map((option) => option.textContent)
+    ).toEqual([
+      'Whole history',
+      'Second term, 2026/2027',
+      'First term, 2026/2027',
+    ]);
+    expect(select).toHaveValue('');
+    expect(screen.queryByText('Brought forward')).not.toBeInTheDocument();
+  });
+
+  it('asks the API for the guardian statement and each child’s statement with the searched term', async () => {
+    const { api } = setup({
+      search: { view: 'family', term: TERM_ID },
+      family: inTerm(),
+    });
+
+    expect(await screen.findByRole('combobox', { name: 'Term' })).toHaveValue(
+      TERM_ID
+    );
+    expect(api.studentAccounts.guardianStatement).toHaveBeenCalledWith({
+      params: { guardianId: NGOZI },
+      query: { termId: TERM_ID },
+    });
+    await waitFor(() => {
+      for (const studentId of [ADA, CHIDI, TOBI]) {
+        expect(api.studentAccounts.statement).toHaveBeenCalledWith({
+          params: { studentId },
+          query: { page: undefined, termId: TERM_ID },
+        });
+      }
+    });
+  });
+
+  it('shows each child’s Brought forward row first under a term', async () => {
+    setup({ search: { view: 'family', term: TERM_ID }, family: inTerm() });
+
+    await screen.findByText('Family total');
+
+    const tables = await screen.findAllByRole('table');
+    expect(tables).toHaveLength(3);
+    for (const table of tables) {
+      expect(within(table).getAllByRole('row')[1]).toHaveAccessibleName(
+        /Brought forward/
+      );
+    }
+  });
+
+  it('keeps the Family total and the child tiles whole-account under a term', async () => {
+    setup({ search: { view: 'family', term: TERM_ID }, family: inTerm() });
+
+    expect(await screen.findByText('Family total')).toBeVisible();
+    expect(screen.getByText('₦80,000')).toBeVisible();
+    expect(
+      screen.getByText(
+        'Owed across all children · ₦5,000 extra paid kept separately'
+      )
+    ).toBeVisible();
+    expect(screen.getByText('Owing ₦60,000')).toBeVisible();
+    expect(screen.getByText('Extra paid ₦5,000')).toBeVisible();
+  });
+
+  it('picks a term from the select, staying in the family view and dropping the page', async () => {
+    const { onSearchChange } = setup({
+      search: { view: 'family', page: 2 },
+      family: guardianStatement(familyChildren(), { termOptions: OPTIONS }),
+    });
+
+    fireEvent.change(await screen.findByRole('combobox', { name: 'Term' }), {
+      target: { value: TERM_ID },
+    });
+
+    expect(onSearchChange).toHaveBeenCalledWith({
+      view: 'family',
+      term: TERM_ID,
+      page: undefined,
+    });
+  });
+
+  it('goes back to the whole history from the select, staying in the family view', async () => {
+    const { onSearchChange } = setup({
+      search: { view: 'family', term: TERM_ID },
+      family: inTerm(),
+    });
+
+    fireEvent.change(await screen.findByRole('combobox', { name: 'Term' }), {
+      target: { value: '' },
+    });
+
+    expect(onSearchChange).toHaveBeenCalledWith({
+      view: 'family',
+      term: undefined,
+      page: undefined,
+    });
+  });
+
+  it('keeps the term when switching between One child and the family view', async () => {
+    setup({ search: { view: 'family', term: TERM_ID }, family: inTerm() });
+
+    expect(
+      await screen.findByRole('link', { name: 'One child' })
+    ).toHaveAttribute('href', expect.stringContaining(`term=${TERM_ID}`));
   });
 });

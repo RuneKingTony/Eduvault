@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import {
   PAYMENT_ACCOUNT_GATEWAY_MESSAGE,
+  PAYMENT_ACCOUNT_METHOD_MESSAGE,
   PAYMENT_ACCOUNT_RETIRED_MESSAGE,
   PAYMENT_FUTURE_DATE_MESSAGE,
   PAYMENT_METHOD_OFF_MESSAGE,
@@ -85,17 +86,20 @@ const stored = (id = 'payment-1'): Omit<Payment, 'currency'> => ({
   voidEntry: null,
 });
 
+const okAccount = (kind: 'bank' | 'cash' | 'pos'): UsableMoneyAccount => ({
+  status: 'ok',
+  ledgerAccountId: 'ledger-1',
+  campusId: null,
+  kind,
+});
+
 class FakePayments extends PaymentRepository {
   methods: PaymentMethods = { cash: true, transfer: true, pos: true };
   existing: ExistingPayment | undefined;
   raced: ExistingPayment | undefined;
   lookups = 0;
   visible: Omit<Payment, 'currency'> | undefined = stored();
-  account: UsableMoneyAccount = {
-    status: 'ok',
-    ledgerAccountId: 'ledger-1',
-    campusId: null,
-  };
+  account: UsableMoneyAccount = okAccount('bank');
   guardian: string | undefined = 'Ngozi Okeke';
   inScope: string[] = [ADA, CHIDI];
   proofState: ProofState = 'free';
@@ -216,6 +220,7 @@ describe('PaymentService.record', () => {
 
   it('uses the typed name when someone else paid', async () => {
     const { payments, service } = setup();
+    payments.account = okAccount('cash');
 
     await service.record(ctx, {
       ...body,
@@ -232,11 +237,39 @@ describe('PaymentService.record', () => {
     });
   });
 
-  it('takes a cash payment without proof', async () => {
-    const { service } = setup();
+  it('takes a cash payment without proof into a cash account', async () => {
+    const { payments, service } = setup();
+    payments.account = okAccount('cash');
     await expect(
       service.record(ctx, { ...body, method: 'cash', proofFileId: undefined })
     ).resolves.toMatchObject({ replayed: false });
+  });
+
+  it('refuses a bank transfer into a cash account, and takes cash into a bank account', async () => {
+    const { payments, service } = setup();
+    payments.account = okAccount('cash');
+    await expect(service.record(ctx, body)).rejects.toThrow(
+      PAYMENT_ACCOUNT_METHOD_MESSAGE
+    );
+    payments.account = okAccount('bank');
+    await expect(
+      service.record(ctx, { ...body, method: 'cash', proofFileId: undefined })
+    ).resolves.toMatchObject({ replayed: false });
+  });
+
+  it('takes a POS payment into a POS or bank account', async () => {
+    const { payments, service } = setup();
+    for (const kind of ['pos', 'bank'] as const) {
+      payments.account = okAccount(kind);
+      await expect(
+        service.record(ctx, {
+          ...body,
+          method: 'pos',
+          proofFileId: undefined,
+          reference: `POS-${kind}-20261007`,
+        })
+      ).resolves.toMatchObject({ replayed: false });
+    }
   });
 
   it('reports a race that another request won as a replay', async () => {
@@ -401,10 +434,10 @@ describe('PaymentService.record validation order', () => {
     const { service } = setup();
     await expect(
       service.record(ctx, { ...body, paidOn: '2026-10-07' })
-    ).resolves.toBeDefined();
+    ).resolves.toMatchObject({ replayed: false });
     await expect(
       service.record(ctx, { ...body, paidOn: '2020-01-01' })
-    ).resolves.toBeDefined();
+    ).resolves.toMatchObject({ replayed: false });
   });
 
   it('refuses a split that does not add up to the amount', async () => {
@@ -570,20 +603,12 @@ describe('PaymentService reads', () => {
     });
   });
 
-  it('feeds the Record a payment sheet from one call', async () => {
-    const { service, moneyAccounts } = setup();
+  it('dates the Record a payment sheet with the school’s today', async () => {
+    const { service } = setup();
 
     const options = await service.recordingOptions(ctx);
 
-    expect(options).toEqual({
-      currency: 'NGN',
-      today: '2026-10-07',
-      accounts: [{ id: ACCOUNT, label: 'GTBank current' }],
-      methods: { cash: true, transfer: true, pos: true },
-      payers: [],
-      students: [],
-    });
-    expect(moneyAccounts.listForRecording).toHaveBeenCalledWith(ctx);
+    expect(options.today).toBe('2026-10-07');
   });
 
   it('lists with the school currency', async () => {

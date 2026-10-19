@@ -1,5 +1,10 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
-import { ApiError } from '@eduvault/api-contract';
+import {
+  ApiError,
+  type Announcement,
+  type CreateAnnouncementInput,
+  type UpdateAnnouncementInput,
+} from '@eduvault/api-contract';
 import { toPermissionMap, type Permission } from '@eduvault/policy';
 import { toast } from '@eduvault/ui';
 import {
@@ -9,6 +14,7 @@ import {
   announcementList,
   campus,
 } from '../test-announcements';
+import { testId } from '../test-api';
 import { fakeAccess, ownerAccess, renderWithApi } from '../test-utils';
 import { AnnouncementsPage } from './announcements-page';
 
@@ -32,21 +38,29 @@ const writerAccess = (reach: 'all' | string[]) =>
     campusScope: reach,
   });
 
+const DRAFT_ID = testId(0x2_50_01);
+const LIVE_ID = testId(0x2_50_02);
+const WITHDRAWN_ID = testId(0x2_50_03);
+const EVERYONE_ID = testId(0x2_50_04);
+const LEKKI_ITEM_ID = testId(0x2_50_05);
+const CREATED_ID = testId(0x2_50_06);
+const pagedId = (index: number) => testId(0x2_51_00 + index);
+
 const draft = announcement({
-  id: 'd1',
+  id: DRAFT_ID,
   title: 'Sports day',
   status: 'draft',
   publishedOn: null,
 });
 const live = announcement({
-  id: 'p1',
+  id: LIVE_ID,
   title: 'PTA meeting',
   pinned: true,
   campusId: LEKKI,
   campusName: 'Lekki',
 });
 const withdrawn = announcement({
-  id: 'w1',
+  id: WITHDRAWN_ID,
   title: 'Old news',
   status: 'withdrawn',
   withdrawnAt: '2026-10-03T08:00:00.000Z',
@@ -65,27 +79,75 @@ function setup(
     draft: announcementList([draft], { counts }),
     withdrawn: announcementList([withdrawn], { counts }),
   };
+  const campuses = options.campuses ?? [
+    campus(LEKKI, 'Lekki'),
+    campus(IKEJA, 'Ikeja'),
+  ];
+  const campusNameOf = (id: string | null) =>
+    campuses.find((item) => item.id === id)?.name ?? null;
+  const itemOf = (id: string): Announcement =>
+    [live, draft, withdrawn, ...(options.list?.items ?? [])].find(
+      (item) => item.id === id
+    ) ?? live;
   const api = {
     announcements: {
       list: vi.fn(({ query }: { query: { status: keyof typeof byStatus } }) =>
         Promise.resolve(options.list ?? byStatus[query.status])
       ),
-      create: vi.fn().mockResolvedValue(live),
-      update: vi.fn().mockResolvedValue(live),
-      publish: vi.fn().mockResolvedValue({
-        ...draft,
-        status: 'published',
-        publishedOn: '2026-10-11',
-      }),
-      withdraw: vi.fn().mockResolvedValue(withdrawn),
-      pin: vi.fn().mockResolvedValue(live),
+      create: vi.fn(({ body }: { body: CreateAnnouncementInput }) =>
+        Promise.resolve(
+          announcement({
+            id: CREATED_ID,
+            title: body.title,
+            body: body.body,
+            tag: body.tag,
+            campusId: body.campusId,
+            campusName: campusNameOf(body.campusId),
+            status: body.status,
+            pinned: body.pinned ?? false,
+            publishedOn: body.status === 'published' ? '2026-10-11' : null,
+          })
+        )
+      ),
+      update: vi.fn(
+        ({
+          params,
+          body,
+        }: {
+          params: { id: string };
+          body: UpdateAnnouncementInput;
+        }) =>
+          Promise.resolve({
+            ...itemOf(params.id),
+            ...body,
+          })
+      ),
+      publish: vi.fn(({ params }: { params: { id: string } }) =>
+        Promise.resolve({
+          ...itemOf(params.id),
+          status: 'published',
+          publishedOn: '2026-10-11',
+        })
+      ),
+      withdraw: vi.fn(({ params }: { params: { id: string } }) =>
+        Promise.resolve({
+          ...itemOf(params.id),
+          status: 'withdrawn',
+          withdrawnAt: '2026-10-11T08:00:00.000Z',
+        })
+      ),
+      pin: vi.fn(
+        ({
+          params,
+          body,
+        }: {
+          params: { id: string };
+          body: { pinned: boolean };
+        }) => Promise.resolve({ ...itemOf(params.id), pinned: body.pinned })
+      ),
     },
     campuses: {
-      list: vi
-        .fn()
-        .mockResolvedValue(
-          options.campuses ?? [campus(LEKKI, 'Lekki'), campus(IKEJA, 'Ikeja')]
-        ),
+      list: vi.fn().mockResolvedValue(campuses),
     },
   };
   renderWithApi(<AnnouncementsPage />, api, options.access ?? ownerAccess());
@@ -157,7 +219,7 @@ describe('AnnouncementsPage list', () => {
 
   it('shows the pager at 23 items and none at 10 or fewer', async () => {
     const items = Array.from({ length: 10 }, (_, index) =>
-      announcement({ id: `p${index}`, title: `Item ${index}` })
+      announcement({ id: pagedId(index), title: `Item ${index}` })
     );
     const api = setup({
       list: announcementList(items, {
@@ -180,7 +242,7 @@ describe('AnnouncementsPage list', () => {
     setup({
       list: announcementList(
         Array.from({ length: 10 }, (_, index) =>
-          announcement({ id: `p${index}`, title: `Item ${index}` })
+          announcement({ id: pagedId(index), title: `Item ${index}` })
         )
       ),
     });
@@ -238,9 +300,9 @@ describe('AnnouncementsPage permissions', () => {
     setup({
       access: writerAccess([LEKKI]),
       list: announcementList([
-        announcement({ id: 'e1', title: 'For everyone' }),
+        announcement({ id: EVERYONE_ID, title: 'For everyone' }),
         announcement({
-          id: 'l1',
+          id: LEKKI_ITEM_ID,
           title: 'Just Lekki',
           campusId: LEKKI,
           campusName: 'Lekki',
@@ -344,7 +406,6 @@ describe('AnnouncementsPage editor', () => {
 
   it('saves a draft with its pin ignored and switches to the Drafts tab', async () => {
     const api = setup();
-    api.announcements.create.mockResolvedValue(draft);
     await openNew();
     fireEvent.change(await screen.findByLabelText('Title'), {
       target: { value: 'Sports day' },
@@ -383,7 +444,6 @@ describe('AnnouncementsPage editor', () => {
       access: writerAccess([LEKKI]),
       campuses: [campus(LEKKI, 'Lekki')],
     });
-    api.announcements.create.mockResolvedValue(live);
     await openNew();
     fireEvent.change(await screen.findByLabelText('Title'), {
       target: { value: 'PTA meeting' },
@@ -398,7 +458,14 @@ describe('AnnouncementsPage editor', () => {
       );
     });
     expect(api.announcements.create).toHaveBeenCalledWith({
-      body: expect.objectContaining({ campusId: LEKKI, status: 'published' }),
+      body: {
+        title: 'PTA meeting',
+        body: 'Saturday.',
+        tag: 'general',
+        campusId: LEKKI,
+        pinned: false,
+        status: 'published',
+      },
     });
   });
 
@@ -434,7 +501,7 @@ describe('AnnouncementsPage row actions', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Publish' }));
     await waitFor(() => {
       expect(api.announcements.publish).toHaveBeenCalledWith({
-        params: { id: 'd1' },
+        params: { id: DRAFT_ID },
       });
     });
     await waitFor(() => {
@@ -455,7 +522,7 @@ describe('AnnouncementsPage row actions', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Withdraw' }));
     await waitFor(() => {
       expect(api.announcements.withdraw).toHaveBeenCalledWith({
-        params: { id: 'p1' },
+        params: { id: LIVE_ID },
       });
     });
     await waitFor(() => {
@@ -476,7 +543,7 @@ describe('AnnouncementsPage row actions', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Unpin' }));
     await waitFor(() => {
       expect(api.announcements.pin).toHaveBeenCalledWith({
-        params: { id: 'p1' },
+        params: { id: LIVE_ID },
         body: { pinned: false },
       });
     });

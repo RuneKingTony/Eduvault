@@ -465,7 +465,6 @@ export async function seedStore(
   { owner, campusIds, school, today, offsetDays }: StoreSeed
 ) {
   const clock = app.get(Clock, { strict: false });
-  clock.set(today);
   try {
     const stocked = await createItems(app, owner);
     const deliveries = app.get(DeliveryService, { strict: false });
@@ -517,6 +516,6 @@ export async function seedStore(
       stocked
     );
   } finally {
-    clock.set(null);
+    clock.set(today);
   }
 }

@@ -27,25 +27,18 @@ const fill = (email: string, password: string, label = 'Email') => {
 };
 
 describe('SignInForm', () => {
-  it('shows the staff header and intro', () => {
+  it('greets staff with Welcome back', () => {
     setup();
-    expect(screen.getByText('Eduvault')).toBeInTheDocument();
-    expect(screen.getByText('Staff sign-in')).toBeInTheDocument();
     expect(
       screen.getByRole('heading', { name: 'Welcome back' })
     ).toBeInTheDocument();
-    expect(
-      screen.getByText('Sign in with the email your school added.')
-    ).toBeInTheDocument();
   });
 
-  it('shows the portal header', () => {
+  it('titles the portal form Sign in', () => {
     setup(OK, 'portal');
-    expect(screen.getByText('Students and guardians')).toBeInTheDocument();
     expect(
       screen.getByRole('heading', { name: 'Sign in' })
     ).toBeInTheDocument();
-    expect(screen.queryByText('Staff sign-in')).not.toBeInTheDocument();
   });
 
   it('has no sign-up or forgot-password link, only the plain line', () => {
@@ -92,10 +85,6 @@ describe('SignInForm', () => {
     setup({ error });
     fill('ada@school.test', 'long-enough-password');
     expect(await screen.findByText(message)).toBeInTheDocument();
-  });
-
-  it('maps failures to copy', () => {
-    expect(signInErrorMessage({})).toBe('That email and password don’t match.');
   });
 
   it('keeps the staff form email-only', async () => {

@@ -1,5 +1,6 @@
 import { screen } from '@testing-library/react';
 import {
+  ARM_ID,
   dashboardApi,
   myClass,
   person,
@@ -24,7 +25,7 @@ describe('MyClassesCard', () => {
     expect(screen.getByText('+3')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /JSS 3 Gold/ })).toHaveAttribute(
       'href',
-      '/classes/a1'
+      `/classes/${ARM_ID}`
     );
     expect(screen.getByRole('link', { name: 'All classes' })).toHaveAttribute(
       'href',

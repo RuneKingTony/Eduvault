@@ -205,7 +205,7 @@ test.describe('isolation', () => {
     await expect(
       pool.query(`DELETE FROM activity_event WHERE id = $1`, [id])
     ).rejects.toThrow('activity_event is append-only');
-    await expect(pool.query(`TRUNCATE activity_event`)).resolves.toBeDefined();
+    await pool.query(`TRUNCATE activity_event`);
   });
 
   test('case 3 and 4: a Lekki-only clerk gets 404 for Ikeja on every route and lists only Lekki', async ({

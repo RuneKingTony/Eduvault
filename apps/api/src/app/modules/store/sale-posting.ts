@@ -20,7 +20,7 @@ export const saleLineDescription = (
   quantity: number
 ): string => `${displayName} × ${quantity}`;
 
-export const saleCostReference = (chargeNumber: string): string =>
+const saleCostReference = (chargeNumber: string): string =>
   `${chargeNumber}-COST`;
 
 export const saleChargeMemo = (studentName: string): string =>

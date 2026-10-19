@@ -17,6 +17,13 @@ const base = {
 } as const;
 
 describe('saleRequestHash', () => {
+  // requestHash is stored on the sale, so changing the canonical form would turn replays of old references into 409s.
+  it('is the SHA-256 of the canonical request, as stored on earlier sales', () => {
+    expect(saleRequestHash(base)).toBe(
+      '12c6718eb357a96659d088f4388d412eedbd30a5568e6d9eda929c4d88957125'
+    );
+  });
+
   it('is the same whatever order the lines come in', () => {
     expect(
       saleRequestHash({ ...base, lines: [...base.lines].toReversed() })

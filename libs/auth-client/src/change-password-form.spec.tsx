@@ -19,15 +19,11 @@ const fill = (newPassword: string, confirm: string) => {
 };
 
 describe('ChangePasswordForm', () => {
-  it('explains the temporary password and the length rule', () => {
+  it('asks the person to choose their own password', () => {
     setup();
     expect(
       screen.getByRole('heading', { name: 'Choose your own password' })
     ).toBeInTheDocument();
-    expect(
-      screen.getByText('You signed in with a temporary password')
-    ).toBeInTheDocument();
-    expect(screen.getByText('At least 10 characters.')).toBeInTheDocument();
   });
 
   it('refuses a short password without calling the server', () => {

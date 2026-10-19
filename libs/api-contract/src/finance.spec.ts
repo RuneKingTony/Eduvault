@@ -3,6 +3,7 @@ import {
   FEE_COPY_NO_SOURCE_MESSAGE,
   FEE_LINE_AMOUNT_MESSAGE,
   FEE_LINE_NAME_REQUIRED,
+  FEE_OPT_IN_LIMIT,
   FEE_TYPE_NAME_REQUIRED,
   JOURNAL_RANGE_MESSAGE,
   MONEY_ACCOUNT_LAST4_MESSAGE,
@@ -23,6 +24,7 @@ import {
   feeTermLabel,
   journalQuerySchema,
   openingBalancesSchema,
+  setFeeOptInsSchema,
   setFeeOptionSchema,
   updateFeeLineSchema,
   updateMoneyAccountSchema,
@@ -389,6 +391,41 @@ describe('setFeeOptionSchema', () => {
     expect(setFeeOptionSchema.safeParse({ optedIn: 'yes' }).success).toBe(
       false
     );
+  });
+});
+
+describe('setFeeOptInsSchema', () => {
+  const body = { termId: id, studentIds: [id], optedIn: true };
+
+  it('takes one to 200 unique student ids', () => {
+    expect(setFeeOptInsSchema.safeParse(body).success).toBe(true);
+    const full = Array.from({ length: FEE_OPT_IN_LIMIT }, () =>
+      crypto.randomUUID()
+    );
+    expect(
+      setFeeOptInsSchema.safeParse({ ...body, studentIds: full }).success
+    ).toBe(true);
+  });
+
+  it('rejects an empty list', () => {
+    expect(
+      setFeeOptInsSchema.safeParse({ ...body, studentIds: [] }).success
+    ).toBe(false);
+  });
+
+  it('rejects more than 200 ids', () => {
+    const tooMany = Array.from({ length: FEE_OPT_IN_LIMIT + 1 }, () =>
+      crypto.randomUUID()
+    );
+    expect(
+      setFeeOptInsSchema.safeParse({ ...body, studentIds: tooMany }).success
+    ).toBe(false);
+  });
+
+  it('rejects duplicate ids', () => {
+    expect(
+      setFeeOptInsSchema.safeParse({ ...body, studentIds: [id, id] }).success
+    ).toBe(false);
   });
 });
 

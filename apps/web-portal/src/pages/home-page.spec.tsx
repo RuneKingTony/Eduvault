@@ -3,6 +3,9 @@ import { ApiError, type AnnouncementSummary } from '@eduvault/api-contract';
 import type { Permission } from '@eduvault/policy';
 import { addDays, lagosDateOf } from '@eduvault/shared';
 import {
+  ADA_ID,
+  STRANGER_ID,
+  TOBI_ID,
   calendarCurrent,
   dayOffEntry,
   portalAnnouncements,
@@ -11,12 +14,13 @@ import {
   portalMe,
   portalStudent,
   renderWithApi,
+  testId,
 } from '../test-utils';
 import { HomePage } from './home-page';
 
 const TODAY = lagosDateOf(new Date());
-const ada = portalChild({ id: 'ada', firstName: 'Ada' });
-const tobi = portalChild({ id: 'tobi', firstName: 'Tobi' });
+const ada = portalChild({ id: ADA_ID, firstName: 'Ada' });
+const tobi = portalChild({ id: TOBI_ID, firstName: 'Tobi' });
 const guardian = portalMe({ children: [ada, tobi] });
 const studentMe = portalMe({
   kind: 'student',
@@ -29,7 +33,7 @@ const studentMe = portalMe({
 const item = (
   overrides: Partial<AnnouncementSummary> = {}
 ): AnnouncementSummary => ({
-  id: 'n1',
+  id: testId(1),
   title: 'PTA meeting',
   body: 'Saturday at ten.',
   tag: 'event',
@@ -46,7 +50,7 @@ interface Answers {
 }
 
 const apiWith = ({
-  student = portalStudent({ id: 'ada' }),
+  student = portalStudent({ id: ADA_ID }),
   news = portalAnnouncements(),
   current = calendarCurrent(),
   daysOff = [],
@@ -105,7 +109,7 @@ describe('Home hero', () => {
 
   it('shows a dash for an unplaced class', async () => {
     renderHome(
-      apiWith({ student: portalStudent({ id: 'ada', className: null }) })
+      apiWith({ student: portalStudent({ id: ADA_ID, className: null }) })
     );
     expect(await screen.findByText('— · Lekki campus')).toBeInTheDocument();
   });
@@ -158,7 +162,9 @@ describe('Home tiles', () => {
 
   it('says there is no holiday and no teacher when there is none', async () => {
     renderHome(
-      apiWith({ student: portalStudent({ id: 'ada', classTeacherName: null }) })
+      apiWith({
+        student: portalStudent({ id: ADA_ID, classTeacherName: null }),
+      })
     );
     expect(await screen.findByText('None this term')).toBeInTheDocument();
   });
@@ -171,12 +177,12 @@ describe('Home announcements', () => {
         news: portalAnnouncements({
           items: [
             item({
-              id: 'p',
+              id: testId(2),
               title: 'Pinned notice',
               pinned: true,
               body: 'Read me first.',
             }),
-            item({ id: 'o', title: 'Older news', body: 'Closed body.' }),
+            item({ id: testId(3), title: 'Older news', body: 'Closed body.' }),
           ],
         }),
       })
@@ -211,13 +217,21 @@ describe('Home announcements', () => {
         news: portalAnnouncements({
           items: [
             item({
-              id: 'p',
+              id: testId(2),
               title: 'Pinned today',
               pinned: true,
               publishedOn: TODAY,
             }),
-            item({ id: 'f', title: 'Fresh', publishedOn: addDays(TODAY, -2) }),
-            item({ id: 'o', title: 'Stale', publishedOn: addDays(TODAY, -20) }),
+            item({
+              id: testId(4),
+              title: 'Fresh',
+              publishedOn: addDays(TODAY, -2),
+            }),
+            item({
+              id: testId(3),
+              title: 'Stale',
+              publishedOn: addDays(TODAY, -20),
+            }),
           ],
         }),
       })
@@ -247,20 +261,20 @@ describe('Home announcements', () => {
   it('offers See all only when the card is full, and opens the full list for the child', async () => {
     const onSeeAll = vi.fn();
     const full = Array.from({ length: 5 }, (_, index) =>
-      item({ id: `n${index}`, title: `News ${index}` })
+      item({ id: testId(10 + index), title: `News ${index}` })
     );
     renderHome(apiWith({ news: portalAnnouncements({ items: full }) }), {
-      childId: 'ada',
+      childId: ADA_ID,
       onSeeAll,
     });
     fireEvent.click(await screen.findByRole('button', { name: 'See all' }));
-    expect(onSeeAll).toHaveBeenCalledWith('ada');
+    expect(onSeeAll).toHaveBeenCalledWith(ADA_ID);
   });
 
   it('has no See all link when everything already fits on the card', async () => {
     renderHome(
       apiWith({
-        news: portalAnnouncements({ items: [item(), item({ id: 'n2' })] }),
+        news: portalAnnouncements({ items: [item(), item({ id: testId(5) })] }),
       })
     );
     await screen.findAllByRole('button', { name: /PTA meeting/ });
@@ -313,10 +327,10 @@ describe('Home holidays and profile', () => {
     const trigger = await screen.findByRole('button', { name: /Profile/ });
     expect(screen.queryByText('GF-0123')).not.toBeInTheDocument();
     fireEvent.click(trigger);
-    expect(screen.getByText('GF-0123')).toHaveClass('font-mono');
+    expect(screen.getByText('GF-0123')).toBeInTheDocument();
     expect(screen.getByText('2 May 2014')).toBeInTheDocument();
     expect(screen.getByText('Username')).toBeInTheDocument();
-    expect(screen.getByText('greenfield-0123')).toHaveClass('font-mono');
+    expect(screen.getByText('greenfield-0123')).toBeInTheDocument();
     expect(screen.queryByText('Signed in with')).not.toBeInTheDocument();
   });
 
@@ -380,32 +394,32 @@ describe('Home states and the selected child', () => {
           announcements: vi.fn(),
         },
       },
-      { childId: 'tobi', onMissing }
+      { childId: TOBI_ID, onMissing }
     );
     await waitFor(() => {
-      expect(onMissing).toHaveBeenCalledWith('ada');
+      expect(onMissing).toHaveBeenCalledWith(ADA_ID);
     });
   });
 
   it('shows the selected child', async () => {
     const api = apiWith({
-      student: portalStudent({ id: 'tobi', firstName: 'Tobi' }),
+      student: portalStudent({ id: TOBI_ID, firstName: 'Tobi' }),
     });
-    renderHome(api, { childId: 'tobi' });
+    renderHome(api, { childId: TOBI_ID });
     expect(
       await screen.findByRole('heading', { name: 'Tobi Okeke' })
     ).toBeInTheDocument();
     expect(api.portal.student).toHaveBeenCalledWith({
-      params: { studentId: 'tobi' },
+      params: { studentId: TOBI_ID },
     });
   });
 
   it('asks the first child for an unlinked id', async () => {
     const api = apiWith();
-    renderHome(api, { childId: 'someone-else' });
+    renderHome(api, { childId: STRANGER_ID });
     await screen.findByRole('heading', { name: 'Ada Okeke' });
     expect(api.portal.student).toHaveBeenCalledWith({
-      params: { studentId: 'ada' },
+      params: { studentId: ADA_ID },
     });
   });
 
@@ -417,8 +431,8 @@ describe('Home states and the selected child', () => {
 
 const WITH_FEES: Permission[] = ['student:readOwn', 'invoice:readOwn'];
 
-const feesApi = (balanceMinor: number) => {
-  const base = apiWith();
+const feesApi = (balanceMinor: number, answers: Answers = {}) => {
+  const base = apiWith(answers);
   return {
     ...base,
     portal: {
@@ -426,8 +440,8 @@ const feesApi = (balanceMinor: number) => {
       children: vi
         .fn()
         .mockResolvedValue([
-          portalChild({ id: 'ada', firstName: 'Ada', balanceMinor }),
-          portalChild({ id: 'tobi', firstName: 'Tobi', balanceMinor: 0 }),
+          portalChild({ id: ADA_ID, firstName: 'Ada', balanceMinor }),
+          portalChild({ id: TOBI_ID, firstName: 'Tobi', balanceMinor: 0 }),
         ]),
       familyStatement: vi.fn().mockResolvedValue(portalFamilyStatement()),
     },
@@ -449,8 +463,13 @@ describe('Home fees tile', () => {
     expect(within(tile).getByText('₦5,000 paid ahead')).toBeInTheDocument();
   });
 
-  it('shows Paid up and Nothing owed at zero, with the other child’s balance ignored', async () => {
-    renderHome(feesApi(0), { held: WITH_FEES, childId: 'tobi' });
+  it('shows Paid up and Nothing owed for a child who owes nothing, whatever a sibling owes', async () => {
+    renderHome(
+      feesApi(6_000_000, {
+        student: portalStudent({ id: TOBI_ID, firstName: 'Tobi' }),
+      }),
+      { held: WITH_FEES, childId: TOBI_ID }
+    );
     const tile = await screen.findByRole('button', { name: /Fees/ });
     expect(within(tile).getByText('Paid up')).toBeInTheDocument();
     expect(within(tile).getByText('Nothing owed')).toBeInTheDocument();
@@ -469,7 +488,7 @@ describe('Home fees tile', () => {
     const onSeeFees = vi.fn();
     renderHome(feesApi(6_000_000), { held: WITH_FEES, onSeeFees });
     fireEvent.click(await screen.findByRole('button', { name: /Fees/ }));
-    expect(onSeeFees).toHaveBeenCalledWith('ada');
+    expect(onSeeFees).toHaveBeenCalledWith(ADA_ID);
   });
 
   it('is hidden, and asks for no balances, without invoice:readOwn', async () => {
@@ -479,7 +498,8 @@ describe('Home fees tile', () => {
     expect(
       screen.queryByRole('button', { name: /Fees/ })
     ).not.toBeInTheDocument();
-    expect(api.portal.children).not.toHaveBeenCalled();
-    expect(api.portal.familyStatement).not.toHaveBeenCalled();
+    const { children, familyStatement } = api.portal;
+    expect(children).not.toHaveBeenCalled();
+    expect(familyStatement).not.toHaveBeenCalled();
   });
 });

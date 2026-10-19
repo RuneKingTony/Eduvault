@@ -2,6 +2,7 @@ import type {
   FeeAppliesTo,
   FeeCandidates,
   FeeLine,
+  FeeOptIns,
   FeeOption,
   FeeSetup,
   FeeType,
@@ -9,6 +10,7 @@ import type {
 import type { ActivityInput, CopiedShare } from '../../common/activity';
 import type { CampusScope } from '../../common/campus-scope';
 import type { DiscountFacts, TermPosition } from '../../common/fees';
+import type { StudentIdentity } from '../../common/students';
 
 export interface FeeScope {
   organizationId: string;
@@ -139,12 +141,15 @@ export abstract class FeeLineRepository {
   ): Promise<FeeLine | undefined>;
 }
 
+export type TypeActivity = (feeType: FeeType) => ActivityInput[];
+
 export abstract class FeeTypeRepository {
   abstract list(organizationId: string): Promise<FeeType[]>;
 
   abstract create(
     organizationId: string,
-    name: string
+    name: string,
+    activity: TypeActivity
   ): Promise<FeeTypeOutcome>;
 }
 
@@ -170,6 +175,7 @@ export interface StudentFeeContext {
 export interface OptionChange {
   organizationId: string;
   userId: string;
+  studentId: string;
   enrollmentId: string;
   feeTypeId: string;
   optedIn: boolean;
@@ -204,6 +210,11 @@ export abstract class FeeStudentRepository {
   ): Promise<FeeCandidates>;
 }
 
+export type OptionActivity = (facts: {
+  student: StudentIdentity;
+  feeType: { id: string; name: string };
+}) => ActivityInput[];
+
 export abstract class FeeOptionRepository {
   abstract hasSession(organizationId: string, id: string): Promise<boolean>;
 
@@ -226,5 +237,17 @@ export abstract class FeeOptionRepository {
     }
   ): Promise<Pick<FeeOption, 'feeTypeId' | 'name'>[]>;
 
-  abstract setOption(change: OptionChange): Promise<void>;
+  abstract setOption(
+    change: OptionChange,
+    activity: OptionActivity
+  ): Promise<boolean>;
+
+  abstract setOptions(
+    changes: { change: OptionChange; activity: OptionActivity }[]
+  ): Promise<number>;
+
+  abstract optInRoster(
+    scope: FeeScope,
+    query: { sessionId: string; feeTypeId: string; q: string | undefined }
+  ): Promise<Pick<FeeOptIns, 'items' | 'total'>>;
 }

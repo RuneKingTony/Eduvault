@@ -2,13 +2,19 @@ import { fireEvent, screen, within } from '@testing-library/react';
 import type { SchoolYear } from '@eduvault/api-contract';
 import { actingAccess, fakeAccess, renderWithApi } from '../test-utils';
 import {
+  HOLIDAY_2,
+  TERM_2,
   currentCalendar,
   currentYear,
   nextYear,
   schoolYear,
   term,
 } from '../test-calendar';
+import { testId } from '../test-api';
 import { CalendarPage } from './calendar-page';
+
+const OLD_YEAR = testId(0x2_00_01);
+const OLD_TERM = testId(0x2_00_02);
 
 const NEXT_YEAR_STARTS =
   'A school year that has already started cannot be deleted.';
@@ -30,7 +36,9 @@ function setup(
   }: SetupOptions = {}
 ) {
   const terms = {
-    makeCurrent: vi.fn().mockResolvedValue(term({ id: 't2' })),
+    makeCurrent: vi.fn(({ params }: { params: { id: string } }) =>
+      term({ id: params.id })
+    ),
     update: vi.fn(),
   };
   const api = {
@@ -56,15 +64,20 @@ function setup(
   return { api, ...handlers };
 }
 
-const cardOf = async (name: string) => {
-  const title = await screen.findByText(name, {
-    selector: '[data-slot="card-title"]',
-  });
-  const card = title.closest<HTMLElement>('[data-slot="card"]');
-  if (card === null) {
-    throw new Error(`no card for ${name}`);
+const YEARS_NEWEST_FIRST = ['2027/2028', '2026/2027'];
+
+const yearToggle = (name: string) =>
+  screen.findByRole('button', { name: new RegExp(`^${name}`) });
+
+const termsOf = async (name: string) => {
+  await yearToggle(name);
+  const table = screen
+    .getAllByRole('table')
+    .at(YEARS_NEWEST_FIRST.indexOf(name));
+  if (table === undefined) {
+    throw new Error(`no terms table for ${name}`);
   }
-  return within(card);
+  return table;
 };
 
 const WRITE_CONTROLS = [
@@ -76,10 +89,10 @@ const WRITE_CONTROLS = [
 ];
 
 async function openMore(name: string) {
-  const card = await cardOf(name);
-  fireEvent.keyDown(card.getByRole('button', { name: `More for ${name}` }), {
-    key: 'Enter',
-  });
+  fireEvent.keyDown(
+    await screen.findByRole('button', { name: `More for ${name}` }),
+    { key: 'Enter' }
+  );
   return screen.findByRole('menuitem', { name: 'Delete school year' });
 }
 
@@ -95,10 +108,17 @@ describe('CalendarPage', () => {
 
   it('lists each year newest first with its dates and its terms', async () => {
     setup();
-    const next = await cardOf('2027/2028');
-    expect(next.getByText('6 Sep 2027 – 28 Jul 2028')).toBeInTheDocument();
-    const now = await cardOf('2026/2027');
-    expect(now.getByText('7 Sep 2026 – 23 Jul 2027')).toBeInTheDocument();
+    expect(
+      await screen.findByRole('button', {
+        name: '2027/2028 6 Sep 2027 – 28 Jul 2028',
+      })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', {
+        name: '2026/2027 7 Sep 2026 – 23 Jul 2027',
+      })
+    ).toBeInTheDocument();
+    const now = within(await termsOf('2026/2027'));
     expect(now.getByText('Current')).toBeInTheDocument();
     expect(now.getAllByRole('row')).toHaveLength(4);
     expect(now.getByText('67')).toBeInTheDocument();
@@ -107,7 +127,7 @@ describe('CalendarPage', () => {
         selector: '[data-slot="card-title"]',
       })
       .map((title) => title.textContent);
-    expect(titles).toEqual(['2027/2028', '2026/2027']);
+    expect(titles).toEqual(YEARS_NEWEST_FIRST);
   });
 
   it('shows the header copy and the info tooltip', async () => {
@@ -129,8 +149,8 @@ describe('CalendarPage', () => {
 
   it('lists the holidays of a term in a tooltip', async () => {
     setup();
-    const now = await cardOf('2026/2027');
-    const count = now.getByRole('button', { name: '3 days' });
+    await yearToggle('2026/2027');
+    const count = screen.getByRole('button', { name: '3 days' });
     fireEvent.focus(count);
     expect(
       (
@@ -144,7 +164,7 @@ describe('CalendarPage', () => {
   describe('write controls', () => {
     it('shows every one to the owner', async () => {
       setup();
-      await cardOf('2026/2027');
+      await yearToggle('2026/2027');
       expect(
         screen.getByRole('button', { name: 'New school year' })
       ).toBeInTheDocument();
@@ -170,7 +190,7 @@ describe('CalendarPage', () => {
       ['an acting super admin with no reason', actingAccess(false)],
     ])('shows none to %s', async (_label, access) => {
       setup(access);
-      await cardOf('2026/2027');
+      await yearToggle('2026/2027');
       for (const name of WRITE_CONTROLS) {
         expect(screen.queryByRole('button', { name })).not.toBeInTheDocument();
       }
@@ -182,7 +202,7 @@ describe('CalendarPage', () => {
 
     it('leaves out the rest for someone who can only set the current term', async () => {
       setup(fakeAccess({ permissions: { session: ['read', 'setCurrent'] } }));
-      await cardOf('2026/2027');
+      await yearToggle('2026/2027');
       expect(
         screen.getAllByRole('button', { name: 'Make current' })
       ).toHaveLength(3);
@@ -200,7 +220,7 @@ describe('CalendarPage', () => {
     const ended = currentYear();
     ended.terms[0] = term({ ...ended.terms[0], ended: true });
     setup(undefined, { items: [ended] });
-    await cardOf('2026/2027');
+    await yearToggle('2026/2027');
     expect(
       screen.queryByRole('button', { name: 'Actions for First term' })
     ).not.toBeInTheDocument();
@@ -214,7 +234,7 @@ describe('CalendarPage', () => {
 
   it('offers Edit dates from a term row menu', async () => {
     setup();
-    const now = await cardOf('2026/2027');
+    const now = within(await termsOf('2026/2027'));
     fireEvent.keyDown(
       now.getByRole('button', { name: 'Actions for Second term' }),
       {
@@ -235,7 +255,7 @@ describe('CalendarPage', () => {
       setup();
       const item = await openMore('2026/2027');
       expect(item).toHaveAttribute('aria-disabled', 'true');
-      fireEvent.focus(item.parentElement!);
+      fireEvent.focus(item);
       expect(
         (await screen.findAllByText(NEXT_YEAR_STARTS)).length
       ).toBeGreaterThan(0);
@@ -258,14 +278,16 @@ describe('CalendarPage', () => {
   describe('Make current', () => {
     it('moves to another term of the current year at once', async () => {
       const { api } = setup();
-      const now = await cardOf('2026/2027');
-      const second = now.getByText('Second term').closest('tr')!;
+      const now = within(await termsOf('2026/2027'));
       fireEvent.click(
-        within(second).getByRole('button', { name: 'Make current' })
+        within(now.getByRole('row', { name: /Second term/ })).getByRole(
+          'button',
+          { name: 'Make current' }
+        )
       );
       await vi.waitFor(() => {
         expect(api.terms.makeCurrent).toHaveBeenCalledWith({
-          params: { id: 't2' },
+          params: { id: TERM_2 },
         });
       });
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
@@ -273,16 +295,18 @@ describe('CalendarPage', () => {
 
     it('opens the dialog for next year’s first term and warns about waiting students', async () => {
       const { api } = setup();
-      const next = await cardOf('2027/2028');
-      const first = next.getByText('First term').closest('tr')!;
+      const next = within(await termsOf('2027/2028'));
       expect(
-        within(next.getByText('Second term').closest('tr')!).queryByRole(
+        within(next.getByRole('row', { name: /Second term/ })).queryByRole(
           'button',
           { name: 'Make current' }
         )
       ).not.toBeInTheDocument();
       fireEvent.click(
-        within(first).getByRole('button', { name: 'Make current' })
+        within(next.getByRole('row', { name: /First term/ })).getByRole(
+          'button',
+          { name: 'Make current' }
+        )
       );
       const dialog = await screen.findByRole('dialog');
       expect(
@@ -298,10 +322,12 @@ describe('CalendarPage', () => {
 
     it('sends a holder of enrollment:place to the Start dialog from the waiting callout', async () => {
       const { api, onStartYear } = setup();
-      const next = await cardOf('2027/2028');
-      const first = next.getByText('First term').closest('tr')!;
+      const next = within(await termsOf('2027/2028'));
       fireEvent.click(
-        within(first).getByRole('button', { name: 'Make current' })
+        within(next.getByRole('row', { name: /First term/ })).getByRole(
+          'button',
+          { name: 'Make current' }
+        )
       );
       const dialog = await screen.findByRole('dialog');
       fireEvent.click(
@@ -314,12 +340,14 @@ describe('CalendarPage', () => {
 
   it('opens the Holidays dialog from the count and removes a holiday', async () => {
     const { api } = setup();
-    api.holidays.remove.mockResolvedValue({
-      id: 'h2',
-      term: term({ schoolDays: 68 }),
-    });
-    const now = await cardOf('2026/2027');
-    fireEvent.click(now.getByRole('button', { name: '3 days' }));
+    api.holidays.remove.mockImplementation(
+      ({ params }: { params: { id: string } }) => ({
+        id: params.id,
+        term: term({ schoolDays: 68 }),
+      })
+    );
+    await yearToggle('2026/2027');
+    fireEvent.click(screen.getByRole('button', { name: '3 days' }));
     const dialog = await screen.findByRole('dialog');
     expect(
       within(dialog).getByText('Holidays in First term, 2026/2027')
@@ -334,17 +362,23 @@ describe('CalendarPage', () => {
     );
     await vi.waitFor(() => {
       expect(api.holidays.remove).toHaveBeenCalledWith({
-        params: { id: 'h2' },
+        params: { id: HOLIDAY_2 },
       });
     });
   });
 
   it('preselects the current term in Add a holiday and lists only terms not yet ended', async () => {
     setup();
-    const now = await cardOf('2026/2027');
-    fireEvent.click(now.getByRole('button', { name: 'Add holiday' }));
+    await yearToggle('2026/2027');
+    fireEvent.click(
+      screen
+        .getAllByRole('button', { name: 'Add holiday' })
+        .at(YEARS_NEWEST_FIRST.indexOf('2026/2027'))!
+    );
     const dialog = await screen.findByRole('dialog');
-    expect(within(dialog).getByLabelText('Term')).toHaveValue('t1');
+    expect(within(dialog).getByLabelText('Term')).toHaveDisplayValue(
+      '2026/2027 · First term'
+    );
     expect(
       within(dialog)
         .getAllByRole('option')
@@ -397,7 +431,7 @@ describe('CalendarPage', () => {
       items: [currentYear()],
       total: 24,
     });
-    await cardOf('2026/2027');
+    await yearToggle('2026/2027');
     expect(
       await screen.findByText('Showing 1 to 10 of 24')
     ).toBeInTheDocument();
@@ -405,10 +439,10 @@ describe('CalendarPage', () => {
     expect(onPageChange).toHaveBeenCalledWith(3);
   });
 
-  it('shows a skeleton while loading and the error when the list fails', async () => {
+  it('shows a skeleton while loading, then asks for the first page', async () => {
     const { api } = setup();
     expect(screen.getByRole('status', { name: 'Loading' })).toBeInTheDocument();
-    await cardOf('2026/2027');
+    await yearToggle('2026/2027');
     expect(api.schoolYears.list).toHaveBeenCalledWith({ query: { page: 1 } });
   });
 
@@ -435,16 +469,22 @@ describe('CalendarPage', () => {
 
   it('collapses a year that is neither current nor next', async () => {
     const old = schoolYear({
-      id: 'y0',
+      id: OLD_YEAR,
       name: '2024/2025',
       startsOn: '2024-09-02',
       endsOn: '2025-07-25',
       deletable: { ok: false, reason: NEXT_YEAR_STARTS },
-      terms: [term({ id: 'o1', schoolYearId: 'y0', ended: true })],
+      terms: [term({ id: OLD_TERM, schoolYearId: OLD_YEAR, ended: true })],
     });
     setup(undefined, { items: [currentYear(), old] });
-    await cardOf('2026/2027');
-    const closed = await cardOf('2024/2025');
-    expect(closed.queryByRole('table')).not.toBeInTheDocument();
+    expect(await yearToggle('2026/2027')).toHaveAttribute(
+      'aria-expanded',
+      'true'
+    );
+    expect(await yearToggle('2024/2025')).toHaveAttribute(
+      'aria-expanded',
+      'false'
+    );
+    expect(screen.getAllByRole('table')).toHaveLength(1);
   });
 });

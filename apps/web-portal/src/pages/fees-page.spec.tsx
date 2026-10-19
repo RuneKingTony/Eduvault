@@ -2,17 +2,20 @@ import { useState } from 'react';
 import { fireEvent, screen, within } from '@testing-library/react';
 import type { Permission } from '@eduvault/policy';
 import {
+  ADA_ID,
+  TOBI_ID,
   calendarCurrent,
   portalChild,
   portalMe,
   portalStatement,
   renderWithApi,
+  testId,
 } from '../test-utils';
 import { FeesPage } from './fees-page';
 
 const HELD: Permission[] = ['student:readOwn', 'invoice:readOwn'];
-const ada = portalChild({ id: 'ada', firstName: 'Ada' });
-const tobi = portalChild({ id: 'tobi', firstName: 'Tobi' });
+const ada = portalChild({ id: ADA_ID, firstName: 'Ada' });
+const tobi = portalChild({ id: TOBI_ID, firstName: 'Tobi' });
 const guardian = portalMe({ children: [ada, tobi] });
 
 type Statement = ReturnType<typeof portalStatement>;
@@ -34,7 +37,7 @@ const withBalance = (balanceMinor: number) =>
     },
   });
 
-const renderFees = (api: ReturnType<typeof apiWith>, childId = 'ada') =>
+const renderFees = (api: ReturnType<typeof apiWith>, childId = ADA_ID) =>
   renderWithApi(
     <FeesPage
       me={guardian}
@@ -62,23 +65,16 @@ describe('FeesPage', () => {
 
   it('reads Owing, the amount and Still to pay when owing', async () => {
     renderFees(apiWith());
-    const stat = (await screen.findByText('Still to pay')).closest('div');
-    expect(stat).not.toBeNull();
-    expect(within(stat as HTMLElement).getByText('Owing')).toBeInTheDocument();
-    expect(
-      within(stat as HTMLElement).getByText('₦60,000')
-    ).toBeInTheDocument();
+    const stat = await screen.findByRole('group', { name: 'Owing' });
+    expect(within(stat).getByText('₦60,000')).toBeInTheDocument();
+    expect(within(stat).getByText('Still to pay')).toBeInTheDocument();
   });
 
   it('reads School fees, Paid up and the extra when in credit, with the callout and no refund button', async () => {
     renderFees(apiWith(withBalance(-500_000)));
-    const stat = (await screen.findByText('₦5,000 extra')).closest('div');
-    expect(
-      within(stat as HTMLElement).getByText('School fees')
-    ).toBeInTheDocument();
-    expect(
-      within(stat as HTMLElement).getByText('Paid up')
-    ).toBeInTheDocument();
+    const stat = await screen.findByRole('group', { name: 'School fees' });
+    expect(within(stat).getByText('Paid up')).toBeInTheDocument();
+    expect(within(stat).getByText('₦5,000 extra')).toBeInTheDocument();
     expect(
       screen.getByText(
         '₦5,000 was paid in extra. It is taken off the next fees automatically.'
@@ -89,24 +85,19 @@ describe('FeesPage', () => {
 
   it('reads Paid up and Nothing owed at zero', async () => {
     renderFees(apiWith(withBalance(0)));
-    const stat = (await screen.findByText('Nothing owed')).closest('div');
-    expect(
-      within(stat as HTMLElement).getByText('School fees')
-    ).toBeInTheDocument();
-    expect(
-      within(stat as HTMLElement).getByText('Paid up')
-    ).toBeInTheDocument();
+    const stat = await screen.findByRole('group', { name: 'School fees' });
+    expect(within(stat).getByText('Paid up')).toBeInTheDocument();
+    expect(within(stat).getByText('Nothing owed')).toBeInTheDocument();
   });
 
   it('shows plain rows with no reference note and no links', async () => {
-    const { container } = renderFees(apiWith());
+    renderFees(apiWith());
     expect(
       await screen.findByText('Term fees, First term')
     ).toBeInTheDocument();
     expect(
       screen.getByText('Payment RCT-0001 from Ngozi Okeke (Bank transfer)')
     ).toBeInTheDocument();
-    expect(container.querySelector('.font-mono')).toBeNull();
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
     expect(screen.getByText('CHG-0001 · ₦60,000')).toBeInTheDocument();
   });
@@ -133,13 +124,13 @@ describe('FeesPage', () => {
     renderFees(api);
     await screen.findByText('Showing 21 to 24 of 24');
     expect(api.portal.statement).toHaveBeenCalledWith({
-      params: { studentId: 'ada' },
+      params: { studentId: ADA_ID },
       query: {},
     });
     fireEvent.click(screen.getByRole('button', { name: 'Previous' }));
     await screen.findByRole('heading', { name: 'Fees' });
     expect(api.portal.statement).toHaveBeenCalledWith({
-      params: { studentId: 'ada' },
+      params: { studentId: ADA_ID },
       query: { page: 2 },
     });
   });
@@ -151,19 +142,19 @@ describe('FeesPage', () => {
           student: {
             ...portalStatement().student,
             id: params.studentId,
-            name: params.studentId === 'tobi' ? 'Tobi Okeke' : 'Ada Okeke',
+            name: params.studentId === TOBI_ID ? 'Tobi Okeke' : 'Ada Okeke',
           },
         })
       )
     );
     function Switching() {
-      const [childId, setChildId] = useState('ada');
+      const [childId, setChildId] = useState(ADA_ID);
       return (
         <>
           <button
             type="button"
             onClick={() => {
-              setChildId('tobi');
+              setChildId(TOBI_ID);
             }}
           >
             Switch to Tobi
@@ -190,7 +181,7 @@ describe('FeesPage', () => {
       await screen.findByText('Tobi Okeke · First term 2026/2027')
     ).toBeInTheDocument();
     expect(statement).toHaveBeenCalledWith({
-      params: { studentId: 'tobi' },
+      params: { studentId: TOBI_ID },
       query: {},
     });
     expect(screen.getByRole('heading', { name: 'Fees' })).toBeInTheDocument();
@@ -214,7 +205,7 @@ describe('FeesPage', () => {
     renderWithApi(
       <FeesPage
         me={guardian}
-        childId="ada"
+        childId={ADA_ID}
         term={undefined}
         onTerm={vi.fn()}
       />,
@@ -233,15 +224,17 @@ describe('FeesPage', () => {
 });
 
 describe('FeesPage term filter', () => {
+  const TERM_1 = testId(101);
+  const TERM_2 = testId(102);
   const OPTIONS = [
-    { id: 'term-2', label: 'Second term, 2026/2027' },
-    { id: 'term-1', label: 'First term, 2026/2027' },
+    { id: TERM_2, label: 'Second term, 2026/2027' },
+    { id: TERM_1, label: 'First term, 2026/2027' },
   ];
   const filtered = (toOn: string | null) =>
     portalStatement({
       termOptions: OPTIONS,
       term: {
-        id: 'term-1',
+        id: TERM_1,
         label: 'First term, 2026/2027',
         fromOn: '2026-09-07',
         toOn,
@@ -254,7 +247,7 @@ describe('FeesPage term filter', () => {
     renderWithApi(
       <FeesPage
         me={guardian}
-        childId="ada"
+        childId={ADA_ID}
         term={undefined}
         onTerm={vi.fn()}
       />,
@@ -265,7 +258,9 @@ describe('FeesPage term filter', () => {
     const select = await screen.findByRole('combobox', { name: 'Term' });
 
     expect(
-      [...select.querySelectorAll('option')].map((option) => option.textContent)
+      within(select)
+        .getAllByRole('option')
+        .map((option) => option.textContent)
     ).toEqual([
       'Whole history',
       'Second term, 2026/2027',
@@ -278,28 +273,36 @@ describe('FeesPage term filter', () => {
   it('asks for the chosen term and shows Brought forward first with the term-end footer', async () => {
     const api = apiWith(filtered('2026-12-18'));
     renderWithApi(
-      <FeesPage me={guardian} childId="ada" term="term-1" onTerm={vi.fn()} />,
+      <FeesPage
+        me={guardian}
+        childId={ADA_ID}
+        term={TERM_1}
+        onTerm={vi.fn()}
+      />,
       api,
       HELD
     );
 
-    const row = (await screen.findByText('Brought forward')).closest('tr');
+    const row = await screen.findByRole('row', { name: /Brought forward/ });
 
     expect(row).toBe(screen.getAllByRole('row')[1]);
-    expect(within(row as HTMLElement).getByText('₦15,000')).toBeInTheDocument();
+    expect(within(row).getByText('₦15,000')).toBeInTheDocument();
     expect(screen.getByText('Owing at end of term')).toBeInTheDocument();
-    expect(screen.getByRole('combobox', { name: 'Term' })).toHaveValue(
-      'term-1'
-    );
+    expect(screen.getByRole('combobox', { name: 'Term' })).toHaveValue(TERM_1);
     expect(api.portal.statement).toHaveBeenCalledWith({
-      params: { studentId: 'ada' },
-      query: { termId: 'term-1' },
+      params: { studentId: ADA_ID },
+      query: { termId: TERM_1 },
     });
   });
 
   it('keeps the usual footer for the latest term', async () => {
     renderWithApi(
-      <FeesPage me={guardian} childId="ada" term="term-1" onTerm={vi.fn()} />,
+      <FeesPage
+        me={guardian}
+        childId={ADA_ID}
+        term={TERM_1}
+        onTerm={vi.fn()}
+      />,
       apiWith(filtered(null)),
       HELD
     );
@@ -310,14 +313,14 @@ describe('FeesPage term filter', () => {
   it('reports the picked term and the whole history', async () => {
     const onTerm = vi.fn();
     renderWithApi(
-      <FeesPage me={guardian} childId="ada" term="term-1" onTerm={onTerm} />,
+      <FeesPage me={guardian} childId={ADA_ID} term={TERM_1} onTerm={onTerm} />,
       apiWith(filtered(null)),
       HELD
     );
     const select = await screen.findByRole('combobox', { name: 'Term' });
 
-    fireEvent.change(select, { target: { value: 'term-2' } });
-    expect(onTerm).toHaveBeenLastCalledWith('term-2');
+    fireEvent.change(select, { target: { value: TERM_2 } });
+    expect(onTerm).toHaveBeenLastCalledWith(TERM_2);
     fireEvent.change(select, { target: { value: '' } });
     expect(onTerm).toHaveBeenLastCalledWith(undefined);
   });

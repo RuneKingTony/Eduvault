@@ -89,7 +89,7 @@ describe('GuardianService.link a new guardian', () => {
       email: 'ngozi@example.com',
       existing: false,
     });
-    expect(result.login?.temporaryPassword).toBeDefined();
+    expect(result.login?.temporaryPassword).toEqual(expect.any(String));
     const [user] = [...tx.users.values()];
     expect(user?.passwordHash).toBe(`hash:${result.login?.temporaryPassword}`);
     expect(tx.rolesOf(ORG, user?.id ?? '')).toEqual(['guardian']);
@@ -401,7 +401,7 @@ describe('GuardianService payers and removal', () => {
         studentId: 'ada',
         guardianId: only.link.guardianId,
       })
-    ).resolves.toBeDefined();
+    ).resolves.toEqual({ studentId: 'ada', guardianId: only.link.guardianId });
   });
 });
 

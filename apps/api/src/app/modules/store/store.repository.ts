@@ -6,6 +6,7 @@ import type {
   Item,
   ItemKind,
 } from '@eduvault/api-contract';
+import type { ActivityInput } from '../../common/activity';
 import type { CampusScope } from '../../common/campus-scope';
 import type { UsableMoneyAccount } from '../../common/money-accounts';
 
@@ -89,6 +90,12 @@ export interface NewDelivery {
   lines: DeliveryLineInput[];
 }
 
+export type DeliveryActivity = (delivery: {
+  id: string;
+  number: string;
+  totalMinor: number;
+}) => ActivityInput[];
+
 export type DeliveryOutcome =
   | { status: 'recorded'; id: string }
   | { status: 'replayed'; id: string }
@@ -153,7 +160,12 @@ export abstract class StoreRepository {
     storeId: string
   ): Promise<boolean>;
 
-  abstract insertDelivery(input: NewDelivery): Promise<DeliveryOutcome>;
+  abstract currency(organizationId: string): Promise<string>;
+
+  abstract insertDelivery(
+    input: NewDelivery,
+    activity: DeliveryActivity
+  ): Promise<DeliveryOutcome>;
 
   abstract listDeliveries(
     scope: StoreScope,

@@ -18,6 +18,7 @@ import {
   type RouteQuery,
   type contract,
 } from '@eduvault/api-contract';
+import { termKeyOf } from '@eduvault/shared';
 import type { ActingState } from './acting-store';
 import type { Api } from './api';
 import type { MembersSearch } from './members-search';
@@ -664,6 +665,20 @@ export const feeOptionsQueryOptions = (api: Api, studentId: string) =>
     queryFn: () => api.feeOptions.list({ params: { studentId }, query: {} }),
   });
 
+export const feeOptInsQueryOptions = (
+  api: Api,
+  query: { feeTypeId: string; termId: string; q: string }
+) =>
+  queryOptions({
+    queryKey: [...FEES_KEY, 'opt-ins', query.feeTypeId, query.termId, query.q],
+    queryFn: () =>
+      api.feeOptIns.list({
+        params: { feeTypeId: query.feeTypeId },
+        query: { termId: query.termId, q: query.q },
+      }),
+    placeholderData: keepPreviousData,
+  });
+
 export async function invalidateFees(queryClient: QueryClient): Promise<void> {
   await queryClient.invalidateQueries({ queryKey: FEES_KEY });
 }
@@ -831,7 +846,7 @@ export const statementQueryOptions = (
       ...STATEMENTS_KEY,
       'student',
       studentId,
-      termId ?? 'all',
+      termKeyOf(termId),
       page ?? 'last',
     ],
     queryFn: () =>
@@ -842,17 +857,27 @@ export const statementQueryOptions = (
     placeholderData: keepPreviousData,
   });
 
-export const familyStatementQueryOptions = (api: Api, guardianId: string) =>
+export const familyStatementQueryOptions = (
+  api: Api,
+  guardianId: string,
+  { termId }: { termId?: string } = {}
+) =>
   queryOptions({
-    queryKey: [...STATEMENTS_KEY, 'family', guardianId],
+    queryKey: [...STATEMENTS_KEY, 'family', guardianId, termKeyOf(termId)],
     queryFn: () =>
-      api.studentAccounts.guardianStatement({ params: { guardianId } }),
+      api.studentAccounts.guardianStatement({
+        params: { guardianId },
+        query: { termId },
+      }),
+    meta: { guardianId },
+    placeholderData: (previous, previousQuery) =>
+      previousQuery?.meta?.['guardianId'] === guardianId ? previous : undefined,
   });
 
 const APPROVALS_KEY = ['approvals'] as const;
 const ADJUSTMENTS_KEY = ['adjustments'] as const;
 
-export const APPROVALS_REFRESH_MS = 60_000;
+const APPROVALS_REFRESH_MS = 60_000;
 
 interface ApprovalsView {
   includeOthers: boolean;

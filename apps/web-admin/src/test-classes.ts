@@ -4,20 +4,18 @@ import type {
   ClassSummary,
   ClassTeacher,
 } from '@eduvault/api-contract';
-
-export const uuid = (n: number): string =>
-  `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+import { testId } from './test-api';
 
 export const IDS = {
-  p1: uuid(1),
-  jss1: uuid(2),
-  ss3: uuid(3),
-  lekki: uuid(10),
-  ikeja: uuid(11),
-  gold: uuid(20),
-  silver: uuid(21),
-  ayo: uuid(30),
-  claire: uuid(31),
+  p1: testId(0xb0_01),
+  jss1: testId(0xb0_02),
+  ss3: testId(0xb0_03),
+  lekki: testId(0xb0_0a),
+  ikeja: testId(0xb0_0b),
+  gold: testId(0xb0_14),
+  silver: testId(0xb0_15),
+  ayo: testId(0xb0_1e),
+  claire: testId(0xb0_1f),
 } as const;
 
 export const classLevel = (

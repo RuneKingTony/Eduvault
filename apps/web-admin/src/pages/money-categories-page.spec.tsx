@@ -109,32 +109,23 @@ describe('MoneyCategoriesPage chart', () => {
     expect(
       await screen.findByText('Fees owed to the school')
     ).toBeInTheDocument();
-    const row = screen.getByText('Fees owed to the school').closest('tr');
-    expect(row).not.toBeNull();
-    expect(within(row as HTMLElement).getByText('1100')).toBeInTheDocument();
-    expect(
-      within(row as HTMLElement).getByText('Money held')
-    ).toBeInTheDocument();
-    expect(within(row as HTMLElement).getByText('₦27,000')).toBeInTheDocument();
-    const discounts = screen.getByText('Discounts given').closest('tr');
-    expect(
-      within(discounts as HTMLElement).getByText('Cost')
-    ).toBeInTheDocument();
-    expect(
-      within(discounts as HTMLElement).getByText('−₦1,500')
-    ).toBeInTheDocument();
+    const row = screen.getByRole('row', { name: /Fees owed to the school/ });
+    expect(within(row).getByText('1100')).toBeInTheDocument();
+    expect(within(row).getByText('Money held')).toBeInTheDocument();
+    expect(within(row).getByText('₦27,000')).toBeInTheDocument();
+    const discounts = screen.getByRole('row', { name: /Discounts given/ });
+    expect(within(discounts).getByText('Cost')).toBeInTheDocument();
+    expect(within(discounts).getByText('−₦1,500')).toBeInTheDocument();
   });
 
   it('indents a child under its parent and locks only the built-in rows', async () => {
     setup();
-    const tuition = (await screen.findByText('Tuition')).closest(
-      'tr'
-    ) as HTMLElement;
+    const tuition = await screen.findByRole('row', { name: /Tuition/ });
     expect(within(tuition).getByText('└')).toBeInTheDocument();
     expect(
       within(tuition).queryByRole('button', { name: 'Built in' })
     ).not.toBeInTheDocument();
-    const fees = screen.getByText('Fee income').closest('tr') as HTMLElement;
+    const fees = screen.getByRole('row', { name: /Fee income/ });
     expect(
       within(fees).getByRole('button', { name: 'Built in' })
     ).toBeInTheDocument();

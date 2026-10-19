@@ -8,13 +8,18 @@ import type {
   PaymentVoidList,
   StudentDiscount,
   StudentDiscountList,
+  TermChoice,
 } from '@eduvault/api-contract';
+import { approvedLeave, declinedLeave } from './test-leave';
+import { stockCount } from './test-store';
 
 const id = (n: number) =>
   `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 
+export const approvalIdAt = (n: number) => id(1000 + n);
+
 export const VOID_ID = id(701);
-export const ADJUSTMENT_ID = id(702);
+const ADJUSTMENT_ID = id(702);
 export const DISCOUNT_ID = id(703);
 export const COUNT_APPROVAL_ID = id(704);
 export const BOLA = id(711);
@@ -90,20 +95,13 @@ export const approvalList = (
 
 export const approvalSummary = (
   over: Partial<ApprovalSummary> = {}
-): ApprovalSummary => {
-  const preview = [voidApproval(), approvalItem()];
-  return {
-    currency: 'NGN',
-    waitingForMe: preview.length,
-    byNav: {
-      approvals: preview.length,
-      payments: preview.length,
-      store: 0,
-    },
-    preview,
-    ...over,
-  };
-};
+): ApprovalSummary => ({
+  currency: 'NGN',
+  waitingForMe: 7,
+  byNav: { approvals: 3, payments: 4, store: 0 },
+  preview: [voidApproval(), approvalItem()],
+  ...over,
+});
 
 export const adjustmentRow = (over: Partial<Adjustment> = {}): Adjustment => ({
   id: ADJUSTMENT_ID,
@@ -136,7 +134,9 @@ export const adjustmentList = (
   over: Partial<AdjustmentList> = {}
 ): AdjustmentList => ({ ...listOf(items), ...over });
 
-const voidRow = (over: Partial<PaymentVoidItem> = {}): PaymentVoidItem => ({
+export const voidRow = (
+  over: Partial<PaymentVoidItem> = {}
+): PaymentVoidItem => ({
   id: VOID_ID,
   status: 'submitted',
   reason: 'Keyed the wrong child',
@@ -158,6 +158,52 @@ export const voidList = (
   over: Partial<PaymentVoidList> = {}
 ): PaymentVoidList => ({ ...listOf(items), ...over });
 
+export const TERM_1 = id(741);
+export const TERM_2 = id(742);
+export const TERM_3 = id(743);
+const TERM_4 = id(744);
+const TERM_5 = id(745);
+const TERM_6 = id(746);
+
+export const termChoices = (): TermChoice[] => [
+  {
+    id: TERM_1,
+    label: 'First term, 2026/2027',
+    startsOn: '2026-09-07',
+    isCurrent: true,
+  },
+  {
+    id: TERM_2,
+    label: 'Second term, 2026/2027',
+    startsOn: '2027-01-04',
+    isCurrent: false,
+  },
+  {
+    id: TERM_3,
+    label: 'Third term, 2026/2027',
+    startsOn: '2027-04-19',
+    isCurrent: false,
+  },
+  {
+    id: TERM_4,
+    label: 'First term, 2027/2028',
+    startsOn: '2027-09-06',
+    isCurrent: false,
+  },
+  {
+    id: TERM_5,
+    label: 'Second term, 2027/2028',
+    startsOn: '2028-01-03',
+    isCurrent: false,
+  },
+  {
+    id: TERM_6,
+    label: 'Third term, 2027/2028',
+    startsOn: '2028-04-24',
+    isCurrent: false,
+  },
+];
+
 export const discountRow = (
   over: Partial<StudentDiscount> = {}
 ): StudentDiscount => ({
@@ -167,8 +213,8 @@ export const discountRow = (
   value: 50,
   feeType: { id: id(721), name: 'Tuition' },
   reason: 'Academic scholarship',
-  fromTerm: { id: id(731), name: 'Second term, 2026/2027' },
-  toTerm: { id: id(732), name: 'Third term, 2026/2027' },
+  fromTerm: { id: TERM_2, name: 'Second term, 2026/2027' },
+  toTerm: { id: TERM_3, name: 'Third term, 2026/2027' },
   status: 'submitted',
   createdBy: 'Chika Eze',
   createdAt: '2026-10-14T08:00:00.000Z',
@@ -196,3 +242,26 @@ export const storeWriteOffApproval = (
     campusId: id(901),
     ...over,
   });
+
+export const decisionApi = () => ({
+  paymentVoids: {
+    approve: vi.fn().mockResolvedValue(voidRow({ status: 'approved' })),
+    decline: vi.fn().mockResolvedValue(voidRow({ status: 'rejected' })),
+  },
+  adjustments: {
+    approve: vi.fn().mockResolvedValue(adjustmentRow({ status: 'approved' })),
+    decline: vi.fn().mockResolvedValue(adjustmentRow({ status: 'rejected' })),
+  },
+  studentDiscounts: {
+    approve: vi.fn().mockResolvedValue(discountRow({ status: 'approved' })),
+    decline: vi.fn().mockResolvedValue(discountRow({ status: 'rejected' })),
+  },
+  leave: {
+    approve: vi.fn().mockResolvedValue(approvedLeave()),
+    decline: vi.fn().mockResolvedValue(declinedLeave()),
+  },
+  stockCounts: {
+    approve: vi.fn().mockResolvedValue(stockCount({ status: 'approved' })),
+    decline: vi.fn().mockResolvedValue(stockCount({ status: 'rejected' })),
+  },
+});

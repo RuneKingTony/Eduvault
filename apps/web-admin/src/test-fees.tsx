@@ -9,12 +9,15 @@ import {
 } from '@tanstack/react-router';
 import { render } from '@testing-library/react';
 import type {
+  Campus,
+  CreateFeeLineInput,
   FeeCopySource,
   FeeGrid,
   FeeGridCell,
   FeeGridRow,
   FeeLine,
   FeeCandidates,
+  FeeOptIns,
   FeePreview,
   FeeSetup,
   FeeType,
@@ -23,6 +26,7 @@ import type {
 import { PermissionsProvider } from '@eduvault/auth-client';
 import { TooltipProvider } from '@eduvault/ui';
 import { ApiProvider, type Api } from './api';
+import { checked } from './test-api';
 import { parseFeesSearch } from './fees-search';
 import { IKEJA, LEKKI, campus } from './test-announcements';
 import { ownerAccess } from './test-utils';
@@ -34,6 +38,15 @@ export const TERM_1 = uuid(0x1_01);
 export const TERM_2 = uuid(0x1_02);
 export const JSS1 = uuid(0x2_01);
 export const JSS2 = uuid(0x2_02);
+export const JSS3 = uuid(0x2_03);
+export const FEE_LINE = uuid(0x4_01);
+export const FEE_LINE_LEKKI = uuid(0x4_02);
+export const FEE_LINE_RETIRED = uuid(0x4_03);
+export const FEE_LINE_BUS = uuid(0x4_04);
+export const FEE_LINE_PTA = uuid(0x4_05);
+export const ADA = uuid(0x5_01);
+export const CHIDI = uuid(0x5_02);
+const NEW_FEE_TYPE = uuid(0x3_09);
 
 export const TUITION: FeeType = {
   id: uuid(0x3_01),
@@ -82,7 +95,7 @@ export const copySource = (
 });
 
 export const feeLine = (overrides: Partial<FeeLine> = {}): FeeLine => ({
-  id: 'fl-1',
+  id: FEE_LINE,
   termId: TERM_1,
   classLevelId: JSS2,
   levelName: 'JSS 2',
@@ -106,7 +119,7 @@ export const gridCell = (
 ): FeeGridCell => ({
   feeTypeId: TUITION.id,
   base: {
-    feeLineId: 'fl-1',
+    feeLineId: FEE_LINE,
     amountMinor: 18_000_000,
     appliesTo: 'all',
     isOptional: false,
@@ -132,13 +145,13 @@ export const feeGrid = (overrides: Partial<FeeGrid> = {}): FeeGrid => ({
 const candidates = (overrides: Partial<FeeCandidates> = {}): FeeCandidates => ({
   items: [
     {
-      id: 'st-1',
+      id: ADA,
       name: 'Ada Okeke',
       admissionNumber: 'GF-0123',
       levelName: 'JSS 2',
     },
     {
-      id: 'st-2',
+      id: CHIDI,
       name: 'Chidi Eze',
       admissionNumber: 'GF-0124',
       levelName: 'JSS 2',
@@ -151,7 +164,7 @@ const candidates = (overrides: Partial<FeeCandidates> = {}): FeeCandidates => ({
 export const preview = (overrides: Partial<FeePreview> = {}): FeePreview => ({
   currency: 'NGN',
   student: {
-    id: 'st-1',
+    id: ADA,
     name: 'Ada Okeke',
     armName: 'JSS 2 Gold',
     levelName: 'JSS 2',
@@ -162,7 +175,7 @@ export const preview = (overrides: Partial<FeePreview> = {}): FeePreview => ({
   charged: null,
   lines: [
     {
-      feeLineId: 'fl-1',
+      feeLineId: FEE_LINE,
       description: 'Tuition',
       feeTypeName: 'Tuition',
       amountMinor: 18_000_000,
@@ -170,7 +183,7 @@ export const preview = (overrides: Partial<FeePreview> = {}): FeePreview => ({
       campusName: null,
     },
     {
-      feeLineId: 'fl-2',
+      feeLineId: FEE_LINE_BUS,
       description: 'School bus',
       feeTypeName: 'School bus',
       amountMinor: 4_500_000,
@@ -183,30 +196,127 @@ export const preview = (overrides: Partial<FeePreview> = {}): FeePreview => ({
   ...overrides,
 });
 
+export const optInRoster = (overrides: Partial<FeeOptIns> = {}): FeeOptIns => ({
+  schoolYearName: '2026/2027',
+  items: [
+    {
+      studentId: ADA,
+      name: 'Ada Okeke',
+      admissionNumber: 'GF-0123',
+      levelName: 'JSS 2',
+      campusName: 'Lekki',
+      optedIn: true,
+    },
+    {
+      studentId: CHIDI,
+      name: 'Chidi Eze',
+      admissionNumber: 'GF-0124',
+      levelName: 'JSS 2',
+      campusName: 'Ikeja',
+      optedIn: false,
+    },
+  ],
+  total: 2,
+  ...overrides,
+});
+
 interface FeesApiOptions {
   lines?: FeeLine[];
+  optIns?: FeeOptIns;
   grid?: FeeGrid;
   types?: FeeType[];
   preview?: FeePreview;
   copySource?: FeeCopySource;
+  campuses?: Campus[];
 }
 
-const pickerApi = () => ({
-  campuses: {
-    list: vi
-      .fn()
-      .mockResolvedValue([campus(LEKKI, 'Lekki'), campus(IKEJA, 'Ikeja')]),
-  },
+const pickerApi = (campuses: Campus[]) => ({
+  campuses: { list: vi.fn().mockResolvedValue(campuses) },
   feeOptions: {
     list: vi.fn().mockResolvedValue([]),
-    set: vi.fn().mockResolvedValue({ feeTypeId: BUS.id, optedIn: true }),
+    set: vi
+      .fn()
+      .mockImplementation(
+        ({
+          params,
+          body,
+        }: {
+          params: { feeTypeId: string };
+          body: { optedIn: boolean };
+        }) =>
+          Promise.resolve({
+            feeTypeId: params.feeTypeId,
+            optedIn: body.optedIn,
+          })
+      ),
   },
+});
+
+const optInWrites = (roster: FeeOptIns) => ({
+  list: vi.fn().mockResolvedValue(roster),
+  set: vi
+    .fn()
+    .mockImplementation(
+      ({
+        params,
+        body,
+      }: {
+        params: { feeTypeId: string };
+        body: { studentIds: string[]; optedIn: boolean };
+      }) =>
+        Promise.resolve({
+          feeTypeId: params.feeTypeId,
+          optedIn: body.optedIn,
+          changed: body.studentIds.length,
+          unchanged: 0,
+        })
+    ),
+});
+
+const feeLineWrites = () => ({
+  create: vi.fn().mockImplementation(({ body }: { body: CreateFeeLineInput }) =>
+    Promise.resolve(
+      feeLine({
+        termId: body.termId,
+        classLevelId: body.classLevelId,
+        feeTypeId: body.feeTypeId,
+        campusId: body.campusId,
+        name: body.name,
+        amountMinor: body.amountMinor,
+        appliesTo: body.appliesTo ?? 'all',
+        isOptional: body.isOptional ?? false,
+      })
+    )
+  ),
+  update: vi
+    .fn()
+    .mockImplementation(
+      ({
+        params,
+        body,
+      }: {
+        params: { id: string };
+        body: { amountMinor: number };
+      }) =>
+        Promise.resolve(
+          feeLine({ id: params.id, amountMinor: body.amountMinor })
+        )
+    ),
+  retire: vi
+    .fn()
+    .mockImplementation(({ params }: { params: { id: string } }) =>
+      Promise.resolve(
+        feeLine({ id: params.id, retiredAt: '2026-10-05T09:00:00.000Z' })
+      )
+    ),
 });
 
 export function feesApi(options: FeesApiOptions = {}) {
   const lines = options.lines ?? [feeLine()];
   return {
-    ...pickerApi(),
+    ...pickerApi(
+      options.campuses ?? [campus(LEKKI, 'Lekki'), campus(IKEJA, 'Ikeja')]
+    ),
     feeLines: {
       setup: vi.fn().mockResolvedValue(feeSetup()),
       list: vi.fn().mockResolvedValue(lines),
@@ -218,17 +328,16 @@ export function feesApi(options: FeesApiOptions = {}) {
         copied: 12,
         sourceTerm: copySource().sourceTerm,
       }),
-      create: vi.fn().mockResolvedValue(feeLine({ name: 'Excursion' })),
-      update: vi.fn().mockResolvedValue(feeLine({ amountMinor: 20_000_000 })),
-      retire: vi
-        .fn()
-        .mockResolvedValue(feeLine({ retiredAt: '2026-10-05T09:00:00.000Z' })),
+      ...feeLineWrites(),
     },
+    feeOptIns: optInWrites(options.optIns ?? optInRoster()),
     feeTypes: {
       list: vi.fn().mockResolvedValue(options.types ?? [TUITION, PTA, BUS]),
       create: vi
         .fn()
-        .mockResolvedValue({ id: 'ft-new', code: 4090, name: 'Sports levy' }),
+        .mockImplementation(({ body }: { body: { name: string } }) =>
+          Promise.resolve({ id: NEW_FEE_TYPE, code: 4090, name: body.name })
+        ),
     },
   };
 }
@@ -244,7 +353,7 @@ export function renderFees(
   const root = createRootRoute({
     component: () => (
       <QueryClientProvider client={queryClient}>
-        <ApiProvider api={api as unknown as Api}>
+        <ApiProvider api={checked(api)}>
           <PermissionsProvider value={access}>
             <TooltipProvider>{page}</TooltipProvider>
           </PermissionsProvider>

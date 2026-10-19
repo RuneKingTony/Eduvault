@@ -1,18 +1,28 @@
 import { fireEvent, screen, within } from '@testing-library/react';
 import { actingAccess, renderWithApi, starterAccess } from '../test-utils';
-import { CATALOGUE, IKEJA, LEKKI, summary } from '../test-members';
+import {
+  CATALOGUE,
+  EMEKA_ID,
+  FUNMI_ID,
+  IKEJA,
+  KEMI_ID,
+  LEKKI,
+  TUNDE_ID,
+  signedIn,
+  summary,
+} from '../test-members';
 import { MembersPage } from './members-page';
 
 const items = [
-  summary({ id: 'm1', name: 'Funmi Adeyemi', roles: ['member', 'owner'] }),
+  summary({ id: FUNMI_ID, name: 'Funmi Adeyemi', roles: ['member', 'owner'] }),
   summary({
-    id: 'm2',
+    id: TUNDE_ID,
     name: 'Tunde Bakare',
     title: 'Teacher',
     roles: ['member', 'teacher', 'front-desk'],
     campusIds: [LEKKI.id, IKEJA.id],
   }),
-  summary({ id: 'm3', name: 'Kemi Lawson', roles: ['member'] }),
+  summary({ id: KEMI_ID, name: 'Kemi Lawson', roles: ['member'] }),
 ];
 
 function setup(
@@ -27,7 +37,7 @@ function setup(
   const api = {
     members,
     campuses: { list: vi.fn().mockResolvedValue([LEKKI, IKEJA]) },
-    me: { get: vi.fn().mockResolvedValue({ activeCampusId: null }) },
+    me: { get: vi.fn().mockResolvedValue(signedIn()) },
   };
   const handlers = {
     onSearchChange: vi.fn(),
@@ -67,13 +77,13 @@ describe('MembersPage', () => {
 
   it('marks a member on leave today with an On leave badge', async () => {
     setup({}, undefined, [
-      summary({ id: 'm1', name: 'Funmi Adeyemi' }),
-      summary({ id: 'm2', name: 'Emeka Obi', onLeave: true }),
+      summary({ id: FUNMI_ID, name: 'Funmi Adeyemi' }),
+      summary({ id: EMEKA_ID, name: 'Emeka Obi', onLeave: true }),
     ]);
-    const away = (await screen.findByText('Emeka Obi')).closest('tr');
-    expect(within(away as HTMLElement).getByText('On leave')).toBeVisible();
-    const present = screen.getByText('Funmi Adeyemi').closest('tr');
-    expect(within(present as HTMLElement).queryByText('On leave')).toBeNull();
+    const away = await screen.findByRole('row', { name: /Emeka Obi/ });
+    expect(within(away).getByText('On leave')).toBeVisible();
+    const present = screen.getByRole('row', { name: /Funmi Adeyemi/ });
+    expect(within(present).queryByText('On leave')).toBeNull();
   });
 
   it('passes search, role and page through to the list request', async () => {
@@ -100,7 +110,7 @@ describe('MembersPage', () => {
   it('opens a member from the row', async () => {
     const { onOpenMember } = setup();
     fireEvent.click(await screen.findByText('Tunde Bakare'));
-    expect(onOpenMember).toHaveBeenCalledWith('m2');
+    expect(onOpenMember).toHaveBeenCalledWith(TUNDE_ID);
   });
 
   it('says so when no one matches', async () => {

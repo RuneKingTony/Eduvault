@@ -2,10 +2,13 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import {
   ApiError,
   type ClassDetail,
+  type GraduateClassInput,
   type MePermissions,
+  type UpdateClassInput,
 } from '@eduvault/api-contract';
 import { toast } from '@eduvault/ui';
 import { currentCalendar, noCalendar } from '../test-calendar';
+import { testId } from '../test-api';
 import { IDS, classDetail, teacher } from '../test-classes';
 import { actingAccess, renderWithApi, starterAccess } from '../test-utils';
 import { ClassPage } from './class-page';
@@ -17,6 +20,12 @@ vi.mock('@eduvault/ui', async (importOriginal) => ({
 
 type Access = MePermissions;
 
+const ADA_OBI = testId(0x2_10_01);
+const BOLA_ADE = testId(0x2_10_02);
+const ZAINAB_BELLO = testId(0x2_10_03);
+const ADA_ADAMS = testId(0x2_10_04);
+const TOBI_BELLO = testId(0x2_10_05);
+
 const GOLD = classDetail({
   displayName: 'JSS 2 Gold',
   name: 'Gold',
@@ -24,13 +33,13 @@ const GOLD = classDetail({
   classTeachers: [teacher('Ayo Bassey'), teacher('Claire Ade', 'assistant')],
   roster: [
     {
-      studentId: IDS.p1,
+      studentId: ADA_OBI,
       name: 'Ada Obi',
       admissionNumber: 'GF-0123',
       electives: ['French', 'Music'],
     },
     {
-      studentId: IDS.jss1,
+      studentId: BOLA_ADE,
       name: 'Bola Ade',
       admissionNumber: 'GF-0124',
       electives: [],
@@ -45,6 +54,13 @@ interface Options {
   calendar?: ReturnType<typeof currentCalendar> | 'pending';
 }
 
+const retiredAfter = (row: ClassDetail, body: UpdateClassInput) => {
+  if (body.archived === undefined) {
+    return row.retiredAt;
+  }
+  return body.archived ? '2026-07-24T09:00:00.000Z' : null;
+};
+
 function setup({
   access = starterAccess('administrator'),
   row = GOLD,
@@ -53,12 +69,18 @@ function setup({
 }: Options = {}) {
   const api = {
     classes: {
-      graduate: vi.fn().mockResolvedValue({ graduated: 2 }),
+      graduate: vi.fn(({ body }: { body: GraduateClassInput }) => ({
+        graduated: body.studentIds.length,
+      })),
       get:
         failure === undefined
           ? vi.fn().mockResolvedValue(row)
           : vi.fn().mockRejectedValue(failure),
-      update: vi.fn().mockResolvedValue(row),
+      update: vi.fn(({ body }: { body: UpdateClassInput }) => ({
+        ...row,
+        name: body.name ?? row.name,
+        retiredAt: retiredAfter(row, body),
+      })),
       removeTeacher: vi
         .fn()
         .mockResolvedValue({ classId: IDS.gold, userId: IDS.ayo }),
@@ -94,11 +116,33 @@ const openMenu = async () => {
   );
 };
 
-const card = async (title: string) => {
-  const heading = await screen.findByText(title, {
-    selector: '[data-slot="card-title"]',
-  });
-  return within(heading.closest<HTMLElement>('[data-slot="card"]')!);
+const cardTitle = (title: string) =>
+  screen.findByText(title, { selector: '[data-slot="card-title"]' });
+
+const teacherList = async () => {
+  await screen.findByText('Ayo Bassey', { selector: 'span' });
+  const list = screen
+    .getAllByRole('list')
+    .find((candidate) => within(candidate).queryByText('Ayo Bassey') !== null);
+  if (list === undefined) {
+    throw new Error('no class teacher list');
+  }
+  return list;
+};
+
+const rosterTable = async () => {
+  await screen.findByRole('columnheader', { name: 'Adm. no.' });
+  const table = screen
+    .getAllByRole('table')
+    .find(
+      (candidate) =>
+        within(candidate).queryByRole('columnheader', { name: 'Adm. no.' }) !==
+        null
+    );
+  if (table === undefined) {
+    throw new Error('no roster table');
+  }
+  return table;
 };
 
 const TERM_NAMES = ['First term', 'Second term', 'Third term'];
@@ -161,8 +205,8 @@ describe('ClassPage', () => {
   describe('teachers', () => {
     it('lists them lead first with role badges', async () => {
       setup();
-      const teachers = await card('Teachers');
-      expect(teachers.getByText('Class teachers')).toBeInTheDocument();
+      const teachers = within(await teacherList());
+      expect(screen.getByText('Class teachers')).toBeInTheDocument();
       const rows = teachers.getAllByRole('listitem');
       expect(within(rows[0]!).getByText('Ayo Bassey')).toBeInTheDocument();
       expect(within(rows[0]!).getByText('Lead')).toHaveAttribute(
@@ -174,7 +218,7 @@ describe('ClassPage', () => {
         'secondary'
       );
       expect(
-        teachers.getByRole('button', { name: 'Add class teacher' })
+        screen.getByRole('button', { name: 'Add class teacher' })
       ).toBeInTheDocument();
     });
 
@@ -182,15 +226,16 @@ describe('ClassPage', () => {
       setup({
         row: classDetail({ displayName: 'JSS 2 Gold', classTeachers: [] }),
       });
-      const teachers = await card('Teachers');
-      expect(teachers.getByText('No class teacher yet')).toBeInTheDocument();
       expect(
-        teachers.getByText(
+        await screen.findByText('No class teacher yet')
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(
           'Add a lead teacher so the class has someone responsible.'
         )
       ).toBeInTheDocument();
       expect(
-        teachers.getByRole('button', { name: 'Add class teacher' })
+        screen.getByRole('button', { name: 'Add class teacher' })
       ).toBeInTheDocument();
     });
 
@@ -203,28 +248,27 @@ describe('ClassPage', () => {
           retiredAt: archived,
         }),
       });
-      const teachers = await card('Teachers');
-      expect(teachers.getByText('No class teacher yet')).toBeInTheDocument();
       expect(
-        teachers.queryByRole('button', { name: 'Add class teacher' })
+        await screen.findByText('No class teacher yet')
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: 'Add class teacher' })
       ).not.toBeInTheDocument();
     });
 
     it('hides Add on an archived class that has teachers', async () => {
       setup({ row: { ...GOLD, retiredAt: '2026-07-24T09:00:00.000Z' } });
-      const teachers = await card('Teachers');
+      const teachers = within(await teacherList());
       expect(teachers.getByText('Ayo Bassey')).toBeInTheDocument();
       expect(
-        teachers.queryByRole('button', { name: 'Add class teacher' })
+        screen.queryByRole('button', { name: 'Add class teacher' })
       ).not.toBeInTheDocument();
     });
 
     it('opens the add dialog', async () => {
       setup();
       fireEvent.click(
-        (await card('Teachers')).getByRole('button', {
-          name: 'Add class teacher',
-        })
+        await screen.findByRole('button', { name: 'Add class teacher' })
       );
       expect(
         await screen.findByText('Add class teacher', {
@@ -236,9 +280,7 @@ describe('ClassPage', () => {
     it('removes a teacher and toasts', async () => {
       const { api } = setup();
       fireEvent.click(
-        (await card('Teachers')).getByRole('button', {
-          name: 'Remove Ayo Bassey',
-        })
+        await screen.findByRole('button', { name: 'Remove Ayo Bassey' })
       );
       await waitFor(() => {
         expect(api.classes.removeTeacher).toHaveBeenCalledWith({
@@ -255,13 +297,13 @@ describe('ClassPage', () => {
       ['a read-only acting super admin', actingAccess(false)],
     ])('hides Add and Remove for %s', async (_label, access) => {
       setup({ access });
-      const teachers = await card('Teachers');
+      const teachers = within(await teacherList());
       expect(teachers.getByText('Ayo Bassey')).toBeInTheDocument();
       expect(
-        teachers.queryByRole('button', { name: 'Add class teacher' })
+        screen.queryByRole('button', { name: 'Add class teacher' })
       ).not.toBeInTheDocument();
       expect(
-        teachers.queryByRole('button', { name: /^Remove / })
+        screen.queryByRole('button', { name: /^Remove / })
       ).not.toBeInTheDocument();
     });
   });
@@ -269,18 +311,15 @@ describe('ClassPage', () => {
   describe('roster', () => {
     it('shows the students with their admission numbers and a count', async () => {
       setup();
-      const roster = await card('Roster');
-      expect(roster.getByText('2')).toBeInTheDocument();
+      const roster = within(await rosterTable());
+      expect(await cardTitle('Roster')).toHaveTextContent('Roster2');
       expect(roster.getByText('Ada Obi')).toBeInTheDocument();
       expect(roster.getByText('GF-0123')).toHaveClass('font-mono');
-      expect(
-        roster.getByRole('columnheader', { name: 'Adm. no.' })
-      ).toBeInTheDocument();
     });
 
     it('shows each student’s electives, or a dash for none', async () => {
       setup();
-      const roster = await card('Roster');
+      const roster = within(await rosterTable());
       expect(
         roster.getByRole('columnheader', { name: 'Electives' })
       ).toBeInTheDocument();
@@ -290,14 +329,12 @@ describe('ClassPage', () => {
 
     it('says Nothing here yet for an empty roster', async () => {
       setup({ row: classDetail({ displayName: 'JSS 2 Gold', roster: [] }) });
-      expect(
-        (await card('Roster')).getByText('Nothing here yet')
-      ).toBeInTheDocument();
+      expect(await screen.findByText('Nothing here yet')).toBeInTheDocument();
     });
 
     it('is not shown without student:read', async () => {
       setup({ row: { ...GOLD, roster: null } });
-      await card('Teachers');
+      await cardTitle('Teachers');
       expect(
         screen.queryByText('Roster', { selector: '[data-slot="card-title"]' })
       ).not.toBeInTheDocument();
@@ -364,7 +401,7 @@ describe('ClassPage', () => {
       ['a read-only acting super admin', actingAccess(false)],
     ])('is not offered to %s', async (_label, access) => {
       setup({ access });
-      await card('Teachers');
+      await cardTitle('Teachers');
       expect(
         screen.queryByRole('button', { name: 'Actions for JSS 2 Gold' })
       ).not.toBeInTheDocument();
@@ -412,19 +449,19 @@ describe('ClassPage', () => {
       studentCount: 3,
       roster: [
         {
-          studentId: IDS.p1,
+          studentId: ZAINAB_BELLO,
           name: 'Zainab Bello',
           admissionNumber: 'GF-0131',
           electives: [],
         },
         {
-          studentId: IDS.jss1,
+          studentId: ADA_ADAMS,
           name: 'Ada Adams',
           admissionNumber: 'GF-0123',
           electives: [],
         },
         {
-          studentId: IDS.ss3,
+          studentId: TOBI_BELLO,
           name: 'Tobi Bello',
           admissionNumber: 'GF-0124',
           electives: [],
@@ -492,7 +529,7 @@ describe('ClassPage', () => {
       await waitFor(() => {
         expect(api.classes.graduate).toHaveBeenCalledWith({
           params: { id: IDS.gold },
-          body: { studentIds: [IDS.p1, IDS.jss1] },
+          body: { studentIds: [ZAINAB_BELLO, ADA_ADAMS] },
         });
       });
       await waitFor(() => {

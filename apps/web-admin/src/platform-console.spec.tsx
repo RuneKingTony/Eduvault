@@ -4,13 +4,7 @@ import {
   createMemoryHistory,
   createRouter,
 } from '@tanstack/react-router';
-import {
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-  within,
-} from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import {
   AuthClientProvider,
   type EduvaultAuthClient,
@@ -21,6 +15,7 @@ import { stubMatchMedia } from '@eduvault/ui/testing';
 import { ALL_PERMISSIONS, READ_PERMS, toPermissionMap } from '@eduvault/policy';
 import { clearActing, getActing, startActing } from './acting-store';
 import { ApiProvider, type Api } from './api';
+import { checked } from './test-api';
 import { NotFoundPage } from './components/page-fallbacks';
 import { routeTree } from './routeTree.gen';
 import {
@@ -117,7 +112,7 @@ async function renderAt(path: string, answer: Me) {
   });
   render(
     <QueryClientProvider client={queryClient}>
-      <ApiProvider api={api}>
+      <ApiProvider api={checked(api)}>
         <AuthClientProvider authClient={authClient}>
           <RouterProvider router={router} />
         </AuthClientProvider>
@@ -130,6 +125,11 @@ async function renderAt(path: string, answer: Me) {
   });
   return { router, permissions, api };
 }
+
+const sidebarLink = (name: string) =>
+  screen
+    .getAllByRole('link', { name })
+    .find((link) => !link.hasAttribute('aria-disabled'));
 
 describe('platform console', () => {
   beforeEach(() => {
@@ -150,12 +150,10 @@ describe('platform console', () => {
     expect(router.state.location.pathname).toBe('/platform/schools');
     expect(screen.getByText('Eduvault platform')).toBeInTheDocument();
     expect(screen.getByText('Super admin console')).toBeInTheDocument();
-    const nav = document.querySelector<HTMLElement>('[data-slot="sidebar"]')!;
-    expect(within(nav).getByText('Platform')).toBeInTheDocument();
-    expect(within(nav).getByRole('link', { name: 'Schools' })).toHaveAttribute(
-      'aria-current',
-      'page'
-    );
+    expect(
+      screen.getByRole('button', { name: 'Platform' })
+    ).toBeInTheDocument();
+    expect(sidebarLink('Schools')).toHaveAttribute('aria-current', 'page');
     expect(screen.getByText('Greenfield College')).toBeInTheDocument();
     expect(permissions).not.toHaveBeenCalled();
   });
@@ -193,10 +191,7 @@ describe('platform console', () => {
     expect(
       await screen.findByRole('heading', { name: 'Audit log' })
     ).toBeInTheDocument();
-    const nav = document.querySelector<HTMLElement>('[data-slot="sidebar"]')!;
-    expect(
-      within(nav).getByRole('link', { name: 'Audit log' })
-    ).toHaveAttribute('aria-current', 'page');
+    expect(sidebarLink('Audit log')).toHaveAttribute('aria-current', 'page');
   });
 
   describe('acting', () => {
@@ -250,7 +245,7 @@ describe('platform console', () => {
       });
       render(
         <QueryClientProvider client={queryClient}>
-          <ApiProvider api={api}>
+          <ApiProvider api={checked(api)}>
             <AuthClientProvider authClient={authClient}>
               <RouterProvider router={router} />
             </AuthClientProvider>

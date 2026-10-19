@@ -1,4 +1,8 @@
-import base, { noDefaultExport, noEnum } from '../../eslint.config.mjs';
+import base, {
+  noDefaultExport,
+  noEnum,
+  noWeakMatchers,
+} from '../../eslint.config.mjs';
 
 const classLevelAuth = {
   selector:
@@ -54,6 +58,7 @@ const databaseInternals = [
 
 export default [
   ...base,
+  noWeakMatchers,
   {
     files: ['**/*.ts'],
     rules: {

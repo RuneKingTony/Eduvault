@@ -1,7 +1,10 @@
-import type {
-  BalanceList,
-  GuardianStatement,
-  StudentStatement,
+import {
+  FINANCE_PAGE_SIZE,
+  GUARDIAN_ACCOUNT_NOT_FOUND_MESSAGE,
+  TERM_NOT_FOUND_MESSAGE,
+  type BalanceList,
+  type GuardianStatement,
+  type StudentStatement,
 } from '@eduvault/api-contract';
 import { addDays } from '@eduvault/shared';
 import { LedgerService } from '../src/app/modules/ledger/ledger.service';
@@ -79,6 +82,52 @@ const termStatement = (
     actor,
     `/finance/students/${studentId}/statement?pageSize=50&termId=${termId}`
   );
+
+const familyAt = async (
+  api: Fixtures['api'],
+  actor: { cookie: string },
+  { guardianId, termId }: { guardianId: string; termId?: string }
+) =>
+  (
+    await api(actor)
+      .get(`/finance/guardians/${guardianId}/statement`)
+      .query(termId === undefined ? {} : { termId })
+      .expect(200)
+  ).body as GuardianStatement;
+
+async function expectFamilyTermView(
+  api: Fixtures['api'],
+  actor: { cookie: string },
+  { whole, termId }: { whole: GuardianStatement; termId: string }
+) {
+  const view = await familyAt(api, actor, {
+    guardianId: whole.guardian.id,
+    termId,
+  });
+  expect(view.term?.id).toBe(termId);
+  expect(view.termOptions).toEqual(whole.termOptions);
+  expect(view.familyTotalMinor).toBe(whole.familyTotalMinor);
+  expect(view.creditMinor).toBe(whole.creditMinor);
+  const singles = await Promise.all(
+    view.children.map((child) =>
+      statementAt(
+        api,
+        actor,
+        `/finance/students/${child.student.id}/statement?pageSize=${FINANCE_PAGE_SIZE}&termId=${termId}`
+      )
+    )
+  );
+  for (const [index, child] of view.children.entries()) {
+    const brought = child.broughtForward?.amountMinor ?? Number.NaN;
+    expect(child.closingMinor).toBe(brought + signedSum(child.rows));
+    expect(child).toEqual(singles[index]);
+    expect(child.totals).toEqual(
+      whole.children.find(({ student }) => student.id === child.student.id)
+        ?.totals
+    );
+  }
+  return view;
+}
 
 const YEAR = '2026/2027';
 
@@ -336,7 +385,7 @@ test.describe('balances and statements over the books', () => {
     const paged = await balancesOf(api, owner, '?pageSize=1&page=2');
     expect(paged.total).toBe(2);
     expect(paged.items.map((row) => row.studentId)).toEqual([studentLekki.id]);
-    expect(paged.items[0]?.guardian?.name).toBeDefined();
+    expect(paged.items[0]?.guardian?.name).toEqual(expect.any(String));
   });
 
   test('received this term counts only the in-scope allocations of a split payment', async ({
@@ -637,6 +686,75 @@ test.describe('term filter', () => {
     expect(whole.termOptions.map((option) => option.id)).toEqual([first.id]);
     expect(whole.termOptions[0]?.label).toBe(`First term, ${YEAR}`);
   });
+
+  test('gives each child the single statement’s term view and keeps the family totals whole-account', async ({
+    api,
+    app,
+    clock,
+    pool,
+    schools: { orgA, owner, lekki, studentLekki },
+  }) => {
+    clock.set('2026-10-07');
+    const fixture = await chargeFixture(app, api, owner);
+    const { first, second, third } = await calendarTerms(api, owner);
+    const [guardian] = studentLekki.guardians ?? [];
+    const guardianId = guardian?.guardianId ?? '';
+    const sibling = await createStudent(app, owner, {
+      campusId: lekki.id,
+      guardians: [
+        {
+          existingGuardianId: guardianId,
+          relationship: 'mother',
+          paysFees: true,
+        },
+      ],
+    });
+    await owes(app, owner, {
+      studentId: studentLekki.id,
+      amountMinor: OPENING,
+    });
+    await app
+      .get(LedgerService, { strict: false })
+      .postOpening(await orgContextFor(app, owner), {
+        items: [
+          {
+            studentId: sibling.id,
+            amountMinor: TUITION_MINOR + 500_000,
+            direction: 'credit',
+            effectiveOn: '2026-09-01',
+          },
+        ],
+        moneyAccounts: [],
+      });
+    const { runId } = await prepare(api, owner, {
+      termId: fixture.firstTermId,
+      scope: 'school',
+    });
+    await sendRun(api, owner, runId ?? '');
+    const account = await bankAccount(app, owner);
+    await recordCash(api, owner, {
+      accountId: account.id,
+      paidOn: clock.today(),
+      allocations: [{ studentId: studentLekki.id, amountMinor: PAID }],
+    });
+    const before = await moneyFingerprint(pool, orgA.id);
+
+    const whole = await familyAt(api, owner, { guardianId });
+    const views = await Promise.all(
+      [first, second, third].map(({ id: termId }) =>
+        expectFamilyTermView(api, owner, { whole, termId })
+      )
+    );
+
+    expect(whole.creditMinor).toBe(500_000);
+    expect(whole.term).toBeNull();
+    expect(whole.children.every((child) => child.term === null)).toBe(true);
+    expect(views.every((view) => view.children.length === 2)).toBe(true);
+    for (const child of views[2]?.children ?? []) {
+      expect(child.closingMinor).toBe(child.totals.balanceMinor);
+    }
+    expect(await moneyFingerprint(pool, orgA.id)).toEqual(before);
+  });
 });
 
 test.describe('isolation', () => {
@@ -710,15 +828,7 @@ test.describe('isolation', () => {
   test('a family view lists only in-scope children and answers 404 when none are in reach', async ({
     api,
     app,
-    schools: {
-      owner,
-      ownerB,
-      lekkiOnly,
-      lekki,
-      ikeja,
-      studentLekki,
-      studentIkeja,
-    },
+    schools: { owner, ownerB, lekkiOnly, ikeja, studentLekki, studentIkeja },
   }) => {
     const [ikejaGuardian] = studentIkeja.guardians ?? [];
     const [lekkiGuardian] = studentLekki.guardians ?? [];
@@ -748,7 +858,6 @@ test.describe('isolation', () => {
     expect(family.children.map((child) => child.student.id)).toEqual([
       studentLekki.id,
     ]);
-    expect(lekki.id).toBeDefined();
     const wide = (
       await api(owner)
         .get(`/finance/guardians/${lekkiGuardian?.guardianId}/statement`)
@@ -760,6 +869,54 @@ test.describe('isolation', () => {
     await api(ownerB)
       .get(`/finance/guardians/${crypto.randomUUID()}/statement`)
       .expect(404);
+  });
+
+  test('the family statement answers 404 for another school’s term and for an out-of-scope guardian with a valid term', async ({
+    api,
+    app,
+    clock,
+    pool,
+    schools: { orgA, owner, ownerB, lekkiOnly, studentLekki, studentIkeja },
+  }) => {
+    clock.set('2026-10-07');
+    await chargeFixture(app, api, owner);
+    const { first } = await calendarTerms(api, owner);
+    const foreign = await termOf(api, ownerB, { year: YEAR, sequence: 1 });
+    const ikejaGuardianId = studentIkeja.guardians?.[0]?.guardianId;
+    const lekkiGuardianId = studentLekki.guardians?.[0]?.guardianId ?? '';
+    const before = await moneyFingerprint(pool, orgA.id);
+
+    const foreignForOwner = await api(owner)
+      .get(
+        `/finance/guardians/${lekkiGuardianId}/statement?termId=${foreign.id}`
+      )
+      .expect(404);
+    expect(foreignForOwner.body.message).toBe(TERM_NOT_FOUND_MESSAGE);
+    await api(lekkiOnly)
+      .get(
+        `/finance/guardians/${lekkiGuardianId}/statement?termId=${foreign.id}`
+      )
+      .expect(404);
+    await api(owner)
+      .get(
+        `/finance/guardians/${lekkiGuardianId}/statement?termId=${crypto.randomUUID()}`
+      )
+      .expect(404);
+    for (const termId of [first.id, foreign.id]) {
+      const outOfScope = await api(lekkiOnly)
+        .get(`/finance/guardians/${ikejaGuardianId}/statement?termId=${termId}`)
+        .expect(404);
+      expect(outOfScope.body.message).toBe(GUARDIAN_ACCOUNT_NOT_FOUND_MESSAGE);
+    }
+    await api(owner)
+      .get(`/finance/guardians/${lekkiGuardianId}/statement?termId=nope`)
+      .expect(400);
+    await familyAt(api, lekkiOnly, {
+      guardianId: lekkiGuardianId,
+      termId: first.id,
+    });
+
+    expect(await moneyFingerprint(pool, orgA.id)).toEqual(before);
   });
 
   test('another school’s rows never reach the lists', async ({

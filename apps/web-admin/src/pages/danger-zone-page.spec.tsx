@@ -48,9 +48,11 @@ function setup({
   const api = {
     school: {
       handoverCandidates: vi.fn().mockResolvedValue(candidates),
-      handover: vi.fn().mockResolvedValue({ ownerUserId: tunde.userId }),
+      handover: vi.fn(({ body }: { body: { userId: string } }) =>
+        Promise.resolve({ ownerUserId: body.userId })
+      ),
       deletable: vi.fn().mockResolvedValue(deletable),
-      remove: vi.fn().mockResolvedValue({ id: 'school-1' }),
+      remove: vi.fn().mockResolvedValue({ id: profile().id }),
     },
     schoolAccount: { get: vi.fn().mockResolvedValue(profile()) },
   };
