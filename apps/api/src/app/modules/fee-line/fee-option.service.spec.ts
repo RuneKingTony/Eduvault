@@ -2,6 +2,7 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { FEE_OPTION_NOT_OPTIONAL_MESSAGE } from '@eduvault/api-contract';
 import type { OrgContext } from '../../common/auth';
 import {
+  FakeFeeLineRepository,
   FakeFeeOptionRepository,
   FakeFeeStudentRepository,
 } from './fake-fee-line.repository';
@@ -10,7 +11,7 @@ import { FeeOptionService } from './fee-option.service';
 
 const ctx = {
   organizationId: 'school-a',
-  user: { id: 'caller' },
+  user: { id: 'caller', name: 'Tunde Bakare' },
   campusScope: 'all',
 } as OrgContext;
 
@@ -37,7 +38,11 @@ function setup() {
   return {
     repository,
     students,
-    service: new FeeOptionService(repository, students),
+    service: new FeeOptionService(
+      repository,
+      students,
+      new FakeFeeLineRepository()
+    ),
   };
 }
 
@@ -92,6 +97,7 @@ describe('FeeOptionService.set', () => {
       {
         organizationId: 'school-a',
         userId: 'caller',
+        studentId: 'ada',
         enrollmentId: 'enrol-1',
         feeTypeId: 'bus',
         optedIn: true,
@@ -102,6 +108,7 @@ describe('FeeOptionService.set', () => {
   it('switches an opt-in off after the level has no live optional line', async () => {
     const { service, repository } = setup();
     repository.optional = [];
+    repository.optedIn = ['bus'];
     const result = await service.set(
       ctx,
       { studentId: 'ada', feeTypeId: 'bus' },
@@ -109,6 +116,61 @@ describe('FeeOptionService.set', () => {
     );
     expect(result).toEqual({ feeTypeId: 'bus', optedIn: false });
     expect(repository.changes).toHaveLength(1);
+  });
+
+  it('records one opt-in row on the student’s campus', async () => {
+    const { service, repository } = setup();
+    await service.set(
+      ctx,
+      { studentId: 'ada', feeTypeId: 'bus' },
+      { optedIn: true }
+    );
+    expect(repository.recorded).toEqual([
+      {
+        organizationId: 'school-a',
+        campusId: 'lekki',
+        pillar: 'finance',
+        kind: 'fee_option.opted_in',
+        actorUserId: 'caller',
+        subjectType: 'student',
+        subjectId: 'ada',
+        text: 'Tunde Bakare opted Ada Okeke into School bus.',
+        data: {
+          studentId: 'ada',
+          feeTypeId: 'bus',
+          enrollmentId: 'enrol-1',
+          optedIn: true,
+        },
+      },
+    ]);
+  });
+
+  it('records one opt-out row for a fee the student had opted into', async () => {
+    const { service, repository } = setup();
+    repository.optedIn = ['bus'];
+    await service.set(
+      ctx,
+      { studentId: 'ada', feeTypeId: 'bus' },
+      { optedIn: false }
+    );
+    expect(repository.recorded).toHaveLength(1);
+    expect(repository.recorded[0]).toMatchObject({
+      kind: 'fee_option.opted_out',
+      text: 'Tunde Bakare opted Ada Okeke out of School bus.',
+      data: { optedIn: false },
+    });
+  });
+
+  it('records nothing when the state does not change', async () => {
+    const { service, repository } = setup();
+    const optIn = { optedIn: true };
+    const params = { studentId: 'ada', feeTypeId: 'bus' };
+    await service.set(ctx, params, optIn);
+    await service.set(ctx, params, optIn);
+    expect(repository.recorded).toHaveLength(1);
+    const { service: other, repository: untouched } = setup();
+    await other.set(ctx, params, { optedIn: false });
+    expect(untouched.recorded).toEqual([]);
   });
 
   it('answers 400 for a fee type with no optional line for the level', async () => {
@@ -121,6 +183,7 @@ describe('FeeOptionService.set', () => {
     await expect(refused).rejects.toBeInstanceOf(BadRequestException);
     await expect(refused).rejects.toThrow(FEE_OPTION_NOT_OPTIONAL_MESSAGE);
     expect(repository.changes).toEqual([]);
+    expect(repository.recorded).toEqual([]);
   });
 
   it('answers 404 for a school year that is not in the school', async () => {
@@ -148,7 +211,7 @@ describe('FeeOptionService.set', () => {
   });
 
   it('answers 404 for a student outside the finance scope', async () => {
-    const { service, students } = setup();
+    const { service, students, repository } = setup();
     students.student = undefined;
     await expect(
       service.set(
@@ -157,5 +220,6 @@ describe('FeeOptionService.set', () => {
         { optedIn: true }
       )
     ).rejects.toBeInstanceOf(NotFoundException);
+    expect(repository.recorded).toEqual([]);
   });
 });

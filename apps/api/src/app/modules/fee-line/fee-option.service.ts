@@ -11,9 +11,14 @@ import {
   type FeeOptionResult,
   type SetFeeOptionInput,
 } from '@eduvault/api-contract';
+import {
+  feeOptionChangedActivity,
+  financeActorIn,
+} from '../../common/activity';
 import type { OrgContext } from '../../common/auth';
 import { feeScopeOf } from './fee-scope';
 import {
+  FeeLineRepository,
   FeeOptionRepository,
   FeeStudentRepository,
   type StudentFeeContext,
@@ -27,7 +32,8 @@ type EnrolledStudent = StudentFeeContext & {
 export class FeeOptionService {
   constructor(
     private readonly options: FeeOptionRepository,
-    private readonly students: FeeStudentRepository
+    private readonly students: FeeStudentRepository,
+    private readonly lines: FeeLineRepository
   ) {}
 
   async list(
@@ -82,13 +88,25 @@ export class FeeOptionService {
         throw new BadRequestException(FEE_OPTION_NOT_OPTIONAL_MESSAGE);
       }
     }
-    await this.options.setOption({
-      organizationId: ctx.organizationId,
-      userId: ctx.user.id,
-      enrollmentId: enrollment.id,
-      feeTypeId: params.feeTypeId,
-      optedIn: input.optedIn,
+    const actor = await financeActorIn(ctx, {
+      currency: () => this.lines.currency(ctx.organizationId),
     });
+    await this.options.setOption(
+      {
+        organizationId: ctx.organizationId,
+        userId: ctx.user.id,
+        studentId: params.studentId,
+        enrollmentId: enrollment.id,
+        feeTypeId: params.feeTypeId,
+        optedIn: input.optedIn,
+      },
+      (facts) =>
+        feeOptionChangedActivity(actor, {
+          ...facts,
+          enrollmentId: enrollment.id,
+          optedIn: input.optedIn,
+        })
+    );
     return { feeTypeId: params.feeTypeId, optedIn: input.optedIn };
   }
 

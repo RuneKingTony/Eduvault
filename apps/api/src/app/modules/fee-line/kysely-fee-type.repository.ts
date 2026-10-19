@@ -1,16 +1,24 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { FEE_INCOME_SYSTEM_KEY, type FeeType } from '@eduvault/api-contract';
+import { ActivityWriter } from '../../common/activity';
 import { KYSELY_TOKEN, type Database } from '../../common/db/tokens';
 import {
   feeTypeQuery,
   insertChildAccount,
   transactAccounts,
 } from '../../common/ledger';
-import { FeeTypeRepository, type FeeTypeOutcome } from './fee-line.repository';
+import {
+  FeeTypeRepository,
+  type FeeTypeOutcome,
+  type TypeActivity,
+} from './fee-line.repository';
 
 @Injectable()
 export class KyselyFeeTypeRepository extends FeeTypeRepository {
-  constructor(@Inject(KYSELY_TOKEN) private readonly db: Database) {
+  constructor(
+    @Inject(KYSELY_TOKEN) private readonly db: Database,
+    private readonly activity: ActivityWriter
+  ) {
     super();
   }
 
@@ -20,7 +28,11 @@ export class KyselyFeeTypeRepository extends FeeTypeRepository {
       .execute();
   }
 
-  create(organizationId: string, name: string): Promise<FeeTypeOutcome> {
+  create(
+    organizationId: string,
+    name: string,
+    activity: TypeActivity
+  ): Promise<FeeTypeOutcome> {
     return transactAccounts(this.db, async (trx): Promise<FeeTypeOutcome> => {
       const parent = await trx
         .selectFrom('ledger_account')
@@ -37,10 +49,9 @@ export class KyselyFeeTypeRepository extends FeeTypeRepository {
         return inserted;
       }
       const { row } = inserted;
-      return {
-        status: 'saved',
-        feeType: { id: row.id, code: row.code, name: row.name },
-      };
+      const feeType = { id: row.id, code: row.code, name: row.name };
+      await this.activity.within(trx).recordMany(activity(feeType));
+      return { status: 'saved', feeType };
     });
   }
 }

@@ -69,6 +69,21 @@ describe('ActivityWriter', () => {
     }
   );
 
+  it.each(['fee_option.opted_in', 'fee_option.opted_out'])(
+    'refuses a school-wide finance row of kind %s',
+    async (kind) => {
+      await expect(
+        run({
+          ...base,
+          pillar: 'finance',
+          campusId: null,
+          kind,
+          subjectType: 'student',
+        })
+      ).rejects.toThrow('A finance activity row needs a campus');
+    }
+  );
+
   it('refuses a school-wide finance row of a fee-line subject with a money kind', async () => {
     await expect(
       run({
