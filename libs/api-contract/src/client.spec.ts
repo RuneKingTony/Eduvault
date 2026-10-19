@@ -1,4 +1,4 @@
-import { ApiError, createApiClient } from './client';
+import { ApiError, createApiClient, denialMessage } from './client';
 import { contract } from './contract';
 
 const jsonResponse = (status: number, body: unknown) =>
@@ -270,5 +270,32 @@ describe('createApiClient', () => {
         params: { id: '5b0f1e1e-6e53-4c52-9f1c-0a1d7a7f9c11' },
       })
     ).resolves.toBeUndefined();
+  });
+});
+
+const refusal = (status: number, message: string) =>
+  new ApiError(status, { code: 'Forbidden', message });
+
+describe('denialMessage', () => {
+  const denied = 'You do not have access to this.';
+
+  it.each([
+    'Missing permission student:create',
+    'Missing permission student:create or student:update',
+    'Missing permission student:create and guardian:link',
+  ])('swaps a 403 %j for the caller text', (message) => {
+    expect(denialMessage(refusal(403, message), denied)).toBe(denied);
+  });
+
+  it('keeps any other 403 text, any other status and any other error', () => {
+    expect(denialMessage(refusal(403, 'Acting is read-only'), denied)).toBe(
+      'Acting is read-only'
+    );
+    expect(
+      denialMessage(refusal(409, 'Missing permission student:create'), denied)
+    ).toBe('Missing permission student:create');
+    expect(denialMessage(new Error('Missing permission x:y'), denied)).toBe(
+      'Missing permission x:y'
+    );
   });
 });
