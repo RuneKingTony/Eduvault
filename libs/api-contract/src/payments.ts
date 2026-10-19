@@ -1,7 +1,12 @@
 import { PROOF_FILE_TYPES, naira } from '@eduvault/shared';
 import { z } from 'zod';
 import { approvalStatusSchema } from './approvals';
-import { FINANCE_PAGE_SIZE, FINANCE_PAGE_SIZE_MAX } from './finance';
+import {
+  FINANCE_PAGE_SIZE,
+  FINANCE_PAGE_SIZE_MAX,
+  moneyAccountKindSchema,
+  type MoneyAccountKind,
+} from './finance';
 import { invoiceJournalSchema } from './invoices';
 import {
   currencySchema,
@@ -10,6 +15,7 @@ import {
   notReservedReference,
   paymentMethodSchema,
   paymentMethodsSchema,
+  type PaymentMethod,
 } from './schemas';
 
 export const PAYMENT_STATUSES = ['posted', 'void_pending', 'voided'] as const;
@@ -185,6 +191,26 @@ export const paymentMoneyAccountSchema = z.object({
 });
 export type PaymentMoneyAccount = z.infer<typeof paymentMoneyAccountSchema>;
 
+const recordingMoneyAccountSchema = paymentMoneyAccountSchema.extend({
+  kind: moneyAccountKindSchema,
+});
+export type RecordingMoneyAccount = z.infer<typeof recordingMoneyAccountSchema>;
+
+export const PAYMENT_ACCOUNT_METHOD_MESSAGE =
+  'A bank transfer goes into a bank account, and POS into a POS or bank account.';
+export const METHOD_ACCOUNT_KINDS: Record<
+  PaymentMethod,
+  readonly MoneyAccountKind[]
+> = {
+  cash: ['cash', 'bank', 'pos'],
+  transfer: ['bank'],
+  pos: ['pos', 'bank'],
+};
+export const accountTakesMethod = (
+  kind: MoneyAccountKind,
+  method: PaymentMethod
+): boolean => METHOD_ACCOUNT_KINDS[method].includes(kind);
+
 export const paymentAllocationSummarySchema = z.object({
   studentId: idSchema,
   studentName: z.string(),
@@ -291,7 +317,7 @@ export type RecordingPayer = z.infer<typeof recordingPayerSchema>;
 export const recordingOptionsSchema = z.object({
   currency: currencySchema,
   today: z.iso.date(),
-  accounts: z.array(paymentMoneyAccountSchema),
+  accounts: z.array(recordingMoneyAccountSchema),
   methods: paymentMethodsSchema,
   payers: z.array(recordingPayerSchema),
   students: z.array(recordingChildSchema),

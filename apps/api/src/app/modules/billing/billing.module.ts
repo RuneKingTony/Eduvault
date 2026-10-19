@@ -6,9 +6,11 @@ import { CampusModule } from '../campus/campus.module';
 import { InvoiceModule } from '../invoice/invoice.module';
 import { BillingPlanService } from './billing-plan.service';
 import { BillingController } from './billing.controller';
-import { BillingRepository } from './billing.repository';
+import { BillingPlanRepository } from './billing-plan.repository';
+import { BillingRunRepository } from './billing-run.repository';
 import { BillingService } from './billing.service';
-import { KyselyBillingRepository } from './kysely-billing.repository';
+import { KyselyBillingPlanRepository } from './kysely-billing-plan.repository';
+import { KyselyBillingRunRepository } from './kysely-billing-run.repository';
 
 @Module({
   imports: [
@@ -23,7 +25,8 @@ import { KyselyBillingRepository } from './kysely-billing.repository';
   providers: [
     BillingService,
     BillingPlanService,
-    { provide: BillingRepository, useClass: KyselyBillingRepository },
+    { provide: BillingPlanRepository, useClass: KyselyBillingPlanRepository },
+    { provide: BillingRunRepository, useClass: KyselyBillingRunRepository },
   ],
 })
 export class BillingModule {}

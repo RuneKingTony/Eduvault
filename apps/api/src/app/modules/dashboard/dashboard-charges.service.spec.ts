@@ -2,7 +2,10 @@ import type { BillingRunList } from '@eduvault/api-contract';
 import type { OrgContext } from '../../common/auth';
 import type { BillingPlanService } from '../billing/billing-plan.service';
 import type { BillingService } from '../billing/billing.service';
-import type { ChargeSummary, TermInfo } from '../billing/billing.repository';
+import type {
+  ChargeSummary,
+  TermInfo,
+} from '../billing/billing-plan.repository';
 import { DashboardChargesService } from './dashboard-charges.service';
 
 const term: TermInfo = {

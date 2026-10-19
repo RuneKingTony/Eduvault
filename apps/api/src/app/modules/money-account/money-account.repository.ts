@@ -1,6 +1,7 @@
 import type {
   CashBookItem,
   MoneyAccount,
+  MoneyAccountKind,
   MoneyAccountList,
 } from '@eduvault/api-contract';
 import type { OrgScope } from '../../common/scope';
@@ -30,6 +31,7 @@ export type MoneyAccountOutcome =
 export interface RecordingOption {
   id: string;
   label: string;
+  kind: MoneyAccountKind;
 }
 
 export abstract class MoneyAccountRepository {

@@ -1,4 +1,5 @@
 import type {
+  MoneyAccountKind,
   Payment,
   PaymentListQuery,
   PaymentListSummary,
@@ -25,7 +26,12 @@ export type RecordingAccount =
   | { status: 'missing' }
   | { status: 'retired' }
   | { status: 'gateway' }
-  | { status: 'ok'; ledgerAccountId: string; campusId: string | null };
+  | {
+      status: 'ok';
+      ledgerAccountId: string;
+      campusId: string | null;
+      kind: MoneyAccountKind;
+    };
 
 export interface PaymentPage {
   items: PaymentSummary[];

@@ -331,6 +331,7 @@ export class KyselyMoneyAccountRepository extends MoneyAccountRepository {
         row.account_last4 === null
           ? row.name
           : `${row.name} · ending ${row.account_last4}`,
+      kind: moneyAccountKindSchema.parse(row.kind),
     }));
   }
 }

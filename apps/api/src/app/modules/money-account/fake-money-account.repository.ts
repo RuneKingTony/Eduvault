@@ -119,7 +119,7 @@ export class FakeMoneyAccountRepository extends MoneyAccountRepository {
             (row.campusId === null ||
               canSeeCampus(scope.campusScope, row.campusId))
         )
-        .map((row) => ({ id: row.id, label: row.name }))
+        .map((row) => ({ id: row.id, label: row.name, kind: row.kind }))
     );
   }
 }

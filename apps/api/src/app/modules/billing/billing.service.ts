@@ -21,8 +21,11 @@ import type { OrgContext } from '../../common/auth';
 import { InvoiceService } from '../invoice/invoice.service';
 import { settleCounts } from './billing-round';
 import { BillingPlanService } from './billing-plan.service';
-import { BillingRepository, type RunOutcome } from './billing.repository';
 import { orgScopeOf } from '../../common/scope';
+import {
+  BillingRunRepository,
+  type RunOutcome,
+} from './billing-run.repository';
 
 const FIRST_PAGE: BillingRunListQuery = { page: 1, pageSize: 10 };
 
@@ -51,7 +54,7 @@ function assertDone(
 @Injectable()
 export class BillingService {
   constructor(
-    private readonly billing: BillingRepository,
+    private readonly runs: BillingRunRepository,
     private readonly plans: BillingPlanService,
     private readonly invoices: InvoiceService
   ) {}
@@ -61,8 +64,8 @@ export class BillingService {
     query: BillingRunListQuery
   ): Promise<BillingRunList> {
     const [currency, page] = await Promise.all([
-      this.billing.currency(ctx.organizationId),
-      this.billing.listRuns(orgScopeOf(ctx), query),
+      this.runs.currency(ctx.organizationId),
+      this.runs.listRuns(orgScopeOf(ctx), query),
     ]);
     return { currency, ...page };
   }
@@ -76,7 +79,7 @@ export class BillingService {
     id: string,
     query: BillingRunListQuery = FIRST_PAGE
   ): Promise<BillingRun> {
-    const header = await this.billing.findRun(orgScopeOf(ctx), id);
+    const header = await this.runs.findRun(orgScopeOf(ctx), id);
     if (header === undefined) {
       throw new NotFoundException(BILLING_RUN_NOT_FOUND_MESSAGE);
     }
@@ -102,7 +105,7 @@ export class BillingService {
         termId: term.id,
       };
     }
-    const round = await this.billing.createRound({
+    const round = await this.runs.createRound({
       organizationId: ctx.organizationId,
       userId: ctx.user.id,
       termId: term.id,
@@ -122,7 +125,7 @@ export class BillingService {
   }
 
   async issue(ctx: OrgContext, id: string): Promise<BillingRun> {
-    const outcome = await this.billing.issue({
+    const outcome = await this.runs.issue({
       scope: orgScopeOf(ctx),
       runId: id,
       userId: ctx.user.id,
@@ -137,7 +140,7 @@ export class BillingService {
   }
 
   async cancel(ctx: OrgContext, id: string): Promise<BillingRun> {
-    const outcome = await this.billing.cancel({
+    const outcome = await this.runs.cancel({
       scope: orgScopeOf(ctx),
       runId: id,
       userId: ctx.user.id,

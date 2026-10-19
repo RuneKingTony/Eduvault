@@ -18,10 +18,10 @@ import { documentYear } from '../../common/documents';
 import { CampusService } from '../campus/campus.service';
 import { chargedState, defaultTermId, type RoundFilter } from './billing-round';
 import {
-  BillingRepository,
+  BillingPlanRepository,
   type ChargeSummary,
   type TermInfo,
-} from './billing.repository';
+} from './billing-plan.repository';
 import { planRound, type RoundPlan } from './round-plan';
 import { orgScopeOf } from '../../common/scope';
 
@@ -30,7 +30,7 @@ const NO_SAMPLE = 0;
 @Injectable()
 export class BillingPlanService {
   constructor(
-    private readonly billing: BillingRepository,
+    private readonly billing: BillingPlanRepository,
     private readonly campuses: CampusService,
     private readonly clock: Clock
   ) {}

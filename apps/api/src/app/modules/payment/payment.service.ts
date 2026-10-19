@@ -5,7 +5,9 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  accountTakesMethod,
   PAYMENT_ACCOUNT_GATEWAY_MESSAGE,
+  PAYMENT_ACCOUNT_METHOD_MESSAGE,
   PAYMENT_ACCOUNT_NOT_FOUND_MESSAGE,
   PAYMENT_ACCOUNT_RETIRED_MESSAGE,
   PAYMENT_FUTURE_DATE_MESSAGE,
@@ -37,6 +39,7 @@ import {
   PaymentRepository,
   type ExistingPayment,
   type InsertOutcome,
+  type RecordingAccount,
 } from './payment.repository';
 import { orgScopeOf, type OrgScope } from '../../common/scope';
 
@@ -239,10 +242,10 @@ export class PaymentService {
     return checked;
   }
 
-  private async checkPeople(
+  private async usableAccount(
     scope: OrgScope,
     input: RecordPayment
-  ): Promise<Checked> {
+  ): Promise<Extract<RecordingAccount, { status: 'ok' }>> {
     const account = await this.payments.recordingAccount(
       scope,
       input.moneyAccountId
@@ -256,6 +259,17 @@ export class PaymentService {
     if (account.status === 'gateway') {
       throw new BadRequestException(PAYMENT_ACCOUNT_GATEWAY_MESSAGE);
     }
+    if (!accountTakesMethod(account.kind, input.method)) {
+      throw new BadRequestException(PAYMENT_ACCOUNT_METHOD_MESSAGE);
+    }
+    return account;
+  }
+
+  private async checkPeople(
+    scope: OrgScope,
+    input: RecordPayment
+  ): Promise<Checked> {
+    const account = await this.usableAccount(scope, input);
     const guardianName =
       input.payerGuardianId === undefined
         ? undefined

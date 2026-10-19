@@ -1,11 +1,12 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { sql, type Kysely } from 'kysely';
-import type {
-  Payment,
-  PaymentListQuery,
-  PaymentMethods,
-  RecordingChild,
-  RecordingPayer,
+import {
+  moneyAccountKindSchema,
+  type Payment,
+  type PaymentListQuery,
+  type PaymentMethods,
+  type RecordingChild,
+  type RecordingPayer,
 } from '@eduvault/api-contract';
 import type { DB } from '../../../db/db-types';
 import {
@@ -140,6 +141,7 @@ export class KyselyPaymentRepository extends PaymentRepository {
       status: 'ok',
       ledgerAccountId: row.ledger_account_id,
       campusId: row.campus_id,
+      kind: moneyAccountKindSchema.parse(row.kind),
     };
   }
 
