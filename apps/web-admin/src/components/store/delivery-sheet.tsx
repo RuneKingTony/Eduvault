@@ -34,6 +34,7 @@ import {
   toast,
 } from '@eduvault/ui';
 import { useApi } from '../../api';
+import { announceReplay } from '../record-once';
 import { useToday } from '../calendar/use-today';
 import {
   campusesQueryOptions,
@@ -84,8 +85,11 @@ interface LoadedProps {
 }
 
 function announce(delivery: RecordedDelivery, campusName: string) {
-  if (delivery.replayed) {
-    toast.warning(deliveryReplayedMessage(delivery.reference, delivery.number));
+  if (
+    announceReplay(delivery, (again) =>
+      deliveryReplayedMessage(again.reference, again.number)
+    )
+  ) {
     return;
   }
   toast.success(deliveryRecordedMessage(delivery, campusName));
