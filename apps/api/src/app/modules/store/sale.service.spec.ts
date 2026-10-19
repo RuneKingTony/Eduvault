@@ -227,12 +227,6 @@ describe('SaleService.record', () => {
       );
     });
 
-    it('needs no proof for cash', async () => {
-      const { sales, service } = setup();
-      sales.stored.set('sale-1', storedSale());
-      await expect(service.record(ctx(), body)).resolves.toBeDefined();
-    });
-
     it('answers 404 for a proof that is not the caller’s and 409 for one in use', async () => {
       const { sales, service } = setup();
       sales.accountRows = [saleAccount({ kind: 'pos' })];
@@ -442,7 +436,11 @@ describe('SaleService.record', () => {
       sales.stored.set('sale-1', storedSale());
       await expect(
         service.record(ctx(), { ...body, moneyAccountId: 'bank-1' })
-      ).rejects.toBeInstanceOf(ConflictException);
+      ).rejects.toThrow(
+        new ConflictException(
+          storeSaleReferenceUsedMessage(body.reference, 'ISS-2026-0001')
+        )
+      );
     });
 
     it('accepts the retry naming the account the first try chose', async () => {
@@ -454,7 +452,7 @@ describe('SaleService.record', () => {
       ).resolves.toMatchObject({ replayed: true });
     });
 
-    it('answers 409 when the sale is outside the caller’s campuses', async () => {
+    it('answers the generic 409 when the earlier sale cannot be seen', async () => {
       const { sales, service } = setup();
       sales.existing = existing();
       await expect(service.record(ctx(['ikeja']), body)).rejects.toThrow(

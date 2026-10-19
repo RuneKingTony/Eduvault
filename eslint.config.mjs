@@ -188,6 +188,21 @@ export const spaConfig = [
   },
 ];
 
+// Backend projects add this to their own config; a pattern in the root config would be re-based to each project.
+export const noWeakMatchers = {
+  files: ['**/*.spec.ts', '**/test/**/*.ts'],
+  rules: {
+    'vitest/no-restricted-matchers': [
+      'error',
+      {
+        toBeDefined: 'Assert the value, not that it exists.',
+        toBeTruthy: 'Assert the value, not that it is truthy.',
+        toBeFalsy: 'Assert the value, not that it is falsy.',
+      },
+    ],
+  },
+};
+
 export default [
   ...nx.configs['flat/base'],
   ...nx.configs['flat/typescript'],
@@ -423,6 +438,17 @@ export default [
       '@typescript-eslint/no-unsafe-member-access': 'off',
       '@typescript-eslint/no-unsafe-return': 'off',
       '@typescript-eslint/unbound-method': 'off',
+    },
+  },
+  {
+    // A contract runner registers each scenario under the contract's own title, so the title is not a literal; runScenario carries the assertions.
+    files: ['**/store-repository.integration.spec.ts'],
+    rules: {
+      'vitest/expect-expect': [
+        'error',
+        { assertFunctionNames: ['expect', 'runScenario'] },
+      ],
+      'vitest/valid-title': 'off',
     },
   },
   {

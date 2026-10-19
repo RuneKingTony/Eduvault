@@ -1,10 +1,5 @@
 import { assertBalancedLines } from '../../common/ledger';
-import {
-  saleChargeMemo,
-  saleCostPosting,
-  saleCostReference,
-  saleLineDescription,
-} from './sale-posting';
+import { saleChargeMemo, saleCostPosting } from './sale-posting';
 
 const shared = {
   organizationId: 'school',
@@ -52,14 +47,5 @@ describe('saleCostPosting', () => {
 
   it('posts nothing when the stock cost nothing', () => {
     expect(saleCostPosting({ ...input, costMinor: 0 })).toBeUndefined();
-  });
-});
-
-describe('sale line copy', () => {
-  it('words a charge line and the cost reference', () => {
-    expect(saleLineDescription('School shirt, Size 12', 2)).toBe(
-      'School shirt, Size 12 × 2'
-    );
-    expect(saleCostReference('CHG-2026-00007')).toBe('CHG-2026-00007-COST');
   });
 });

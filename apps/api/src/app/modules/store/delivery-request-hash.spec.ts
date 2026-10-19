@@ -23,9 +23,11 @@ const hashOf = (change: Partial<RecordDelivery> = {}) =>
   deliveryRequestHash({ ...base, ...change });
 
 describe('deliveryRequestHash', () => {
-  it('is the same for the same request, a hex SHA-256', () => {
-    expect(hashOf()).toBe(hashOf());
-    expect(hashOf()).toMatch(/^[0-9a-f]{64}$/);
+  // requestHash is stored on the delivery, so changing the canonical form would turn replays of old references into 409s.
+  it('is the SHA-256 of the canonical request, as stored on earlier deliveries', () => {
+    expect(hashOf()).toBe(
+      '95c2285fea5d2afacd9cfa194c3cd443db19c7045e8927ac0dc43ddce9b5a6d6'
+    );
   });
 
   it('ignores the order of the lines', () => {
@@ -49,9 +51,6 @@ describe('deliveryRequestHash', () => {
 
   it('keeps an omitted date apart from a given one', () => {
     expect(hashOf({ receivedOn: '2026-10-07' })).not.toBe(hashOf());
-    expect(hashOf({ receivedOn: '2026-10-07' })).toBe(
-      hashOf({ receivedOn: '2026-10-07' })
-    );
   });
 
   it.each<[string, Partial<RecordDelivery>]>([

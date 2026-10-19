@@ -40,7 +40,7 @@ test.describe('resetting a student’s login', () => {
     const before = await api({ cookie })
       .get('/api/auth/get-session')
       .expect(200);
-    expect(before.body.user.id).toBeTruthy();
+    expect(before.body.user.id).toEqual(expect.any(String));
 
     const reset = await api(owner)
       .post(`/students/${studentLekki.id}/reset-login`)

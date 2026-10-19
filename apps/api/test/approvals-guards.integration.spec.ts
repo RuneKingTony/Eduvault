@@ -35,7 +35,7 @@ test.describe('references to another school’s rows', () => {
     });
     await sendRun(api, ownerB, runId ?? '');
     const [chargeB] = (await invoicesOf(api, ownerB)).items;
-    expect(chargeB).toBeDefined();
+    expect(chargeB).toMatchObject({ id: expect.any(String) });
     const receivableA = await ledgerAccountId(pool, orgA.id, 1100);
     const base = {
       kind: 'credit_note',

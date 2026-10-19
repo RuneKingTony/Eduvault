@@ -4,6 +4,7 @@ import {
   DELIVERY_FUTURE_DATE_MESSAGE,
   DELIVERY_QUANTITY_MAX,
   DELIVERY_QUANTITY_MAX_MESSAGE,
+  DELIVERY_REFERENCE_TAKEN_MESSAGE,
   DELIVERY_REQUIRED_MESSAGE,
   DELIVERY_UNIT_COST_MESSAGE,
   ITEM_PRICE_BELOW_COST_MESSAGE,
@@ -64,6 +65,13 @@ const messageOf = (res: {
 
 const byJson = (a: unknown, b: unknown) =>
   JSON.stringify(a).localeCompare(JSON.stringify(b));
+
+const bookOf = (name: string, levelId: string) => ({
+  kind: 'book',
+  name,
+  variant: null,
+  classLevelId: levelId,
+});
 
 const stockOf = (item: Item, campusId: string) =>
   item.stock.find((row) => row.campusId === campusId);
@@ -615,6 +623,37 @@ test.describe('items', () => {
     expect(free.body).toMatchObject({ costPriceMinor: 0 });
   });
 
+  test('refuses a rename onto another active item with 409, but allows the name on a different class level', async ({
+    api,
+    pool,
+    schools: { owner, orgA },
+  }) => {
+    await createItem(api, owner);
+    const size14 = await createItem(api, owner, { variant: 'Size 14' });
+
+    const clash = await api(owner)
+      .patch(`/store/items/${size14.id}`)
+      .send({ variant: 'Size 12' })
+      .expect(409);
+    expect(clash.body.message).toBe(
+      itemDuplicateMessage('School shirt, Size 12')
+    );
+
+    const jss1 = await classLevelId(pool, orgA.id, 'JSS1');
+    const jss2 = await classLevelId(pool, orgA.id, 'JSS2');
+    await createItem(api, owner, bookOf('Mathematics', jss1));
+    const workbook = await createItem(
+      api,
+      owner,
+      bookOf('Mathematics workbook', jss2)
+    );
+
+    await api(owner)
+      .patch(`/store/items/${workbook.id}`)
+      .send({ name: 'Mathematics' })
+      .expect(200);
+  });
+
   test('allows the same name again once the first item is retired', async ({
     api,
     schools: { owner },
@@ -881,6 +920,38 @@ test.describe('isolation', () => {
     expect(items.items[0]?.stock.map((row) => row.campusId)).toEqual([
       lekki.id,
     ]);
+  });
+
+  test('a Lekki member reusing the reference of an Ikeja delivery gets the bare 409 and nothing is written (case 10)', async ({
+    api,
+    app,
+    pool,
+    schools: { owner, lekkiOnly, lekki, ikeja },
+  }) => {
+    const size12 = await createItem(api, owner);
+    const bank = await bankAccount(app, owner);
+    const lines = [{ itemId: size12.id, quantity: 10, unitCostMinor: COST }];
+    const atIkeja = await receive(api, owner, {
+      campusId: ikeja.id,
+      accountId: bank.id,
+      lines,
+    });
+
+    const res = await api(lekkiOnly)
+      .post('/store/deliveries')
+      .send(
+        deliveryBody({
+          reference: atIkeja.reference,
+          campusId: lekki.id,
+          accountId: bank.id,
+          lines,
+        })
+      );
+
+    expect(res.status).toBe(409);
+    expect(res.body.message).toBe(DELIVERY_REFERENCE_TAKEN_MESSAGE);
+    expect(await rows(pool, 'stock_delivery')).toBe(1);
+    expect(await rows(pool, 'stock_movement')).toBe(1);
   });
 
   test('a member with no permission gets 403 and no session gets 401 on every store route (cases 5 and 6)', async ({

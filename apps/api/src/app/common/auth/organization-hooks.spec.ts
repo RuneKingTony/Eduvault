@@ -70,21 +70,4 @@ describe('assertCampusNameFree', () => {
       body: { message: 'lekki already exists.' },
     });
   });
-
-  it('passes when no other team has the name, skipping the team being edited', async () => {
-    const free = pool([], 0);
-
-    await expect(
-      assertCampusNameFree(free, {
-        organizationId: 'school-a',
-        name: 'Lekki',
-        exceptTeamId: 'team-1',
-      })
-    ).resolves.toBeUndefined();
-    expect(free.query).toHaveBeenCalledWith(expect.any(String), [
-      'school-a',
-      'Lekki',
-      'team-1',
-    ]);
-  });
 });

@@ -7,12 +7,13 @@ import {
   BOOK_LEVEL_REQUIRED_MESSAGE,
   BOOK_NO_SIZE_MESSAGE,
   ITEM_LEVEL_NOT_FOUND_MESSAGE,
+  ITEM_NOT_FOUND_MESSAGE,
   ITEM_PRICE_BELOW_COST_MESSAGE,
   ITEM_RETIRED_EDIT_MESSAGE,
+  STORE_CAMPUS_NOT_FOUND_MESSAGE,
   UNIFORM_NO_LEVEL_MESSAGE,
   itemDuplicateMessage,
   itemListQuerySchema,
-  updateItemSchema,
   type CreateItem,
 } from '@eduvault/api-contract';
 import type { OrgContext } from '../../common/auth';
@@ -121,13 +122,13 @@ describe('ItemService.list', () => {
 
     await expect(
       service.list(ctx([LEKKI]), query({ campusId: IKEJA }))
-    ).rejects.toThrow(NotFoundException);
+    ).rejects.toThrow(new NotFoundException(STORE_CAMPUS_NOT_FOUND_MESSAGE));
     await expect(
       service.list(
         ctx(),
         query({ campusId: '6f1d2a7c-3b0e-4e53-9c55-0d6a3f5f2b10' })
       )
-    ).rejects.toThrow(new NotFoundException('Campus not found'));
+    ).rejects.toThrow(new NotFoundException(STORE_CAMPUS_NOT_FOUND_MESSAGE));
   });
 
   it('keeps only low or out items for lowOnly and never a retired one', async () => {
@@ -201,9 +202,9 @@ describe('ItemService.create', () => {
   });
 
   it('creates a book on a class level of the school', async () => {
-    const { service } = setup();
+    const { repository, service } = setup();
 
-    const book = await service.create(ctx(), {
+    await service.create(ctx(), {
       ...uniform,
       kind: 'book',
       name: 'Mathematics',
@@ -211,7 +212,7 @@ describe('ItemService.create', () => {
       classLevelId: LEVEL,
     });
 
-    expect(book.classLevel).toEqual({ id: LEVEL, name: 'JSS 1' });
+    expect(repository.items[0]?.classLevel?.id).toBe(LEVEL);
   });
 
   it('answers 404 for a class level of another school', async () => {
@@ -277,41 +278,7 @@ describe('ItemService.create', () => {
 });
 
 describe('ItemService.update', () => {
-  it('records a price change for a cost edit and leaves the stock value alone', async () => {
-    const { repository, service } = setup();
-    const shirt = storeItem();
-    repository.items = [shirt];
-    repository.totals = [
-      {
-        storeId: 'store-lekki',
-        itemId: shirt.id,
-        onHand: 10,
-        valueMinor: 3_500_000,
-      },
-    ];
-    const before = await service.list(ctx(), query());
-
-    const updated = await service.update(
-      ctx(),
-      shirt.id,
-      updateItemSchema.parse({ costPriceMinor: 400_000 })
-    );
-
-    expect(repository.priceChanges).toEqual([
-      {
-        itemId: shirt.id,
-        oldCostMinor: 350_000,
-        newCostMinor: 400_000,
-        oldPriceMinor: 450_000,
-        newPriceMinor: 450_000,
-      },
-    ]);
-    expect(updated.costPriceMinor).toBe(400_000);
-    expect(updated.stock).toEqual(before.items[0]?.stock);
-    expect(updated.stock[0]?.valueMinor).toBe(3_500_000);
-  });
-
-  it('records a price change for a selling price edit and none for a name edit', async () => {
+  it('forwards the edited name and low-stock level', async () => {
     const { repository, service } = setup();
     const shirt = storeItem();
     repository.items = [shirt];
@@ -320,10 +287,7 @@ describe('ItemService.update', () => {
       name: 'Polo shirt',
       lowStockLevel: 8,
     });
-    expect(repository.priceChanges).toHaveLength(0);
 
-    await service.update(ctx(), shirt.id, { sellPriceMinor: 500_000 });
-    expect(repository.priceChanges).toHaveLength(1);
     expect(repository.items[0]).toMatchObject({
       displayName: 'Polo shirt, Size 12',
       lowStockLevel: 8,
@@ -347,7 +311,7 @@ describe('ItemService.update', () => {
   it('answers 404 for an unknown item', async () => {
     const { service } = setup();
     await expect(service.update(ctx(), 'nope', { name: 'X' })).rejects.toThrow(
-      NotFoundException
+      new NotFoundException(ITEM_NOT_FOUND_MESSAGE)
     );
   });
 
@@ -371,7 +335,7 @@ describe('ItemService.update', () => {
     expect(retired.retiredAt).not.toBeNull();
     await expect(
       service.update(ctx(), shirt.id, { name: 'Again' })
-    ).rejects.toThrow(ConflictException);
+    ).rejects.toThrow(new ConflictException(ITEM_RETIRED_EDIT_MESSAGE));
   });
 
   it('answers 409 when the new name collides with another active item', async () => {

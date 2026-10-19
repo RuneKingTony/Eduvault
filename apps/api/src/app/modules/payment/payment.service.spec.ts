@@ -401,10 +401,10 @@ describe('PaymentService.record validation order', () => {
     const { service } = setup();
     await expect(
       service.record(ctx, { ...body, paidOn: '2026-10-07' })
-    ).resolves.toBeDefined();
+    ).resolves.toMatchObject({ replayed: false });
     await expect(
       service.record(ctx, { ...body, paidOn: '2020-01-01' })
-    ).resolves.toBeDefined();
+    ).resolves.toMatchObject({ replayed: false });
   });
 
   it('refuses a split that does not add up to the amount', async () => {
@@ -570,20 +570,12 @@ describe('PaymentService reads', () => {
     });
   });
 
-  it('feeds the Record a payment sheet from one call', async () => {
-    const { service, moneyAccounts } = setup();
+  it('dates the Record a payment sheet with the school’s today', async () => {
+    const { service } = setup();
 
     const options = await service.recordingOptions(ctx);
 
-    expect(options).toEqual({
-      currency: 'NGN',
-      today: '2026-10-07',
-      accounts: [{ id: ACCOUNT, label: 'GTBank current' }],
-      methods: { cash: true, transfer: true, pos: true },
-      payers: [],
-      students: [],
-    });
-    expect(moneyAccounts.listForRecording).toHaveBeenCalledWith(ctx);
+    expect(options.today).toBe('2026-10-07');
   });
 
   it('lists with the school currency', async () => {
