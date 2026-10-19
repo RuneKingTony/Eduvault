@@ -21,7 +21,7 @@ import { paidByLabel } from './purchase-text';
 
 export function PurchaseCard({ sale }: { sale: PortalPurchase }) {
   return (
-    <Card>
+    <Card role="group" aria-label={`Purchase ${sale.receiptNumber}`}>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <ShoppingCartIcon aria-hidden="true" className="size-4" />

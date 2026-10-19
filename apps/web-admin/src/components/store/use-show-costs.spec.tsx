@@ -26,10 +26,10 @@ describe('useShowCosts', () => {
   });
 
   it('remembers the choice for the next visit', () => {
-    const first = render(<Probe />);
+    const { unmount } = render(<Probe />);
     fireEvent.click(screen.getByRole('button'));
     expect(localStorage.getItem(SHOW_COSTS_KEY)).toBe('true');
-    first.unmount();
+    unmount();
 
     render(<Probe />);
     expect(screen.getByRole('button')).toHaveTextContent('on');

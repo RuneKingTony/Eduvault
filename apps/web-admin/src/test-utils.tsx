@@ -6,11 +6,8 @@ import type {
   MePermissions,
   PlatformSchool,
 } from '@eduvault/api-contract';
-import {
-  PermissionsProvider,
-  accessOfStarter,
-  fakeAccess,
-} from '@eduvault/auth-client';
+import { PermissionsProvider } from '@eduvault/auth-client';
+import { accessOfStarter, fakeAccess } from '@eduvault/auth-client/testing';
 import { ALL_PERMISSIONS, READ_PERMS, toPermissionMap } from '@eduvault/policy';
 import { TooltipProvider } from '@eduvault/ui';
 import { ApiProvider, type Api } from './api';
@@ -110,7 +107,7 @@ export function renderWithApi(
   };
 }
 
-export { fakeAccess } from '@eduvault/auth-client';
+export { fakeAccess } from '@eduvault/auth-client/testing';
 
 export function seedFeeSetup(queryClient: QueryClient) {
   const key = feeSetupQueryOptions({} as Api).queryKey;

@@ -11,9 +11,20 @@ import {
   renderWithApi,
   starterAccess,
 } from '../test-utils';
-import { CATALOGUE, IKEJA, LEKKI, detail } from '../test-members';
+import {
+  ADA_ID,
+  CATALOGUE,
+  IKEJA,
+  LEKKI,
+  detail,
+  signedIn,
+} from '../test-members';
+import { testId } from '../test-api';
 import { approvedLeave, leaveDto } from '../test-leave';
 import { MemberPage, type NewAccountNotice } from './member-page';
+
+const ARM_ID = testId(0x2_00_01);
+const SECOND_LEAVE_ID = testId(0x2_00_02);
 
 interface Options {
   member?: MemberDetail | Error;
@@ -33,12 +44,22 @@ function setup({ member = detail(), notice, access }: Options = {}) {
       roles: vi.fn().mockResolvedValue(CATALOGUE),
     },
     campuses: { list: vi.fn().mockResolvedValue([LEKKI, IKEJA]) },
-    me: { get: vi.fn().mockResolvedValue({ user: { id: 'someone-else' } }) },
+    me: {
+      get: vi.fn().mockResolvedValue(
+        signedIn({
+          user: {
+            id: 'someone-else',
+            email: 'else@example.test',
+            name: 'Someone Else',
+          },
+        })
+      ),
+    },
     leave: {
       list: vi.fn().mockResolvedValue([
         approvedLeave({ reason: 'Private reason' }),
         leaveDto({
-          id: 'two',
+          id: SECOND_LEAVE_ID,
           startsOn: '2026-10-20',
           endsOn: '2026-10-20',
           days: 1,
@@ -48,7 +69,7 @@ function setup({ member = detail(), notice, access }: Options = {}) {
   };
   renderWithApi(
     <MemberPage
-      memberId="m1"
+      memberId={ADA_ID}
       schoolName="Greenfield College"
       notice={notice}
       onBack={onBack}
@@ -84,8 +105,8 @@ describe('MemberPage', () => {
     setup({
       member: detail({
         permissions: toPermissionMap(['class:read']),
-        classScope: ['arm-1'],
-        classes: [{ id: 'arm-1', displayName: 'JSS 1 Gold' }],
+        classScope: [ARM_ID],
+        classes: [{ id: ARM_ID, displayName: 'JSS 1 Gold' }],
       }),
     });
     expect(
@@ -135,8 +156,9 @@ describe('MemberPage', () => {
     setup({
       member: detail({ roles: ['member', 'owner'], lastOwner: false }),
     });
+    await openMenu();
     expect(
-      await screen.findByRole('button', { name: 'More actions' })
+      screen.getByRole('menuitem', { name: 'Remove from school…' })
     ).toBeInTheDocument();
   });
 

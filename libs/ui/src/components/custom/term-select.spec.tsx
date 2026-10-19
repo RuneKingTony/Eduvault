@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { TermSelect } from './term-select';
 
 const TERMS = [
@@ -11,7 +11,9 @@ describe('TermSelect', () => {
     render(<TermSelect terms={TERMS} value="first" onChange={vi.fn()} />);
     const select = screen.getByRole('combobox', { name: 'Term' });
     expect(
-      [...select.querySelectorAll('option')].map((option) => option.textContent)
+      within(select)
+        .getAllByRole('option')
+        .map((option) => option.textContent)
     ).toEqual([
       'Whole history',
       'Second term, 2026/2027',

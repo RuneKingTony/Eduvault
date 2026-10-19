@@ -114,14 +114,17 @@ describe('LoginsDialog', () => {
     setup([student, guardian, reused]);
     fireEvent.click(screen.getByRole('button', { name: 'Print slip' }));
     expect(print).toHaveBeenCalled();
-    const slips = document.querySelector('[data-print-slips]');
-    expect(slips?.querySelectorAll('section')).toHaveLength(2);
-    expect(slips?.textContent).toContain('Portal login for Peace Udoh');
-    expect(slips?.textContent).toContain('Greenfield College');
-    expect(slips?.textContent).toContain('Go to http://localhost:4201');
-    expect(slips?.textContent).toContain(
-      'Change this password the first time you sign in.'
-    );
+    expect(screen.getAllByText(/^Portal login for /)).toHaveLength(2);
+    expect(screen.getByText('Portal login for Peace Udoh')).toBeInTheDocument();
+    expect(screen.getByText('Portal login for Mrs Udoh')).toBeInTheDocument();
+    expect(
+      screen.queryByText('Portal login for Shared Parent')
+    ).not.toBeInTheDocument();
+    expect(screen.getAllByText('Greenfield College')).toHaveLength(2);
+    expect(screen.getAllByText('Go to http://localhost:4201')).toHaveLength(2);
+    expect(
+      screen.getAllByText('Change this password the first time you sign in.')
+    ).toHaveLength(2);
   });
 
   it('closes with Done', () => {

@@ -1,15 +1,20 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
-import { ApiError } from '@eduvault/api-contract';
+import { ApiError, type CreateMemberInput } from '@eduvault/api-contract';
 import { renderWithApi } from '../test-utils';
-import { IKEJA, LEKKI, detail } from '../test-members';
+import { IKEJA, LEKKI, detail, signedIn } from '../test-members';
 import { AddMemberSheet } from './add-member-sheet';
 
 function setup({
   campuses = [LEKKI, IKEJA],
-  create = vi.fn().mockResolvedValue({
-    member: detail(),
+  create = vi.fn(({ body }: { body: CreateMemberInput }) => ({
+    member: detail({
+      name: body.name,
+      email: body.email,
+      title: body.title ?? '',
+      campusIds: body.campusIds,
+    }),
     temporaryPassword: 'temp-pass',
-  }),
+  })),
 }: { campuses?: unknown[]; create?: ReturnType<typeof vi.fn> } = {}) {
   const onAdded = vi.fn();
   const onOpenCampuses = vi.fn();
@@ -23,7 +28,9 @@ function setup({
     {
       members: { create },
       campuses: { list: vi.fn().mockResolvedValue(campuses) },
-      me: { get: vi.fn().mockResolvedValue({ activeCampusId: LEKKI.id }) },
+      me: {
+        get: vi.fn().mockResolvedValue(signedIn({ activeCampusId: LEKKI.id })),
+      },
     }
   );
   return { create, onAdded, onOpenCampuses };
@@ -57,7 +64,11 @@ describe('AddMemberSheet', () => {
       });
     });
     await waitFor(() => {
-      expect(onAdded).toHaveBeenCalled();
+      expect(onAdded).toHaveBeenCalledTimes(1);
+    });
+    expect(onAdded.mock.lastCall?.[0]).toMatchObject({
+      member: { name: 'New Hire', email: 'new.hire@example.test' },
+      temporaryPassword: 'temp-pass',
     });
   });
 

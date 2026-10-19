@@ -1,11 +1,11 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import type { MePermissions } from '@eduvault/api-contract';
 import { toPermissionMap } from '@eduvault/policy';
 import { toast } from '@eduvault/ui';
 import { currentCalendar } from '../test-calendar';
 import { IDS } from '../test-classes';
 import { fakeAccess, renderWithApi } from '../test-utils';
-import { ARM_ID, studentDetail } from '../test-students';
+import { ARM_ID, TERM_SECOND_ID, studentDetail } from '../test-students';
 import {
   LeaveDialog,
   MarkAwayDialog,
@@ -169,9 +169,9 @@ describe('LeaveDialog', () => {
   it('lists the six reasons', () => {
     setup();
     expect(
-      [...screen.getByLabelText('Reason').querySelectorAll('option')].map(
-        (option) => option.textContent
-      )
+      within(screen.getByLabelText('Reason'))
+        .getAllByRole('option')
+        .map((option) => option.textContent)
     ).toEqual([
       'Did not return',
       'Relocated',
@@ -291,7 +291,7 @@ const campusAccess = (campusScope: 'all' | string[]): MePermissions =>
 
 describe('MoveDialog', () => {
   const movable = studentDetail({
-    nextTerm: { id: 't2', name: 'Second term' },
+    nextTerm: { id: TERM_SECOND_ID, name: 'Second term' },
     canMoveForNextTerm: true,
   });
 
@@ -311,7 +311,9 @@ describe('MoveDialog', () => {
       expect(select).toHaveValue(ARM_ID);
     });
     expect(
-      [...select.querySelectorAll('option')].map((option) => option.textContent)
+      within(select)
+        .getAllByRole('option')
+        .map((option) => option.textContent)
     ).toEqual(['JSS 2 Gold · Lekki', 'JSS 2 Emerald · Ikeja']);
   });
 
@@ -354,7 +356,7 @@ describe('MoveDialog', () => {
     await waitFor(() => {
       expect(mocks.students.place).toHaveBeenCalledWith({
         params: { id: student.id },
-        body: { termId: 't2', classArmId: IDS.silver },
+        body: { termId: TERM_SECOND_ID, classArmId: IDS.silver },
       });
     });
     await waitFor(() => {

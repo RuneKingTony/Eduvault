@@ -1,16 +1,20 @@
 import { screen } from '@testing-library/react';
 import type { DashboardMoney } from '@eduvault/api-contract';
 import { toPermissionMap } from '@eduvault/policy';
+import { testId } from '../../test-api';
 import { dashboardApi, renderInRouter } from '../../test-dashboard';
 import { fakeAccess, ownerAccess } from '../../test-utils';
 import { SchoolAccountCard } from './school-account-card';
+
+const GTBANK_ID = testId(0x2_30_01);
+const POS_ID = testId(0x2_30_02);
 
 const money = (overrides: Partial<DashboardMoney> = {}): DashboardMoney => ({
   currency: 'NGN',
   totalMinor: 10_700_000,
   accounts: [
     {
-      id: 'ma-1',
+      id: GTBANK_ID,
       name: 'GTBank current',
       kind: 'bank',
       campusName: null,
@@ -18,7 +22,7 @@ const money = (overrides: Partial<DashboardMoney> = {}): DashboardMoney => ({
       balanceMinor: 9_500_000,
     },
     {
-      id: 'ma-2',
+      id: POS_ID,
       name: 'Moniepoint POS',
       kind: 'pos',
       campusName: 'Lekki',

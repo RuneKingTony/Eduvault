@@ -3,8 +3,11 @@ import { ApiError } from '@eduvault/api-contract';
 import { toast } from '@eduvault/ui';
 import {
   BUS,
+  FEE_LINE_BUS,
+  FEE_LINE_PTA,
   PTA,
   TERM_1,
+  TUITION,
   feeGrid,
   feeLine,
   feesApi,
@@ -21,7 +24,7 @@ vi.mock('@eduvault/ui', async (importOriginal) => ({
 }));
 
 const ptaLine = feeLine({
-  id: 'fl-pta',
+  id: FEE_LINE_PTA,
   feeTypeId: PTA.id,
   feeTypeCode: PTA.code,
   feeTypeName: PTA.name,
@@ -29,7 +32,7 @@ const ptaLine = feeLine({
   amountMinor: 1_000_000,
 });
 const busLine = feeLine({
-  id: 'fl-bus',
+  id: FEE_LINE_BUS,
   feeTypeId: BUS.id,
   feeTypeCode: BUS.code,
   feeTypeName: BUS.name,
@@ -48,7 +51,7 @@ const otherGrid = feeGrid({
         gridCell({
           feeTypeId: BUS.id,
           base: {
-            feeLineId: 'fl-bus',
+            feeLineId: FEE_LINE_BUS,
             amountMinor: 4_500_000,
             appliesTo: 'all',
             isOptional: true,
@@ -66,7 +69,7 @@ function setup(
   const api = feesApi({
     lines: [ptaLine, busLine],
     grid: otherGrid,
-    types: [{ id: 'ft-tuition', code: 4010, name: 'Tuition' }, PTA, BUS],
+    types: [TUITION, PTA, BUS],
   });
   const onSearchChange = vi.fn();
   renderFees(

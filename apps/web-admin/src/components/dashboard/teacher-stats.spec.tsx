@@ -1,5 +1,6 @@
 import { screen } from '@testing-library/react';
 import {
+  SECOND_ARM_ID,
   dashboardApi,
   dayOff,
   myClass,
@@ -16,7 +17,11 @@ describe('teacher stats', () => {
     const api = dashboardApi({
       myClasses: [
         myClass({ studentCount: 8 }),
-        myClass({ armId: 'a2', studentCount: 5, isClassTeacher: false }),
+        myClass({
+          armId: SECOND_ARM_ID,
+          studentCount: 5,
+          isClassTeacher: false,
+        }),
       ],
     });
     renderInRouter(

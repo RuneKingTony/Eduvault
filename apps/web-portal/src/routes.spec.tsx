@@ -13,10 +13,9 @@ import {
 } from '@testing-library/react';
 import {
   AuthClientProvider,
-  accessOfStarter,
-  fakeAccess,
   type EduvaultAuthClient,
 } from '@eduvault/auth-client';
+import { accessOfStarter, fakeAccess } from '@eduvault/auth-client/testing';
 import type { MePermissions } from '@eduvault/api-contract';
 import {
   ALL_PERMISSIONS,
@@ -104,7 +103,7 @@ function fakeApi(
   };
 }
 
-function renderAt(path: string, api: ReturnType<typeof fakeApi>) {
+function openAt(path: string, api: ReturnType<typeof fakeApi>) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
@@ -137,7 +136,7 @@ describe('the portal routes', () => {
   });
 
   it('sends a guardian on / with no child to My children', async () => {
-    const router = renderAt('/', fakeApi(guardianWithoutFees()));
+    const router = openAt('/', fakeApi(guardianWithoutFees()));
     expect(
       await screen.findByRole('heading', { name: 'Hello, Ngozi' })
     ).toBeInTheDocument();
@@ -146,7 +145,7 @@ describe('the portal routes', () => {
 
   it('keeps a guardian on Home when a child is chosen, and shows that child', async () => {
     const api = fakeApi(guardianWithoutFees());
-    renderAt(`/?child=${ADA_ID}`, api);
+    openAt(`/?child=${ADA_ID}`, api);
     expect(
       await screen.findByRole('heading', { name: 'Ada Okeke' })
     ).toBeInTheDocument();
@@ -157,7 +156,7 @@ describe('the portal routes', () => {
 
   it('falls back to the first child for an id that is not linked', async () => {
     const api = fakeApi(guardianWithoutFees());
-    renderAt(`/?child=${STRANGER_ID}`, api);
+    openAt(`/?child=${STRANGER_ID}`, api);
     await screen.findByRole('heading', { name: 'Ada Okeke' });
     expect(api.portal.student).not.toHaveBeenCalledWith({
       params: { studentId: STRANGER_ID },
@@ -165,7 +164,7 @@ describe('the portal routes', () => {
   });
 
   it('opens Home for a child from My children, carrying the child', async () => {
-    const router = renderAt('/children', fakeApi(guardianWithoutFees()));
+    const router = openAt('/children', fakeApi(guardianWithoutFees()));
     (await screen.findByRole('button', { name: /Tobi Okeke/ })).click();
     await waitFor(() => {
       expect(router.state.location.pathname).toBe('/');
@@ -175,7 +174,7 @@ describe('the portal routes', () => {
 
   it('opens the full announcements list for the chosen child and goes back to Home', async () => {
     const api = fakeApi(guardianWithoutFees());
-    const router = renderAt(`/announcements?child=${TOBI_ID}`, api);
+    const router = openAt(`/announcements?child=${TOBI_ID}`, api);
     expect(
       await screen.findByRole('heading', { name: 'Announcements' })
     ).toBeInTheDocument();
@@ -183,7 +182,7 @@ describe('the portal routes', () => {
       params: { studentId: TOBI_ID },
       query: { page: 1, pageSize: 10 },
     });
-    screen.getByRole('button', { name: 'Back to Home' }).click();
+    fireEvent.click(screen.getByRole('button', { name: 'Back to Home' }));
     await waitFor(() => {
       expect(router.state.location.pathname).toBe('/');
     });
@@ -192,7 +191,7 @@ describe('the portal routes', () => {
 
   it('opens Purchases for the chosen child, last in the nav, carrying the child', async () => {
     const api = fakeApi(guardianAccess());
-    const router = renderAt(`/?child=${TOBI_ID}`, api);
+    const router = openAt(`/?child=${TOBI_ID}`, api);
     await screen.findByRole('heading', { name: 'Ada Okeke' });
     const links = screen
       .getAllByRole('link')
@@ -217,7 +216,7 @@ describe('the portal routes', () => {
 
   it('falls back to the first child on Purchases for an id that is not linked', async () => {
     const api = fakeApi(guardianAccess());
-    renderAt(`/purchases?child=${STRANGER_ID}`, api);
+    openAt(`/purchases?child=${STRANGER_ID}`, api);
     await screen.findByRole('heading', { name: 'Purchases' });
     expect(api.portal.purchases).toHaveBeenCalledWith({
       params: { studentId: ADA_ID },
@@ -229,7 +228,7 @@ describe('the portal routes', () => {
 
   it('sends a family without invoice:readOwn from Purchases to Home and keeps it out of the nav', async () => {
     const api = fakeApi(guardianWithoutFees());
-    const router = renderAt(`/purchases?child=${ADA_ID}`, api);
+    const router = openAt(`/purchases?child=${ADA_ID}`, api);
     expect(
       await screen.findByRole('heading', { name: 'Ada Okeke' })
     ).toBeInTheDocument();
@@ -242,7 +241,7 @@ describe('the portal routes', () => {
 
   it('sends a student on /children to Home', async () => {
     const ownSelf = portalMe({ kind: 'student', children: [ada] });
-    const router = renderAt(
+    const router = openAt(
       '/children',
       fakeApi(accessOfStarter('student', []), ownSelf)
     );
@@ -257,7 +256,7 @@ describe('the portal routes', () => {
 
   it('shows staff the staff screen and never asks for portal data', async () => {
     const api = fakeApi(accessOfStarter('administrator', []));
-    renderAt('/', api);
+    openAt('/', api);
     expect(
       await screen.findByText(
         'This portal is for students and guardians. Staff use web-admin.'
@@ -275,7 +274,7 @@ describe('the portal routes', () => {
         permissions: toPermissionMap(ALL_PERMISSIONS),
       })
     );
-    renderAt('/children', api);
+    openAt('/children', api);
     expect(
       await screen.findByText(/This portal is for students and guardians/)
     ).toBeInTheDocument();
@@ -283,7 +282,7 @@ describe('the portal routes', () => {
   });
 
   it('shows the staff screen to a portal role that lost student:readOwn', async () => {
-    renderAt(
+    openAt(
       '/',
       fakeApi({ ...accessOfStarter('guardian', []), permissions: {} })
     );
@@ -294,7 +293,7 @@ describe('the portal routes', () => {
 
   it('opens Fees for the chosen child with invoice:readOwn', async () => {
     const api = fakeApi(guardianAccess());
-    const router = renderAt(`/fees?child=${TOBI_ID}`, api);
+    const router = openAt(`/fees?child=${TOBI_ID}`, api);
     expect(
       await screen.findByRole('heading', { name: 'Fees' })
     ).toBeInTheDocument();
@@ -323,7 +322,7 @@ describe('the portal routes', () => {
           },
         })
     );
-    const router = renderAt(`/fees?child=${ADA_ID}`, api);
+    const router = openAt(`/fees?child=${ADA_ID}`, api);
     await screen.findByText('Ada Okeke');
 
     const group = screen.getByRole('group', { name: 'Viewing child' });
@@ -341,7 +340,7 @@ describe('the portal routes', () => {
 
   it('falls back to the first child on Fees for an id that is not linked', async () => {
     const api = fakeApi(guardianAccess());
-    renderAt(`/fees?child=${STRANGER_ID}`, api);
+    openAt(`/fees?child=${STRANGER_ID}`, api);
     await screen.findByRole('heading', { name: 'Fees' });
     expect(api.portal.statement).toHaveBeenCalledWith({
       params: { studentId: ADA_ID },
@@ -355,7 +354,7 @@ describe('the portal routes', () => {
 
   it('sends Fees back to Home without invoice:readOwn and never asks for a statement', async () => {
     const api = fakeApi(guardianWithoutFees());
-    const router = renderAt(`/fees?child=${ADA_ID}`, api);
+    const router = openAt(`/fees?child=${ADA_ID}`, api);
     expect(
       await screen.findByRole('heading', { name: 'Ada Okeke' })
     ).toBeInTheDocument();
@@ -364,7 +363,7 @@ describe('the portal routes', () => {
   });
 
   it('lists Fees in the navigation with invoice:readOwn', async () => {
-    renderAt(`/?child=${ADA_ID}`, fakeApi(guardianAccess()));
+    openAt(`/?child=${ADA_ID}`, fakeApi(guardianAccess()));
     await screen.findByRole('heading', { name: 'Ada Okeke' });
     expect(
       screen.getAllByRole('link', { name: 'Fees' }).length
@@ -372,7 +371,7 @@ describe('the portal routes', () => {
   });
 
   it('leaves Fees out of the navigation without invoice:readOwn', async () => {
-    renderAt(`/?child=${ADA_ID}`, fakeApi(guardianWithoutFees()));
+    openAt(`/?child=${ADA_ID}`, fakeApi(guardianWithoutFees()));
     await screen.findByRole('heading', { name: 'Ada Okeke' });
     expect(
       screen.getAllByRole('link', { name: 'Home' }).length
