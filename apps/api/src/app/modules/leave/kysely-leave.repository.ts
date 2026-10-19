@@ -10,7 +10,7 @@ import { holds, resolvePermissions, splitRoles } from '@eduvault/policy';
 import type { DB } from '../../../db/db-types';
 import { ActivityWriter, type ActivityInput } from '../../common/activity';
 import { decisionsFor } from '../../common/approvals';
-import { customRolePermissions } from '../../common/auth';
+import { schoolRolePermissions } from '../../common/auth';
 import { day, iso, isoOrNull } from '../../common/db/rows';
 import { KYSELY_TOKEN, type Database } from '../../common/db/tokens';
 import { inScope } from '../../common/students';
@@ -379,20 +379,15 @@ export class KyselyLeaveRepository extends LeaveRepository {
     organizationId: string,
     userId: string
   ): Promise<boolean> {
-    const [members, roles] = await Promise.all([
+    const [members, custom] = await Promise.all([
       this.db
         .selectFrom('member')
         .select('role')
         .where('organizationId', '=', organizationId)
         .where('userId', '<>', userId)
         .execute(),
-      this.db
-        .selectFrom('organizationRole')
-        .select(['role', 'permission'])
-        .where('organizationId', '=', organizationId)
-        .execute(),
+      schoolRolePermissions(this.db, organizationId),
     ]);
-    const custom = customRolePermissions(roles);
     return members.some((member) =>
       holds(
         resolvePermissions(splitRoles(member.role), custom),
