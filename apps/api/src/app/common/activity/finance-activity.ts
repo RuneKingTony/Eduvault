@@ -22,6 +22,7 @@ type FinanceSubject =
   | 'term'
   | 'store_sale'
   | 'stock_count'
+  | 'stock_delivery'
   | 'invoice';
 
 export interface FinanceActor {
@@ -93,6 +94,17 @@ export interface StoreWriteOffFacts {
   storeId: string;
   campusId: string;
   campusName: string;
+}
+
+export interface StoreDeliveryFacts {
+  id: string;
+  number: string;
+  storeId: string;
+  campusId: string;
+  campusName: string;
+  supplierName: string;
+  lines: number;
+  totalMinor: number;
 }
 
 export const financeActor = (
@@ -338,6 +350,45 @@ export function storeWriteOffDeclinedActivity(
     }),
   ];
 }
+
+export const storeDeliveryReceivedActivity = (
+  actor: FinanceActor,
+  delivery: StoreDeliveryFacts
+): ActivityInput[] => [
+  finance(actor, {
+    campusId: delivery.campusId,
+    kind: 'store_delivery.received',
+    subject: { type: 'stock_delivery', id: delivery.id },
+    text: `${actor.name} received delivery ${delivery.number} from ${delivery.supplierName} at the ${delivery.campusName} store: ${countOf(delivery.lines, 'item', 'items')}, ${money(delivery.totalMinor, actor.currency)}.`,
+    data: {
+      deliveryId: delivery.id,
+      number: delivery.number,
+      storeId: delivery.storeId,
+      supplierName: delivery.supplierName,
+      items: delivery.lines,
+      totalMinor: delivery.totalMinor,
+    },
+  }),
+];
+
+export const storeOpeningStockRecordedActivity = (
+  actor: FinanceActor,
+  delivery: StoreDeliveryFacts
+): ActivityInput[] => [
+  finance(actor, {
+    campusId: delivery.campusId,
+    kind: 'store_opening_stock.recorded',
+    subject: { type: 'stock_delivery', id: delivery.id },
+    text: `${actor.name} recorded opening stock at the ${delivery.campusName} store: ${countOf(delivery.lines, 'item', 'items')}, ${money(delivery.totalMinor, actor.currency)}.`,
+    data: {
+      deliveryId: delivery.id,
+      number: delivery.number,
+      storeId: delivery.storeId,
+      items: delivery.lines,
+      totalMinor: delivery.totalMinor,
+    },
+  }),
+];
 
 export function paymentCancelledActivity(
   actor: FinanceActor,

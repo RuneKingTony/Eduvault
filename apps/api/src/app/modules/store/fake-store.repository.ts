@@ -1,7 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { itemDisplayName, type DeliveryDetail } from '@eduvault/api-contract';
+import type { ActivityInput } from '../../common/activity';
+import { receiveValue } from './stock-value';
 import {
   StoreRepository,
+  type DeliveryActivity,
   type DeliveryOutcome,
   type DeliveryPage,
   type DeliveryPageQuery,
@@ -103,6 +106,7 @@ export class FakeStoreRepository extends StoreRepository {
   opening = false;
   outcome: DeliveryOutcome = { status: 'recorded', id: 'delivery-1' };
   inserted: NewDelivery[] = [];
+  activity: ActivityInput[] = [];
   priceChanges: PriceChangeRecord[] = [];
   suppliers: string[] = [];
 
@@ -273,8 +277,30 @@ export class FakeStoreRepository extends StoreRepository {
     return Promise.resolve(this.opening);
   }
 
-  insertDelivery(input: NewDelivery): Promise<DeliveryOutcome> {
+  currency(): Promise<string> {
+    return Promise.resolve('NGN');
+  }
+
+  insertDelivery(
+    input: NewDelivery,
+    activity: DeliveryActivity
+  ): Promise<DeliveryOutcome> {
     this.inserted.push(input);
+    if (this.outcome.status === 'recorded') {
+      this.activity.push(
+        ...activity({
+          id: this.outcome.id,
+          number: input.isOpening
+            ? `OPEN-STORE-${input.store.campusId}`
+            : 'DEL-2026-0001',
+          totalMinor: input.lines.reduce(
+            (sum, line) =>
+              sum + receiveValue(line.quantity, line.unitCostMinor),
+            0
+          ),
+        })
+      );
+    }
     return Promise.resolve(this.outcome);
   }
 
