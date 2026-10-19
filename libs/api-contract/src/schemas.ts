@@ -14,11 +14,22 @@ import {
   countOf,
   fmtDate,
   fmtDateRange,
+  isReservedReference,
   type PaymentMethod,
 } from '@eduvault/shared';
 import { z } from 'zod';
 
 export const idSchema = z.uuid();
+
+export const RESERVED_REFERENCE_MESSAGE =
+  'That reference looks like a number the system issues. Use a different one.';
+
+export const JOURNAL_REFERENCE_CLASH_MESSAGE =
+  'That number is already in the books for another record. Nothing was saved.';
+
+/** A client-chosen reference becomes a journal reference, so it must stay out of the system's numbers. */
+export const notReservedReference = (reference: string): boolean =>
+  !isReservedReference(reference);
 
 const REFERENCE_SUFFIX_LENGTH = 8;
 

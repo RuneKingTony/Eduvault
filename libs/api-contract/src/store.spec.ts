@@ -1,5 +1,6 @@
 import { contract } from './contract';
 import type { MoneyAccountKind } from './finance';
+import { RESERVED_REFERENCE_MESSAGE } from './schemas';
 import {
   BOOK_LEVEL_REQUIRED_MESSAGE,
   STOCK_COUNT_LINES_MAX_MESSAGE,
@@ -451,6 +452,15 @@ describe('recordSaleSchema', () => {
   it('takes a student, a method and lines', () => {
     expect(recordSaleSchema.safeParse(sale).success).toBe(true);
   });
+
+  it.each(['ISS-2026-0001', 'chg-2026-00001-cost', 'OPEN-STORE-1'])(
+    'refuses %s, a number the system issues',
+    (reference) => {
+      expect(
+        messages(recordSaleSchema.safeParse({ ...sale, reference }))
+      ).toEqual([RESERVED_REFERENCE_MESSAGE]);
+    }
+  );
 
   it('refuses a sale with no lines', () => {
     expect(
