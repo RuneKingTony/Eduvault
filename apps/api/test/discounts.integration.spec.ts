@@ -1,4 +1,5 @@
 import {
+  DISCOUNT_ALREADY_ENDED_MESSAGE,
   DISCOUNT_END_AFTER_UNTIL_MESSAGE,
   DISCOUNT_END_PAST_MESSAGE,
   DISCOUNT_FEE_TYPE_MESSAGE,
@@ -383,6 +384,39 @@ test.describe('ending a discount', () => {
       .expect(409);
 
     expect(res.body.message).toBe(DISCOUNT_NOT_APPROVED_MESSAGE);
+  });
+
+  test('answers 409 when an ended discount is ended again at another term, and keeps its end', async ({
+    api,
+    app,
+    schools: { owner, lekkiOnly, studentLekki },
+  }) => {
+    const fixture = await chargeFixture(app, api, owner);
+    const { discount } = await askDiscount(api, lekkiOnly, {
+      studentId: studentLekki.id,
+      kind: 'percent',
+      value: 5,
+      ledgerAccountId: null,
+      fromTermId: fixture.firstTermId,
+      reason: 'Ended twice',
+    });
+    await approveDiscount(api, owner, discount.id);
+    await api(lekkiOnly)
+      .post(`/finance/discounts/${discount.id}/end`)
+      .send({ lastTermId: fixture.secondTermId })
+      .expect(200);
+
+    const res = await api(lekkiOnly)
+      .post(`/finance/discounts/${discount.id}/end`)
+      .send({ lastTermId: fixture.firstTermId })
+      .expect(409);
+
+    expect(res.body.message).toBe(DISCOUNT_ALREADY_ENDED_MESSAGE);
+    const list = await api(lekkiOnly).get('/finance/discounts').expect(200);
+    expect(
+      list.body.items.find((row: { id: string }) => row.id === discount.id)
+        ?.toTerm
+    ).toMatchObject({ id: fixture.secondTermId });
   });
 
   test('answers 400 for a last term before the current term or after the existing Until', async ({

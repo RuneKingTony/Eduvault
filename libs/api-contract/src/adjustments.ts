@@ -40,6 +40,8 @@ export const DISCOUNT_UNTIL_MESSAGE = 'Until can’t be before From.';
 export const DISCOUNT_TERM_NOT_FOUND_MESSAGE = 'Term not found';
 export const DISCOUNT_NOT_APPROVED_MESSAGE =
   'Only an approved discount can be ended.';
+export const DISCOUNT_ALREADY_ENDED_MESSAGE =
+  'This discount has already ended.';
 export const DISCOUNT_END_PAST_MESSAGE =
   'The last term can’t be before the current term.';
 export const DISCOUNT_END_AFTER_UNTIL_MESSAGE =
