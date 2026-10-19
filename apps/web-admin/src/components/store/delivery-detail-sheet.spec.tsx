@@ -45,6 +45,13 @@ function setup(
   return { api, onClose, onItem };
 }
 
+const factOf = (label: string) => {
+  const index = screen
+    .getAllByRole('term')
+    .findIndex((term) => term.textContent === label);
+  return screen.getAllByRole('definition')[index];
+};
+
 describe('DeliveryDetailSheet', () => {
   it('shows the delivery read-only: facts, lines and the total', async () => {
     const { api } = setup({ showCosts: true });
@@ -86,18 +93,14 @@ describe('DeliveryDetailSheet', () => {
 
     expect(await screen.findByText('Stock held at go-live.')).toBeVisible();
     expect(screen.getByText('Stock held at go-live')).toBeVisible();
-    expect(
-      screen.getByText('Received by').nextElementSibling
-    ).toHaveTextContent('—');
+    expect(factOf('Received by')).toHaveTextContent('—');
   });
 
   it('still shows the delivery when the campuses fail to load', async () => {
     setup({ campusesFail: true });
 
     expect(await screen.findByText('Adebayo Uniforms Ltd')).toBeVisible();
-    expect(screen.getByText('Campus').nextElementSibling).toHaveTextContent(
-      '—'
-    );
+    expect(factOf('Campus')).toHaveTextContent('—');
   });
 
   it('badges a retired item', async () => {

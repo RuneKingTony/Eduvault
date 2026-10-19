@@ -389,13 +389,18 @@ export function ApprovalsPage({
     can(access.permissions, 'adjustment', 'approve') ||
     can(access.permissions, 'leave', 'approve');
   const staff = access.acting === null;
+  const canDecide = access.acting === null || access.acting.writes;
   if (!approves && staff) {
     return <LeaveOnlyApprovalsPage canWrite />;
   }
   return (
     <section className="flex flex-col gap-4">
       <Header />
-      <Queue canAct={staff} search={search} onSearchChange={onSearchChange} />
+      <Queue
+        canAct={canDecide}
+        search={search}
+        onSearchChange={onSearchChange}
+      />
       {staff ? <MyLeaveCard canWrite /> : null}
     </section>
   );

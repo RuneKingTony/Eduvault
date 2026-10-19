@@ -6,7 +6,7 @@ import {
   PencilIcon,
   RotateCcwIcon,
 } from 'lucide-react';
-import { countOf, fmtDate } from '@eduvault/shared';
+import { countOf, fmtTimestamp } from '@eduvault/shared';
 import { SUBJECT_PAGE_SIZE, type Subject } from '@eduvault/api-contract';
 import { Can } from '@eduvault/auth-client';
 import {
@@ -77,7 +77,7 @@ function StatusBadge({ subject }: { subject: Subject }) {
       <TooltipTrigger asChild>
         <Badge variant="secondary">Archived</Badge>
       </TooltipTrigger>
-      <TooltipContent>Retired {fmtDate(subject.retiredAt)}</TooltipContent>
+      <TooltipContent>Retired {fmtTimestamp(subject.retiredAt)}</TooltipContent>
     </Tooltip>
   );
 }

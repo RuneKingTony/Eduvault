@@ -1,5 +1,10 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import type {
+  CreateMoneyAccountInput,
+  UpdateMoneyAccountInput,
+} from '@eduvault/api-contract';
 import { toast } from '@eduvault/ui';
+import { testId } from '../test-api';
 import { LEKKI, IKEJA, campus } from '../test-announcements';
 import { cashBook, moneyAccount, moneyAccountList } from '../test-money';
 import { ownerAccess, renderWithApi, starterAccess } from '../test-utils';
@@ -10,9 +15,14 @@ vi.mock('@eduvault/ui', async (importOriginal) => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
 
+const POS_ID = testId(0x2_60_01);
+const CASH_BOX_ID = testId(0x2_60_02);
+const ADJUSTMENT_ENTRY_ID = testId(0x2_60_11);
+const OPENING_ENTRY_ID = testId(0x2_60_12);
+
 const gtbank = moneyAccount();
 const pos = moneyAccount({
-  id: '00000000-0000-4000-8000-0000000000c2',
+  id: POS_ID,
   name: 'Moniepoint POS',
   kind: 'pos',
   campusId: LEKKI,
@@ -23,7 +33,7 @@ const pos = moneyAccount({
   balanceMinor: 1_200_000,
 });
 const old = moneyAccount({
-  id: '00000000-0000-4000-8000-0000000000c3',
+  id: CASH_BOX_ID,
   name: 'Old cash box',
   kind: 'cash',
   campusId: IKEJA,
@@ -50,20 +60,40 @@ function setup(
           cashBook(list.items.find((item) => item.id === params.id) ?? gtbank)
         )
       ),
-      create: vi.fn().mockResolvedValue({
-        ...gtbank,
-        name: 'Zenith savings',
-        ledgerCode: 1240,
-      }),
-      update: vi
-        .fn()
-        .mockImplementation(({ body }: { body: { retired?: boolean } }) =>
-          Promise.resolve({
-            ...gtbank,
+      create: vi.fn(({ body }: { body: CreateMoneyAccountInput }) =>
+        Promise.resolve(
+          moneyAccount({
+            id: testId(0x2_60_21),
+            name: body.name,
+            kind: body.kind,
+            bankName: body.bankName ?? null,
+            last4: body.last4 ?? null,
+            campusId: body.campusId,
+            campusName: null,
+            ledgerCode: 1240,
+            balanceMinor: 0,
+          })
+        )
+      ),
+      update: vi.fn(
+        ({
+          params,
+          body,
+        }: {
+          params: { id: string };
+          body: UpdateMoneyAccountInput;
+        }) => {
+          const account =
+            list.items.find((item) => item.id === params.id) ?? gtbank;
+          return Promise.resolve({
+            ...account,
+            name: body.name ?? account.name,
+            last4: body.last4 === undefined ? account.last4 : body.last4,
             retiredAt:
               body.retired === true ? '2026-10-12T09:00:00.000Z' : null,
-          })
-        ),
+          });
+        }
+      ),
     },
     campuses: {
       list: vi
@@ -136,7 +166,7 @@ describe('MoneyAccountsPage tiles', () => {
         total: 2,
         items: [
           {
-            entryId: 'e2',
+            entryId: ADJUSTMENT_ENTRY_ID,
             effectiveOn: '2026-09-20',
             reference: 'ADJ-2026-0001',
             kind: 'adjustment',
@@ -147,7 +177,7 @@ describe('MoneyAccountsPage tiles', () => {
             runningBalanceMinor: 9_470_000,
           },
           {
-            entryId: 'e1',
+            entryId: OPENING_ENTRY_ID,
             effectiveOn: '2026-09-01',
             reference: 'OPEN-MA-1',
             kind: 'opening',
@@ -355,7 +385,7 @@ describe('MoneyAccountsPage edit and retire', () => {
       });
     });
     await waitFor(() => {
-      expect(toast.success).toHaveBeenCalledWith('GTBank current saved.');
+      expect(toast.success).toHaveBeenCalledWith('GTBank main saved.');
     });
   });
 

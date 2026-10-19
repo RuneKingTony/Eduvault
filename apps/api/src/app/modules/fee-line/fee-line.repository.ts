@@ -2,6 +2,7 @@ import type {
   FeeAppliesTo,
   FeeCandidates,
   FeeLine,
+  FeeOptIns,
   FeeOption,
   FeeSetup,
   FeeType,
@@ -239,5 +240,14 @@ export abstract class FeeOptionRepository {
   abstract setOption(
     change: OptionChange,
     activity: OptionActivity
-  ): Promise<void>;
+  ): Promise<boolean>;
+
+  abstract setOptions(
+    changes: { change: OptionChange; activity: OptionActivity }[]
+  ): Promise<number>;
+
+  abstract optInRoster(
+    scope: FeeScope,
+    query: { sessionId: string; feeTypeId: string; q: string | undefined }
+  ): Promise<Pick<FeeOptIns, 'items' | 'total'>>;
 }

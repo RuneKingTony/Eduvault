@@ -14,7 +14,6 @@ import {
 } from '@tanstack/react-router';
 import {
   act,
-  cleanup,
   fireEvent,
   render,
   screen,
@@ -34,6 +33,7 @@ import {
 import { stubMatchMedia } from '@eduvault/ui/testing';
 import { requireGate } from '../access';
 import { ApiProvider, type Api } from '../api';
+import { checked } from '../test-api';
 import { DashboardPage } from '../pages/dashboard-page';
 import { mePermissionsQueryOptions } from '../queries';
 import { createQueryClient } from '../query-client';
@@ -41,6 +41,7 @@ import { approvalSummary } from '../test-approvals';
 import { currentCalendar, noCalendar } from '../test-calendar';
 import { fakeAccess, ownerAccess, starterAccess } from '../test-utils';
 import { profile } from '../test-school';
+import { preview } from '../test-students';
 import { AppShell } from './app-shell';
 import { NotFoundPage } from './page-fallbacks';
 
@@ -104,7 +105,7 @@ async function renderAt(
     schoolAccount: { get: vi.fn().mockResolvedValue(profile({ logoUrl })) },
     calendar: { current: vi.fn().mockResolvedValue(calendar) },
     admissions: {
-      preview: vi.fn().mockResolvedValue({ maxGuardians: 4, requireGuardian }),
+      preview: vi.fn().mockResolvedValue(preview({ requireGuardian })),
     },
     approvals: { summary: vi.fn().mockResolvedValue(summary) },
   } as unknown as Api;
@@ -153,9 +154,9 @@ async function renderAt(
     defaultNotFoundComponent: NotFoundPage,
     defaultErrorComponent: ({ error }) => <ErrorMessage error={error} />,
   });
-  render(
+  const { unmount } = render(
     <QueryClientProvider client={queryClient}>
-      <ApiProvider api={api}>
+      <ApiProvider api={checked(api)}>
         <AuthClientProvider authClient={authClient}>
           <RouterProvider router={router} />
         </AuthClientProvider>
@@ -166,17 +167,24 @@ async function renderAt(
   return {
     permissions,
     router,
+    unmount,
     changeAccessTo: (next: MePermissions) => {
       current = next;
     },
   };
 }
 
-const sidebarNav = () =>
-  document.querySelector<HTMLElement>('[data-slot="sidebar"]')!;
+const sidebarLinks = () => {
+  const inTrail = within(
+    screen.getByRole('navigation', { name: 'Breadcrumb' })
+  ).queryAllByRole('link');
+  return screen.getAllByRole('link').filter((link) => !inTrail.includes(link));
+};
 
-const sidebarState = () =>
-  document.querySelector<HTMLElement>('[data-slot="sidebar"][data-state]')!;
+const sidebarLink = (name: string) =>
+  sidebarLinks().find((link) => link.textContent === name);
+
+const groupToggle = () => screen.queryByRole('button', { name: 'People' });
 
 describe('AppShell', () => {
   beforeEach(() => {
@@ -191,31 +199,23 @@ describe('AppShell', () => {
 
   it('shows the grouped nav with the current item marked and Settings alone at the bottom', async () => {
     await renderAt('/finance/school-fees');
-    const nav = within(sidebarNav());
-    expect(nav.getByRole('button', { name: 'Finance' })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: 'Finance' })).toHaveAttribute(
       'aria-expanded',
       'true'
     );
-    expect(nav.getByRole('link', { name: 'Fees' })).toHaveAttribute(
-      'aria-current',
-      'page'
-    );
-    expect(nav.getByRole('link', { name: 'Students' })).not.toHaveAttribute(
-      'aria-current'
-    );
-    expect(nav.getByRole('link', { name: 'Announcements' })).toHaveAttribute(
+    expect(sidebarLink('Fees')).toHaveAttribute('aria-current', 'page');
+    expect(sidebarLink('Students')).not.toHaveAttribute('aria-current');
+    expect(sidebarLink('Announcements')).toHaveAttribute(
       'href',
       '/announcements'
     );
-    const links = nav.getAllByRole('link').map((link) => link.textContent);
+    const links = sidebarLinks().map((link) => link.textContent);
     expect(links.at(-1)).toBe('Settings');
   });
 
   it('marks Settings active on a settings page', async () => {
     await renderAt('/campuses');
-    expect(
-      within(sidebarNav()).getByRole('link', { name: 'Settings' })
-    ).toHaveAttribute('aria-current', 'page');
+    expect(sidebarLink('Settings')).toHaveAttribute('aria-current', 'page');
   });
 
   it('names Settings › the item in the breadcrumb on a settings page', async () => {
@@ -244,7 +244,7 @@ describe('AppShell', () => {
 
   it('shows the school logo in the side nav crest when there is one', async () => {
     await renderAt('/', { logoUrl: '/files/abc' });
-    const logo = await within(sidebarNav()).findByRole('img', {
+    const logo = await screen.findByRole('img', {
       name: 'Greenfield College logo',
     });
     expect(logo).toHaveAttribute('src', expect.stringMatching(/\/files\/abc$/));
@@ -253,7 +253,7 @@ describe('AppShell', () => {
   it('shows the school’s initials in the crest without a logo', async () => {
     await renderAt('/');
     expect(
-      await within(sidebarNav()).findByRole('img', {
+      await screen.findByRole('img', {
         name: 'Greenfield College crest',
       })
     ).toHaveTextContent('GC');
@@ -261,14 +261,13 @@ describe('AppShell', () => {
 
   it('collapses a group and remembers it', async () => {
     await renderAt('/');
-    const nav = within(sidebarNav());
-    fireEvent.click(nav.getByRole('button', { name: 'People' }));
-    expect(nav.getByRole('button', { name: 'People' })).toHaveAttribute(
+    fireEvent.click(screen.getByRole('button', { name: 'People' }));
+    expect(screen.getByRole('button', { name: 'People' })).toHaveAttribute(
       'aria-expanded',
       'false'
     );
     expect(
-      nav.queryByRole('link', { name: 'Students' })
+      screen.queryByRole('link', { name: 'Students' })
     ).not.toBeInTheDocument();
     expect(localStorage.getItem('eduvault.nav-groups')).toBe('["people"]');
   });
@@ -284,15 +283,15 @@ describe('AppShell', () => {
 
   it('collapses to a rail with the toggle and Cmd+B, and remembers it', async () => {
     await renderAt('/');
-    expect(sidebarState()).toHaveAttribute('data-state', 'expanded');
+    expect(groupToggle()).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Toggle sidebar' }));
-    expect(sidebarState()).toHaveAttribute('data-state', 'collapsed');
+    expect(groupToggle()).not.toBeInTheDocument();
     expect(localStorage.getItem('eduvault.sidebar')).toBe('collapsed');
     fireEvent.keyDown(globalThis as unknown as Window, {
       key: 'b',
       metaKey: true,
     });
-    expect(sidebarState()).toHaveAttribute('data-state', 'expanded');
+    expect(groupToggle()).toBeInTheDocument();
   });
 
   it('leaves the saved rail alone when Cmd+B is pressed in the phone layout', async () => {
@@ -308,15 +307,13 @@ describe('AppShell', () => {
   it('starts as a rail when it was collapsed last time', async () => {
     localStorage.setItem('eduvault.sidebar', 'collapsed');
     await renderAt('/');
-    expect(
-      document.querySelector('[data-slot="sidebar"][data-state]')
-    ).toHaveAttribute('data-state', 'collapsed');
+    expect(groupToggle()).not.toBeInTheDocument();
   });
 
   it('shows the current term and year under the school name', async () => {
     await renderAt('/', { calendar: currentCalendar() });
     expect(
-      await within(sidebarNav()).findByText('First term · 2026/2027')
+      await screen.findByText('First term · 2026/2027')
     ).toBeInTheDocument();
   });
 
@@ -325,13 +322,13 @@ describe('AppShell', () => {
     await waitFor(() => {
       expect(authClient.useListOrganizations).toBeDefined();
     });
-    expect(within(sidebarNav()).queryByText(/·/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/·/)).not.toBeInTheDocument();
   });
 
   it('adds School years and terms to the school menu with session:read', async () => {
     await renderAt('/');
     fireEvent.keyDown(
-      within(sidebarNav()).getByRole('button', { name: /Greenfield College/ }),
+      screen.getByRole('button', { name: /Greenfield College/ }),
       { key: 'Enter' }
     );
     expect(
@@ -342,7 +339,7 @@ describe('AppShell', () => {
   it('leaves School years and terms out of the school menu without session:read', async () => {
     await renderAt('/', { access: starterAccess('teacher') });
     fireEvent.keyDown(
-      within(sidebarNav()).getByRole('button', { name: /Greenfield College/ }),
+      screen.getByRole('button', { name: /Greenfield College/ }),
       { key: 'Enter' }
     );
     await screen.findByRole('menuitem', { name: 'Lakeside Academy' });
@@ -386,17 +383,13 @@ describe('AppShell', () => {
   it('shows the not-found page inside the shell', async () => {
     await renderAt('/nowhere');
     expect(screen.getByText('Page not found')).toBeInTheDocument();
-    expect(
-      within(sidebarNav()).getByRole('link', { name: 'Dashboard' })
-    ).toBeInTheDocument();
+    expect(sidebarLink('Dashboard')).toBeInTheDocument();
   });
 
   it('keeps the shell working after a page throws', async () => {
     await renderAt('/broken');
     expect(screen.getByRole('alert')).toHaveTextContent('Page exploded');
-    expect(
-      within(sidebarNav()).getByRole('link', { name: 'Students' })
-    ).toBeInTheDocument();
+    expect(sidebarLink('Students')).toBeInTheDocument();
   });
 
   it('drops the previous school data from the cache when the school is switched', async () => {
@@ -404,7 +397,7 @@ describe('AppShell', () => {
     queryClient.setQueryData(['students'], [{ fullName: 'Ada Obi' }]);
     await renderAt('/students', { queryClient });
     fireEvent.keyDown(
-      within(sidebarNav()).getByRole('button', { name: /Greenfield College/ }),
+      screen.getByRole('button', { name: /Greenfield College/ }),
       { key: 'Enter' }
     );
     fireEvent.click(
@@ -421,19 +414,15 @@ describe('AppShell', () => {
 
   it('signs out from the user menu', async () => {
     await renderAt('/');
-    fireEvent.keyDown(
-      within(sidebarNav()).getByRole('button', { name: /Funmi Adeyemi/ }),
-      { key: 'Enter' }
-    );
+    fireEvent.keyDown(screen.getByRole('button', { name: /Funmi Adeyemi/ }), {
+      key: 'Enter',
+    });
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Sign out' }));
     expect(signOut).toHaveBeenCalledOnce();
   });
 });
 
-const linkNames = () =>
-  within(sidebarNav())
-    .getAllByRole('link')
-    .map((link) => link.textContent);
+const linkNames = () => sidebarLinks().map((link) => link.textContent);
 
 describe('AppShell access', () => {
   beforeEach(() => {
@@ -482,7 +471,7 @@ describe('AppShell access', () => {
     expect(linkNames()).toContain('Fees');
     changeAccessTo(starterAccess('bursar'));
     fireEvent.keyDown(
-      within(sidebarNav()).getByRole('button', { name: /Greenfield College/ }),
+      screen.getByRole('button', { name: /Greenfield College/ }),
       { key: 'Enter' }
     );
     fireEvent.click(
@@ -512,34 +501,29 @@ describe('AppShell access', () => {
       'Payments',
       'Settings',
     ]);
-    expect(
-      within(sidebarNav()).getByRole('link', { name: 'Settings' })
-    ).toHaveAttribute('href', '/settings/profile');
+    expect(sidebarLink('Settings')).toHaveAttribute(
+      'href',
+      '/settings/profile'
+    );
   });
 
   it('opens Settings on the calendar for a session:read-only member', async () => {
     await renderAt('/', {
       access: fakeAccess({ permissions: { session: ['read'] } }),
     });
-    expect(
-      within(sidebarNav()).getByRole('link', { name: 'Settings' })
-    ).toHaveAttribute('href', '/calendar');
+    expect(sidebarLink('Settings')).toHaveAttribute('href', '/calendar');
   });
 
   it('opens Settings on Roles for a member who can see roles but not campuses', async () => {
     await renderAt('/', {
       access: fakeAccess({ permissions: { ac: ['read'] } }),
     });
-    expect(
-      within(sidebarNav()).getByRole('link', { name: 'Settings' })
-    ).toHaveAttribute('href', '/roles');
+    expect(sidebarLink('Settings')).toHaveAttribute('href', '/roles');
   });
 
   it('marks Settings active on a role page', async () => {
     await renderAt('/roles/new');
-    expect(
-      within(sidebarNav()).getByRole('link', { name: 'Settings' })
-    ).toHaveAttribute('aria-current', 'page');
+    expect(sidebarLink('Settings')).toHaveAttribute('aria-current', 'page');
   });
 
   it('shows a bursar Students and Fees but no Staff and members or Settings', async () => {
@@ -556,9 +540,7 @@ describe('AppShell access', () => {
   it('shows a member with no roles only Dashboard and Approvals', async () => {
     await renderAt('/', { access: fakeAccess() });
     expect(linkNames()).toEqual(['Dashboard', 'Approvals']);
-    expect(
-      within(sidebarNav()).queryByRole('link', { name: 'Settings' })
-    ).not.toBeInTheDocument();
+    expect(sidebarLink('Settings')).toBeUndefined();
   });
 
   it('shows Announcements to an administrator and hides it from a bursar', async () => {
@@ -600,9 +582,7 @@ describe('AppShell access', () => {
 
   it('keeps Fees active on Other fees', async () => {
     await renderAt('/finance/other-fees');
-    expect(
-      within(sidebarNav()).getByRole('link', { name: 'Fees' })
-    ).toHaveAttribute('aria-current', 'page');
+    expect(sidebarLink('Fees')).toHaveAttribute('aria-current', 'page');
   });
 
   it('keeps the command menu to what the member can open', async () => {
@@ -625,7 +605,9 @@ describe('AppShell access', () => {
   });
 
   it('offers Add a fee we charge with feeLine:create and hides it from an administrator', async () => {
-    await renderAt('/', { access: starterAccess('bursar') });
+    const { unmount } = await renderAt('/', {
+      access: starterAccess('bursar'),
+    });
     fireEvent.keyDown(globalThis as unknown as Window, {
       key: 'k',
       ctrlKey: true,
@@ -637,7 +619,7 @@ describe('AppShell access', () => {
     expect(
       screen.getByRole('option', { name: /Add a fee we charge/ })
     ).toBeInTheDocument();
-    cleanup();
+    unmount();
 
     await renderAt('/', { access: starterAccess('administrator') });
     fireEvent.keyDown(globalThis as unknown as Window, {
@@ -654,7 +636,9 @@ describe('AppShell access', () => {
   });
 
   it('offers Record a payment with payment:record and hides it from a reader', async () => {
-    await renderAt('/', { access: starterAccess('bursar') });
+    const { unmount } = await renderAt('/', {
+      access: starterAccess('bursar'),
+    });
     fireEvent.keyDown(globalThis as unknown as Window, {
       key: 'k',
       ctrlKey: true,
@@ -666,7 +650,7 @@ describe('AppShell access', () => {
     expect(
       screen.getByRole('option', { name: /Record a payment/ })
     ).toBeInTheDocument();
-    cleanup();
+    unmount();
 
     await renderAt('/', { access: starterAccess('administrator') });
     fireEvent.keyDown(globalThis as unknown as Window, {
@@ -683,7 +667,9 @@ describe('AppShell access', () => {
   });
 
   it('offers See who owes fees with invoice:read and hides it from a teacher', async () => {
-    await renderAt('/', { access: starterAccess('administrator') });
+    const { unmount } = await renderAt('/', {
+      access: starterAccess('administrator'),
+    });
     fireEvent.keyDown(globalThis as unknown as Window, {
       key: 'k',
       ctrlKey: true,
@@ -695,7 +681,7 @@ describe('AppShell access', () => {
     expect(
       screen.getByRole('option', { name: /See who owes fees/ })
     ).toBeInTheDocument();
-    cleanup();
+    unmount();
 
     await renderAt('/', { access: starterAccess('teacher') });
     fireEvent.keyDown(globalThis as unknown as Window, {
@@ -729,7 +715,9 @@ describe('AppShell access', () => {
   });
 
   it('offers Charge students with invoice:bill and hides it from a reader', async () => {
-    await renderAt('/', { access: starterAccess('bursar') });
+    const { unmount } = await renderAt('/', {
+      access: starterAccess('bursar'),
+    });
     fireEvent.keyDown(globalThis as unknown as Window, {
       key: 'k',
       ctrlKey: true,
@@ -741,7 +729,7 @@ describe('AppShell access', () => {
     expect(
       screen.getByRole('option', { name: /Charge students/ })
     ).toBeInTheDocument();
-    cleanup();
+    unmount();
 
     await renderAt('/', { access: starterAccess('administrator') });
     fireEvent.keyDown(globalThis as unknown as Window, {
@@ -773,7 +761,7 @@ describe('AppShell access', () => {
   });
 
   it('offers Admit a student with student:create and hides it from a bursar', async () => {
-    await renderAt('/');
+    const { unmount } = await renderAt('/');
     fireEvent.keyDown(globalThis as unknown as Window, {
       key: 'k',
       ctrlKey: true,
@@ -785,7 +773,7 @@ describe('AppShell access', () => {
     expect(
       screen.getByRole('option', { name: /Admit a student/ })
     ).toBeInTheDocument();
-    cleanup();
+    unmount();
 
     await renderAt('/', { access: starterAccess('bursar') });
     fireEvent.keyDown(globalThis as unknown as Window, {
@@ -895,10 +883,9 @@ describe('AppShell access', () => {
 
   it('opens My access from the user menu', async () => {
     await renderAt('/', { access: starterAccess('administrator') });
-    fireEvent.keyDown(
-      within(sidebarNav()).getByRole('button', { name: /Funmi Adeyemi/ }),
-      { key: 'Enter' }
-    );
+    fireEvent.keyDown(screen.getByRole('button', { name: /Funmi Adeyemi/ }), {
+      key: 'Enter',
+    });
     expect(screen.queryByText('Member, no roles')).not.toBeInTheDocument();
     fireEvent.click(await screen.findByRole('menuitem', { name: 'My access' }));
     expect(
@@ -910,14 +897,16 @@ describe('AppShell access', () => {
   it('reads the user menu role label from the permissions', async () => {
     await renderAt('/', { access: fakeAccess() });
     expect(
-      within(sidebarNav()).getByRole('button', {
+      screen.getByRole('button', {
         name: /Funmi Adeyemi.*Member, no roles/,
       })
     ).toBeInTheDocument();
   });
 
   it('offers Discount or refund with adjustment:create and hides it from a principal', async () => {
-    await renderAt('/', { access: starterAccess('bursar') });
+    const { unmount } = await renderAt('/', {
+      access: starterAccess('bursar'),
+    });
     fireEvent.keyDown(globalThis as unknown as Window, {
       key: 'k',
       ctrlKey: true,
@@ -929,7 +918,7 @@ describe('AppShell access', () => {
     expect(
       screen.getByRole('option', { name: /Discount or refund/ })
     ).toBeInTheDocument();
-    cleanup();
+    unmount();
 
     await renderAt('/', { access: starterAccess('principal') });
     fireEvent.keyDown(globalThis as unknown as Window, {
@@ -998,9 +987,12 @@ describe('AppShell access', () => {
     await renderAt('/finance/payments', { access: starterAccess('principal') });
     const bell = await screen.findByRole('button', { name: 'Approvals' });
     expect(await within(bell).findByText('7')).toBeVisible();
-    const nav = within(sidebarNav());
-    expect(await nav.findAllByLabelText('3 waiting for you')).toHaveLength(1);
-    expect(await nav.findAllByLabelText('4 waiting for you')).toHaveLength(1);
+    expect(await screen.findAllByLabelText('3 waiting for you')).toHaveLength(
+      1
+    );
+    expect(await screen.findAllByLabelText('4 waiting for you')).toHaveLength(
+      1
+    );
   });
 
   it('lists Approval rules in the settings frame after Admissions rules', async () => {

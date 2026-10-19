@@ -6,7 +6,10 @@ import type {
 } from '@eduvault/api-contract';
 import { isPlaceholderEmail } from '@eduvault/shared';
 import { familyTotals } from '../../common/ledger';
-import type { OwnStatement } from '../student-account/student-account.service';
+import type {
+  FamilyTermFields,
+  OwnStatement,
+} from '../student-account/student-account.service';
 import type { PortalStudentRecord } from './portal.repository';
 
 export const portalKindOf = (hasStudentRow: boolean): PortalKind =>
@@ -59,9 +62,15 @@ export function toPortalStatement(
 }
 
 export function toPortalFamilyStatement(
-  currency: string,
   children: readonly PortalChild[],
-  balances: ReadonlyMap<string, number>
+  {
+    currency,
+    balances,
+    ...termFields
+  }: {
+    currency: string;
+    balances: ReadonlyMap<string, number>;
+  } & FamilyTermFields
 ): PortalFamilyStatement {
   const rows = children.map((child) => ({
     studentId: child.id,
@@ -79,5 +88,6 @@ export function toPortalFamilyStatement(
     totalOwedMinor: owedMinor,
     creditMinor,
     children: rows,
+    ...termFields,
   };
 }

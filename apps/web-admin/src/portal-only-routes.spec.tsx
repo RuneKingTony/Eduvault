@@ -13,6 +13,7 @@ import type { Me, MePermissions } from '@eduvault/api-contract';
 import { toPermissionMap, type Permission } from '@eduvault/policy';
 import { stubMatchMedia } from '@eduvault/ui/testing';
 import { ApiProvider, type Api } from './api';
+import { checked } from './test-api';
 import { NotFoundPage } from './components/page-fallbacks';
 import { routeTree } from './routeTree.gen';
 import { fakeAccess, ownerAccess } from './test-utils';
@@ -64,7 +65,7 @@ function renderAt(path: string, access: MePermissions) {
   });
   render(
     <QueryClientProvider client={queryClient}>
-      <ApiProvider api={api}>
+      <ApiProvider api={checked(api)}>
         <AuthClientProvider authClient={authClient}>
           <RouterProvider router={router} />
         </AuthClientProvider>

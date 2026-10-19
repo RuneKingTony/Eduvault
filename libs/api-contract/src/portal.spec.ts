@@ -5,6 +5,7 @@ import {
   portalAnnouncementListQuerySchema,
   portalAnnouncementsQuerySchema,
   portalChildSchema,
+  portalFamilyStatementQuerySchema,
   portalFamilyStatementSchema,
   portalMeSchema,
   portalPriceListSchema,
@@ -209,6 +210,18 @@ describe('the portal statement query', () => {
   });
 });
 
+describe('the portal family statement query', () => {
+  it('takes an optional term id and refuses anything that is not an id', () => {
+    expect(portalFamilyStatementQuerySchema.parse({ termId: id })).toEqual({
+      termId: id,
+    });
+    expect(portalFamilyStatementQuerySchema.parse({})).toEqual({});
+    expect(
+      portalFamilyStatementQuerySchema.safeParse({ termId: 'nope' }).success
+    ).toBe(false);
+  });
+});
+
 describe('the portal statement', () => {
   it('takes all five statuses', () => {
     for (const status of [
@@ -292,6 +305,8 @@ describe('the portal family statement', () => {
         balanceMinor: -2_000_000,
       },
     ],
+    term: null,
+    termOptions: [],
   };
 
   it('keeps what is owed and the credit apart, neither below zero', () => {
@@ -303,6 +318,26 @@ describe('the portal family statement', () => {
     expect(
       portalFamilyStatementSchema.safeParse({ ...family, totalOwedMinor: -1 })
         .success
+    ).toBe(false);
+  });
+
+  it('carries the term and its options beside the whole-account totals', () => {
+    const filled = {
+      ...family,
+      term: {
+        id,
+        label: 'First term, 2026/2027',
+        fromOn: '2026-09-01',
+        toOn: null,
+      },
+      termOptions: [{ id, label: 'First term, 2026/2027' }],
+    };
+    expect(portalFamilyStatementSchema.parse(filled)).toEqual(filled);
+    expect(
+      portalFamilyStatementSchema.safeParse({
+        ...family,
+        termOptions: undefined,
+      }).success
     ).toBe(false);
   });
 

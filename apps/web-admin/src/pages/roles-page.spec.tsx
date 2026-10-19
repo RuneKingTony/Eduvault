@@ -30,7 +30,7 @@ const render = (
 const cards = () =>
   within(screen.getByRole('region', { name: 'Your school’s roles' }))
     .getAllByRole('listitem')
-    .map((item) => item.querySelector('button')?.getAttribute('aria-label'));
+    .map((item) => within(item).getByRole('button').getAttribute('aria-label'));
 
 describe('RolesPage', () => {
   it('groups the ready-made roles in seed order, then the school’s own, and keeps Owner and Member out of the grid', async () => {

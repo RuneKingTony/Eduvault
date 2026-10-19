@@ -1,6 +1,5 @@
 import type { INestApplicationContext } from '@nestjs/common';
 import type { OrgContext } from '../../src/app/common/auth';
-import { Clock } from '../../src/app/common/clock';
 import { KYSELY_TOKEN, type Database } from '../../src/app/common/db/tokens';
 import { BillingService } from '../../src/app/modules/billing/billing.service';
 import { orgContextFor } from './actors';
@@ -35,7 +34,6 @@ const SCHOLARSHIP_REASON = 'Academic scholarship, top of JSS 1';
 
 interface ChargesSeed {
   owner: OrgContext;
-  today: string;
 }
 
 interface Level {
@@ -204,7 +202,6 @@ export async function seedCharges(
   seed: ChargesSeed
 ) {
   const db = app.get<Database>(KYSELY_TOKEN, { strict: false });
-  const clock = app.get(Clock, { strict: false });
   const terms = await termsOfCurrentYear(db, seed.owner.organizationId);
   const [first, second, third] = [1, 2, 3].map((sequence) => {
     const id = terms.get(sequence);
@@ -214,21 +211,16 @@ export async function seedCharges(
     return id;
   }) as [string, string, string];
 
-  clock.set(seed.today);
-  try {
-    await seedFeeLines(app, seed, [first, second]);
-    await seedDiscounts(app, seed, { first, second, third });
-    const bursar = await orgContextFor(app, emailOf('chika'));
-    const billing = app.get(BillingService, { strict: false });
-    const round = await billing.prepare(bursar, {
-      termId: first,
-      scope: 'school',
-    });
-    if (round.runId === null) {
-      throw new Error('The seeded first-term round charged nobody');
-    }
-    await billing.issue(bursar, round.runId);
-  } finally {
-    clock.set(null);
+  await seedFeeLines(app, seed, [first, second]);
+  await seedDiscounts(app, seed, { first, second, third });
+  const bursar = await orgContextFor(app, emailOf('chika'));
+  const billing = app.get(BillingService, { strict: false });
+  const round = await billing.prepare(bursar, {
+    termId: first,
+    scope: 'school',
+  });
+  if (round.runId === null) {
+    throw new Error('The seeded first-term round charged nobody');
   }
+  await billing.issue(bursar, round.runId);
 }

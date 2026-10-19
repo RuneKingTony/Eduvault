@@ -50,17 +50,23 @@ export function FamilyViewButton({
   studentId,
   familyView,
   childCount,
+  term,
 }: {
   studentId: string;
   familyView: boolean;
   childCount: number;
+  term: string | undefined;
 }) {
   return (
     <Button asChild variant="secondary">
       <Link
         to="/finance/accounts/$studentId"
         params={{ studentId }}
-        search={{ view: familyView ? undefined : 'family', page: undefined }}
+        search={{
+          view: familyView ? undefined : 'family',
+          page: undefined,
+          term,
+        }}
       >
         <UsersIcon />
         {familyView ? 'One child' : `Family view (${childCount})`}

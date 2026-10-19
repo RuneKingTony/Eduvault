@@ -2,7 +2,15 @@ import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { toast } from '@eduvault/ui';
 import { toPermissionMap } from '@eduvault/policy';
 import { fakeAccess, renderWithApi } from '../test-utils';
-import { ARM_ID, ARM_J3, newSchoolYearPreview } from '../test-students';
+import {
+  ARM_ID,
+  ARM_J3,
+  EFE_ID,
+  STUDENT_ID,
+  TOBI_ID,
+  YEAR_2027_ID,
+  newSchoolYearPreview,
+} from '../test-students';
 import { StartYearDialog } from './start-year-dialog';
 
 function setup(
@@ -18,11 +26,15 @@ function setup(
       .mockResolvedValue(options.preview ?? newSchoolYearPreview()),
     startNewSchoolYear:
       options.start ??
-      vi.fn().mockResolvedValue({
-        moved: 1,
-        repeating: 1,
-        graduated: 1,
-        skipped: 0,
+      vi.fn(({ body }: { body: { rows: { outcome: string }[] } }) => {
+        const count = (outcome: string) =>
+          body.rows.filter((row) => row.outcome === outcome).length;
+        return Promise.resolve({
+          moved: count('move'),
+          repeating: count('repeat'),
+          graduated: count('graduate'),
+          skipped: 0,
+        });
       }),
   };
   const onOpenChange = vi.fn();
@@ -197,11 +209,11 @@ describe('StartYearDialog', () => {
     await waitFor(() => {
       expect(students.startNewSchoolYear).toHaveBeenCalledWith({
         body: {
-          targetYearId: 'y2',
+          targetYearId: YEAR_2027_ID,
           rows: [
-            { studentId: 's1', outcome: 'move', classArmId: ARM_J3 },
-            { studentId: 's2', outcome: 'repeat', classArmId: ARM_ID },
-            { studentId: 's3', outcome: 'graduate' },
+            { studentId: STUDENT_ID, outcome: 'move', classArmId: ARM_J3 },
+            { studentId: TOBI_ID, outcome: 'repeat', classArmId: ARM_ID },
+            { studentId: EFE_ID, outcome: 'graduate' },
           ],
         },
       });

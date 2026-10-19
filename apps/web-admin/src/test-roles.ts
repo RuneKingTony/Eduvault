@@ -5,15 +5,24 @@ import {
   toPermissionMap,
   type Permission,
 } from '@eduvault/policy';
+import { testId } from './test-api';
+
+const holderIds = new Map<string, string>();
+
+const holderId = (name: string): string => {
+  const known = holderIds.get(name);
+  if (known !== undefined) {
+    return known;
+  }
+  const next = testId(0xe1_00 + holderIds.size);
+  holderIds.set(name, next);
+  return next;
+};
 
 export const holder = (
   name: string,
   roles: string[] = ['member']
-): RoleHolder => ({
-  memberId: `m-${name.toLowerCase().replaceAll(' ', '-')}`,
-  name,
-  roles,
-});
+): RoleHolder => ({ memberId: holderId(name), name, roles });
 
 export const role = (
   slug: string,

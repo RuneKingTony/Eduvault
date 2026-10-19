@@ -1,5 +1,6 @@
 import type {
   AdmissionPreview,
+  NewSchoolYearGroup,
   NewSchoolYearPreview,
   GuardianDetail,
   GuardianLink,
@@ -8,11 +9,32 @@ import type {
   StudentList,
   StudentRow,
 } from '@eduvault/api-contract';
+import { testId } from './test-api';
 import { IKEJA, LEKKI } from './test-members';
 
 export const STUDENT_ID = '5b0f1e1e-6e53-4c52-9f1c-0a1d7a7f9c11';
 export const ARM_ID = '6c0f1e1e-6e53-4c52-9f1c-0a1d7a7f9c55';
 export const GUARDIAN_ID = '9a0f1e1e-6e53-4c52-9f1c-0a1d7a7f9c66';
+const ARM_IKEJA_ID = '7d0f1e1e-6e53-4c52-9f1c-0a1d7a7f9c99';
+
+const SESSION_2026_ID = testId(0xc0_10);
+const SESSION_2025_ID = testId(0xc0_11);
+export const TERM_FIRST_ID = testId(0xc0_12);
+export const TERM_SECOND_ID = testId(0xc0_13);
+
+export const TOBI_ID = testId(0xc0_20);
+export const EFE_ID = testId(0xc0_21);
+export const UCHE_ID = testId(0xc0_22);
+export const OTHER_GUARDIAN_ID = testId(0xc0_23);
+export const THIRD_GUARDIAN_ID = testId(0xc0_24);
+export const DUPLICATE_STUDENT_ID = testId(0xc0_25);
+
+export const YEAR_2027_ID = testId(0xc0_30);
+const YEAR_2026_ID = testId(0xc0_31);
+const TERM_2027_FIRST_ID = testId(0xc0_32);
+const LEVEL_JSS2_ID = testId(0xc0_33);
+const LEVEL_JSS3_ID = testId(0xc0_34);
+const LEVEL_SS3_ID = testId(0xc0_35);
 
 export const studentRow = (
   overrides: Partial<StudentRow> = {}
@@ -112,7 +134,7 @@ export const studentDetail = (
   archivedBy: null,
   history: [
     {
-      sessionId: 's2',
+      sessionId: SESSION_2026_ID,
       sessionName: '2026/2027',
       levelName: 'JSS 2',
       status: 'active',
@@ -126,7 +148,7 @@ export const studentDetail = (
       ],
     },
     {
-      sessionId: 's1',
+      sessionId: SESSION_2025_ID,
       sessionName: '2025/2026',
       levelName: 'JSS 1',
       status: 'completed',
@@ -152,15 +174,15 @@ export const preview = (
 ): AdmissionPreview => ({
   nextAdmissionNumber: 'GF-0234',
   nextStudentUsername: 'greenfield-0234',
-  currentTerm: { id: 't1', name: 'First term' },
-  currentSession: { id: 's2', name: '2026/2027' },
+  currentTerm: { id: TERM_FIRST_ID, name: 'First term' },
+  currentSession: { id: SESSION_2026_ID, name: '2026/2027' },
   nextTerm: null,
   maxGuardians: 4,
   requireGuardian: true,
   classes: [
     { id: ARM_ID, label: 'JSS 2 Gold · Lekki', campusId: LEKKI.id },
     {
-      id: '7d0f1e1e-6e53-4c52-9f1c-0a1d7a7f9c99',
+      id: ARM_IKEJA_ID,
       label: 'JSS 2 Emerald · Ikeja',
       campusId: IKEJA.id,
     },
@@ -171,55 +193,69 @@ export const preview = (
 export const ARM_J3 = '8e0f1e1e-6e53-4c52-9f1c-0a1d7a7f9c01';
 const ARM_SS3 = '8e0f1e1e-6e53-4c52-9f1c-0a1d7a7f9c02';
 
-const person = (id: string, firstName: string, lastName: string) => ({
-  id,
-  firstName,
-  lastName,
-  admissionNumber: `GF-${id}`,
+const jssGroup = (): NewSchoolYearGroup => ({
+  fromClass: {
+    id: ARM_ID,
+    name: 'JSS 2 Gold',
+    campusName: 'Lekki',
+    archived: false,
+  },
+  level: { id: LEVEL_JSS2_ID, name: 'JSS 2', isFinalYear: false },
+  nextLevel: { id: LEVEL_JSS3_ID, name: 'JSS 3' },
+  toClass: { id: ARM_J3, name: 'JSS 3 Gold', campusName: 'Lekki' },
+  classChoices: [],
+  repeatClassChoices: [],
+  students: [
+    {
+      id: STUDENT_ID,
+      firstName: 'Ada',
+      lastName: 'Okeke',
+      admissionNumber: 'GF-0123',
+    },
+    {
+      id: TOBI_ID,
+      firstName: 'Tobi',
+      lastName: 'Lawal',
+      admissionNumber: 'GF-0124',
+    },
+  ],
+  inactive: [{ id: UCHE_ID, name: 'Uche Mba' }],
+});
+
+const finalYearGroup = (): NewSchoolYearGroup => ({
+  fromClass: {
+    id: ARM_SS3,
+    name: 'SS 3 Blue',
+    campusName: 'Ikeja',
+    archived: false,
+  },
+  level: { id: LEVEL_SS3_ID, name: 'SS 3', isFinalYear: true },
+  nextLevel: null,
+  toClass: null,
+  classChoices: [],
+  repeatClassChoices: [],
+  students: [
+    {
+      id: EFE_ID,
+      firstName: 'Efe',
+      lastName: 'Ade',
+      admissionNumber: 'GF-0125',
+    },
+  ],
+  inactive: [],
 });
 
 export const newSchoolYearPreview = (
   overrides: Partial<NewSchoolYearPreview> = {}
 ): NewSchoolYearPreview => ({
   targetYear: {
-    id: 'y2',
+    id: YEAR_2027_ID,
     name: '2027/2028',
-    firstTerm: { id: 't4', name: 'First term', isCurrent: false },
+    firstTerm: { id: TERM_2027_FIRST_ID, name: 'First term', isCurrent: false },
   },
-  leavingYear: { id: 'y1', name: '2026/2027' },
+  leavingYear: { id: YEAR_2026_ID, name: '2026/2027' },
   canGraduate: true,
   alreadyInTargetYear: 0,
-  groups: [
-    {
-      fromClass: {
-        id: ARM_ID,
-        name: 'JSS 2 Gold',
-        campusName: 'Lekki',
-        archived: false,
-      },
-      level: { id: 'l-j2', name: 'JSS 2', isFinalYear: false },
-      nextLevel: { id: 'l-j3', name: 'JSS 3' },
-      toClass: { id: ARM_J3, name: 'JSS 3 Gold', campusName: 'Lekki' },
-      classChoices: [],
-      repeatClassChoices: [],
-      students: [person('s1', 'Ada', 'Okeke'), person('s2', 'Tobi', 'Lawal')],
-      inactive: [{ id: 's9', name: 'Uche Mba' }],
-    },
-    {
-      fromClass: {
-        id: ARM_SS3,
-        name: 'SS 3 Blue',
-        campusName: 'Ikeja',
-        archived: false,
-      },
-      level: { id: 'l-ss3', name: 'SS 3', isFinalYear: true },
-      nextLevel: null,
-      toClass: null,
-      classChoices: [],
-      repeatClassChoices: [],
-      students: [person('s3', 'Efe', 'Ade')],
-      inactive: [],
-    },
-  ],
+  groups: [jssGroup(), finalYearGroup()],
   ...overrides,
 });

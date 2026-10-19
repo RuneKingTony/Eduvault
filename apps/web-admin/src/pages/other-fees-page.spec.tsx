@@ -3,8 +3,11 @@ import { ApiError } from '@eduvault/api-contract';
 import { toast } from '@eduvault/ui';
 import {
   BUS,
+  FEE_LINE_BUS,
+  FEE_LINE_PTA,
   PTA,
   TERM_1,
+  TUITION,
   feeGrid,
   feeLine,
   feesApi,
@@ -21,7 +24,7 @@ vi.mock('@eduvault/ui', async (importOriginal) => ({
 }));
 
 const ptaLine = feeLine({
-  id: 'fl-pta',
+  id: FEE_LINE_PTA,
   feeTypeId: PTA.id,
   feeTypeCode: PTA.code,
   feeTypeName: PTA.name,
@@ -29,7 +32,7 @@ const ptaLine = feeLine({
   amountMinor: 1_000_000,
 });
 const busLine = feeLine({
-  id: 'fl-bus',
+  id: FEE_LINE_BUS,
   feeTypeId: BUS.id,
   feeTypeCode: BUS.code,
   feeTypeName: BUS.name,
@@ -48,7 +51,7 @@ const otherGrid = feeGrid({
         gridCell({
           feeTypeId: BUS.id,
           base: {
-            feeLineId: 'fl-bus',
+            feeLineId: FEE_LINE_BUS,
             amountMinor: 4_500_000,
             appliesTo: 'all',
             isOptional: true,
@@ -66,7 +69,7 @@ function setup(
   const api = feesApi({
     lines: [ptaLine, busLine],
     grid: otherGrid,
-    types: [{ id: 'ft-tuition', code: 4010, name: 'Tuition' }, PTA, BUS],
+    types: [TUITION, PTA, BUS],
   });
   const onSearchChange = vi.fn();
   renderFees(
@@ -133,6 +136,24 @@ describe('OtherFeesPage', () => {
     expect(
       screen.queryByRole('row', { name: /PTA fee .* ₦10,000/ })
     ).not.toBeInTheDocument();
+  });
+
+  it('shows the Who takes card only with a fee type chip selected', async () => {
+    const { api } = setup(ownerAccess(), { type: BUS.id });
+    expect(await screen.findByText('Who takes School bus')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(api.feeOptIns.list).toHaveBeenCalledWith({
+        params: { feeTypeId: BUS.id },
+        query: { termId: TERM_1, q: '' },
+      });
+    });
+  });
+
+  it('leaves the Who takes card out on All other fees', async () => {
+    const { api } = setup();
+    await screen.findByText('Other fees · First term, 2026/2027');
+    expect(screen.queryByText(/^Who takes /)).not.toBeInTheDocument();
+    expect(api.feeOptIns.list).not.toHaveBeenCalled();
   });
 
   it('reports the chip picked', async () => {

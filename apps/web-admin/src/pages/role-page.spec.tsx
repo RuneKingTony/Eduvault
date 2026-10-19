@@ -6,7 +6,11 @@ import {
   waitFor,
   within,
 } from '@testing-library/react';
-import { ApiError } from '@eduvault/api-contract';
+import {
+  ApiError,
+  type CreateRoleInput,
+  type UpdateRoleInput,
+} from '@eduvault/api-contract';
 import { toast } from '@eduvault/ui';
 import {
   ALL_PERMISSIONS,
@@ -54,9 +58,31 @@ function setup({
   access = ownerAccess(),
   get,
   list = vi.fn().mockResolvedValue(roleListResponse(roles)),
-  create = vi.fn().mockResolvedValue(role('cashier', { label: 'Cashier' })),
-  update = vi.fn().mockResolvedValue(role('bursar')),
-  remove = vi.fn().mockResolvedValue({ slug: 'x' }),
+  create = vi.fn(({ body }: { body: CreateRoleInput }) =>
+    role(body.slug ?? body.label.toLowerCase().replaceAll(' ', '-'), {
+      label: body.label,
+      description: body.description ?? null,
+      permissions: body.permissions,
+    })
+  ),
+  update = vi.fn(
+    ({ params, body }: { params: { slug: string }; body: UpdateRoleInput }) => {
+      const current =
+        roles.find((entry) => entry.slug === params.slug) ?? role(params.slug);
+      return {
+        ...current,
+        label: body.label ?? current.label,
+        description:
+          body.description === undefined
+            ? current.description
+            : body.description,
+        permissions: body.permissions ?? current.permissions,
+      };
+    }
+  ),
+  remove = vi.fn(({ params }: { params: { slug: string } }) => ({
+    slug: params.slug,
+  })),
 }: Setup = {}) {
   const found = roles.find((entry) => entry.slug === slug);
   const handlers = {

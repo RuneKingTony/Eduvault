@@ -1,3 +1,4 @@
+import { isReservedReference } from '@eduvault/shared';
 import {
   OPENING_MEMO,
   planMoneyAccountEntry,
@@ -107,5 +108,18 @@ describe('planMoneyAccountEntry', () => {
       equityId: 'e',
     });
     expect(entry.lines.map((line) => line.campusId)).toEqual([null, null]);
+  });
+});
+
+describe('opening references', () => {
+  it('stay out of reach of a client-chosen payment reference', () => {
+    const money = planMoneyAccountEntry(
+      { moneyAccountId: 'ma-1', amountMinor: 5, effectiveOn: '2026-09-01' },
+      { campusId: null, ledgerAccountId: 'la', equityId: 'e' }
+    );
+    expect(
+      isReservedReference(planStudentEntry(student, target).reference)
+    ).toBe(true);
+    expect(isReservedReference(money.reference)).toBe(true);
   });
 });

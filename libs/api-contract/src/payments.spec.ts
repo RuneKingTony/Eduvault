@@ -1,4 +1,5 @@
 import { contract } from './contract';
+import { RESERVED_REFERENCE_MESSAGE } from './schemas';
 import {
   PAYMENT_ALLOCATION_TWICE_MESSAGE,
   PAYMENT_AMOUNT_MESSAGE,
@@ -46,6 +47,15 @@ describe('recordPaymentSchema', () => {
     expect(parsed.reference).toBe('TRF-20261007-K3Q7ZA');
     expect(parsed.providerReference).toBeUndefined();
   });
+
+  it.each(['ADJ-2026-0001', ' del-2026-0004', 'VOID-TRF-20261007-K3Q7ZA'])(
+    'refuses %s, a number the system issues',
+    (reference) => {
+      expect(
+        messages(recordPaymentSchema.safeParse({ ...body, reference }))
+      ).toEqual([RESERVED_REFERENCE_MESSAGE]);
+    }
+  );
 
   it('treats a blank provider reference as none', () => {
     const parsed = recordPaymentSchema.parse({

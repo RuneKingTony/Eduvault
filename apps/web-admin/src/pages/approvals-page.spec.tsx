@@ -132,15 +132,23 @@ describe('ApprovalsPage', () => {
     expect(await screen.findByText('Nothing waiting for you')).toBeVisible();
   });
 
-  it.each([false, true])(
-    'shows an acting super admin the rows but no buttons, even when acting writes is %s',
-    async (writes) => {
-      setup({ access: actingAccess(writes) });
-      expect(await screen.findByText('Cancel a payment')).toBeVisible();
-      expect(screen.queryByRole('button', { name: /^Approve/ })).toBeNull();
-      expect(screen.queryByRole('button', { name: /^Decline/ })).toBeNull();
-    }
-  );
+  it('shows a super admin acting read-only the rows but no buttons', async () => {
+    setup({ access: actingAccess(false) });
+    expect(await screen.findByText('Cancel a payment')).toBeVisible();
+    expect(screen.queryByRole('button', { name: /^Approve/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Decline/ })).toBeNull();
+  });
+
+  it('gives a super admin acting with a reason the Approve and Decline buttons', async () => {
+    setup({
+      access: actingAccess(true),
+      list: approvalList([voidApproval()]),
+    });
+    expect(
+      await screen.findByRole('button', { name: /^Approve/ })
+    ).toBeEnabled();
+    expect(screen.getByRole('button', { name: /^Decline/ })).toBeEnabled();
+  });
 
   it('approves a cancellation after saying what approving does, then toasts with a Payments action', async () => {
     const api = setup({ list: approvalList([voidApproval()]) });

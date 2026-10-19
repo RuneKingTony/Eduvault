@@ -108,12 +108,19 @@ function setup(withActions = false) {
   };
 }
 
-const groupHeadings = () =>
-  [
-    ...document.querySelectorAll(
-      '[cmdk-group]:not([hidden]) [cmdk-group-heading]'
-    ),
-  ].map((node) => node.textContent);
+const groupHeadings = () => {
+  const groups = screen.queryAllByRole('group', { name: /.+/ });
+  const shown = ['Pages', 'Settings', 'Actions']
+    .map((name) => ({
+      name,
+      index: groups.indexOf(screen.queryByRole('group', { name }) as never),
+    }))
+    .filter(({ index }) => index !== -1)
+    .toSorted((a, b) => a.index - b.index)
+    .map(({ name }) => name);
+  expect(groups).toHaveLength(shown.length);
+  return shown;
+};
 
 describe('CommandMenu', () => {
   it('lists Pages then Settings and hides the empty Actions group', () => {

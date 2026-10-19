@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { AppTopbar } from './app-topbar';
 
 describe('AppTopbar', () => {
@@ -11,10 +11,15 @@ describe('AppTopbar', () => {
         <nav aria-label="Breadcrumb">Students</nav>
       </AppTopbar>
     );
-    const header = screen.getByRole('banner');
-    const order = [...header.querySelectorAll('button, nav')].map(
-      (node) => node.textContent
+    const header = within(screen.getByRole('banner'));
+    const open = header.getByRole('button', { name: 'Open navigation' });
+    const breadcrumb = header.getByRole('navigation', { name: 'Breadcrumb' });
+    const search = header.getByRole('button', { name: 'Search' });
+    expect(open.compareDocumentPosition(breadcrumb)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING
     );
-    expect(order).toEqual(['Open navigation', 'Students', 'Search']);
+    expect(breadcrumb.compareDocumentPosition(search)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING
+    );
   });
 });

@@ -30,9 +30,7 @@ describe('ItemsSoldTable', () => {
   it('lists the sale with its student and class, items, total and paid receipt', () => {
     setup();
 
-    const row = within(
-      screen.getByText('ISS-2026-0001').closest('tr') as HTMLElement
-    );
+    const row = within(screen.getByRole('row', { name: /ISS-2026-0001/ }));
     expect(row.getByText('Ada Okeke')).toBeVisible();
     expect(row.getByText('JSS 1 Gold')).toBeVisible();
     expect(

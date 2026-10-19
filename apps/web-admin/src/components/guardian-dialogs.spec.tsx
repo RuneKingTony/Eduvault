@@ -6,7 +6,10 @@ import { toPermissionMap, type Permission } from '@eduvault/policy';
 import { fakeAccess, renderWithApi } from '../test-utils';
 import {
   GUARDIAN_ID,
+  OTHER_GUARDIAN_ID,
   STUDENT_ID,
+  THIRD_GUARDIAN_ID,
+  TOBI_ID,
   guardianDetail,
   guardianLink,
   preview,
@@ -24,6 +27,13 @@ const student = {
   firstName: 'Ada',
   lastName: 'Okeke',
   onRoll: true,
+};
+
+const bayo = {
+  id: OTHER_GUARDIAN_ID,
+  fullName: 'Bayo Adewale',
+  phone: '0807',
+  outsideScope: false,
 };
 
 const accessWith = (...permissions: Permission[]): MePermissions =>
@@ -58,7 +68,7 @@ function setup(
   options: {
     links?: ReturnType<typeof guardianLink>[];
     detail?: ReturnType<typeof guardianDetail>;
-    others?: unknown[];
+    others?: (typeof bayo)[];
     requireGuardian?: boolean;
     access?: MePermissions;
   } = {}
@@ -68,7 +78,13 @@ function setup(
       guardians: vi.fn().mockResolvedValue(options.links ?? [guardianLink()]),
       linkGuardian: vi.fn(),
       updateGuardianLink: vi.fn().mockResolvedValue(guardianLink()),
-      unlinkGuardian: vi.fn().mockResolvedValue({}),
+      unlinkGuardian: vi.fn(
+        ({ params }: { params: { id: string; guardianId: string } }) =>
+          Promise.resolve({
+            studentId: params.id,
+            guardianId: params.guardianId,
+          })
+      ),
     },
     guardians: {
       list: vi.fn().mockResolvedValue(options.others ?? []),
@@ -121,14 +137,7 @@ describe('AddGuardianDialog', () => {
     setup(
       { kind: 'add', student },
       {
-        others: [
-          {
-            id: 'g2',
-            fullName: 'Bayo Adewale',
-            phone: '0807',
-            outsideScope: false,
-          },
-        ],
+        others: [bayo],
       }
     );
     expect(await screen.findByLabelText('Existing guardian')).toBeChecked();
@@ -141,14 +150,7 @@ describe('AddGuardianDialog', () => {
     setup(
       { kind: 'add', student },
       {
-        others: [
-          {
-            id: 'g2',
-            fullName: 'Bayo Adewale',
-            phone: '0807',
-            outsideScope: false,
-          },
-        ],
+        others: [bayo],
       }
     );
     await screen.findByLabelText('Existing guardian');
@@ -162,21 +164,20 @@ describe('AddGuardianDialog', () => {
     const api = setup(
       { kind: 'add', student },
       {
-        others: [
-          {
-            id: 'g2',
-            fullName: 'Bayo Adewale',
-            phone: '0807',
-            outsideScope: false,
-          },
-        ],
+        others: [bayo],
       }
     );
-    api.students.linkGuardian.mockResolvedValue({
-      link: guardianLink({ fullName: 'Bayo Adewale' }),
-    });
+    api.students.linkGuardian.mockImplementation(
+      ({ body }: { body: { existingGuardianId: string } }) =>
+        Promise.resolve({
+          link: guardianLink({
+            guardianId: body.existingGuardianId,
+            fullName: bayo.fullName,
+          }),
+        })
+    );
     fireEvent.change(await screen.findByLabelText('Guardian'), {
-      target: { value: 'g2' },
+      target: { value: OTHER_GUARDIAN_ID },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Add guardian' }));
     await waitFor(() => {
@@ -187,7 +188,7 @@ describe('AddGuardianDialog', () => {
     expect(api.students.linkGuardian).toHaveBeenCalledWith({
       params: { id: STUDENT_ID },
       body: {
-        existingGuardianId: 'g2',
+        existingGuardianId: OTHER_GUARDIAN_ID,
         relationship: 'mother',
         paysFees: false,
       },
@@ -206,7 +207,7 @@ describe('AddGuardianDialog', () => {
       login: {
         who: 'guardian',
         name: 'Mrs Udoh',
-        guardianId: 'g9',
+        guardianId: THIRD_GUARDIAN_ID,
         relationship: 'mother',
         username: 'udoh-family',
         temporaryPassword: 'Abcd2345Wxyz',
@@ -306,7 +307,7 @@ const remove = (
 describe('RemoveLinkDialog', () => {
   it('titles the dialog and removes the link with the PRD toast', async () => {
     const second = guardianLink({
-      guardianId: 'g2',
+      guardianId: OTHER_GUARDIAN_ID,
       fullName: 'Ifeanyi Okeke',
       paysFees: false,
     });
@@ -323,7 +324,7 @@ describe('RemoveLinkDialog', () => {
             paysFees: false,
           },
           {
-            studentId: 's2',
+            studentId: TOBI_ID,
             name: 'Chidi Okeke',
             relationship: 'father',
             paysFees: false,
@@ -349,13 +350,13 @@ describe('RemoveLinkDialog', () => {
       );
     });
     expect(api.students.unlinkGuardian).toHaveBeenCalledWith({
-      params: { id: STUDENT_ID, guardianId: 'g2' },
+      params: { id: STUDENT_ID, guardianId: OTHER_GUARDIAN_ID },
     });
   });
 
   it('disables Remove for the only payer and says to tick another guardian first', async () => {
     const second = guardianLink({
-      guardianId: 'g2',
+      guardianId: OTHER_GUARDIAN_ID,
       fullName: 'Ifeanyi Okeke',
       paysFees: false,
     });
@@ -390,7 +391,7 @@ describe('RemoveLinkDialog', () => {
   it('adds the last-child note naming the school', async () => {
     const { start, links } = remove([
       guardianLink(),
-      guardianLink({ guardianId: 'g2', paysFees: false }),
+      guardianLink({ guardianId: OTHER_GUARDIAN_ID, paysFees: false }),
     ]);
     setup(start, { links });
     expect(

@@ -1,9 +1,20 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { toast } from '@eduvault/ui';
-import { ApiError, type MePermissions } from '@eduvault/api-contract';
+import {
+  ApiError,
+  type AdmitStudentInput,
+  type MePermissions,
+} from '@eduvault/api-contract';
 import { toPermissionMap, type Permission } from '@eduvault/policy';
 import { fakeAccess, renderWithApi } from '../test-utils';
-import { ARM_ID, preview, studentDetail } from '../test-students';
+import {
+  ARM_ID,
+  DUPLICATE_STUDENT_ID,
+  TERM_FIRST_ID,
+  TERM_SECOND_ID,
+  preview,
+  studentDetail,
+} from '../test-students';
 import { AdmitStudentSheet } from './admit-student-sheet';
 
 vi.mock('@eduvault/ui', async (importOriginal) => ({
@@ -25,6 +36,24 @@ const ADMITTER: Permission[] = [
   'guardian:read',
   'session:read',
 ];
+
+const admitted = ({
+  body,
+}: {
+  body: Pick<
+    AdmitStudentInput,
+    'firstName' | 'lastName' | 'gender' | 'dateOfBirth'
+  >;
+}) =>
+  Promise.resolve({
+    student: studentDetail({
+      firstName: body.firstName,
+      lastName: body.lastName,
+      gender: body.gender,
+      dateOfBirth: body.dateOfBirth,
+    }),
+    logins: [],
+  });
 
 function setup(
   options: {
@@ -49,9 +78,7 @@ function setup(
       duplicates: vi.fn().mockResolvedValue({ matches: options.matches ?? [] }),
     },
     students: {
-      create:
-        options.create ??
-        vi.fn().mockResolvedValue({ student: studentDetail(), logins: [] }),
+      create: options.create ?? vi.fn(admitted),
     },
     guardians: { list: vi.fn().mockResolvedValue([]) },
   };
@@ -318,7 +345,7 @@ const toReview = async () => {
   await screen.findByText('Student login');
 };
 
-const SECOND = { id: 't2', name: 'Second term' };
+const SECOND = { id: TERM_SECOND_ID, name: 'Second term' };
 
 describe('AdmitStudentSheet term picker', () => {
   it('offers no picker in the last term of the year', async () => {
@@ -334,7 +361,7 @@ describe('AdmitStudentSheet term picker', () => {
     await fillStudent();
     next();
     const picker = await screen.findByLabelText('Admit for');
-    expect(picker).toHaveValue('t1');
+    expect(picker).toHaveValue(TERM_FIRST_ID);
     expect(
       within(picker)
         .getAllByRole('option')
@@ -347,7 +374,7 @@ describe('AdmitStudentSheet term picker', () => {
     await fillStudent();
     next();
     fireEvent.change(await screen.findByLabelText('Admit for'), {
-      target: { value: 't2' },
+      target: { value: TERM_SECOND_ID },
     });
     expect(screen.getByLabelText('Class for Second term')).toBeInTheDocument();
     expect(
@@ -364,15 +391,12 @@ describe('AdmitStudentSheet term picker', () => {
   });
 
   it('sends the term id and shows the term in the review', async () => {
-    const create = vi.fn().mockResolvedValue({
-      student: studentDetail(),
-      logins: [],
-    });
+    const create = vi.fn(admitted);
     setup({ preview: preview({ nextTerm: SECOND }), create });
     await fillStudent();
     next();
     fireEvent.change(await screen.findByLabelText('Admit for'), {
-      target: { value: 't2' },
+      target: { value: TERM_SECOND_ID },
     });
     next();
     fillGuardian();
@@ -384,14 +408,13 @@ describe('AdmitStudentSheet term picker', () => {
     await waitFor(() => {
       expect(create).toHaveBeenCalled();
     });
-    expect(create.mock.calls[0]?.[0].body).toMatchObject({ termId: 't2' });
+    expect(create.mock.calls[0]?.[0].body).toMatchObject({
+      termId: TERM_SECOND_ID,
+    });
   });
 
   it('sends no term id when the current term stays chosen', async () => {
-    const create = vi.fn().mockResolvedValue({
-      student: studentDetail(),
-      logins: [],
-    });
+    const create = vi.fn(admitted);
     setup({ preview: preview({ nextTerm: SECOND }), create });
     await toReview();
     fireEvent.click(screen.getByRole('button', { name: 'Admit and enrol' }));
@@ -428,7 +451,7 @@ describe('AdmitStudentSheet step 4', () => {
         {
           name: 'Peace Udoh',
           state: 'Active',
-          studentId: 'st-9',
+          studentId: DUPLICATE_STUDENT_ID,
           admissionNumber: 'GF-0200',
         },
         { name: 'Peace Udoh', state: 'Left' },
@@ -440,7 +463,7 @@ describe('AdmitStudentSheet step 4', () => {
     ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'GF-0200' })).toHaveAttribute(
       'href',
-      '/students/st-9'
+      `/students/${DUPLICATE_STUDENT_ID}`
     );
     expect(screen.getByText(/on another campus/)).toBeInTheDocument();
     expect(
@@ -454,9 +477,7 @@ describe('AdmitStudentSheet step 4', () => {
   });
 
   it('makes Guardian 1 the payer when nobody pays and sends the admission body', async () => {
-    const create = vi
-      .fn()
-      .mockResolvedValue({ student: studentDetail(), logins: [] });
+    const create = vi.fn(admitted);
     const { onAdmitted } = setup({ create });
     await toGuardianStep();
     fireEvent.click(

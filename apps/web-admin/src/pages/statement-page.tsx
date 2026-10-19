@@ -11,6 +11,8 @@ import {
   familyDescription,
   familyTotalSubline,
   money,
+  termKeyOf,
+  type TermPick,
 } from '@eduvault/shared';
 import { Button, ErrorMessage, PageSkeleton, TermSelect } from '@eduvault/ui';
 import { withTerm, type StatementSearch } from '../accounts-search';
@@ -53,11 +55,13 @@ function Actions({
   studentId,
   statement,
   familyView,
+  term,
   onRecord,
 }: {
   studentId: string;
   statement: StudentStatement;
   familyView: boolean;
+  term: string | undefined;
   onRecord: () => void;
 }) {
   const canRecord = useCan('payment', 'record');
@@ -70,6 +74,7 @@ function Actions({
           studentId={studentId}
           familyView={familyView}
           childCount={children}
+          term={term}
         />
       ) : null}
       {canRecord ? (
@@ -102,11 +107,17 @@ function Header({
   );
 }
 
-function ChildStatement({ initial }: { initial: StudentStatement }) {
+function ChildStatement({
+  initial,
+  termId,
+}: {
+  initial: StudentStatement;
+  termId: string | undefined;
+}) {
   const [page, setPage] = useState<number | undefined>();
   const api = useApi();
   const query = useQuery({
-    ...statementQueryOptions(api, initial.student.id, { page }),
+    ...statementQueryOptions(api, initial.student.id, { page, termId }),
     ...(page === undefined ? { initialData: initial } : {}),
   });
   return <StatementCard statement={query.data ?? initial} onPage={setPage} />;
@@ -160,15 +171,17 @@ function FamilyTiles({ family }: { family: GuardianStatement }) {
 function FamilyView({
   studentId,
   statement,
+  term,
+  onTerm,
   onRecord,
-}: {
+}: TermPick & {
   studentId: string;
   statement: StudentStatement;
   onRecord: () => void;
 }) {
   const guardianId = statement.family?.guardianId ?? '';
   const family = useQuery({
-    ...familyStatementQueryOptions(useApi(), guardianId),
+    ...familyStatementQueryOptions(useApi(), guardianId, { termId: term }),
     enabled: guardianId !== '',
   });
   if (family.isError) {
@@ -177,6 +190,7 @@ function FamilyView({
   if (family.data === undefined) {
     return <PageSkeleton rows={2} />;
   }
+  const shownTerm = family.data.term?.id;
   return (
     <>
       <Header
@@ -187,13 +201,23 @@ function FamilyView({
             studentId={studentId}
             statement={statement}
             familyView
+            term={term}
             onRecord={onRecord}
           />
         }
       />
+      <TermSelect
+        terms={family.data.termOptions}
+        value={term}
+        onChange={onTerm}
+      />
       <FamilyTiles family={family.data} />
       {family.data.children.map((child) => (
-        <ChildStatement key={child.student.id} initial={child} />
+        <ChildStatement
+          key={`${child.student.id}:${termKeyOf(shownTerm)}`}
+          initial={child}
+          termId={shownTerm}
+        />
       ))}
     </>
   );
@@ -206,11 +230,9 @@ function SingleStatement({
   onTerm,
   onPage,
   onRecord,
-}: {
+}: TermPick & {
   studentId: string;
   data: StudentStatement;
-  term: string | undefined;
-  onTerm: (term: string | undefined) => void;
   onPage: (page: number) => void;
   onRecord: () => void;
 }) {
@@ -224,6 +246,7 @@ function SingleStatement({
             studentId={studentId}
             statement={data}
             familyView={false}
+            term={term}
             onRecord={onRecord}
           />
         }
@@ -231,6 +254,45 @@ function SingleStatement({
       <TermSelect terms={data.termOptions} value={term} onChange={onTerm} />
       <StatementCard statement={data} onPage={onPage} />
     </>
+  );
+}
+
+function StatementBody({
+  studentId,
+  data,
+  search,
+  onSearchChange,
+  onRecord,
+}: {
+  studentId: string;
+  data: StudentStatement;
+  search: StatementSearch;
+  onSearchChange: (next: StatementSearch) => void;
+  onRecord: () => void;
+}) {
+  const pick: TermPick = {
+    term: search.term,
+    onTerm: (term) => {
+      onSearchChange(withTerm(search, term));
+    },
+  };
+  return search.view === 'family' && data.family !== null ? (
+    <FamilyView
+      {...pick}
+      studentId={studentId}
+      statement={data}
+      onRecord={onRecord}
+    />
+  ) : (
+    <SingleStatement
+      {...pick}
+      studentId={studentId}
+      data={data}
+      onRecord={onRecord}
+      onPage={(page) => {
+        onSearchChange({ ...search, page });
+      }}
+    />
   );
 }
 
@@ -251,34 +313,20 @@ export function StatementPage({
     })
   );
   const canRecord = useCan('payment', 'record');
-  const record = () => {
-    setRecording(true);
-  };
   return (
     <DetailPage queries={[statement]} notFound={<NotFound />}>
       {([data]) => (
         <section className="flex flex-col gap-4">
           <Crumbs last={data.student.name} />
-          {search.view === 'family' && data.family !== null ? (
-            <FamilyView
-              studentId={studentId}
-              statement={data}
-              onRecord={record}
-            />
-          ) : (
-            <SingleStatement
-              studentId={studentId}
-              data={data}
-              term={search.term}
-              onTerm={(term) => {
-                onSearchChange(withTerm(search, term));
-              }}
-              onRecord={record}
-              onPage={(page) => {
-                onSearchChange({ ...search, page });
-              }}
-            />
-          )}
+          <StatementBody
+            studentId={studentId}
+            data={data}
+            search={search}
+            onSearchChange={onSearchChange}
+            onRecord={() => {
+              setRecording(true);
+            }}
+          />
           {canRecord ? (
             <RecordPaymentSheet
               open={recording}

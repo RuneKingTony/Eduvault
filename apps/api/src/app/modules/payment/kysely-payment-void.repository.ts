@@ -149,7 +149,7 @@ class KyselyVoidTx implements PaymentVoidTx {
   }
 
   async post(entry: VoidPost): Promise<string> {
-    const { entry: posted } = await this.deps.poster.post(this.trx, {
+    const posted = await this.deps.poster.postOnce(this.trx, {
       ...entry,
       organizationId: this.organizationId,
       postedBy: this.who.userId,

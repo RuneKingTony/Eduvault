@@ -9,6 +9,7 @@ import {
   type OrgContext,
 } from '../../src/app/common/auth';
 import { castToBetterAuthRoles } from '../../src/app/common/auth/better-auth-roles';
+import { Clock } from '../../src/app/common/clock';
 import { ENV_TOKEN, type Env } from '../../src/app/common/config/env';
 import { AuditRepository } from '../../src/app/common/audit';
 import { KYSELY_TOKEN, type Database } from '../../src/app/common/db/tokens';
@@ -232,11 +233,33 @@ export async function runSeed(
   log(`Seeding Eduvault dev data; seed "today" is ${today}.`);
 
   const offsetDays = seedOffsetDays(now, SEED_TODAY);
+  const clock = app.get(Clock, { strict: false });
+  clock.set(today);
+  try {
+    return await seedAndCheck(app, { superAdmin, today, offsetDays, log });
+  } finally {
+    clock.set(null);
+  }
+}
+
+interface SeedRun {
+  superAdmin: AuthenticatedUser;
+  today: string;
+  offsetDays: number;
+  log: (line: string) => void;
+}
+
+/** Runs with the clock pinned to the seed's "today", so the student lifecycle and every date the check reads stay fixed however long ago the seed was written. */
+async function seedAndCheck(
+  app: INestApplicationContext,
+  { superAdmin, today, offsetDays, log }: SeedRun
+): Promise<SeedResult> {
+  const db = app.get<Database>(KYSELY_TOKEN, { strict: false });
   const created = await createSchools(app, superAdmin);
   await backdateSchools(db, created.organizationIds, offsetDays);
   await addMembers(app, created);
   const greenfieldOwner = lookupOwner(created.owners, GREENFIELD_SLUG);
-  await seedCalendar(app, { owner: greenfieldOwner, today, offsetDays });
+  await seedCalendar(app, { owner: greenfieldOwner, offsetDays });
   await seedClasses(app, {
     owner: greenfieldOwner,
     campusIds: created.campusIds,
@@ -245,7 +268,6 @@ export async function runSeed(
   });
   await seedStudents(app, {
     owner: await orgContextFor(app, emailOf('tunde')),
-    today,
     offsetDays,
   });
   await seedSubjects(app, {
@@ -271,7 +293,7 @@ export async function runSeed(
     today,
     offsetDays,
   });
-  await seedCharges(app, { owner: greenfieldOwner, today });
+  await seedCharges(app, { owner: greenfieldOwner });
   await seedApprovals(app, { owner: greenfieldOwner, today });
   await seedLeave(app, { owner: greenfieldOwner, today });
   await addSupportActivity(app, superAdmin, created.organizationIds);
