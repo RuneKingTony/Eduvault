@@ -11,6 +11,7 @@ export interface RoleDraft {
   label: string;
   description: string;
   permissions: PermissionMap;
+  slug?: string;
 }
 
 export const EMPTY_DRAFT: RoleDraft = {
@@ -47,6 +48,7 @@ export const draftBody = (draft: RoleDraft) => ({
   description:
     draft.description.trim() === '' ? null : draft.description.trim(),
   permissions: draft.permissions,
+  ...(draft.slug === undefined ? {} : { slug: draft.slug }),
 });
 
 export const thingsSwitchedOn = (permissions: PermissionMap): number =>
