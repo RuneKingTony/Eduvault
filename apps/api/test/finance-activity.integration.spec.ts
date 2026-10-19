@@ -15,6 +15,7 @@ import { chargeFixture, prepare, sendRun } from './support/factories/billing';
 import {
   createMoneyAccount,
   financeActivityRows,
+  isDeliveryRow,
   type FinanceActivityRow,
   financeTexts,
   ledgerAccountId,
@@ -36,10 +37,14 @@ import {
 import { schoolsTest as test } from './support/two-schools';
 
 const SCHEDULE_KINDS: string[] = Object.values(FEE_SCHEDULE_KINDS);
-
 const financeRows = async (pool: Pool, organizationId: string) =>
   (await financeActivityRows(pool, organizationId)).filter(
-    (row) => !SCHEDULE_KINDS.includes(row.kind)
+    (row) => !SCHEDULE_KINDS.includes(row.kind) && !isDeliveryRow(row)
+  );
+
+const deliveryRows = async (pool: Pool, organizationId: string) =>
+  (await financeActivityRows(pool, organizationId)).filter((row) =>
+    isDeliveryRow(row)
   );
 
 const feeScheduleRows = async (pool: Pool, organizationId: string) =>
@@ -766,6 +771,66 @@ test.describe('finance activity', () => {
     expect(await written(lekkiOnly)).toHaveLength(1);
     expect(await written(invoiceOnly)).toHaveLength(1);
     expect(await written(paymentOnly)).toHaveLength(1);
+    expect(await financeTexts(api, ikejaReader)).toEqual([]);
+    expect(await financeTexts(api, storeOnly)).toEqual([]);
+    expect(await financeTexts(api, noPermission)).toEqual([]);
+    expect(await financeTexts(api, ownerB)).toEqual([]);
+  });
+
+  test('a store delivery’s row reaches a finance reader on that campus only, and no other campus, school or store-only member', async ({
+    api,
+    app,
+    clock,
+    pool,
+    withPermissions,
+    schools: { owner, ownerB, orgA, lekki, ikeja, lekkiOnly, noPermission },
+  }) => {
+    clock.set('2026-10-07');
+    const cash = await createMoneyAccount(app, owner, {
+      name: 'Lekki cash box',
+      kind: 'cash',
+      campusId: lekki.id,
+    });
+    const shirt = await createItem(api, owner);
+    const delivery = await receive(api, owner, {
+      campusId: lekki.id,
+      accountId: cash.id,
+      lines: [{ itemId: shirt.id, quantity: 5, unitCostMinor: 350_000 }],
+    });
+    const invoiceOnly = await withPermissions(orgA, ['invoice:read'], {
+      campuses: [lekki],
+    });
+    const ikejaReader = await withPermissions(orgA, ['payment:read'], {
+      campuses: [ikeja],
+    });
+    const storeOnly = await withPermissions(
+      orgA,
+      ['store:read', 'store:receive'],
+      { campuses: [lekki, ikeja] }
+    );
+
+    const rows = await deliveryRows(pool, orgA.id);
+    expect(kindsAndCampuses(rows)).toEqual([
+      ['store_delivery.received', lekki.id],
+    ]);
+    expect(rows[0]).toMatchObject({
+      subject_type: 'stock_delivery',
+      subject_id: delivery.id,
+      text: expect.stringMatching(
+        new RegExp(
+          String.raw`^.+ received delivery ${delivery.number} from Adebayo Uniforms Ltd at the Lekki store: 1 item, ₦17,500\.$`
+        )
+      ) as unknown,
+    });
+
+    const received = async (actor: typeof owner) =>
+      (await financeTexts(api, actor)).filter((text) =>
+        text.includes(`delivery ${delivery.number}`)
+      );
+
+    expect(await received(owner)).toHaveLength(1);
+    expect(await received(lekkiOnly)).toHaveLength(1);
+    expect(await received(invoiceOnly)).toHaveLength(1);
     expect(await financeTexts(api, ikejaReader)).toEqual([]);
     expect(await financeTexts(api, storeOnly)).toEqual([]);
     expect(await financeTexts(api, noPermission)).toEqual([]);

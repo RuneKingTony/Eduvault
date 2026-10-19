@@ -188,6 +188,111 @@ describe('DeliveryService.record', () => {
   });
 });
 
+describe('DeliveryService.record activity', () => {
+  it('writes one delivery row on the store campus for a recorded delivery', async () => {
+    const { repository, service } = setup();
+
+    await service.record(ctx(), body);
+
+    expect(repository.activity).toEqual([
+      {
+        organizationId: 'school-a',
+        campusId: LEKKI,
+        pillar: 'finance',
+        kind: 'store_delivery.received',
+        actorUserId: 'chika',
+        subjectType: 'stock_delivery',
+        subjectId: 'delivery-1',
+        text: 'Chika received delivery DEL-2026-0001 from Adebayo Uniforms Ltd at the Lekki store: 2 items, ₦39,800.',
+        data: {
+          deliveryId: 'delivery-1',
+          number: 'DEL-2026-0001',
+          storeId: 'store-lekki',
+          supplierName: 'Adebayo Uniforms Ltd',
+          items: 2,
+          totalMinor: 3_980_000,
+        },
+      },
+    ]);
+  });
+
+  it('writes one opening-stock row on the store campus for recorded opening stock', async () => {
+    const { repository, service } = setup();
+
+    await service.record(ctx(), opening);
+
+    expect(repository.activity).toHaveLength(1);
+    expect(repository.activity[0]).toMatchObject({
+      campusId: LEKKI,
+      pillar: 'finance',
+      kind: 'store_opening_stock.recorded',
+      subjectType: 'stock_delivery',
+      text: 'Chika recorded opening stock at the Lekki store: 2 items, ₦39,800.',
+    });
+  });
+
+  it.each([
+    ['replayed', { status: 'replayed', id: 'delivery-1' }],
+    ['reference_used', { status: 'reference_used', number: 'DEL-2026-0009' }],
+    ['opening_exists', { status: 'opening_exists' }],
+  ] as const)(
+    'writes none when the repository answers %s',
+    async (_name, outcome) => {
+      const { repository, service } = setup();
+      repository.outcome = outcome;
+
+      await service.record(ctx(), body).catch(() => undefined);
+      await service.record(ctx(), opening).catch(() => undefined);
+
+      expect(repository.inserted).toHaveLength(2);
+      expect(repository.activity).toHaveLength(0);
+    }
+  );
+
+  it('writes none on the early replay path', async () => {
+    const { repository, service } = setup();
+    repository.existing = {
+      id: 'delivery-1',
+      number: 'DEL-2026-0001',
+      requestHash: deliveryRequestHash(body),
+    };
+
+    await service.record(ctx(), body);
+
+    expect(repository.activity).toHaveLength(0);
+  });
+
+  it('writes none when a second opening stock is refused before the insert', async () => {
+    const { repository, service } = setup();
+    repository.opening = true;
+
+    await service.record(ctx(), opening).catch(() => undefined);
+
+    expect(repository.activity).toHaveLength(0);
+  });
+
+  it.each<[string, RecordDelivery]>([
+    ['a future date', { ...body, receivedOn: '2026-10-08' }],
+    ['no lines', { ...body, lines: [] }],
+    ['no money account', { ...body, moneyAccountId: undefined }],
+    ['an unknown account', { ...body, moneyAccountId: IKEJA }],
+    [
+      'an unknown item',
+      {
+        ...body,
+        lines: [{ itemId: IKEJA, quantity: 1, unitCostMinor: 100 }],
+      },
+    ],
+    ['a campus out of scope', { ...body, campusId: IKEJA }],
+  ])('writes none for %s', async (_name, input) => {
+    const { repository, service } = setup();
+
+    await refused(service.record(ctx([LEKKI]), input));
+
+    expect(repository.activity).toHaveLength(0);
+  });
+});
+
 describe('DeliveryService.record replay', () => {
   it('returns the earlier delivery and inserts nothing for an identical request', async () => {
     const { repository, service } = setup();

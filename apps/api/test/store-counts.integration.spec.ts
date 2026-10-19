@@ -20,6 +20,7 @@ import { entriesFor } from './support/factories/billing';
 import {
   createMoneyAccount,
   financeActivityRows,
+  financeActivityRowsBesidesDeliveries,
 } from './support/factories/finance';
 import {
   approveCount,
@@ -869,7 +870,9 @@ test.describe('isolation', () => {
           .body as StockCountList
       ).items
     ).toHaveLength(1);
-    expect(await financeActivityRows(pool, orgA.id)).toEqual([]);
+    expect(await financeActivityRowsBesidesDeliveries(pool, orgA.id)).toEqual(
+      []
+    );
     expect(await financeActivityRows(pool, orgB.id)).toEqual([]);
   });
 

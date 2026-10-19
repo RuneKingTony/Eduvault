@@ -18,6 +18,8 @@ import {
   paymentRecordedActivity,
   roundCancelledActivity,
   roundSentActivity,
+  storeDeliveryReceivedActivity,
+  storeOpeningStockRecordedActivity,
   storeSaleRecordedActivity,
   storeWriteOffApprovedActivity,
   storeWriteOffDeclinedActivity,
@@ -26,6 +28,7 @@ import {
   type FinanceActor,
   type OneOffChargeFacts,
   type PaymentFacts,
+  type StoreDeliveryFacts,
   type StoreSaleFacts,
   type StoreWriteOffFacts,
 } from './finance-activity';
@@ -279,6 +282,100 @@ describe('storeSaleRecordedActivity', () => {
       sale
     );
     expect(row?.text).toContain('for GHS 13,500 (sale');
+  });
+});
+
+describe('store delivery activity', () => {
+  const delivery: StoreDeliveryFacts = {
+    id: 'delivery-1',
+    number: 'DEL-2026-0003',
+    storeId: 'store-1',
+    campusId: LEKKI,
+    campusName: 'Lekki',
+    supplierName: 'Adebayo Uniforms Ltd',
+    lines: 2,
+    totalMinor: 3_980_000,
+  };
+
+  it('writes one finance row on the store campus for a delivery', () => {
+    expect(storeDeliveryReceivedActivity(actor, delivery)).toEqual([
+      {
+        organizationId: 'org-1',
+        campusId: LEKKI,
+        pillar: 'finance',
+        kind: 'store_delivery.received',
+        actorUserId: 'user-1',
+        subjectType: 'stock_delivery',
+        subjectId: 'delivery-1',
+        text: 'Tunde Bakare received delivery DEL-2026-0003 from Adebayo Uniforms Ltd at the Lekki store: 2 items, ₦39,800.',
+        data: {
+          deliveryId: 'delivery-1',
+          number: 'DEL-2026-0003',
+          storeId: 'store-1',
+          supplierName: 'Adebayo Uniforms Ltd',
+          items: 2,
+          totalMinor: 3_980_000,
+        },
+      },
+    ]);
+  });
+
+  it('says "1 item" for a single-line delivery', () => {
+    const [row] = storeDeliveryReceivedActivity(actor, {
+      ...delivery,
+      lines: 1,
+    });
+    expect(row?.text).toContain('at the Lekki store: 1 item, ₦39,800.');
+  });
+
+  it('writes one finance row on the store campus for opening stock', () => {
+    expect(
+      storeOpeningStockRecordedActivity(actor, {
+        ...delivery,
+        number: 'OPEN-STORE-campus-lekki',
+        supplierName: 'Opening stock count',
+        lines: 3,
+      })
+    ).toEqual([
+      {
+        organizationId: 'org-1',
+        campusId: LEKKI,
+        pillar: 'finance',
+        kind: 'store_opening_stock.recorded',
+        actorUserId: 'user-1',
+        subjectType: 'stock_delivery',
+        subjectId: 'delivery-1',
+        text: 'Tunde Bakare recorded opening stock at the Lekki store: 3 items, ₦39,800.',
+        data: {
+          deliveryId: 'delivery-1',
+          number: 'OPEN-STORE-campus-lekki',
+          storeId: 'store-1',
+          items: 3,
+          totalMinor: 3_980_000,
+        },
+      },
+    ]);
+  });
+
+  it('says "1 item" for single-line opening stock', () => {
+    const [row] = storeOpeningStockRecordedActivity(actor, {
+      ...delivery,
+      lines: 1,
+    });
+    expect(row?.text).toContain('at the Lekki store: 1 item, ₦39,800.');
+  });
+
+  it('formats the amount in the school currency', () => {
+    const [received] = storeDeliveryReceivedActivity(
+      { ...actor, currency: 'GHS' },
+      delivery
+    );
+    const [opening] = storeOpeningStockRecordedActivity(
+      { ...actor, currency: 'GHS' },
+      delivery
+    );
+    expect(received?.text).toContain('2 items, GHS 39,800.');
+    expect(opening?.text).toContain('2 items, GHS 39,800.');
   });
 });
 

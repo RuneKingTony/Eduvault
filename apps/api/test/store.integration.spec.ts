@@ -23,7 +23,11 @@ import {
 } from '@eduvault/api-contract';
 import { acting, expect } from './support/base-test';
 import { entriesFor } from './support/factories/billing';
-import { ledgerAccountId, postEntry } from './support/factories/finance';
+import {
+  financeActivityRows,
+  ledgerAccountId,
+  postEntry,
+} from './support/factories/finance';
 import { bankAccount } from './support/factories/payments';
 import {
   classLevelId,
@@ -439,6 +443,78 @@ test.describe('receiving a delivery', () => {
       .expect(409);
     expect(different.body.message).toContain(first.body.number);
     expect(await rows(pool, 'stock_movement')).toBe(1);
+  });
+
+  test('writes one finance row on the store campus for a delivery and for opening stock, and none for a replay or a second opening stock', async ({
+    api,
+    app,
+    pool,
+    schools: { owner, orgA, lekki },
+  }) => {
+    const size12 = await createItem(api, owner);
+    const bank = await bankAccount(app, owner);
+    const line = { itemId: size12.id, quantity: 10, unitCostMinor: COST };
+    const body = deliveryBody({
+      campusId: lekki.id,
+      accountId: bank.id,
+      lines: [line],
+    });
+    const deliveryRows = async () =>
+      (await financeActivityRows(pool, orgA.id)).filter((row) =>
+        ['store_delivery.received', 'store_opening_stock.recorded'].includes(
+          row.kind
+        )
+      );
+
+    const delivery = await api(owner)
+      .post('/store/deliveries')
+      .send(body)
+      .expect(201);
+    await api(owner).post('/store/deliveries').send(body).expect(200);
+    expect(await deliveryRows()).toHaveLength(1);
+
+    const opening = await openStock(api, owner, {
+      campusId: lekki.id,
+      lines: [line],
+    });
+    await api(owner)
+      .post('/store/deliveries')
+      .send({
+        ...deliveryBody({ campusId: lekki.id, lines: [line] }),
+        isOpening: true,
+      })
+      .expect(409);
+
+    const [received, recorded, ...rest] = await deliveryRows();
+    expect(rest).toEqual([]);
+    expect(received).toMatchObject({
+      kind: 'store_delivery.received',
+      campus_id: lekki.id,
+      subject_type: 'stock_delivery',
+      subject_id: delivery.body.id,
+      data: {
+        deliveryId: delivery.body.id,
+        number: delivery.body.number,
+        supplierName: 'Adebayo Uniforms Ltd',
+        items: 1,
+        totalMinor: TEN_SHIRTS,
+      },
+    });
+    expect(received?.text).toMatch(
+      new RegExp(
+        String.raw`^.+ received delivery ${delivery.body.number} from Adebayo Uniforms Ltd at the Lekki store: 1 item, ₦35,000\.$`
+      )
+    );
+    expect(recorded).toMatchObject({
+      kind: 'store_opening_stock.recorded',
+      campus_id: lekki.id,
+      subject_type: 'stock_delivery',
+      subject_id: opening.id,
+      data: { deliveryId: opening.id, items: 1, totalMinor: TEN_SHIRTS },
+    });
+    expect(recorded?.text).toMatch(
+      /^.+ recorded opening stock at the Lekki store: 1 item, ₦35,000\.$/
+    );
   });
 
   test('lists deliveries with the suppliers over the scope and reads one by id', async ({

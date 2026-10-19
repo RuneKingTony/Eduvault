@@ -5,6 +5,7 @@ import {
   STORE_STOCK_SYSTEM_KEY,
 } from '@eduvault/api-contract';
 import type { DB } from '../../../db/db-types';
+import type { ActivityWriter } from '../../common/activity';
 import { advisoryLock } from '../../common/db/advisory-lock';
 import { uniqueViolation } from '../../common/db/unique-violation';
 import {
@@ -14,6 +15,7 @@ import {
 import { systemAccountId, type LedgerPoster } from '../../common/ledger';
 import { receiveValue } from './stock-value';
 import type {
+  DeliveryActivity,
   DeliveryOutcome,
   ExistingDelivery,
   NewDelivery,
@@ -26,6 +28,12 @@ interface Issued {
   number: string;
   deliveryId: string;
   totalMinor: number;
+}
+
+interface DeliveryDeps {
+  poster: LedgerPoster;
+  activity: ActivityWriter;
+  record: DeliveryActivity;
 }
 
 export async function findDeliveryByReference(
@@ -168,7 +176,7 @@ async function insertRows(
 
 async function create(
   trx: Kysely<DB>,
-  poster: LedgerPoster,
+  deps: DeliveryDeps,
   input: NewDelivery
 ): Promise<DeliveryOutcome> {
   const issued: Issued = {
@@ -179,14 +187,21 @@ async function create(
       0
     ),
   };
-  const entryId = await postEntry(trx, poster, { input, issued });
+  const entryId = await postEntry(trx, deps.poster, { input, issued });
   await insertRows(trx, { input, issued, entryId });
+  await deps.activity.within(trx).recordMany(
+    deps.record({
+      id: issued.deliveryId,
+      number: issued.number,
+      totalMinor: issued.totalMinor,
+    })
+  );
   return { status: 'recorded', id: issued.deliveryId };
 }
 
 async function recordIn(
   trx: Kysely<DB>,
-  poster: LedgerPoster,
+  deps: DeliveryDeps,
   input: NewDelivery
 ): Promise<DeliveryOutcome> {
   const { organizationId, reference } = input;
@@ -213,18 +228,16 @@ async function recordIn(
   ) {
     return { status: 'opening_exists' };
   }
-  return create(trx, poster, input);
+  return create(trx, deps, input);
 }
 
 export async function insertDelivery(
   db: Kysely<DB>,
-  poster: LedgerPoster,
+  deps: DeliveryDeps,
   input: NewDelivery
 ): Promise<DeliveryOutcome> {
   try {
-    return await db
-      .transaction()
-      .execute((trx) => recordIn(trx, poster, input));
+    return await db.transaction().execute((trx) => recordIn(trx, deps, input));
   } catch (error) {
     if (uniqueViolation(error) === OPENING_KEY) {
       return { status: 'opening_exists' };

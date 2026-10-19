@@ -39,6 +39,7 @@ import { entriesFor, receivableBalance } from './support/factories/billing';
 import {
   createMoneyAccount,
   financeActivityRows,
+  financeActivityRowsBesidesDeliveries,
   ledgerAccountId,
   postEntry,
 } from './support/factories/finance';
@@ -166,7 +167,7 @@ test.describe('recording a student purchase', () => {
       ],
     });
 
-    const rows = await financeActivityRows(pool, orgA.id);
+    const rows = await financeActivityRowsBesidesDeliveries(pool, orgA.id);
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
       kind: 'store_sale.recorded',
@@ -399,7 +400,9 @@ test.describe('refusals leave nothing behind', () => {
         )
       ).rows
     ).toEqual(sequences.rows);
-    expect(await financeActivityRows(pool, orgA.id)).toEqual([]);
+    expect(await financeActivityRowsBesidesDeliveries(pool, orgA.id)).toEqual(
+      []
+    );
     expect(await stockOf(api, owner, { item: shirt, campusId: lekki.id })).toBe(
       10
     );
@@ -450,7 +453,9 @@ test.describe('refusals leave nothing behind', () => {
     expect(res.status).toBe(409);
     expect(res.body.message).toBe(STORE_SALE_REFERENCE_TAKEN_MESSAGE);
     expect(await saleTables(pool)).toEqual(before);
-    expect(await financeActivityRows(pool, orgA.id)).toEqual([]);
+    expect(await financeActivityRowsBesidesDeliveries(pool, orgA.id)).toEqual(
+      []
+    );
     expect(await receivableBalance(pool, orgA.id, studentLekki.id)).toBe(0);
     expect(await stockOf(api, owner, { item: shirt, campusId: lekki.id })).toBe(
       10
@@ -481,7 +486,9 @@ test.describe('refusals leave nothing behind', () => {
       storeSaleStockShortMessage(3, 'Tie', 'Lekki')
     );
     expect(await saleTables(pool)).toEqual(before);
-    expect(await financeActivityRows(pool, orgA.id)).toEqual([]);
+    expect(await financeActivityRowsBesidesDeliveries(pool, orgA.id)).toEqual(
+      []
+    );
   });
 
   test('two sales of the last unit at once: one is recorded, the other is told the shelf is empty', async ({
@@ -750,10 +757,14 @@ test.describe('replaying a reference', () => {
     const first = (await api(owner).post('/store/sales').send(body).expect(201))
       .body as RecordedSale;
     const before = await saleTables(pool);
-    expect(await financeActivityRows(pool, orgA.id)).toHaveLength(1);
+    expect(
+      await financeActivityRowsBesidesDeliveries(pool, orgA.id)
+    ).toHaveLength(1);
 
     const again = await api(owner).post('/store/sales').send(body).expect(200);
-    expect(await financeActivityRows(pool, orgA.id)).toHaveLength(1);
+    expect(
+      await financeActivityRowsBesidesDeliveries(pool, orgA.id)
+    ).toHaveLength(1);
 
     expect(again.body).toMatchObject({
       id: first.id,
@@ -1603,7 +1614,9 @@ test.describe('isolation', () => {
     ]);
     expect((await saleTables(pool)).store_sale).toBe(1);
     expect((await saleTables(pool)).payment).toBe(1);
-    expect(await financeActivityRows(pool, orgA.id)).toHaveLength(1);
+    expect(
+      await financeActivityRowsBesidesDeliveries(pool, orgA.id)
+    ).toHaveLength(1);
   });
 
   test('an acting super admin without a reason cannot record a sale (case 12)', async ({
