@@ -46,6 +46,68 @@ const count = async (pool: Pool, table: string, organizationId: string) =>
     ).rows[0]?.count
   );
 
+const usernameGuardian = {
+  new: {
+    fullName: 'Chidi Eze',
+    phone: '08011112222',
+    address: '4 Palm Close',
+    relationship: 'father',
+    paysFees: true,
+    login: { kind: 'username' },
+  },
+};
+
+const numberOf = (admissionNumber: string) =>
+  Number(admissionNumber.slice(admissionNumber.lastIndexOf('-') + 1));
+
+const tally = async (pool: Pool, organizationId: string) => ({
+  students: await count(pool, 'student', organizationId),
+  enrolments: await count(pool, 'student_enrollment', organizationId),
+  users: Number(
+    (await pool.query<{ count: string }>('SELECT count(*) FROM "user"')).rows[0]
+      ?.count
+  ),
+});
+
+// A BEFORE INSERT trigger seeds a same-username row inside the inserting
+// transaction, so the insert hits user_username_uidx and the rollback removes
+// the seed. The sequence survives the rollback and counts the attempts.
+async function withUsernameClashes<T extends { status: number }>(
+  pool: Pool,
+  clash: { username: string; times: number },
+  run: () => PromiseLike<T>
+): Promise<{ attempts: number; res: T }> {
+  await pool.query('CREATE SEQUENCE username_clash_attempts');
+  await pool.query(`
+    CREATE FUNCTION username_clash() RETURNS trigger LANGUAGE plpgsql AS $$
+    BEGIN
+      IF nextval('username_clash_attempts') <= ${clash.times} THEN
+        INSERT INTO "user" (name, email, "emailVerified", username, "displayUsername", "createdAt", "updatedAt")
+        VALUES ('Racer', gen_random_uuid()::text || '@example.com', false, NEW.username, NEW.username, now(), now());
+      END IF;
+      RETURN NEW;
+    END $$`);
+  await pool.query(`
+    CREATE TRIGGER username_clash BEFORE INSERT ON "user" FOR EACH ROW
+    WHEN (NEW.username = '${clash.username}' AND pg_trigger_depth() = 0)
+    EXECUTE FUNCTION username_clash()`);
+  try {
+    const res = await run();
+    const { rows } = await pool.query<{
+      last_value: string;
+      is_called: boolean;
+    }>('SELECT last_value, is_called FROM username_clash_attempts');
+    return {
+      attempts: rows[0]?.is_called === true ? Number(rows[0].last_value) : 0,
+      res,
+    };
+  } finally {
+    await pool.query('DROP TRIGGER username_clash ON "user"');
+    await pool.query('DROP FUNCTION username_clash()');
+    await pool.query('DROP SEQUENCE username_clash_attempts');
+  }
+}
+
 test.describe('admission', () => {
   test('creates the student, enrolment, placement, guardians, logins and one activity row', async ({
     api,
@@ -278,6 +340,81 @@ test.describe('admission', () => {
         (await pool.query('SELECT count(*) FROM "user"')).rows[0].count
       ),
     }).toEqual(before);
+  });
+
+  test('retries once when a guardian username is taken by a competing commit', async ({
+    api,
+    app,
+    pool,
+    schools: { owner, orgA, lekki },
+  }) => {
+    const arm = await ensureClass(app, owner, lekki.id);
+    const first = await api(owner)
+      .post('/students')
+      .send(body(arm))
+      .expect(201);
+    const before = await tally(pool, orgA.id);
+
+    const { attempts, res } = await withUsernameClashes(
+      pool,
+      { username: 'chidi-eze-family', times: 1 },
+      () =>
+        api(owner)
+          .post('/students')
+          .send(
+            body(arm, { firstName: 'Second', guardians: [usernameGuardian] })
+          )
+    );
+
+    expect(res.status).toBe(201);
+    expect(attempts).toBe(2);
+    expect(
+      res.body.logins.map((login: { username: string }) => login.username)
+    ).toContain('chidi-eze-family');
+    expect(await tally(pool, orgA.id)).toEqual({
+      students: before.students + 1,
+      enrolments: before.enrolments + 1,
+      users: before.users + 2,
+    });
+    expect(numberOf(res.body.student.admissionNumber)).toBe(
+      numberOf(first.body.student.admissionNumber) + 1
+    );
+  });
+
+  test('gives up after one retry, answers 409, and leaves no row and no burned number', async ({
+    api,
+    app,
+    pool,
+    schools: { owner, orgA, lekki },
+  }) => {
+    const arm = await ensureClass(app, owner, lekki.id);
+    const first = await api(owner)
+      .post('/students')
+      .send(body(arm))
+      .expect(201);
+    const before = await tally(pool, orgA.id);
+
+    const { attempts, res } = await withUsernameClashes(
+      pool,
+      { username: 'chidi-eze-family', times: 2 },
+      () =>
+        api(owner)
+          .post('/students')
+          .send(
+            body(arm, { firstName: 'Second', guardians: [usernameGuardian] })
+          )
+    );
+
+    expect(res.status).toBe(409);
+    expect(attempts).toBe(2);
+    expect(await tally(pool, orgA.id)).toEqual(before);
+    const next = await api(owner)
+      .post('/students')
+      .send(body(arm, { firstName: 'Third' }))
+      .expect(201);
+    expect(numberOf(next.body.student.admissionNumber)).toBe(
+      numberOf(first.body.student.admissionNumber) + 1
+    );
   });
 
   test('concurrent admissions get distinct numbers in the prefix format', async ({
