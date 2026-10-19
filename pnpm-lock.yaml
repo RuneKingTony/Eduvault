@@ -81,6 +81,9 @@ catalogs:
     eslint-plugin-sonarjs:
       specifier: ^4.2.2
       version: 4.2.2
+    eslint-plugin-testing-library:
+      specifier: ^7.16.0
+      version: 7.16.2
     eslint-plugin-unicorn:
       specifier: ^64.0.0
       version: 64.0.0
@@ -365,6 +368,9 @@ importers:
       eslint-plugin-sonarjs:
         specifier: catalog:eslint
         version: 4.2.2(eslint@9.39.5(jiti@2.7.0))
+      eslint-plugin-testing-library:
+        specifier: catalog:eslint
+        version: 7.16.2(eslint@9.39.5(jiti@2.7.0))(typescript@5.9.3)
       eslint-plugin-unicorn:
         specifier: catalog:eslint
         version: 64.0.0(eslint@9.39.5(jiti@2.7.0))
@@ -5792,6 +5798,12 @@ packages:
     resolution: {integrity: sha512-usNF9GfP89ibwhfxpZaCMW40sC7UEOusDgDCk7lyqAhh4AYdbBaAgLVL5Y/QS0jSed8eJ2ACGH6zzE8ezd/yZQ==}
     peerDependencies:
       eslint: ^8.0.0 || ^9.0.0 || ^10.0.0
+
+  eslint-plugin-testing-library@7.16.2:
+    resolution: {integrity: sha512-8gleGnQXK2ZA3hHwjCwpYTZvM+9VsrJ+/9kDI8CjqAQGAdMQOdn/rJNu7ZySENuiWlGKQWyZJ4ZjEg2zamaRHw==}
+    engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
+    peerDependencies:
+      eslint: ^8.57.0 || ^9.0.0 || ^10.0.0
 
   eslint-plugin-unicorn@64.0.0:
     resolution: {integrity: sha512-rNZwalHh8i0UfPlhNwg5BTUO1CMdKNmjqe+TgzOTZnpKoi8VBgsW7u9qCHIdpxEzZ1uwrJrPF0uRb7l//K38gA==}
@@ -14922,6 +14934,15 @@ snapshots:
       ts-api-utils: 2.5.0(typescript@5.9.3)
       typescript: 5.9.3
       yaml: 2.9.1
+
+  eslint-plugin-testing-library@7.16.2(eslint@9.39.5(jiti@2.7.0))(typescript@5.9.3):
+    dependencies:
+      '@typescript-eslint/scope-manager': 8.71.1
+      '@typescript-eslint/utils': 8.71.1(eslint@9.39.5(jiti@2.7.0))(typescript@5.9.3)
+      eslint: 9.39.5(jiti@2.7.0)
+    transitivePeerDependencies:
+      - supports-color
+      - typescript
 
   eslint-plugin-unicorn@64.0.0(eslint@9.39.5(jiti@2.7.0)):
     dependencies:
