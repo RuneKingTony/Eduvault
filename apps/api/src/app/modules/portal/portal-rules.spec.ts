@@ -172,16 +172,21 @@ const child = (
   ...overrides,
 });
 
+const noTerm = { term: null, termOptions: [] };
+
 describe('toPortalFamilyStatement', () => {
   it('keeps ₦100,000 owed and ₦20,000 credit apart rather than netting them', () => {
     const family = toPortalFamilyStatement(
-      'NGN',
       [child('ada'), child('chidi'), child('tobi')],
-      new Map([
-        ['ada', 6_000_000],
-        ['chidi', 4_000_000],
-        ['tobi', -2_000_000],
-      ])
+      {
+        currency: 'NGN',
+        balances: new Map([
+          ['ada', 6_000_000],
+          ['chidi', 4_000_000],
+          ['tobi', -2_000_000],
+        ]),
+        ...noTerm,
+      }
     );
     expect(family.totalOwedMinor).toBe(10_000_000);
     expect(family.creditMinor).toBe(2_000_000);
@@ -191,11 +196,11 @@ describe('toPortalFamilyStatement', () => {
   });
 
   it('lists a left child with debt as archived with their balance', () => {
-    const family = toPortalFamilyStatement(
-      'NGN',
-      [child('ada', { archived: true })],
-      new Map([['ada', 300_000]])
-    );
+    const family = toPortalFamilyStatement([child('ada', { archived: true })], {
+      currency: 'NGN',
+      balances: new Map([['ada', 300_000]]),
+      ...noTerm,
+    });
     expect(family.children).toEqual([
       {
         studentId: 'ada',
@@ -210,11 +215,49 @@ describe('toPortalFamilyStatement', () => {
   });
 
   it('is empty with zero totals when no child is in scope', () => {
-    expect(toPortalFamilyStatement('NGN', [], new Map())).toEqual({
+    expect(
+      toPortalFamilyStatement([], {
+        currency: 'NGN',
+        balances: new Map(),
+        ...noTerm,
+      })
+    ).toEqual({
       currency: 'NGN',
       totalOwedMinor: 0,
       creditMinor: 0,
       children: [],
+      term: null,
+      termOptions: [],
     });
+  });
+
+  it('carries the term and its options without changing the totals', () => {
+    const account = {
+      currency: 'NGN',
+      balances: new Map([
+        ['ada', 6_000_000],
+        ['tobi', -2_000_000],
+      ]),
+    };
+    const children = [child('ada'), child('tobi')];
+    const term = {
+      id: 'first',
+      label: 'First term, 2026/2027',
+      fromOn: '2026-09-01',
+      toOn: null,
+    };
+    const termOptions = [{ id: 'first', label: 'First term, 2026/2027' }];
+
+    const whole = toPortalFamilyStatement(children, { ...account, ...noTerm });
+    const filtered = toPortalFamilyStatement(children, {
+      ...account,
+      term,
+      termOptions,
+    });
+
+    expect(filtered).toMatchObject({ term, termOptions });
+    expect(filtered.totalOwedMinor).toBe(whole.totalOwedMinor);
+    expect(filtered.creditMinor).toBe(whole.creditMinor);
+    expect(filtered.children).toEqual(whole.children);
   });
 });

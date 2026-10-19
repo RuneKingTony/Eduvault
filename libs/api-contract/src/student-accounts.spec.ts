@@ -4,6 +4,8 @@ import {
   ROW_STATUS_LABELS,
   STATEMENT_ROW_STATUSES,
   balanceListQuerySchema,
+  familyStatementQuerySchema,
+  familyTermFields,
   guardianStatementParamsSchema,
   isOwingStatus,
   statementQuerySchema,
@@ -55,6 +57,48 @@ describe('statementQuerySchema', () => {
     expect(statementQuerySchema.parse({}).termId).toBeUndefined();
     expect(statementQuerySchema.safeParse({ termId: 'nope' }).success).toBe(
       false
+    );
+  });
+});
+
+describe('familyStatementQuerySchema', () => {
+  it('takes an optional term id and no paging', () => {
+    const id = '0198a4b2-3c5d-7e6f-8a9b-0c1d2e3f4a5b';
+    expect(familyStatementQuerySchema.parse({ termId: id })).toEqual({
+      termId: id,
+    });
+    expect(familyStatementQuerySchema.parse({})).toEqual({});
+    expect(
+      familyStatementQuerySchema.safeParse({ termId: 'nope' }).success
+    ).toBe(false);
+  });
+});
+
+describe('familyTermFields', () => {
+  const schema = z.object(familyTermFields);
+
+  it('accepts the whole-history nulls and a filled term', () => {
+    const id = '0198a4b2-3c5d-7e6f-8a9b-0c1d2e3f4a5b';
+    expect(schema.safeParse({ term: null, termOptions: [] }).success).toBe(
+      true
+    );
+    expect(
+      schema.safeParse({
+        term: {
+          id,
+          label: 'First term, 2026/2027',
+          fromOn: '2026-09-01',
+          toOn: null,
+        },
+        termOptions: [{ id, label: 'First term, 2026/2027' }],
+      }).success
+    ).toBe(true);
+  });
+
+  it('leaves the per-student figures to the single statement', () => {
+    expect(Object.keys(familyTermFields)).toEqual(['term', 'termOptions']);
+    expect(Object.keys(statementTermFields)).toEqual(
+      expect.arrayContaining(['broughtForward', 'closingMinor'])
     );
   });
 });

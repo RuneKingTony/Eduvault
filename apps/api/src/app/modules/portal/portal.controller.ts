@@ -3,6 +3,7 @@ import {
   contract,
   type PortalAnnouncementListQuery,
   type PortalAnnouncementsQuery,
+  type PortalFamilyStatementQuery,
   type PortalStatementQuery,
   type RouteOutput,
 } from '@eduvault/api-contract';
@@ -77,9 +78,10 @@ export class PortalController {
   @Get('family-statement')
   @OrganizationAuth('invoice', 'readOwn')
   familyStatement(
-    @Org() org: OrgContext
+    @Org() org: OrgContext,
+    @Query(zod(routes.familyStatement.query)) query: PortalFamilyStatementQuery
   ): Promise<RouteOutput<typeof routes.familyStatement>> {
-    return this.portal.familyStatement(org);
+    return this.portal.familyStatement(org, query);
   }
 
   @Get('students/:studentId/purchases')

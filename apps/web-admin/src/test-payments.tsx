@@ -11,6 +11,7 @@ import { render } from '@testing-library/react';
 import type {
   BalanceList,
   BalanceRow,
+  GuardianStatement,
   MePermissions,
   Payment,
   PaymentList,
@@ -271,6 +272,20 @@ export const statement = (
   term: null,
   broughtForward: null,
   closingMinor: null,
+  termOptions: [],
+  ...over,
+});
+
+export const guardianStatement = (
+  children: StudentStatement[],
+  over: Partial<GuardianStatement> = {}
+): GuardianStatement => ({
+  currency: 'NGN',
+  guardian: { id: NGOZI, name: 'Ngozi Okeke' },
+  familyTotalMinor: 8_000_000,
+  creditMinor: 500_000,
+  children,
+  term: null,
   termOptions: [],
   ...over,
 });

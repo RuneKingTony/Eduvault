@@ -161,11 +161,20 @@ const statementTermOptionSchema = z.object({
   label: z.string(),
 });
 
-export const statementTermFields = {
+export const familyStatementQuerySchema = z.object({
+  termId: idSchema.optional(),
+});
+export type FamilyStatementQuery = z.output<typeof familyStatementQuerySchema>;
+
+export const familyTermFields = {
   term: statementTermSchema.nullable(),
+  termOptions: z.array(statementTermOptionSchema),
+};
+
+export const statementTermFields = {
+  ...familyTermFields,
   broughtForward: statementBroughtForwardSchema,
   closingMinor: minorSchema.nullable(),
-  termOptions: z.array(statementTermOptionSchema),
 };
 
 export const studentStatementSchema = z.object({
@@ -195,5 +204,6 @@ export const guardianStatementSchema = z.object({
   familyTotalMinor: minorSchema.nonnegative(),
   creditMinor: minorSchema.nonnegative(),
   children: z.array(studentStatementSchema),
+  ...familyTermFields,
 });
 export type GuardianStatement = z.infer<typeof guardianStatementSchema>;

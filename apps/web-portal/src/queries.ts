@@ -5,6 +5,7 @@ import {
   type QueryExecuteOptions,
   type QueryKey,
 } from '@tanstack/react-query';
+import { termKeyOf } from '@eduvault/shared';
 import type { Api } from './api';
 
 const ME_PERMISSIONS_KEY = ['me', 'permissions'] as const;
@@ -61,6 +62,9 @@ export const portalAnnouncementListQueryOptions = (
     placeholderData: keepPreviousData,
   });
 
+const termQueryOf = (termId: string | undefined) =>
+  termId === undefined ? {} : { termId };
+
 export const portalStatementQueryOptions = (
   api: Api,
   studentId: string,
@@ -71,7 +75,7 @@ export const portalStatementQueryOptions = (
       ...PORTAL_KEY,
       'statement',
       studentId,
-      termId ?? 'all',
+      termKeyOf(termId),
       page ?? 'last',
     ],
     queryFn: () =>
@@ -79,16 +83,20 @@ export const portalStatementQueryOptions = (
         params: { studentId },
         query: {
           ...(page === undefined ? {} : { page }),
-          ...(termId === undefined ? {} : { termId }),
+          ...termQueryOf(termId),
         },
       }),
     placeholderData: keepPreviousData,
   });
 
-export const portalFamilyStatementQueryOptions = (api: Api) =>
+export const portalFamilyStatementQueryOptions = (
+  api: Api,
+  { termId }: { termId?: string } = {}
+) =>
   queryOptions({
-    queryKey: [...PORTAL_KEY, 'family-statement'],
-    queryFn: () => api.portal.familyStatement({}),
+    queryKey: [...PORTAL_KEY, 'family-statement', termKeyOf(termId)],
+    queryFn: () => api.portal.familyStatement({ query: termQueryOf(termId) }),
+    placeholderData: keepPreviousData,
   });
 
 export const portalPurchasesQueryOptions = (api: Api, studentId: string) =>

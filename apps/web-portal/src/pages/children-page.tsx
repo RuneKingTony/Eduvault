@@ -14,6 +14,8 @@ import {
   feesTile,
   money,
   portalBalanceLine,
+  termKeyOf,
+  type TermPick,
 } from '@eduvault/shared';
 import {
   Badge,
@@ -22,6 +24,7 @@ import {
   CardContent,
   ErrorMessage,
   PageSkeleton,
+  TermSelect,
 } from '@eduvault/ui';
 import { useApi } from '../api';
 import { NoChildren } from '../components/no-children';
@@ -126,10 +129,16 @@ function ChildCards({
   );
 }
 
-function ChildStatement({ studentId }: { studentId: string }) {
+function ChildStatement({
+  studentId,
+  termId,
+}: {
+  studentId: string;
+  termId: string | undefined;
+}) {
   const [page, setPage] = useState<number | undefined>(undefined);
   const statement = useQuery(
-    portalStatementQueryOptions(useApi(), studentId, { page })
+    portalStatementQueryOptions(useApi(), studentId, { page, termId })
   );
   if (statement.data === undefined) {
     return statement.isPending ? (
@@ -171,7 +180,11 @@ function FamilyTiles({ family }: { family: PortalFamilyStatement }) {
   );
 }
 
-function FamilyStatementSection({ family }: { family: PortalFamilyStatement }) {
+function FamilyStatementSection({
+  family,
+  term,
+  onTerm,
+}: TermPick & { family: PortalFamilyStatement }) {
   return (
     <section className="flex flex-col gap-4">
       <header>
@@ -183,16 +196,23 @@ function FamilyStatementSection({ family }: { family: PortalFamilyStatement }) {
           </strong>
         </p>
       </header>
+      <TermSelect terms={family.termOptions} value={term} onChange={onTerm} />
       {family.children.length > 1 ? <FamilyTiles family={family} /> : null}
       {family.children.map((child) => (
-        <ChildStatement key={child.studentId} studentId={child.studentId} />
+        <ChildStatement
+          key={`${child.studentId}:${termKeyOf(term)}`}
+          studentId={child.studentId}
+          termId={term}
+        />
       ))}
     </section>
   );
 }
 
-function FamilyStatement() {
-  const family = useQuery(portalFamilyStatementQueryOptions(useApi()));
+function FamilyStatement({ term, onTerm }: TermPick) {
+  const family = useQuery(
+    portalFamilyStatementQueryOptions(useApi(), { termId: term })
+  );
   if (family.data === undefined) {
     return family.isPending ? (
       <PageSkeleton rows={3} />
@@ -200,15 +220,19 @@ function FamilyStatement() {
       <ErrorMessage error={family.error} />
     );
   }
-  return <FamilyStatementSection family={family.data} />;
+  return (
+    <FamilyStatementSection family={family.data} term={term} onTerm={onTerm} />
+  );
 }
 
 function ChildrenBody({
   list,
   currency,
+  term,
+  onTerm,
   onOpenChild,
   onSeeFees,
-}: {
+}: TermPick & {
   list: readonly PortalChild[];
   currency: string;
   onOpenChild: (childId: string) => void;
@@ -225,7 +249,7 @@ function ChildrenBody({
         fees={{ currency, onSeeFees }}
         onOpenChild={onOpenChild}
       />
-      <FamilyStatement />
+      <FamilyStatement term={term} onTerm={onTerm} />
     </>
   ) : (
     <ChildCards list={list} onOpenChild={onOpenChild} />
@@ -234,9 +258,11 @@ function ChildrenBody({
 
 export function ChildrenPage({
   me,
+  term,
+  onTerm,
   onOpenChild,
   onSeeFees,
-}: {
+}: TermPick & {
   me: PortalMe;
   onOpenChild: (childId: string) => void;
   onSeeFees: (childId: string) => void;
@@ -261,6 +287,8 @@ export function ChildrenPage({
       <ChildrenBody
         list={children.data}
         currency={me.school.currency}
+        term={term}
+        onTerm={onTerm}
         onOpenChild={onOpenChild}
         onSeeFees={onSeeFees}
       />

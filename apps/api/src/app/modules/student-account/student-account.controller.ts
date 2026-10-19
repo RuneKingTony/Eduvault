@@ -37,8 +37,10 @@ export class StudentAccountController {
   guardianStatement(
     @Org() org: OrgContext,
     @Param(zod(routes.guardianStatement.params))
-    params: { guardianId: string }
+    params: { guardianId: string },
+    @Query(zod(routes.guardianStatement.query))
+    query: Parameters<StudentAccountService['guardianStatement']>[2]
   ): Promise<RouteOutput<typeof routes.guardianStatement>> {
-    return this.accounts.guardianStatement(org, params.guardianId);
+    return this.accounts.guardianStatement(org, params.guardianId, query);
   }
 }

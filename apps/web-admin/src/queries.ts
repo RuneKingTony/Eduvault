@@ -18,6 +18,7 @@ import {
   type RouteQuery,
   type contract,
 } from '@eduvault/api-contract';
+import { termKeyOf } from '@eduvault/shared';
 import type { ActingState } from './acting-store';
 import type { Api } from './api';
 import type { MembersSearch } from './members-search';
@@ -831,7 +832,7 @@ export const statementQueryOptions = (
       ...STATEMENTS_KEY,
       'student',
       studentId,
-      termId ?? 'all',
+      termKeyOf(termId),
       page ?? 'last',
     ],
     queryFn: () =>
@@ -842,11 +843,21 @@ export const statementQueryOptions = (
     placeholderData: keepPreviousData,
   });
 
-export const familyStatementQueryOptions = (api: Api, guardianId: string) =>
+export const familyStatementQueryOptions = (
+  api: Api,
+  guardianId: string,
+  { termId }: { termId?: string } = {}
+) =>
   queryOptions({
-    queryKey: [...STATEMENTS_KEY, 'family', guardianId],
+    queryKey: [...STATEMENTS_KEY, 'family', guardianId, termKeyOf(termId)],
     queryFn: () =>
-      api.studentAccounts.guardianStatement({ params: { guardianId } }),
+      api.studentAccounts.guardianStatement({
+        params: { guardianId },
+        query: { termId },
+      }),
+    meta: { guardianId },
+    placeholderData: (previous, previousQuery) =>
+      previousQuery?.meta?.['guardianId'] === guardianId ? previous : undefined,
   });
 
 const APPROVALS_KEY = ['approvals'] as const;

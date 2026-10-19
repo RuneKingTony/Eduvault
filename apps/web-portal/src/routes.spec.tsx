@@ -74,6 +74,8 @@ const guardianWithout = (...omitted: Permission[]): MePermissions => {
 const guardianAccess = () => guardianWithout();
 const guardianWithoutFees = () => guardianWithout('invoice:readOwn');
 
+const TERM_ID = '00000000-0000-4000-8000-0000000c0001';
+
 const ada = portalChild({ id: ADA_ID, firstName: 'Ada' });
 const tobi = portalChild({ id: TOBI_ID, firstName: 'Tobi' });
 
@@ -170,6 +172,50 @@ describe('the portal routes', () => {
       expect(router.state.location.pathname).toBe('/');
     });
     expect(router.state.location.search).toEqual({ child: TOBI_ID });
+  });
+
+  it('asks My children for the family statement and each child’s statement with the term in the URL', async () => {
+    const term = { id: TERM_ID, label: 'First term, 2026/2027' };
+    const api = fakeApi(guardianAccess());
+    api.portal.familyStatement.mockResolvedValue(
+      portalFamilyStatement({ termOptions: [term] })
+    );
+    openAt(`/children?term=${TERM_ID}`, api);
+
+    expect(await screen.findByRole('combobox', { name: 'Term' })).toHaveValue(
+      TERM_ID
+    );
+    expect(api.portal.familyStatement).toHaveBeenCalledWith({
+      query: { termId: TERM_ID },
+    });
+    await waitFor(() => {
+      expect(api.portal.statement).toHaveBeenCalledWith({
+        params: { studentId: ADA_ID },
+        query: { termId: TERM_ID },
+      });
+    });
+  });
+
+  it('keeps the child in the URL when a term is picked on My children', async () => {
+    const api = fakeApi(guardianAccess());
+    api.portal.familyStatement.mockResolvedValue(
+      portalFamilyStatement({
+        termOptions: [{ id: TERM_ID, label: 'First term, 2026/2027' }],
+      })
+    );
+    const router = openAt(`/children?child=${TOBI_ID}`, api);
+
+    fireEvent.change(await screen.findByRole('combobox', { name: 'Term' }), {
+      target: { value: TERM_ID },
+    });
+
+    await waitFor(() => {
+      expect(router.state.location.search).toEqual({
+        child: TOBI_ID,
+        term: TERM_ID,
+      });
+    });
+    expect(router.state.location.pathname).toBe('/children');
   });
 
   it('opens the full announcements list for the chosen child and goes back to Home', async () => {
