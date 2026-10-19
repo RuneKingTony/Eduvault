@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import {
   PAYMENT_ACCOUNT_GATEWAY_MESSAGE,
+  PAYMENT_ACCOUNT_METHOD_MESSAGE,
   PAYMENT_ACCOUNT_RETIRED_MESSAGE,
   PAYMENT_FUTURE_DATE_MESSAGE,
   PAYMENT_METHOD_OFF_MESSAGE,
@@ -85,17 +86,20 @@ const stored = (id = 'payment-1'): Omit<Payment, 'currency'> => ({
   voidEntry: null,
 });
 
+const okAccount = (kind: 'bank' | 'cash' | 'pos'): RecordingAccount => ({
+  status: 'ok',
+  ledgerAccountId: 'ledger-1',
+  campusId: null,
+  kind,
+});
+
 class FakePayments extends PaymentRepository {
   methods: PaymentMethods = { cash: true, transfer: true, pos: true };
   existing: ExistingPayment | undefined;
   raced: ExistingPayment | undefined;
   lookups = 0;
   visible: Omit<Payment, 'currency'> | undefined = stored();
-  account: RecordingAccount = {
-    status: 'ok',
-    ledgerAccountId: 'ledger-1',
-    campusId: null,
-  };
+  account: RecordingAccount = okAccount('bank');
   guardian: string | undefined = 'Ngozi Okeke';
   inScope: string[] = [ADA, CHIDI];
   proofState: ProofState = 'free';
@@ -216,6 +220,7 @@ describe('PaymentService.record', () => {
 
   it('uses the typed name when someone else paid', async () => {
     const { payments, service } = setup();
+    payments.account = okAccount('cash');
 
     await service.record(ctx, {
       ...body,
@@ -232,11 +237,39 @@ describe('PaymentService.record', () => {
     });
   });
 
-  it('takes a cash payment without proof', async () => {
-    const { service } = setup();
+  it('takes a cash payment without proof into a cash account', async () => {
+    const { payments, service } = setup();
+    payments.account = okAccount('cash');
     await expect(
       service.record(ctx, { ...body, method: 'cash', proofFileId: undefined })
     ).resolves.toMatchObject({ replayed: false });
+  });
+
+  it('refuses a bank transfer into a cash account, and takes cash into a bank account', async () => {
+    const { payments, service } = setup();
+    payments.account = okAccount('cash');
+    await expect(service.record(ctx, body)).rejects.toThrow(
+      PAYMENT_ACCOUNT_METHOD_MESSAGE
+    );
+    payments.account = okAccount('bank');
+    await expect(
+      service.record(ctx, { ...body, method: 'cash', proofFileId: undefined })
+    ).resolves.toMatchObject({ replayed: false });
+  });
+
+  it('takes a POS payment into a POS or bank account', async () => {
+    const { payments, service } = setup();
+    for (const kind of ['pos', 'bank'] as const) {
+      payments.account = okAccount(kind);
+      await expect(
+        service.record(ctx, {
+          ...body,
+          method: 'pos',
+          proofFileId: undefined,
+          reference: `POS-${kind}-20261007`,
+        })
+      ).resolves.toMatchObject({ replayed: false });
+    }
   });
 
   it('reports a race that another request won as a replay', async () => {

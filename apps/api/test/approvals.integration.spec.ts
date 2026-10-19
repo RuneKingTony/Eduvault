@@ -435,7 +435,11 @@ test.describe('accounts for recording', () => {
         .get('/finance/money-accounts/for-recording')
         .expect(200);
       expect(res.body).toEqual([
-        { id: account.id, label: expect.stringContaining('GTBank') },
+        {
+          id: account.id,
+          kind: 'bank',
+          label: expect.stringContaining('GTBank'),
+        },
       ]);
     }
     await api(noPermission)
@@ -457,7 +461,11 @@ test.describe('accounts for recording', () => {
       .expect(200);
 
     expect(res.body).toEqual([
-      { id: accountB.id, label: expect.stringContaining('GTBank') },
+      {
+        id: accountB.id,
+        kind: 'bank',
+        label: expect.stringContaining('GTBank'),
+      },
     ]);
     expect(JSON.stringify(res.body)).not.toContain(accountA.id);
   });
