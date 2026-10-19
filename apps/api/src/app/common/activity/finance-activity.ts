@@ -527,7 +527,7 @@ export const feeTypeCreatedActivity = (
   }),
 ];
 
-export interface FeeOptionFacts {
+interface FeeOptionFacts {
   student: StudentIdentity;
   feeType: { id: string; name: string };
   enrollmentId: string;
