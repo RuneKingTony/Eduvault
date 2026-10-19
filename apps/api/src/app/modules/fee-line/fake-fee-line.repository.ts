@@ -6,6 +6,7 @@ import type {
 } from '@eduvault/api-contract';
 import type { ActivityInput } from '../../common/activity';
 import { canSeeCampus } from '../../common/campus-scope';
+import type { StudentIdentity } from '../../common/students';
 import {
   FeeLineRepository,
   FeeOptionRepository,
@@ -23,9 +24,11 @@ import {
   type LevelRef,
   type LineActivity,
   type NewFeeLine,
+  type OptionActivity,
   type OptionChange,
   type StudentFeeContext,
   type TermRef,
+  type TypeActivity,
 } from './fee-line.repository';
 
 export class FakeFeeLineRepository extends FeeLineRepository {
@@ -218,19 +221,26 @@ export class FakeFeeTypeRepository extends FeeTypeRepository {
   types: FeeType[] = [];
   outcome: FeeTypeOutcome | undefined;
   createdNames: string[] = [];
+  recorded: ActivityInput[] = [];
 
   list(): Promise<FeeType[]> {
     return Promise.resolve(this.types);
   }
 
-  create(_organizationId: string, name: string): Promise<FeeTypeOutcome> {
+  create(
+    _organizationId: string,
+    name: string,
+    activity: TypeActivity
+  ): Promise<FeeTypeOutcome> {
     this.createdNames.push(name);
-    return Promise.resolve(
-      this.outcome ?? {
-        status: 'saved',
-        feeType: { id: 'new-type', code: 4090, name },
-      }
-    );
+    const outcome: FeeTypeOutcome = this.outcome ?? {
+      status: 'saved',
+      feeType: { id: 'new-type', code: 4090, name },
+    };
+    if (outcome.status === 'saved') {
+      this.recorded.push(...activity(outcome.feeType));
+    }
+    return Promise.resolve(outcome);
   }
 }
 
@@ -263,6 +273,12 @@ export class FakeFeeOptionRepository extends FeeOptionRepository {
   optedIn: string[] = [];
   optional: { feeTypeId: string; name: string }[] = [];
   changes: OptionChange[] = [];
+  student: StudentIdentity = {
+    id: 'ada',
+    name: 'Ada Okeke',
+    campusId: 'lekki',
+  };
+  recorded: ActivityInput[] = [];
 
   hasSession(_organizationId: string, id: string): Promise<boolean> {
     return Promise.resolve(this.sessions.has(id));
@@ -280,8 +296,27 @@ export class FakeFeeOptionRepository extends FeeOptionRepository {
     return Promise.resolve(this.optional);
   }
 
-  setOption(change: OptionChange): Promise<void> {
+  setOption(change: OptionChange, activity: OptionActivity): Promise<void> {
     this.changes.push(change);
+    const held = this.optedIn.includes(change.feeTypeId);
+    if (held === change.optedIn) {
+      return Promise.resolve();
+    }
+    this.optedIn = change.optedIn
+      ? [...this.optedIn, change.feeTypeId]
+      : this.optedIn.filter((id) => id !== change.feeTypeId);
+    const feeType = this.optional.find(
+      (option) => option.feeTypeId === change.feeTypeId
+    );
+    this.recorded.push(
+      ...activity({
+        student: this.student,
+        feeType: {
+          id: change.feeTypeId,
+          name: feeType?.name ?? change.feeTypeId,
+        },
+      })
+    );
     return Promise.resolve();
   }
 }

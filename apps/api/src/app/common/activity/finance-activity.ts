@@ -3,6 +3,7 @@ import {
   type AdjustmentKind,
   type DiscountKind,
   type FeeLine,
+  type FeeType,
 } from '@eduvault/api-contract';
 import { countOf, money } from '@eduvault/shared';
 import type { StudentIdentity } from '../students';
@@ -16,6 +17,8 @@ type FinanceSubject =
   | 'adjustment'
   | 'student_discount'
   | 'fee_line'
+  | 'fee_type'
+  | 'student'
   | 'term'
   | 'store_sale'
   | 'stock_count'
@@ -506,6 +509,48 @@ export function discountDeclinedActivity(
     }),
   ];
 }
+
+export const feeTypeCreatedActivity = (
+  actor: FinanceActor,
+  feeType: FeeType
+): ActivityInput[] => [
+  finance(actor, {
+    campusId: null,
+    kind: FEE_SCHEDULE_KINDS.feeTypeCreated,
+    subject: { type: 'fee_type', id: feeType.id },
+    text: `${actor.name} added the fee type ${feeType.name} (${feeType.code}).`,
+    data: {
+      feeTypeId: feeType.id,
+      code: feeType.code,
+      name: feeType.name,
+    },
+  }),
+];
+
+interface FeeOptionFacts {
+  student: StudentIdentity;
+  feeType: { id: string; name: string };
+  enrollmentId: string;
+  optedIn: boolean;
+}
+
+export const feeOptionChangedActivity = (
+  actor: FinanceActor,
+  { student, feeType, enrollmentId, optedIn }: FeeOptionFacts
+): ActivityInput[] => [
+  finance(actor, {
+    campusId: student.campusId,
+    kind: optedIn ? 'fee_option.opted_in' : 'fee_option.opted_out',
+    subject: { type: 'student', id: student.id },
+    text: `${actor.name} opted ${student.name} ${optedIn ? 'into' : 'out of'} ${feeType.name}.`,
+    data: {
+      studentId: student.id,
+      feeTypeId: feeType.id,
+      enrollmentId,
+      optedIn,
+    },
+  }),
+];
 
 interface CopiedTerm {
   id: string;

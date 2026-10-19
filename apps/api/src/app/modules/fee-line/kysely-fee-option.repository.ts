@@ -1,11 +1,20 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { ActivityWriter } from '../../common/activity';
 import { currentSessionId } from '../../common/db/current-session';
 import { KYSELY_TOKEN, type Database } from '../../common/db/tokens';
-import { FeeOptionRepository, type OptionChange } from './fee-line.repository';
+import { findStudentIdentity } from '../../common/students';
+import {
+  FeeOptionRepository,
+  type OptionActivity,
+  type OptionChange,
+} from './fee-line.repository';
 
 @Injectable()
 export class KyselyFeeOptionRepository extends FeeOptionRepository {
-  constructor(@Inject(KYSELY_TOKEN) private readonly db: Database) {
+  constructor(
+    @Inject(KYSELY_TOKEN) private readonly db: Database,
+    private readonly activity: ActivityWriter
+  ) {
     super();
   }
 
@@ -83,29 +92,51 @@ export class KyselyFeeOptionRepository extends FeeOptionRepository {
     return rows.map((row) => ({ feeTypeId: row.id, name: row.name }));
   }
 
-  async setOption(change: OptionChange): Promise<void> {
-    if (change.optedIn) {
-      await this.db
-        .insertInto('student_fee_option')
-        .values({
-          organization_id: change.organizationId,
-          enrollment_id: change.enrollmentId,
-          ledger_account_id: change.feeTypeId,
-          created_by: change.userId,
-        })
-        .onConflict((conflict) =>
-          conflict
-            .constraint('student_fee_option_enrollment_account_key')
-            .doNothing()
-        )
-        .execute();
-      return;
-    }
-    await this.db
-      .deleteFrom('student_fee_option')
-      .where('organization_id', '=', change.organizationId)
-      .where('enrollment_id', '=', change.enrollmentId)
-      .where('ledger_account_id', '=', change.feeTypeId)
-      .execute();
+  setOption(change: OptionChange, activity: OptionActivity): Promise<void> {
+    return this.db.transaction().execute(async (trx) => {
+      const changed = change.optedIn
+        ? await trx
+            .insertInto('student_fee_option')
+            .values({
+              organization_id: change.organizationId,
+              enrollment_id: change.enrollmentId,
+              ledger_account_id: change.feeTypeId,
+              created_by: change.userId,
+            })
+            .onConflict((conflict) =>
+              conflict
+                .constraint('student_fee_option_enrollment_account_key')
+                .doNothing()
+            )
+            .returning('id')
+            .execute()
+        : await trx
+            .deleteFrom('student_fee_option')
+            .where('organization_id', '=', change.organizationId)
+            .where('enrollment_id', '=', change.enrollmentId)
+            .where('ledger_account_id', '=', change.feeTypeId)
+            .returning('id')
+            .execute();
+      if (changed.length === 0) {
+        return;
+      }
+      const student = await findStudentIdentity(
+        trx,
+        { organizationId: change.organizationId, campusScope: 'all' },
+        change.studentId
+      );
+      const feeType = await trx
+        .selectFrom('ledger_account')
+        .select(['id', 'name'])
+        .where('organization_id', '=', change.organizationId)
+        .where('id', '=', change.feeTypeId)
+        .executeTakeFirst();
+      if (student === undefined || feeType === undefined) {
+        throw new Error('A fee option change needs its student and fee type');
+      }
+      await this.activity
+        .within(trx)
+        .recordMany(activity({ student, feeType }));
+    });
   }
 }

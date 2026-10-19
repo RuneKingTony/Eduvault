@@ -10,6 +10,8 @@ import {
   feeLineCreatedActivity,
   feeLineRetiredActivity,
   feeLinesCopiedActivity,
+  feeOptionChangedActivity,
+  feeTypeCreatedActivity,
   oneOffChargeActivity,
   paymentCancellationDeclinedActivity,
   paymentCancelledActivity,
@@ -875,5 +877,83 @@ describe('oneOffChargeActivity', () => {
     expect(row?.text).toBe(
       `Charged Bola Ade ${money(1_750_000, 'GHS')} (CHG-2026-0031)`
     );
+  });
+});
+
+describe('feeTypeCreatedActivity', () => {
+  it('writes one school-wide finance row naming the type and its code', () => {
+    expect(
+      feeTypeCreatedActivity(actor, {
+        id: 'type-9',
+        code: 4090,
+        name: 'Sports levy',
+      })
+    ).toEqual([
+      {
+        organizationId: 'org-1',
+        campusId: null,
+        pillar: 'finance',
+        kind: 'fee_type.created',
+        actorUserId: 'user-1',
+        subjectType: 'fee_type',
+        subjectId: 'type-9',
+        text: 'Tunde Bakare added the fee type Sports levy (4090).',
+        data: { feeTypeId: 'type-9', code: 4090, name: 'Sports levy' },
+      },
+    ]);
+  });
+});
+
+describe('feeOptionChangedActivity', () => {
+  const facts = {
+    student: { id: 'student-1', name: 'Bola Ade', campusId: LEKKI },
+    feeType: { id: 'type-bus', name: 'School bus' },
+    enrollmentId: 'enrol-1',
+  };
+
+  it('writes an opt-in row on the student’s campus', () => {
+    expect(
+      feeOptionChangedActivity(actor, { ...facts, optedIn: true })
+    ).toEqual([
+      {
+        organizationId: 'org-1',
+        campusId: LEKKI,
+        pillar: 'finance',
+        kind: 'fee_option.opted_in',
+        actorUserId: 'user-1',
+        subjectType: 'student',
+        subjectId: 'student-1',
+        text: 'Tunde Bakare opted Bola Ade into School bus.',
+        data: {
+          studentId: 'student-1',
+          feeTypeId: 'type-bus',
+          enrollmentId: 'enrol-1',
+          optedIn: true,
+        },
+      },
+    ]);
+  });
+
+  it('writes an opt-out row on the student’s campus', () => {
+    expect(
+      feeOptionChangedActivity(actor, { ...facts, optedIn: false })
+    ).toEqual([
+      {
+        organizationId: 'org-1',
+        campusId: LEKKI,
+        pillar: 'finance',
+        kind: 'fee_option.opted_out',
+        actorUserId: 'user-1',
+        subjectType: 'student',
+        subjectId: 'student-1',
+        text: 'Tunde Bakare opted Bola Ade out of School bus.',
+        data: {
+          studentId: 'student-1',
+          feeTypeId: 'type-bus',
+          enrollmentId: 'enrol-1',
+          optedIn: false,
+        },
+      },
+    ]);
   });
 });
