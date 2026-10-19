@@ -4,6 +4,7 @@ import type { EduvaultAuthClient } from '@eduvault/auth-client';
 import type { Me } from '@eduvault/api-contract';
 import { ApiProvider, type Api } from './api';
 import { App } from './app';
+import { checked } from './test-api';
 
 vi.mock('@tanstack/react-router', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@tanstack/react-router')>()),
@@ -26,13 +27,18 @@ const signedIn = {
   isPending: false,
 };
 
+const GREENFIELD = { id: 'o1', name: 'Greenfield College' };
+const HILLCREST = { id: 'o2', name: 'Hillcrest Academy' };
+
 const clientWith = (
   session: { data: unknown; isPending: boolean },
-  signOut = vi.fn().mockResolvedValue({ data: {}, error: null })
+  signOut = vi.fn().mockResolvedValue({ data: {}, error: null }),
+  schools = [GREENFIELD]
 ): EduvaultAuthClient =>
   ({
     useSession: () => session,
-    useListOrganizations: () => ({ data: [] }),
+    useListOrganizations: () => ({ data: schools }),
+    organization: { setActive: vi.fn() },
     signOut,
   }) as unknown as EduvaultAuthClient;
 
@@ -43,15 +49,15 @@ const apiWith = (...answers: Me[]) => {
   }
   const setPassword = vi.fn().mockResolvedValue(undefined);
   return {
-    api: { me: { get, setPassword } } as unknown as Api,
+    api: checked({ me: { get, setPassword } }),
     setPassword,
   };
 };
 
-const renderApp = (authClient: EduvaultAuthClient, api: Partial<Api> = {}) =>
+const renderApp = (authClient: EduvaultAuthClient, api: Api = checked({})) =>
   render(
     <QueryClientProvider client={new QueryClient()}>
-      <ApiProvider api={api as Api}>
+      <ApiProvider api={api}>
         <App authClient={authClient} />
       </ApiProvider>
     </QueryClientProvider>
@@ -124,7 +130,7 @@ describe('App', () => {
     const get = vi
       .fn()
       .mockRejectedValue(new Error('Authentication is required'));
-    const api = { me: { get } } as unknown as Api;
+    const api = checked({ me: { get } });
     renderApp(clientWith({ data: null, isPending: false }), api);
     expect(
       screen.getByRole('heading', { name: /Welcome back|Sign in/ })
@@ -144,7 +150,7 @@ describe('App', () => {
     expect(screen.getByText('Contact the school for details.')).toBeVisible();
     expect(screen.queryByText('The router is showing')).not.toBeInTheDocument();
     expect(
-      screen.queryByRole('button', { name: /Greenfield|School/ })
+      screen.queryByRole('button', { name: 'Greenfield College' })
     ).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
     await waitFor(() => {
@@ -159,11 +165,20 @@ describe('App', () => {
         suspendedSchool: { id: 'o1', name: 'Greenfield College' },
       })
     );
-    renderApp(clientWith(signedIn), api);
+    renderApp(clientWith(signedIn, undefined, [GREENFIELD, HILLCREST]), api);
     await screen.findByText('Greenfield College is paused on Eduvault');
     expect(
-      screen.getAllByRole('button').map((button) => button.textContent)
-    ).toEqual(expect.arrayContaining(['Sign out', 'Check again']));
-    expect(screen.getAllByRole('button')).toHaveLength(3);
+      screen.getByRole('button', { name: 'Check again' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Sign out' })
+    ).toBeInTheDocument();
+    fireEvent.keyDown(
+      screen.getByRole('button', { name: 'Greenfield College' }),
+      { key: 'Enter' }
+    );
+    expect(
+      await screen.findByRole('menuitem', { name: 'Hillcrest Academy' })
+    ).toBeInTheDocument();
   });
 });

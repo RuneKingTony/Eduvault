@@ -1,4 +1,5 @@
 import { landingRedirect } from './default-page';
+import { ADA_ID } from './test-utils';
 
 describe('landingRedirect', () => {
   it('sends a guardian on / with no child to My children', () => {
@@ -9,7 +10,7 @@ describe('landingRedirect', () => {
 
   it('keeps a guardian on Home when a child is chosen', () => {
     expect(
-      landingRedirect({ kind: 'guardian', path: '/', child: 'ada' })
+      landingRedirect({ kind: 'guardian', path: '/', child: ADA_ID })
     ).toBeUndefined();
   });
 

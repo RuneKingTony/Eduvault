@@ -16,14 +16,24 @@ import type {
   PortalPurchases,
   PortalStudent,
 } from '@eduvault/api-contract';
-import { PermissionsProvider } from '@eduvault/auth-client';
+import { PermissionsProvider, accessOfStarter } from '@eduvault/auth-client';
 import { toPermissionMap, type Permission } from '@eduvault/policy';
 import { ApiProvider, type Api } from './api';
+import { checked } from './test-api';
+
+export const ADA_ID = '5b0f1e1e-6e53-4c52-9f1c-0a1d7a7f9c11';
+export const TOBI_ID = '7e2a3c4d-1f5b-4a6e-8b9c-2d3e4f5a6b7c';
+export const EFE_ID = '9c4b5d6e-3a7d-4c8f-9dae-4f5a6b7c8d9e';
+export const NNE_ID = 'a1b2c3d4-5e6f-4a7b-8c9d-0e1f2a3b4c5d';
+export const STRANGER_ID = 'c3d4e5f6-7a8b-4c9d-8e0f-1a2b3c4d5e6f';
+
+export const testId = (n: number): string =>
+  `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 
 export const portalChild = (
   overrides: Partial<PortalChild> = {}
 ): PortalChild => ({
-  id: '5b0f1e1e-6e53-4c52-9f1c-0a1d7a7f9c11',
+  id: ADA_ID,
   firstName: 'Ada',
   lastName: 'Okeke',
   className: 'JSS 1 Gold',
@@ -50,7 +60,7 @@ export const portalMe = (overrides: Partial<PortalMe> = {}): PortalMe => ({
 export const portalStudent = (
   overrides: Partial<PortalStudent> = {}
 ): PortalStudent => ({
-  id: '5b0f1e1e-6e53-4c52-9f1c-0a1d7a7f9c11',
+  id: ADA_ID,
   firstName: 'Ada',
   lastName: 'Okeke',
   admissionNumber: 'GF-0123',
@@ -180,7 +190,7 @@ export const portalStatement = (
 ): PortalStatement => ({
   currency: 'NGN',
   student: {
-    id: '5b0f1e1e-6e53-4c52-9f1c-0a1d7a7f9c11',
+    id: ADA_ID,
     name: 'Ada Okeke',
     admissionNumber: 'GF-0123',
     className: 'JSS 1 Gold',
@@ -226,7 +236,7 @@ export const portalFamilyStatement = (
   creditMinor: 0,
   children: [
     {
-      studentId: '5b0f1e1e-6e53-4c52-9f1c-0a1d7a7f9c11',
+      studentId: ADA_ID,
       name: 'Ada Okeke',
       className: 'JSS 1 Gold',
       campusName: 'Lekki',
@@ -237,15 +247,12 @@ export const portalFamilyStatement = (
   ...overrides,
 });
 
-const mePermissions = (
+const guardianAccess = (
   permissions: readonly Permission[] = ['student:readOwn']
 ): MePermissions => ({
-  organizationId: 'o1',
-  roles: ['guardian'],
+  ...accessOfStarter('guardian', []),
   permissions: toPermissionMap(permissions),
-  campusScope: [],
   classScope: [],
-  acting: null,
 });
 
 export function renderWithApi(
@@ -258,8 +265,8 @@ export function renderWithApi(
   });
   return render(
     <QueryClientProvider client={queryClient}>
-      <PermissionsProvider value={mePermissions(held)}>
-        <ApiProvider api={api as unknown as Api}>{ui}</ApiProvider>
+      <PermissionsProvider value={guardianAccess(held)}>
+        <ApiProvider api={checked(api)}>{ui}</ApiProvider>
       </PermissionsProvider>
     </QueryClientProvider>
   );

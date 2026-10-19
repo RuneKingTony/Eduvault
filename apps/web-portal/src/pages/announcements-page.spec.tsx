@@ -2,22 +2,26 @@ import { fireEvent, screen } from '@testing-library/react';
 import { ApiError, type AnnouncementSummary } from '@eduvault/api-contract';
 import { addDays, lagosDateOf } from '@eduvault/shared';
 import {
+  ADA_ID,
+  STRANGER_ID,
+  TOBI_ID,
   portalAnnouncementList,
   portalChild,
   portalMe,
   renderWithApi,
+  testId,
 } from '../test-utils';
 import { AnnouncementsPage } from './announcements-page';
 
 const TODAY = lagosDateOf(new Date());
-const ada = portalChild({ id: 'ada', firstName: 'Ada' });
-const tobi = portalChild({ id: 'tobi', firstName: 'Tobi' });
+const ada = portalChild({ id: ADA_ID, firstName: 'Ada' });
+const tobi = portalChild({ id: TOBI_ID, firstName: 'Tobi' });
 const guardian = portalMe({ children: [ada, tobi] });
 
 const item = (
   overrides: Partial<AnnouncementSummary> = {}
 ): AnnouncementSummary => ({
-  id: 'n1',
+  id: testId(1),
   title: 'PTA meeting',
   body: 'Saturday at ten.',
   tag: 'event',
@@ -28,7 +32,7 @@ const item = (
 
 const manyItems = (count: number, from = 0) =>
   Array.from({ length: count }, (_, index) =>
-    item({ id: `n${from + index}`, title: `News ${from + index}` })
+    item({ id: testId(10 + from + index), title: `News ${from + index}` })
   );
 
 const renderPage = (
@@ -52,13 +56,13 @@ describe('AnnouncementsPage', () => {
         total: 1,
       })
     );
-    renderPage(announcementList, { childId: 'tobi' });
+    renderPage(announcementList, { childId: TOBI_ID });
     expect(await screen.findByText('Open day')).toBeInTheDocument();
     expect(
       screen.getByText('From the school office for Tobi. Tap one to read more.')
     ).toBeInTheDocument();
     expect(announcementList).toHaveBeenCalledWith({
-      params: { studentId: 'tobi' },
+      params: { studentId: TOBI_ID },
       query: { page: 1, pageSize: 10 },
     });
     expect(screen.queryByRole('navigation', { name: 'Pages' })).toBeNull();
@@ -68,12 +72,12 @@ describe('AnnouncementsPage', () => {
     const announcementList = vi
       .fn()
       .mockResolvedValue(portalAnnouncementList());
-    renderPage(announcementList, { childId: 'stranger' });
+    renderPage(announcementList, { childId: STRANGER_ID });
     expect(
       await screen.findByText('No news from the school yet.')
     ).toBeInTheDocument();
     expect(announcementList).toHaveBeenCalledWith(
-      expect.objectContaining({ params: { studentId: 'ada' } })
+      expect.objectContaining({ params: { studentId: ADA_ID } })
     );
   });
 
@@ -88,7 +92,7 @@ describe('AnnouncementsPage', () => {
           })
         )
       );
-    renderPage(announcementList, { childId: 'ada' });
+    renderPage(announcementList, { childId: ADA_ID });
     expect(await screen.findByText('News 0')).toBeInTheDocument();
     expect(screen.getByText('Showing 1 to 10 of 12')).toBeInTheDocument();
 
@@ -96,7 +100,7 @@ describe('AnnouncementsPage', () => {
     expect(await screen.findByText('News 10')).toBeInTheDocument();
     expect(screen.queryByText('News 0')).not.toBeInTheDocument();
     expect(announcementList).toHaveBeenLastCalledWith({
-      params: { studentId: 'ada' },
+      params: { studentId: ADA_ID },
       query: { page: 2, pageSize: 10 },
     });
   });
@@ -104,13 +108,13 @@ describe('AnnouncementsPage', () => {
   it('goes back to Home carrying the child', async () => {
     const onBack = vi.fn();
     renderPage(vi.fn().mockResolvedValue(portalAnnouncementList()), {
-      childId: 'tobi',
+      childId: TOBI_ID,
       onBack,
     });
     fireEvent.click(
       await screen.findByRole('button', { name: 'Back to Home' })
     );
-    expect(onBack).toHaveBeenCalledWith('tobi');
+    expect(onBack).toHaveBeenCalledWith(TOBI_ID);
   });
 
   it('shows the error when the list cannot be loaded', async () => {
@@ -120,7 +124,7 @@ describe('AnnouncementsPage', () => {
         .mockRejectedValue(
           new ApiError(404, { code: 'NotFound', message: 'Student not found' })
         ),
-      { childId: 'ada' }
+      { childId: ADA_ID }
     );
     expect(await screen.findByText('Student not found')).toBeInTheDocument();
   });

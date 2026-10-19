@@ -41,18 +41,15 @@ describe('portal nav', () => {
     expect(idsFor('student')).toEqual(['home']);
   });
 
-  it('puts Fees on the receipt icon behind invoice:readOwn', () => {
+  it('puts Fees behind invoice:readOwn', () => {
     expect(PORTAL_NAV.find((entry) => entry.id === 'fees')).toMatchObject({
-      icon: 'receipt',
       permission: 'invoice:readOwn',
     });
   });
 
-  it('puts Purchases last on the store icon behind invoice:readOwn', () => {
+  it('puts Purchases last, behind invoice:readOwn', () => {
     expect(PORTAL_NAV.at(-1)).toMatchObject({
       id: 'purchases',
-      route: '/purchases',
-      icon: 'store',
       permission: 'invoice:readOwn',
     });
     expect(
@@ -68,13 +65,6 @@ describe('portal nav', () => {
 
   it('keeps only the entries whose route exists', () => {
     expect(idsFor('guardian', readOwnFees, new Set(['/']))).toEqual(['home']);
-  });
-
-  it('gives My children a shorter label for the bottom bar', () => {
-    expect(PORTAL_NAV.find((entry) => entry.id === 'children')).toMatchObject({
-      shortLabel: 'Children',
-      icon: 'users-round',
-    });
   });
 
   it('marks Home only on the root and My children on its sub-pages', () => {

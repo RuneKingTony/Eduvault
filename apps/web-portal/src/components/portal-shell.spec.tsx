@@ -23,7 +23,13 @@ import { NotFoundPage } from './portal-fallbacks';
 import { PortalShell } from './portal-shell';
 import { toPermissionMap } from '@eduvault/policy';
 import type { MePermissions, PortalMe } from '@eduvault/api-contract';
-import { portalChild, portalMe } from '../test-utils';
+import {
+  ADA_ID,
+  STRANGER_ID,
+  TOBI_ID,
+  portalChild,
+  portalMe,
+} from '../test-utils';
 
 const signOut = vi.fn().mockResolvedValue({ data: {}, error: null });
 const setActive = vi.fn().mockResolvedValue({ data: {}, error: null });
@@ -51,9 +57,9 @@ const access = {
   permissions: toPermissionMap(['student:readOwn']),
 } as Pick<MePermissions, 'permissions'>;
 
-const ada = portalChild({ id: 'ada', firstName: 'Ada' });
+const ada = portalChild({ id: ADA_ID, firstName: 'Ada' });
 const tobi = portalChild({
-  id: 'tobi',
+  id: TOBI_ID,
   firstName: 'Tobi',
   campusName: 'Ikeja',
 });
@@ -161,16 +167,16 @@ describe('PortalShell on a desktop', () => {
     const nav = within(screen.getByRole('navigation', { name: 'Portal' }));
     expect(nav.getByRole('link', { name: 'Home' })).toHaveAttribute(
       'href',
-      '/?child=ada'
+      `/?child=${ADA_ID}`
     );
     expect(nav.getByRole('link', { name: 'My children' })).toHaveAttribute(
       'href',
-      '/children?child=ada'
+      `/children?child=${ADA_ID}`
     );
   });
 
   it('puts the switcher in the top bar and switches child on the current page', async () => {
-    const router = await renderAt('/children?child=ada');
+    const router = await renderAt(`/children?child=${ADA_ID}`);
     const bar = within(screen.getByRole('banner'));
     const group = bar.getByRole('group', { name: 'Viewing child' });
     expect(within(group).getByRole('button', { name: 'Ada' })).toHaveAttribute(
@@ -179,7 +185,7 @@ describe('PortalShell on a desktop', () => {
     );
     fireEvent.click(within(group).getByRole('button', { name: 'Tobi' }));
     await waitFor(() => {
-      expect(router.state.location.search).toEqual({ child: 'tobi' });
+      expect(router.state.location.search).toEqual({ child: TOBI_ID });
     });
     expect(router.state.location.pathname).toBe('/children');
     expect(
@@ -188,19 +194,19 @@ describe('PortalShell on a desktop', () => {
   });
 
   it('clears the picked term when switching child', async () => {
-    const router = await renderAt('/children?child=ada&term=first-term');
+    const router = await renderAt(`/children?child=${ADA_ID}&term=first-term`);
     expect(router.state.location.search).toEqual({
-      child: 'ada',
+      child: ADA_ID,
       term: 'first-term',
     });
     fireEvent.click(screen.getByRole('button', { name: 'Tobi' }));
     await waitFor(() => {
-      expect(router.state.location.search).toEqual({ child: 'tobi' });
+      expect(router.state.location.search).toEqual({ child: TOBI_ID });
     });
   });
 
   it('falls back to the first child for an unlinked id', async () => {
-    await renderAt('/?child=someone-else');
+    await renderAt(`/?child=${STRANGER_ID}`);
     expect(screen.getByRole('button', { name: 'Ada' })).toHaveAttribute(
       'aria-pressed',
       'true'
@@ -270,7 +276,7 @@ describe('PortalShell on a desktop', () => {
   });
 
   it('lists the schools when there is more than one and switches back to the default page', async () => {
-    const router = await renderAt('/children?child=tobi', {
+    const router = await renderAt(`/children?child=${TOBI_ID}`, {
       authClient: makeClient({ email: 'ngozi@mail.test' }, [
         ...schools,
         { id: 'o2', name: 'Hillcrest Academy' },
@@ -328,10 +334,9 @@ describe('PortalShell on a phone', () => {
     vi.unstubAllGlobals();
   });
 
-  it('swaps the top nav for a fixed bottom nav with the short label', async () => {
+  it('swaps the top nav for one nav with the short label', async () => {
     await renderAt('/');
     const nav = screen.getByRole('navigation', { name: 'Portal' });
-    expect(nav).toHaveClass('fixed', 'bottom-0');
     expect(screen.getAllByRole('navigation', { name: 'Portal' })).toHaveLength(
       1
     );
@@ -361,10 +366,5 @@ describe('PortalShell on a phone', () => {
     expect(
       screen.queryByRole('group', { name: 'Viewing child' })
     ).not.toBeInTheDocument();
-  });
-
-  it('keeps clear of the bottom nav', async () => {
-    await renderAt('/');
-    expect(screen.getByRole('main')).toHaveClass('pb-24');
   });
 });
