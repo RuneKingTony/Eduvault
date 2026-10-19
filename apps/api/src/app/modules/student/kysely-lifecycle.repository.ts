@@ -3,11 +3,8 @@ import { sql, type Kysely } from 'kysely';
 import { splitRoles } from '@eduvault/policy';
 import type { DB } from '../../../db/db-types';
 import { ActivityWriter, type ActivityInput } from '../../common/activity';
-import {
-  addMemberRole,
-  resetPortalPassword,
-  stripMemberRole,
-} from '../../common/auth/portal-login';
+import { addMemberRole, stripMemberRole } from '../../common/auth/member-rows';
+import { resetPortalPassword } from '../../common/auth/portal-login';
 import { KYSELY_TOKEN, type Database } from '../../common/db/tokens';
 import {
   archiveGraduates,
