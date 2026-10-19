@@ -15,10 +15,10 @@ import { IKEJA, LEKKI } from './test-members';
 export const STUDENT_ID = '5b0f1e1e-6e53-4c52-9f1c-0a1d7a7f9c11';
 export const ARM_ID = '6c0f1e1e-6e53-4c52-9f1c-0a1d7a7f9c55';
 export const GUARDIAN_ID = '9a0f1e1e-6e53-4c52-9f1c-0a1d7a7f9c66';
-export const ARM_IKEJA_ID = '7d0f1e1e-6e53-4c52-9f1c-0a1d7a7f9c99';
+const ARM_IKEJA_ID = '7d0f1e1e-6e53-4c52-9f1c-0a1d7a7f9c99';
 
-export const SESSION_2026_ID = testId(0xc0_10);
-export const SESSION_2025_ID = testId(0xc0_11);
+const SESSION_2026_ID = testId(0xc0_10);
+const SESSION_2025_ID = testId(0xc0_11);
 export const TERM_FIRST_ID = testId(0xc0_12);
 export const TERM_SECOND_ID = testId(0xc0_13);
 
@@ -30,11 +30,11 @@ export const THIRD_GUARDIAN_ID = testId(0xc0_24);
 export const DUPLICATE_STUDENT_ID = testId(0xc0_25);
 
 export const YEAR_2027_ID = testId(0xc0_30);
-export const YEAR_2026_ID = testId(0xc0_31);
-export const TERM_2027_FIRST_ID = testId(0xc0_32);
-export const LEVEL_JSS2_ID = testId(0xc0_33);
-export const LEVEL_JSS3_ID = testId(0xc0_34);
-export const LEVEL_SS3_ID = testId(0xc0_35);
+const YEAR_2026_ID = testId(0xc0_31);
+const TERM_2027_FIRST_ID = testId(0xc0_32);
+const LEVEL_JSS2_ID = testId(0xc0_33);
+const LEVEL_JSS3_ID = testId(0xc0_34);
+const LEVEL_SS3_ID = testId(0xc0_35);
 
 export const studentRow = (
   overrides: Partial<StudentRow> = {}
@@ -191,7 +191,7 @@ export const preview = (
 });
 
 export const ARM_J3 = '8e0f1e1e-6e53-4c52-9f1c-0a1d7a7f9c01';
-export const ARM_SS3 = '8e0f1e1e-6e53-4c52-9f1c-0a1d7a7f9c02';
+const ARM_SS3 = '8e0f1e1e-6e53-4c52-9f1c-0a1d7a7f9c02';
 
 const jssGroup = (): NewSchoolYearGroup => ({
   fromClass: {

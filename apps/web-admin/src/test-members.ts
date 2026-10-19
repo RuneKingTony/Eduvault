@@ -8,8 +8,8 @@ import type {
 import { toPermissionMap } from '@eduvault/policy';
 import { testId } from './test-api';
 
-export const SCHOOL_ID = testId(0xd0_01);
-export const LEKKI_ID = testId(0xd0_02);
+const SCHOOL_ID = testId(0xd0_01);
+const LEKKI_ID = testId(0xd0_02);
 export const IKEJA_ID = testId(0xd0_03);
 export const ADA_ID = testId(0xd0_10);
 export const FUNMI_ID = testId(0xd0_11);

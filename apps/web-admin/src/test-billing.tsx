@@ -39,14 +39,14 @@ export const INVOICE_ID = testId(0x1_50_11);
 export const INVOICE_TWO_ID = testId(0x1_50_12);
 export const TERM_ONE = testId(0x1_50_21);
 export const TERM_TWO = testId(0x1_50_22);
-export const INVOICE_STUDENT_ID = testId(0x1_50_31);
-export const INVOICE_STUDENT_TWO_ID = testId(0x1_50_32);
-export const INVOICE_CAMPUS_ID = testId(0x1_50_41);
-export const LINE_TUITION_ID = testId(0x1_50_51);
-export const LINE_DISCOUNT_ID = testId(0x1_50_52);
-export const LEDGER_TUITION_ID = testId(0x1_50_61);
-export const LEDGER_DISCOUNT_ID = testId(0x1_50_62);
-export const STUDENT_DISCOUNT_ID = testId(0x1_50_71);
+const INVOICE_STUDENT_ID = testId(0x1_50_31);
+const INVOICE_STUDENT_TWO_ID = testId(0x1_50_32);
+const INVOICE_CAMPUS_ID = testId(0x1_50_41);
+const LINE_TUITION_ID = testId(0x1_50_51);
+const LINE_DISCOUNT_ID = testId(0x1_50_52);
+const LEDGER_TUITION_ID = testId(0x1_50_61);
+const LEDGER_DISCOUNT_ID = testId(0x1_50_62);
+const STUDENT_DISCOUNT_ID = testId(0x1_50_71);
 
 export const billingTerm = (over: Partial<BillingTerm> = {}): BillingTerm => ({
   termId: TERM_ONE,

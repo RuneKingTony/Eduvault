@@ -5,10 +5,10 @@ import type {
 } from '@eduvault/api-contract';
 import { testId } from './test-api';
 
-export const LEAVE_ID = testId(0xf0_01);
-export const APPROVED_LEAVE_ID = testId(0xf0_02);
-export const DECLINED_LEAVE_ID = testId(0xf0_03);
-export const CANCELLED_LEAVE_ID = testId(0xf0_04);
+const LEAVE_ID = testId(0xf0_01);
+const APPROVED_LEAVE_ID = testId(0xf0_02);
+const DECLINED_LEAVE_ID = testId(0xf0_03);
+const CANCELLED_LEAVE_ID = testId(0xf0_04);
 
 export const leaveDto = (over: Partial<LeaveDto> = {}): LeaveDto => ({
   id: LEAVE_ID,

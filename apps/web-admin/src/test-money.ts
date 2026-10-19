@@ -7,10 +7,10 @@ import type {
 } from '@eduvault/api-contract';
 import { testId } from './test-api';
 
-export const GTBANK_ID = testId(0x1_40_01);
-export const GTBANK_LEDGER_ID = testId(0x1_40_11);
-export const FEE_INCOME_ID = testId(0xe1);
-export const OPENING_ENTRY_ID = testId(0x1_40_31);
+const GTBANK_ID = testId(0x1_40_01);
+const GTBANK_LEDGER_ID = testId(0x1_40_11);
+const FEE_INCOME_ID = testId(0xe1);
+const OPENING_ENTRY_ID = testId(0x1_40_31);
 
 export const moneyAccount = (
   overrides: Partial<MoneyAccount> = {}

@@ -38,8 +38,8 @@ export const CHIDI = testId(0x1_60_12);
 export const TOBI = testId(0x1_60_13);
 export const NGOZI = testId(0x1_60_21);
 export const ACCOUNT = testId(0x1_60_31);
-export const PROOF_FILE_ID = '00000000-0000-4000-8000-0000000a0a01';
-export const STATEMENT_INVOICE_ID = testId(0x1_60_51);
+const PROOF_FILE_ID = '00000000-0000-4000-8000-0000000a0a01';
+const STATEMENT_INVOICE_ID = testId(0x1_60_51);
 const INVOICE_ENTRY_ID = testId(0x1_60_61);
 const PAYMENT_ENTRY_ID = testId(0x1_60_62);
 

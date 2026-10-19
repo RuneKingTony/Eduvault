@@ -7,9 +7,9 @@ import { testId } from './test-api';
 
 export const LEKKI = testId(0x1_30_01);
 export const IKEJA = testId(0x1_30_02);
-export const SCHOOL_ID = testId(0x1_30_03);
-export const ANNOUNCEMENT_ID = testId(0x1_30_11);
-export const AUTHOR_ID = testId(0x1_30_21);
+const SCHOOL_ID = testId(0x1_30_03);
+const ANNOUNCEMENT_ID = testId(0x1_30_11);
+const AUTHOR_ID = testId(0x1_30_21);
 
 export const campus = (id: string, name: string): Campus => ({
   id,

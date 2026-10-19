@@ -6,17 +6,17 @@ import type {
 } from '@eduvault/api-contract';
 import { testId } from './test-api';
 
-export const YEAR_1 = testId(0xa0_01);
+const YEAR_1 = testId(0xa0_01);
 export const YEAR_2 = testId(0xa0_02);
 export const TERM_1 = testId(0xa0_11);
 export const TERM_2 = testId(0xa0_12);
-export const TERM_3 = testId(0xa0_13);
+const TERM_3 = testId(0xa0_13);
 export const TERM_4 = testId(0xa0_14);
-export const TERM_5 = testId(0xa0_15);
-export const TERM_6 = testId(0xa0_16);
+const TERM_5 = testId(0xa0_15);
+const TERM_6 = testId(0xa0_16);
 export const HOLIDAY_1 = testId(0xa0_21);
 export const HOLIDAY_2 = testId(0xa0_22);
-export const HOLIDAY_3 = testId(0xa0_23);
+const HOLIDAY_3 = testId(0xa0_23);
 
 const holiday = (overrides: Partial<Holiday> = {}): Holiday => ({
   id: HOLIDAY_1,
