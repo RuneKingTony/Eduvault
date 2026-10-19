@@ -636,6 +636,11 @@ export const schoolRoleSchema = schoolRoleEntrySchema.extend({
 });
 export type SchoolRole = z.infer<typeof schoolRoleSchema>;
 
+/** What every refusal for a missing permission starts with; `denialMessage` keys on it. */
+export const MISSING_PERMISSION_PREFIX = 'Missing permission';
+export const missingPermissionMessage = (what: string): string =>
+  `${MISSING_PERMISSION_PREFIX} ${what}`;
+
 export const ROLE_NAME_REQUIRED = 'Give the role a name first.';
 export const ROLE_ESCALATION_MESSAGE =
   'You can’t give access you don’t have yourself. Switch those parts off and save again.';

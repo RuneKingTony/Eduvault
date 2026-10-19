@@ -1,5 +1,6 @@
 import { ApiError, createApiClient, denialMessage } from './client';
 import { contract } from './contract';
+import { missingPermissionMessage } from './schemas';
 
 const jsonResponse = (status: number, body: unknown) =>
   Response.json(body, {
@@ -278,6 +279,18 @@ const refusal = (status: number, message: string) =>
 
 describe('denialMessage', () => {
   const denied = 'You do not have access to this.';
+
+  it('reads every message the builder makes', () => {
+    expect(missingPermissionMessage('student:create')).toBe(
+      'Missing permission student:create'
+    );
+    expect(
+      denialMessage(
+        refusal(403, missingPermissionMessage('a:b or c:d')),
+        denied
+      )
+    ).toBe(denied);
+  });
 
   it.each([
     'Missing permission student:create',
