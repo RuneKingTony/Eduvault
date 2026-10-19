@@ -588,6 +588,58 @@ test.describe('members', () => {
       expect(removeMember.body.message).toContain('Cashier');
     });
 
+    test('refuses changing the campuses or the title of a member who holds a role the caller lacks', async ({
+      api,
+      createRole,
+      hire,
+      withPermissions,
+      schools: { orgA, owner, lekki, ikeja },
+    }) => {
+      await createRole(orgA, {
+        slug: 'cashier',
+        label: 'Cashier',
+        permissions: ['schoolAccount:update'],
+      });
+      const editor = await withPermissions(
+        orgA,
+        ['member:read', 'member:update'],
+        { campuses: [lekki, ikeja] }
+      );
+      const holder = await hire(owner, {
+        name: 'Holder',
+        title: 'Bursar',
+        campusIds: [lekki.id, ikeja.id],
+      });
+      await putRoles(api, owner, {
+        id: holder.member.id,
+        roles: ['cashier'],
+        campusIds: [lekki.id, ikeja.id],
+      }).expect(200);
+
+      const campuses = await api(editor)
+        .put(`/members/${holder.member.id}/campuses`)
+        .send({ campusIds: [lekki.id] })
+        .expect(403);
+      expect(campuses.body.message).toBe(
+        `You can’t change the campuses of Holder: they hold Cashier, which ${ESCALATION.replace('it ', '')}`
+      );
+      const title = await putTitle(api, editor, {
+        id: holder.member.id,
+        title: 'Registrar',
+      }).expect(403);
+      expect(title.body.message).toBe(
+        `You can’t change the title of Holder: they hold Cashier, which ${ESCALATION.replace('it ', '')}`
+      );
+
+      const after = (
+        await api(owner).get(`/members/${holder.member.id}`).expect(200)
+      ).body as MemberDetail;
+      expect(after.campusIds.toSorted((a, b) => a.localeCompare(b))).toEqual(
+        [lekki.id, ikeja.id].toSorted((a, b) => a.localeCompare(b))
+      );
+      expect(after.title).toBe('Bursar');
+    });
+
     test('a refused change leaves roles and campuses unchanged', async ({
       api,
       createRole,
