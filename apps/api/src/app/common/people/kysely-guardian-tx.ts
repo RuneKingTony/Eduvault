@@ -37,8 +37,8 @@ const toGuardian = (row: {
 
 export class KyselyGuardianTx implements GuardianTx {
   constructor(
-    private readonly db: Kysely<DB>,
-    private readonly activity: ActivityWriter
+    protected readonly db: Kysely<DB>,
+    protected readonly activity: ActivityWriter
   ) {}
 
   async lockStudent(

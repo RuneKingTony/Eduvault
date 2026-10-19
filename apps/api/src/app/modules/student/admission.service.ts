@@ -28,6 +28,7 @@ import {
   type OrgContext,
 } from '../../common/auth';
 import { defaultPayer, type SchoolRules } from '../../common/people';
+import { admitStudent } from './admit-student';
 import { formatAdmissionNumber, formatStudentUsername } from './admission-ids';
 import {
   AdmissionRepository,
@@ -148,7 +149,7 @@ export class AdmissionService {
     const school = await this.admissions.school(ctx.organizationId);
     const studentPassword = generateTemporaryPassword();
     const drafts = await this.prepareGuardians(input.guardians);
-    const outcome = await this.admissions.admit({
+    const outcome = await admitStudent(this.admissions, {
       organizationId: ctx.organizationId,
       actor: { id: ctx.user.id, name: ctx.user.name },
       student: {

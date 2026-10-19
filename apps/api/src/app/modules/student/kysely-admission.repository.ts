@@ -1,39 +1,24 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { sql, type Kysely } from 'kysely';
-import { GUARDIAN_NOT_FOUND_MESSAGE } from '@eduvault/api-contract';
-import type { DB } from '../../../db/db-types';
+import { Inject, Injectable } from '@nestjs/common';
+import { sql } from 'kysely';
 import { ActivityWriter } from '../../common/activity';
 import { Clock, schoolToday } from '../../common/clock';
-import { createPortalLogin } from '../../common/auth';
 import type { CampusScope } from '../../common/campus-scope';
 import { inCampusScope } from '../../common/db/in-campus-scope';
 import { KYSELY_TOKEN, type Database } from '../../common/db/tokens';
-import {
-  allocateDocumentNumber,
-  peekDocumentNumber,
-} from '../../common/documents';
-import {
-  KyselyGuardianTx,
-  attachGuardian,
-  provisionGuardian,
-  readSchoolRules,
-  type GuardianTx,
-  type SchoolRules,
-} from '../../common/people';
+import { peekDocumentNumber } from '../../common/documents';
+import { readSchoolRules, type SchoolRules } from '../../common/people';
 import { visibleStudentsCte } from '../../common/students';
-import { formatAdmissionNumber, formatStudentUsername } from './admission-ids';
+import type { AdmissionTx } from './admission-tx';
 import {
   AdmissionRepository,
+  UsernameTakenError,
   type AdmissionClass,
-  type AdmissionGuardian,
-  type AdmissionOutcome,
-  type AdmissionWrite,
-  type AdmittedGuardian,
   type CurrentTerm,
   type DuplicateMatch,
   type SchoolNaming,
 } from './admission.repository';
 import type { CampusClassScope } from '../../common/scope';
+import { KyselyAdmissionTx } from './kysely-admission-tx.repository';
 
 const PG_UNIQUE_VIOLATION = '23505';
 const USERNAME_INDEX = 'user_username_uidx';
@@ -63,159 +48,6 @@ const toClass = (row: ArmRow): AdmissionClass => ({
   campusId: row.campus_id,
   campusName: row.campus_name,
 });
-
-const activityText = (
-  write: AdmissionWrite,
-  admissionNumber: string,
-  guardians: readonly AdmittedGuardian[]
-): string => {
-  const { firstName, lastName } = write.student;
-  const from = write.startsLater ? ` from ${write.term.termName}` : '';
-  const placed = `placed in ${write.arm.levelName} ${write.arm.name}${from}`;
-  const names = guardians.map((guardian) => guardian.name).join(' and ');
-  const noun = guardians.length === 1 ? 'guardian' : 'guardians';
-  const people =
-    guardians.length === 0
-      ? 'with no guardian yet'
-      : `with ${names} as ${noun}`;
-  return `${firstName} ${lastName} admitted (${admissionNumber}), ${placed}, ${people}.`;
-};
-
-async function insertStudent(
-  trx: Kysely<DB>,
-  input: { write: AdmissionWrite; admissionNumber: string; today: string }
-): Promise<string> {
-  const { write, admissionNumber, today } = input;
-  const row = await trx
-    .insertInto('student')
-    .values({
-      organization_id: write.organizationId,
-      campus_id: write.arm.campusId,
-      first_name: write.student.firstName,
-      last_name: write.student.lastName,
-      gender: write.student.gender,
-      date_of_birth: write.student.dateOfBirth,
-      admission_number: admissionNumber,
-      admitted_on: today,
-      created_by: write.actor.id,
-    })
-    .returning('id')
-    .executeTakeFirstOrThrow();
-  return row.id;
-}
-
-async function insertEnrolment(
-  trx: Kysely<DB>,
-  write: AdmissionWrite,
-  studentId: string
-): Promise<void> {
-  const enrolment = await trx
-    .insertInto('student_enrollment')
-    .values({
-      organization_id: write.organizationId,
-      student_id: studentId,
-      session_id: write.term.sessionId,
-      class_level_id: write.arm.levelId,
-      status: 'active',
-      is_new_student: true,
-      created_by: write.actor.id,
-    })
-    .returning('id')
-    .executeTakeFirstOrThrow();
-  await trx
-    .insertInto('enrollment_placement')
-    .values({
-      organization_id: write.organizationId,
-      enrollment_id: enrolment.id,
-      term_id: write.term.termId,
-      class_arm_id: write.arm.id,
-      campus_id: write.arm.campusId,
-      created_by: write.actor.id,
-    })
-    .execute();
-}
-
-interface GuardianStep {
-  write: AdmissionWrite;
-  studentId: string;
-  draft: AdmissionGuardian;
-}
-
-const attachBase = ({ write, studentId }: GuardianStep) => ({
-  organizationId: write.organizationId,
-  studentId,
-  actorId: write.actor.id,
-});
-
-type ExistingDraft = Extract<AdmissionGuardian, { kind: 'existing' }>;
-type NewDraft = Extract<AdmissionGuardian, { kind: 'new' }>;
-
-async function admitExisting(
-  tx: GuardianTx,
-  step: GuardianStep & { draft: ExistingDraft }
-): Promise<AdmittedGuardian> {
-  const { draft } = step;
-  const guardian = await tx.findGuardian(
-    step.write.organizationId,
-    draft.guardianId
-  );
-  if (guardian === undefined) {
-    throw new NotFoundException(GUARDIAN_NOT_FOUND_MESSAGE);
-  }
-  await attachGuardian(tx, {
-    ...attachBase(step),
-    guardianId: guardian.id,
-    userId: guardian.userId,
-    relationship: draft.relationship,
-    paysFees: draft.paysFees,
-  });
-  return {
-    guardianId: guardian.id,
-    name: guardian.fullName,
-    relationship: draft.relationship,
-    isNew: false,
-    newLogin: false,
-    email: null,
-    username: null,
-  };
-}
-
-async function admitNew(
-  tx: GuardianTx,
-  step: GuardianStep & { draft: NewDraft }
-): Promise<AdmittedGuardian> {
-  const { write, draft } = step;
-  const provisioned = await provisionGuardian(tx, {
-    organizationId: write.organizationId,
-    actorId: write.actor.id,
-    guardian: draft.guardian,
-    passwordHash: draft.passwordHash,
-  });
-  await attachGuardian(tx, {
-    ...attachBase(step),
-    guardianId: provisioned.guardianId,
-    userId: provisioned.userId,
-    relationship: draft.guardian.relationship,
-    paysFees: draft.guardian.paysFees,
-  });
-  return {
-    guardianId: provisioned.guardianId,
-    name: draft.guardian.fullName,
-    relationship: draft.guardian.relationship,
-    isNew: true,
-    newLogin: provisioned.newLogin,
-    email: provisioned.email,
-    username: provisioned.username,
-  };
-}
-
-const admitGuardian = (
-  tx: GuardianTx,
-  step: GuardianStep
-): Promise<AdmittedGuardian> =>
-  step.draft.kind === 'existing'
-    ? admitExisting(tx, { ...step, draft: step.draft })
-    : admitNew(tx, { ...step, draft: step.draft });
 
 @Injectable()
 export class KyselyAdmissionRepository extends AdmissionRepository {
@@ -397,66 +229,13 @@ export class KyselyAdmissionRepository extends AdmissionRepository {
     }));
   }
 
-  async admit(write: AdmissionWrite): Promise<AdmissionOutcome> {
+  async transaction<T>(fn: (tx: AdmissionTx) => Promise<T>): Promise<T> {
     try {
-      return await this.admitOnce(write);
+      return await this.db
+        .transaction()
+        .execute((trx) => fn(new KyselyAdmissionTx(trx, this.activity)));
     } catch (error) {
-      if (!isUsernameClash(error)) {
-        throw error;
-      }
-      return this.admitOnce(write);
+      throw isUsernameClash(error) ? new UsernameTakenError() : error;
     }
-  }
-
-  private admitOnce(write: AdmissionWrite): Promise<AdmissionOutcome> {
-    return this.db.transaction().execute(async (trx) => {
-      const number = await allocateDocumentNumber(trx, {
-        organizationId: write.organizationId,
-        kind: 'admission',
-        year: null,
-      });
-      const admissionNumber = formatAdmissionNumber(
-        write.school.prefix,
-        number
-      );
-      const studentUsername = formatStudentUsername(write.school.slug, number);
-      const studentId = await insertStudent(trx, {
-        write,
-        admissionNumber,
-        today: this.today(write.organizationId),
-      });
-      await insertEnrolment(trx, write, studentId);
-      const login = await createPortalLogin(trx, {
-        organizationId: write.organizationId,
-        role: 'student',
-        name: `${write.student.firstName} ${write.student.lastName}`,
-        email: null,
-        username: studentUsername,
-        passwordHash: write.studentPasswordHash,
-      });
-      await trx
-        .updateTable('student')
-        .set({ user_id: login.userId })
-        .where('id', '=', studentId)
-        .where('organization_id', '=', write.organizationId)
-        .execute();
-      const tx = new KyselyGuardianTx(trx, this.activity);
-      const guardians: AdmittedGuardian[] = [];
-      for (const draft of write.guardians) {
-        guardians.push(await admitGuardian(tx, { write, studentId, draft }));
-      }
-      await this.activity.record(trx, {
-        organizationId: write.organizationId,
-        campusId: write.arm.campusId,
-        pillar: 'foundation',
-        kind: 'student.admitted',
-        actorUserId: write.actor.id,
-        subjectType: 'student',
-        subjectId: studentId,
-        text: activityText(write, admissionNumber, guardians),
-        data: { admissionNumber, classArmId: write.arm.id },
-      });
-      return { studentId, admissionNumber, studentUsername, guardians };
-    });
   }
 }
