@@ -10,6 +10,7 @@ import { ApiError } from '@eduvault/api-contract';
 import { toast } from '@eduvault/ui';
 import {
   ALL_PERMISSIONS,
+  capabilityLabels,
   toPermissionMap,
   type Permission,
 } from '@eduvault/policy';
@@ -444,6 +445,116 @@ describe('RolePage copy', () => {
     setup({ slug: 'bursar' });
     await screen.findByRole('heading', { name: /^Bursar/ });
     expect(screen.queryByText('Or copy')).not.toBeInTheDocument();
+  });
+});
+
+const feesApprover = () =>
+  screen.findByRole('button', { name: /^Fees approver/ });
+
+const FEES_APPROVER_PERMISSIONS = {
+  student: ['read'],
+  invoice: ['read'],
+  payment: ['read'],
+  adjustment: ['read', 'approve'],
+};
+
+describe('RolePage templates', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('fills the draft from Fees approver and creates the role with its slug', async () => {
+    const { create } = setup();
+    fireEvent.click(await feesApprover());
+    expect(nameField()).toHaveValue('Fees approver');
+    expect(screen.getByLabelText('Description')).toHaveValue(
+      'Approves refunds, write-offs and discounts; cannot record payments.'
+    );
+    expect(toast.warning).not.toHaveBeenCalled();
+    expect(toast.success).toHaveBeenCalledOnce();
+    const message = vi.mocked(toast.success).mock.calls[0]?.[0];
+    const { container } = render(<>{message}</>);
+    expect(container).toHaveTextContent(
+      'Filled from the Fees approver template. Review, then create.'
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Create role' }));
+    await waitFor(() => {
+      expect(create).toHaveBeenCalledWith({
+        body: {
+          label: 'Fees approver',
+          description:
+            'Approves refunds, write-offs and discounts; cannot record payments.',
+          slug: 'fees-approver',
+          permissions: FEES_APPROVER_PERMISSIONS,
+        },
+      });
+    });
+  });
+
+  it('skips what the editor does not hold and warns instead of the success toast', async () => {
+    const { create } = setup({
+      access: accessOf(
+        'ac:create',
+        'student:read',
+        'invoice:read',
+        'payment:read',
+        'adjustment:read'
+      ),
+    });
+    fireEvent.click(await feesApprover());
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(toast.warning).toHaveBeenCalledOnce();
+    const message = vi.mocked(toast.warning).mock.calls[0]?.[0] as string;
+    const [label] = capabilityLabels(['adjustment:approve']);
+    expect(message).toMatch(/^Skipped 1 you don’t hold: /);
+    expect(message).toContain(label);
+    expect(message).not.toContain('adjustment:approve');
+    fireEvent.click(screen.getByRole('button', { name: 'Create role' }));
+    await waitFor(() => {
+      expect(create).toHaveBeenCalledOnce();
+    });
+    expect(create.mock.calls[0]?.[0].body.permissions).toEqual({
+      student: ['read'],
+      invoice: ['read'],
+      payment: ['read'],
+      adjustment: ['read'],
+    });
+  });
+
+  it('overwrites a name that was already typed', async () => {
+    setup();
+    await screen.findByRole('heading', { name: 'New role' });
+    fireEvent.change(nameField(), { target: { value: 'Mine' } });
+    fireEvent.click(await feesApprover());
+    expect(nameField()).toHaveValue('Fees approver');
+  });
+
+  it('sends no slug when a role is copied after a template', async () => {
+    const { create } = setup();
+    fireEvent.click(await feesApprover());
+    fireEvent.change(await screen.findByLabelText('Or copy'), {
+      target: { value: 'teacher' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Create role' }));
+    await waitFor(() => {
+      expect(create).toHaveBeenCalledOnce();
+    });
+    expect(create.mock.calls[0]?.[0].body).not.toHaveProperty('slug');
+  });
+
+  it('is not offered on an existing role', async () => {
+    setup({ slug: 'bursar' });
+    await screen.findByRole('heading', { name: /^Bursar/ });
+    expect(screen.queryByText('Start from a template')).not.toBeInTheDocument();
+  });
+
+  it('is not offered to an ac:read-only viewer', async () => {
+    setup({ access: accessOf('ac:read') });
+    await screen.findByRole('heading', { name: 'New role' });
+    expect(screen.queryByText('Start from a template')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /^Fees approver/ })
+    ).not.toBeInTheDocument();
   });
 });
 

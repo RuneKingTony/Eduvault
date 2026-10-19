@@ -29,7 +29,6 @@ import {
   type AreaChange,
 } from '../components/role-editor/role-areas';
 import {
-  RoleCopy,
   warnSkipped,
   type RoleCopyResult,
 } from '../components/role-editor/role-copy';
@@ -45,6 +44,7 @@ import {
   RoleNotes,
 } from '../components/role-editor/role-header';
 import { RoleHolders } from '../components/role-editor/role-holders';
+import { RoleStartCard } from '../components/role-editor/role-templates';
 import {
   useRoleEditor,
   type RoleEditorHandlers,
@@ -135,9 +135,13 @@ function AbilityCard({
   );
 }
 
-function copiedDraft(draft: RoleDraft, { role, kept }: RoleCopyResult) {
+function copiedDraft(
+  draft: RoleDraft,
+  { role, kept }: RoleCopyResult
+): RoleDraft {
   return {
     ...draft,
+    slug: undefined,
     permissions: kept,
     label:
       draft.label.trim() === ''
@@ -214,9 +218,12 @@ function RoleEditor({
       <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <div className="flex flex-col gap-4">
           {model.isNew && model.editable ? (
-            <RoleCopy
+            <RoleStartCard
               roles={catalogue}
               editorMap={model.access}
+              onTemplate={(fields) => {
+                setDraft({ ...draft, ...fields });
+              }}
               onCopy={(result) => {
                 setDraft(copiedDraft(draft, result));
               }}
