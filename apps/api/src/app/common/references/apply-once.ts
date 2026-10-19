@@ -8,7 +8,7 @@ interface AppliedRow {
   requestHash: string;
 }
 
-export type ReferenceClaim<Row extends AppliedRow> =
+type ReferenceClaim<Row extends AppliedRow> =
   | { status: 'first' }
   | { status: 'replayed'; existing: Row }
   | { status: 'clash'; existing: Row };
