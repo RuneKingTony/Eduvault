@@ -23,8 +23,11 @@ import type { ActingState } from './acting-store';
 import type { Api } from './api';
 import type { MembersSearch } from './members-search';
 import type { StudentsSearch } from './students-search';
+import {
+  ME_PERMISSIONS_KEY,
+  permissionsQueryOptions,
+} from '@eduvault/auth-client';
 
-export const ME_PERMISSIONS_KEY = ['me', 'permissions'] as const;
 export const PLATFORM_SCHOOLS_KEY = ['platform', 'schools'] as const;
 const PLATFORM_AUDIT_KEY = ['platform', 'audit'] as const;
 
@@ -83,20 +86,17 @@ export const mePermissionsQueryOptions = (
   api: Api,
   acting: ActingState | null = null
 ) =>
-  queryOptions({
-    queryKey:
-      acting === null
-        ? ME_PERMISSIONS_KEY
-        : [
-            ...ME_PERMISSIONS_KEY,
-            'acting',
-            acting.organizationId,
-            acting.reason !== null,
-          ],
-    queryFn: () => api.me.permissions({}),
-    staleTime: 60_000,
-    refetchOnWindowFocus: 'always',
-  });
+  permissionsQueryOptions(
+    api,
+    acting === null
+      ? ME_PERMISSIONS_KEY
+      : [
+          ...ME_PERMISSIONS_KEY,
+          'acting',
+          acting.organizationId,
+          acting.reason !== null,
+        ]
+  );
 
 const STUDENTS_KEY = ['students'] as const;
 

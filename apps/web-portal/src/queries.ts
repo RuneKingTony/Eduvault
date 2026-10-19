@@ -8,17 +8,8 @@ import {
 import { termKeyOf } from '@eduvault/shared';
 import type { Api } from './api';
 
-const ME_PERMISSIONS_KEY = ['me', 'permissions'] as const;
 const PORTAL_KEY = ['portal'] as const;
 const CALENDAR_KEY = ['calendar'] as const;
-
-export const mePermissionsQueryOptions = (api: Api) =>
-  queryOptions({
-    queryKey: ME_PERMISSIONS_KEY,
-    queryFn: () => api.me.permissions({}),
-    staleTime: 60_000,
-    refetchOnWindowFocus: 'always',
-  });
 
 export const portalMeQueryOptions = (api: Api) =>
   queryOptions({

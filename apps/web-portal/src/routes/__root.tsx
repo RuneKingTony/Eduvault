@@ -3,12 +3,15 @@ import {
   createRootRouteWithContext,
   useRouteContext,
 } from '@tanstack/react-router';
-import { PermissionsProvider } from '@eduvault/auth-client';
+import {
+  PermissionsProvider,
+  permissionsQueryOptions,
+} from '@eduvault/auth-client';
 import type { Api } from '../api';
 import { PortalShell } from '../components/portal-shell';
 import { StaffScreen } from '../components/staff-screen';
 import { isPortalUser } from '../portal-access';
-import { mePermissionsQueryOptions, portalMeQueryOptions } from '../queries';
+import { portalMeQueryOptions } from '../queries';
 import { childParam } from '../selected-child';
 
 interface RouterContext {
@@ -34,7 +37,7 @@ export const Route = createRootRouteWithContext<RouterContext>()({
     return child === undefined ? {} : { child };
   },
   beforeLoad: async ({ context: { queryClient, api } }) => {
-    const access = await queryClient.query(mePermissionsQueryOptions(api));
+    const access = await queryClient.query(permissionsQueryOptions(api));
     if (!isPortalUser(access)) {
       return { access, portal: null };
     }

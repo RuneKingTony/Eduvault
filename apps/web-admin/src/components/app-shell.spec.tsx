@@ -16,6 +16,7 @@ import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import {
   AuthClientProvider,
+  createEduvaultQueryClient,
   type EduvaultAuthClient,
 } from '@eduvault/auth-client';
 import {
@@ -30,7 +31,6 @@ import { ApiProvider, type Api } from '../api';
 import { checked } from '../test-api';
 import { DashboardPage } from '../pages/dashboard-page';
 import { mePermissionsQueryOptions } from '../queries';
-import { createQueryClient } from '../query-client';
 import { approvalSummary } from '../test-approvals';
 import { currentCalendar, noCalendar } from '../test-calendar';
 import { fakeAccess, ownerAccess, starterAccess } from '../test-utils';
@@ -433,7 +433,7 @@ describe('AppShell access', () => {
   });
 
   it('refetches the access after a 403 and sends the open page to the Dashboard', async () => {
-    const queryClient = createQueryClient();
+    const queryClient = createEduvaultQueryClient();
     const { changeAccessTo } = await renderAt('/students', { queryClient });
     changeAccessTo(fakeAccess());
     await queryClient
