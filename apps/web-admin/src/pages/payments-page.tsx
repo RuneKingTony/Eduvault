@@ -29,6 +29,7 @@ import { PaymentsTable } from '../components/payments/payments-table';
 import { RecordPaymentSheet } from '../components/payments/record-payment-sheet';
 import type { PaymentsSearch } from '../payments-search';
 import { paymentsQueryOptions } from '../queries';
+import { useSearchText } from '../components/use-search-text';
 
 function RecordButton({ onOpen }: { onOpen: () => void }) {
   return (
@@ -135,19 +136,18 @@ function PaymentsToolbar({
   shown: number;
   onSearchChange: (next: PaymentsSearch) => void;
 }) {
+  const { text, onTextChange } = useSearchText(search.q, (q) => {
+    onSearchChange({ ...search, q, page: undefined });
+  });
   return (
     <div className="flex flex-wrap items-center gap-2 px-4 pb-3">
       <SearchInput
         className="min-w-48 flex-1"
         aria-label="Search payments"
         placeholder="Search receipt, payer or student"
-        value={search.q ?? ''}
+        value={text}
         onChange={(event) => {
-          onSearchChange({
-            ...search,
-            q: event.target.value === '' ? undefined : event.target.value,
-            page: undefined,
-          });
+          onTextChange(event.target.value);
         }}
       />
       <span className="ml-auto text-sm text-muted-foreground">

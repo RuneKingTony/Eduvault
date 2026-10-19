@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent, { type UserEvent } from '@testing-library/user-event';
 import { actingAccess, renderWithApi, starterAccess } from '../test-utils';
 import {
@@ -106,9 +106,11 @@ describe('MembersPage', () => {
     const user = userEvent.setup();
     const { onSearchChange } = setup({ search: { page: 3 } });
     await typeInto(user, await screen.findByLabelText('Search'), 'tunde');
-    expect(onSearchChange).toHaveBeenCalledWith({
-      page: undefined,
-      q: 'tunde',
+    await waitFor(() => {
+      expect(onSearchChange).toHaveBeenCalledWith({
+        page: undefined,
+        q: 'tunde',
+      });
     });
   });
 

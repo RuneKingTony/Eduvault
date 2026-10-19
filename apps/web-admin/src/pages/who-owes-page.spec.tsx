@@ -120,9 +120,11 @@ describe('WhoOwesPage', () => {
     });
     await user.click(screen.getByLabelText('Search students'));
     await user.paste('ada');
-    expect(onSearchChange).toHaveBeenLastCalledWith({
-      page: undefined,
-      q: 'ada',
+    await waitFor(() => {
+      expect(onSearchChange).toHaveBeenLastCalledWith({
+        page: undefined,
+        q: 'ada',
+      });
     });
   });
 

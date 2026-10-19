@@ -188,7 +188,12 @@ describe('StudentsPage', () => {
     const { onSearchChange } = setup({ props: { search: { page: 3 } } });
     const box = await screen.findByPlaceholderText('Search name or GF number');
     await typeInto(user, box, 'ada');
-    expect(onSearchChange).toHaveBeenCalledWith({ page: undefined, q: 'ada' });
+    await waitFor(() => {
+      expect(onSearchChange).toHaveBeenCalledWith({
+        page: undefined,
+        q: 'ada',
+      });
+    });
   });
 
   it('offers the Campus and Level filters, the Campus one only with more than one campus', async () => {

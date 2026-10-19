@@ -58,6 +58,7 @@ import {
   studentsQueryOptions,
 } from '../queries';
 import type { StudentsSearch } from '../students-search';
+import { useSearchText } from '../components/use-search-text';
 
 interface StudentsPageProps {
   search: StudentsSearch;
@@ -215,16 +216,18 @@ function SearchBox({
     ...schoolProfileQueryOptions(api),
     enabled: canReadSchool,
   });
+  const { text, onTextChange } = useSearchText(search.q, (q) => {
+    onChange({ q });
+  });
   return (
     <Input
       type="search"
       aria-label="Search"
       placeholder={`Search name or ${profile.data?.admissionPrefix ?? 'admission'} number`}
-      defaultValue={search.q ?? ''}
+      value={text}
       className="max-w-xs"
       onChange={(event) => {
-        const q = event.target.value.trim();
-        onChange({ q: q === '' ? undefined : q });
+        onTextChange(event.target.value);
       }}
     />
   );

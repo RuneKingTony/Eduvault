@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { starterAccess } from '../test-utils';
 import {
@@ -166,9 +166,11 @@ describe('PaymentsPage', () => {
     const { onSearchChange } = setup({ search: { page: 2 } });
     await user.click(await screen.findByLabelText('Search payments'));
     await user.paste('ngozi');
-    expect(onSearchChange).toHaveBeenCalledWith({
-      q: 'ngozi',
-      page: undefined,
+    await waitFor(() => {
+      expect(onSearchChange).toHaveBeenCalledWith({
+        q: 'ngozi',
+        page: undefined,
+      });
     });
   });
 });

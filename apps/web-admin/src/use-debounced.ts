@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-const SEARCH_DELAY_MS = 250;
+export const SEARCH_DELAY_MS = 250;
 
 export function useDebounced(value: string): string {
   const [settled, setSettled] = useState(value);
