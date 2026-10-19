@@ -199,7 +199,7 @@ describe('FeePreviewService.preview', () => {
       student({ placement: null })
     );
     expect((await service.preview(ctx, query)).lines).toEqual([]);
-    options.optedIn = ['bus'];
+    options.optIn('enrol-1', 'bus');
     const preview = await service.preview(ctx, query);
     expect(preview.student.campusName).toBe('Lekki');
     expect(preview.student.armName).toBeNull();

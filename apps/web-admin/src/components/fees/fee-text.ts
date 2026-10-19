@@ -58,4 +58,21 @@ export const optionToast = (
     ? `${firstName} now takes ${feeType} from the next round of charges.`
     : `${firstName} no longer takes ${feeType} from the next round of charges.`;
 
+export const optInsToast = (
+  feeType: string,
+  optedIn: boolean,
+  counts: { selected: number; changed: number }
+): string => {
+  if (counts.changed === 0) {
+    return optedIn
+      ? `No change: the selected students already take ${feeType}.`
+      : `No change: the selected students already don't take ${feeType}.`;
+  }
+  const students = countOf(counts.selected, 'student', 'students');
+  const verb = counts.selected === 1 ? 'takes' : 'take';
+  return optedIn
+    ? `${students} now ${verb} ${feeType} from the next round of charges.`
+    : `${students} no longer ${verb} ${feeType}.`;
+};
+
 export const ENTER_AMOUNT = 'Enter an amount.';
