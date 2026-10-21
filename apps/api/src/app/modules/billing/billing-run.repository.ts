@@ -55,10 +55,7 @@ export abstract class BillingRunRepository {
     query: BillingRunListQuery
   ): Promise<RunPage>;
 
-  abstract findRun(
-    scope: OrgScope,
-    id: string
-  ): Promise<RunHeader | undefined>;
+  abstract findRun(scope: OrgScope, id: string): Promise<RunHeader | undefined>;
 
   abstract createRound(input: NewRound): Promise<CreatedRound>;
 
