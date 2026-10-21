@@ -36,11 +36,13 @@ test.describe('whether a money account can serve the caller', () => {
       status: 'ok',
       ledgerAccountId: await ledgerOf(schoolWide.id),
       campusId: null,
+      kind: 'bank',
     });
     expect(await usableMoneyAccount(db, everyone, onIkeja.id)).toEqual({
       status: 'ok',
       ledgerAccountId: await ledgerOf(onIkeja.id),
       campusId: ikeja.id,
+      kind: 'bank',
     });
     expect(await usableMoneyAccount(db, everyone, retired.id)).toEqual({
       status: 'retired',
