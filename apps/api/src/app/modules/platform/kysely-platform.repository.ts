@@ -1,18 +1,20 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { sql, type Transaction } from 'kysely';
+import { sql } from 'kysely';
 import type {
   PlatformSchool,
   PlatformSchoolMember,
 } from '@eduvault/api-contract';
-import { OWNER_ROLE, MEMBER_ROLE, splitRoles } from '@eduvault/policy';
-import type { DB } from '../../../db/db-types';
+import { MEMBER_ROLE, splitRoles } from '@eduvault/policy';
 import type { PlatformAuditEntry } from '../../common/audit';
 import { insertPlatformAudit } from '../../common/audit/kysely-audit.repository';
-import { endClassTeaching } from '../../common/db/end-class-teaching';
+import {
+  makeOwner,
+  removeMember,
+  setMemberRoles,
+} from '../../common/auth/member-rows';
 import { escapeLike } from '../../common/db/escape-like';
 import { iso } from '../../common/db/rows';
 import { KYSELY_TOKEN, type Database } from '../../common/db/tokens';
-import { ownerRoles } from './owner-roles';
 import {
   PlatformRepository,
   type NewSchoolAccountRow,
@@ -260,7 +262,10 @@ export class KyselyPlatformRepository extends PlatformRepository {
 
   async replaceOwner(input: OwnerReplacement): Promise<void> {
     await this.db.transaction().execute(async (trx) => {
-      await this.makeOwner(trx, input);
+      await makeOwner(trx, {
+        organizationId: input.organizationId,
+        userId: input.newOwnerUserId,
+      });
       const others = await trx
         .selectFrom('member')
         .select(['id', 'userId'])
@@ -270,77 +275,15 @@ export class KyselyPlatformRepository extends PlatformRepository {
         .execute();
       for (const other of others) {
         await (input.previousOwner === 'member'
-          ? trx
-              .updateTable('member')
-              .set({ role: MEMBER_ROLE })
-              .where('id', '=', other.id)
-              .execute()
-          : this.removeMember(trx, input.organizationId, other));
+          ? setMemberRoles(trx, { memberId: other.id, roles: [MEMBER_ROLE] })
+          : removeMember(trx, {
+              organizationId: input.organizationId,
+              userId: other.userId,
+              memberId: other.id,
+            }));
       }
       await insertPlatformAudit(trx, input.audit);
     });
-  }
-
-  private async makeOwner(
-    trx: Transaction<DB>,
-    input: OwnerReplacement
-  ): Promise<void> {
-    const current = await trx
-      .selectFrom('member')
-      .select(['id', 'role'])
-      .where('organizationId', '=', input.organizationId)
-      .where('userId', '=', input.newOwnerUserId)
-      .executeTakeFirst();
-    if (current) {
-      await trx
-        .updateTable('member')
-        .set({ role: ownerRoles(splitRoles(current.role)).join(',') })
-        .where('id', '=', current.id)
-        .execute();
-      return;
-    }
-    await trx
-      .insertInto('member')
-      .values({
-        organizationId: input.organizationId,
-        userId: input.newOwnerUserId,
-        role: OWNER_ROLE,
-        createdAt: sql`now()`,
-      })
-      .execute();
-  }
-
-  private async removeMember(
-    trx: Transaction<DB>,
-    organizationId: string,
-    member: { id: string; userId: string }
-  ): Promise<void> {
-    const removed = await trx
-      .deleteFrom('teamMember')
-      .where('userId', '=', member.userId)
-      .where(
-        'teamId',
-        'in',
-        trx
-          .selectFrom('team')
-          .select('id')
-          .where('organizationId', '=', organizationId)
-      )
-      .returning('teamId')
-      .execute();
-    if (removed.length > 0) {
-      await trx
-        .updateTable('team')
-        .set({ memberCount: sql`GREATEST("memberCount" - 1, 0)` })
-        .where(
-          'id',
-          'in',
-          removed.map((row) => row.teamId)
-        )
-        .execute();
-    }
-    await trx.deleteFrom('member').where('id', '=', member.id).execute();
-    await endClassTeaching(trx, { organizationId, userId: member.userId });
   }
 
   async slugTaken(slug: string): Promise<boolean> {

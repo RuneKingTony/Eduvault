@@ -1,7 +1,7 @@
 import type { Kysely } from 'kysely';
 import type { DB } from '../../../db/db-types';
 import type { ActivityWriter } from '../activity';
-import { stripMemberRole } from '../auth/portal-login';
+import { stripMemberRole } from '../auth/member-rows';
 import { endEnrolments } from './end-enrolments';
 
 export interface GraduatingStudent {

@@ -2,7 +2,7 @@ import type { INestApplicationContext } from '@nestjs/common';
 import type { GuardianDraft } from '@eduvault/api-contract';
 import { AccountService, type OrgContext } from '../../src/app/common/auth';
 import { KYSELY_TOKEN, type Database } from '../../src/app/common/db/tokens';
-import { stripMemberRole } from '../../src/app/common/auth/portal-login';
+import { stripMemberRole } from '../../src/app/common/auth/member-rows';
 import { ClassService } from '../../src/app/modules/class/class.service';
 import { AdmissionService } from '../../src/app/modules/student/admission.service';
 import { LifecycleService } from '../../src/app/modules/student/lifecycle.service';
