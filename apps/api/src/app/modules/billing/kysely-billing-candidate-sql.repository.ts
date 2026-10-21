@@ -1,5 +1,5 @@
 import { sql, type RawBuilder } from 'kysely';
-import { INACTIVE_AFTER_DAYS } from '@eduvault/shared';
+import { inactiveSql } from '../../common/students';
 import type { RoundFilter } from './billing-round';
 
 // These fragments read the caller's aliases: s (student) and en (enrollment); roundFilterSql also reads p (placements).
@@ -35,10 +35,7 @@ export const includedSql = (today: string): RawBuilder<boolean> =>
   sql<boolean>`(
     en.status = 'active'
     and s.exit_kind is null
-    and (
-      s.not_seen_since is null
-      or ${today}::date - s.not_seen_since < ${INACTIVE_AFTER_DAYS}
-    )
+    and not ${inactiveSql(today, 's.not_seen_since')}
   )`;
 
 export const chargedSql = (termId: string): RawBuilder<boolean> =>
