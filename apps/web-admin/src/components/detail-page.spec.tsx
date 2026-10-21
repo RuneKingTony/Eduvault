@@ -75,13 +75,16 @@ describe('DetailPage', () => {
     expect(screen.getByText('No such row')).toBeVisible();
     unmount();
 
-    const second = page({ data: 'ok', error: broken });
+    const { unmount: unmountLoaded } = page({ data: 'ok', error: broken });
     expect(screen.getByText('Loaded ok')).toBeVisible();
-    second.unmount();
+    unmountLoaded();
 
-    const third = page({ data: undefined, error: broken });
+    const { unmount: unmountBroken } = page({
+      data: undefined,
+      error: broken,
+    });
     expect(screen.getByRole('alert')).toBeVisible();
-    third.unmount();
+    unmountBroken();
 
     page({ data: undefined, error: null });
     expect(screen.queryByText('Loaded ok')).not.toBeInTheDocument();
