@@ -25,16 +25,10 @@ import {
   type PlacementClass,
   type StudentDetail,
 } from '@eduvault/api-contract';
-import { fmtDate, inactiveFrom } from '@eduvault/shared';
+import { fmtDate, inactiveFrom, isInactiveByAbsence } from '@eduvault/shared';
 import type { OrgContext } from '../../common/auth';
 import { Clock, schoolToday } from '../../common/clock';
-import {
-  canUndoLeaving,
-  inactiveAtOnce,
-  leaveDateError,
-  lifeOf,
-  markAwayDateError,
-} from './lifecycle';
+import { canUndoLeaving, leaveDateError, markAwayDateError } from './lifecycle';
 import type { CurrentTerm } from './admission.repository';
 import type {
   EnrolmentFacts,
@@ -116,7 +110,7 @@ export class LifecycleService {
         byUserId: ctx.user.id,
         note: noteOf(input.note),
       });
-      const outcome = inactiveAtOnce(input.date, today)
+      const outcome = isInactiveByAbsence(input.date, today)
         ? 'More than 5 weeks, so now Inactive.'
         : `Inactive from ${fmtDate(inactiveFrom(input.date))} if not back.`;
       await recordFor(
@@ -137,13 +131,7 @@ export class LifecycleService {
       if (student.notSeenSince === null) {
         throw new ConflictException(studentNotMarkedMessage(fullName(student)));
       }
-      const wasInactive =
-        lifeOf({
-          notSeenSince: student.notSeenSince,
-          exitKind: null,
-          newInCurrentSession: false,
-          today,
-        }) === 'inactive';
+      const wasInactive = isInactiveByAbsence(student.notSeenSince, today);
       await tx.clearNotSeen(ctx.organizationId, student.id);
       await recordFor(
         { tx, ctx, student },

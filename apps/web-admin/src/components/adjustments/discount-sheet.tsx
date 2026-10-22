@@ -215,20 +215,23 @@ function useDiscountForm(
     toTermId: '',
     reason: '',
   }));
-  const [errors, setErrors] = useState<DiscountErrors>({});
+  const [submitted, setSubmitted] = useState(false);
   const create = useCreateDiscount(onClose);
   const patch = (change: Partial<DiscountState>) => {
     setState((current) => ({ ...current, ...change }));
   };
+  const problems = (current: DiscountState): DiscountErrors => {
+    const order = options.terms.map((term) => term.id);
+    const untilBeforeFrom =
+      order.indexOf(current.toTermId) < order.indexOf(current.fromTermId);
+    return validateDiscount(current, untilBeforeFrom);
+  };
+  const errors = submitted ? problems(state) : {};
 
   function submit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
-    const order = options.terms.map((term) => term.id);
-    const untilBeforeFrom =
-      order.indexOf(state.toTermId) < order.indexOf(state.fromTermId);
-    const found = validateDiscount(state, untilBeforeFrom);
-    setErrors(found);
-    if (Object.keys(found).length === 0) {
+    setSubmitted(true);
+    if (Object.keys(problems(state)).length === 0) {
       create.mutate(state);
     }
   }

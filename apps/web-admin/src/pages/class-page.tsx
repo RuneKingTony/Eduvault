@@ -7,11 +7,7 @@ import {
   UsersIcon,
   XIcon,
 } from 'lucide-react';
-import {
-  ApiError,
-  type CalendarCurrent,
-  type ClassDetail,
-} from '@eduvault/api-contract';
+import type { CalendarCurrent, ClassDetail } from '@eduvault/api-contract';
 import { Can, UserAvatar } from '@eduvault/auth-client';
 import { countOf } from '@eduvault/shared';
 import {
@@ -36,10 +32,7 @@ import {
   EmptyDescription,
   EmptyHeader,
   EmptyTitle,
-  ErrorMessage,
-  NotFoundState,
   NumberedPager,
-  PageSkeleton,
   Table,
   TableBody,
   TableCell,
@@ -49,6 +42,11 @@ import {
   toast,
 } from '@eduvault/ui';
 import { useApi } from '../api';
+import {
+  BackButton,
+  DetailNotFound,
+  DetailPage,
+} from '../components/detail-page';
 import { AddClassTeacherDialog } from '../components/add-class-teacher-dialog';
 import { ROLE_LABELS } from '../components/class-text';
 import { GraduateClassDialog } from '../components/graduate-class-dialog';
@@ -303,17 +301,12 @@ function RosterCard({
 
 function ClassNotFound({ onBack }: { onBack: () => void }) {
   return (
-    <section className="flex flex-col gap-4">
-      <h1>Class not found</h1>
-      <NotFoundState
-        title="We couldn’t find that class"
-        description="It may have been moved, or it may belong to a campus or class you don’t look after."
-      >
-        <Button type="button" variant="outline" onClick={onBack}>
-          Go back
-        </Button>
-      </NotFoundState>
-    </section>
+    <DetailNotFound
+      heading="Class not found"
+      title="We couldn’t find that class"
+      description="It may have been moved, or it may belong to a campus or class you don’t look after."
+      back={<BackButton label="Go back" onBack={onBack} />}
+    />
   );
 }
 
@@ -455,22 +448,20 @@ export function ClassPage({
   const api = useApi();
   const classRow = useQuery(classQueryOptions(api, classId));
   const current = useQuery(currentTermQueryOptions(api));
-  if (classRow.error instanceof ApiError && classRow.error.status === 404) {
-    return <ClassNotFound onBack={onBack} />;
-  }
-  if (classRow.isError) {
-    return <ErrorMessage error={classRow.error} />;
-  }
-  if (classRow.data === undefined) {
-    return <PageSkeleton rows={2} />;
-  }
   return (
-    <ClassBody
-      classRow={classRow.data}
-      term={current.data?.term?.name ?? null}
-      current={current.data}
-      onBack={onBack}
-      {...graduateHandlers}
-    />
+    <DetailPage
+      queries={[classRow]}
+      notFound={<ClassNotFound onBack={onBack} />}
+    >
+      {([loaded]) => (
+        <ClassBody
+          classRow={loaded}
+          term={current.data?.term?.name ?? null}
+          current={current.data}
+          onBack={onBack}
+          {...graduateHandlers}
+        />
+      )}
+    </DetailPage>
   );
 }

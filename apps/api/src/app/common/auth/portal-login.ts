@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import type { Kysely } from 'kysely';
-import { splitRoles } from '@eduvault/policy';
 import { PLACEHOLDER_EMAIL_DOMAIN } from '@eduvault/shared';
 import type { DB } from '../../../db/db-types';
+import { addMemberRole } from './member-rows';
 
 export type PortalRole = 'student' | 'guardian';
 
@@ -75,64 +75,4 @@ export async function resetPortalPassword(
     .where('id', '=', input.userId)
     .execute();
   await db.deleteFrom('session').where('userId', '=', input.userId).execute();
-}
-
-interface MemberKey {
-  organizationId: string;
-  userId: string;
-}
-
-async function findMember(db: Kysely<DB>, key: MemberKey) {
-  return db
-    .selectFrom('member')
-    .select(['id', 'role'])
-    .where('organizationId', '=', key.organizationId)
-    .where('userId', '=', key.userId)
-    .executeTakeFirst();
-}
-
-export async function addMemberRole(
-  db: Kysely<DB>,
-  key: MemberKey & { role: string }
-): Promise<void> {
-  const member = await findMember(db, key);
-  if (member === undefined) {
-    await db
-      .insertInto('member')
-      .values({
-        organizationId: key.organizationId,
-        userId: key.userId,
-        role: key.role,
-        createdAt: new Date(),
-      })
-      .execute();
-    return;
-  }
-  const roles = splitRoles(member.role);
-  if (!roles.includes(key.role)) {
-    await db
-      .updateTable('member')
-      .set({ role: [...roles, key.role].join(',') })
-      .where('id', '=', member.id)
-      .execute();
-  }
-}
-
-export async function stripMemberRole(
-  db: Kysely<DB>,
-  key: MemberKey & { role: string }
-): Promise<string[]> {
-  const member = await findMember(db, key);
-  if (member === undefined) {
-    return [];
-  }
-  const rest = splitRoles(member.role).filter((role) => role !== key.role);
-  await (rest.length === 0
-    ? db.deleteFrom('member').where('id', '=', member.id).execute()
-    : db
-        .updateTable('member')
-        .set({ role: rest.join(',') })
-        .where('id', '=', member.id)
-        .execute());
-  return rest;
 }

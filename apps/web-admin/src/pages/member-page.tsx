@@ -5,35 +5,27 @@ import {
   KeyRoundIcon,
   MoreHorizontalIcon,
   PencilIcon,
-  SearchXIcon,
   Trash2Icon,
 } from 'lucide-react';
-import { ApiError, type MemberDetail } from '@eduvault/api-contract';
+import type { MemberDetail } from '@eduvault/api-contract';
 import { meQueryOptions, useCan } from '@eduvault/auth-client';
 import {
   Alert,
   AlertDescription,
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
   Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
   ErrorMessage,
-  PageSkeleton,
 } from '@eduvault/ui';
 import { useApi } from '../api';
+import {
+  BackButton,
+  DetailCrumbs,
+  DetailNotFound,
+  DetailPage,
+} from '../components/detail-page';
 import { MemberAccessCard } from '../components/member-access-card';
 import { EditTitleDialog } from '../components/edit-title-dialog';
 import { MemberLeaveCard } from '../components/leave/member-leave-card';
@@ -61,23 +53,11 @@ interface MemberPageProps {
 
 function MemberNotFound({ onBack }: { onBack: () => void }) {
   return (
-    <Empty className="border">
-      <EmptyHeader>
-        <EmptyMedia variant="icon">
-          <SearchXIcon />
-        </EmptyMedia>
-        <EmptyTitle>Member not found</EmptyTitle>
-        <EmptyDescription>
-          We couldn’t find that member. It may have been moved, or it may belong
-          to a campus or class you don’t look after.
-        </EmptyDescription>
-      </EmptyHeader>
-      <EmptyContent>
-        <Button type="button" onClick={onBack}>
-          Go back
-        </Button>
-      </EmptyContent>
-    </Empty>
+    <DetailNotFound
+      title="Member not found"
+      description="We couldn’t find that member. It may have been moved, or it may belong to a campus or class you don’t look after."
+      back={<BackButton label="Go back" variant="default" onBack={onBack} />}
+    />
   );
 }
 
@@ -252,23 +232,15 @@ function MemberTop({
 
 function MemberCrumbs({ name, onBack }: { name: string; onBack: () => void }) {
   return (
-    <Breadcrumb>
-      <BreadcrumbList>
-        <BreadcrumbItem>People</BreadcrumbItem>
-        <BreadcrumbSeparator />
-        <BreadcrumbItem>
-          <BreadcrumbLink asChild>
-            <button type="button" onClick={onBack}>
-              Staff and members
-            </button>
-          </BreadcrumbLink>
-        </BreadcrumbItem>
-        <BreadcrumbSeparator />
-        <BreadcrumbItem>
-          <BreadcrumbPage>{name}</BreadcrumbPage>
-        </BreadcrumbItem>
-      </BreadcrumbList>
-    </Breadcrumb>
+    <DetailCrumbs
+      section="People"
+      parent={
+        <button type="button" onClick={onBack}>
+          Staff and members
+        </button>
+      }
+      last={name}
+    />
   );
 }
 
@@ -344,15 +316,13 @@ function MemberView({
 export function MemberPage(props: MemberPageProps) {
   const data = useMemberPageData(props.memberId);
   const { member } = data;
-  if (member.error instanceof ApiError && member.error.status === 404) {
-    return <MemberNotFound onBack={props.onBack} />;
-  }
-  if (member.data === undefined) {
-    return member.error === null ? (
-      <PageSkeleton rows={3} />
-    ) : (
-      <ErrorMessage error={member.error} />
-    );
-  }
-  return <MemberView detail={member.data} data={data} props={props} />;
+  return (
+    <DetailPage
+      queries={[member]}
+      rows={3}
+      notFound={<MemberNotFound onBack={props.onBack} />}
+    >
+      {([detail]) => <MemberView detail={detail} data={data} props={props} />}
+    </DetailPage>
+  );
 }

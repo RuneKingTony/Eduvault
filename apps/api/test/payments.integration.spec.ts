@@ -1,4 +1,5 @@
 import {
+  PAYMENT_ACCOUNT_GATEWAY_MESSAGE,
   PAYMENT_ACCOUNT_RETIRED_MESSAGE,
   PAYMENT_FUTURE_DATE_MESSAGE,
   PAYMENT_PROOF_NOT_FOUND_MESSAGE,
@@ -17,6 +18,7 @@ import {
 import { acting, expect } from './support/base-test';
 import { entriesFor, receivableBalance } from './support/factories/billing';
 import { ledgerAccountId, postEntry } from './support/factories/finance';
+import { gatewayAccountId } from './support/factories/store';
 import {
   PDF_BYTES,
   bankAccount,
@@ -406,6 +408,23 @@ test.describe('recording a payment', () => {
       .post('/finance/payments')
       .send({ ...base, amountMinor: 0 })
       .expect(400);
+  });
+
+  test('refuses a gateway account with 400 and records nothing', async ({
+    api,
+    pool,
+    schools: { owner, orgA, studentLekki },
+  }) => {
+    const gateway = await gatewayAccountId(pool, orgA.id);
+    const allocations = [{ studentId: studentLekki.id, amountMinor: PART }];
+
+    const res = await api(owner)
+      .post('/finance/payments')
+      .send(cashBody({ accountId: gateway, allocations }))
+      .expect(400);
+
+    expect(res.body.message).toBe(PAYMENT_ACCOUNT_GATEWAY_MESSAGE);
+    expect(await count(pool, 'payment')).toBe(0);
   });
 
   test('answers 404 for a student, account, guardian or proof that is not in reach', async ({

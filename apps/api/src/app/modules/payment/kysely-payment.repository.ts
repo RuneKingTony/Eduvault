@@ -13,8 +13,11 @@ import {
   financeActor,
   paymentRecordedActivity,
 } from '../../common/activity';
-import { inCampusScope } from '../../common/db/in-campus-scope';
 import { KYSELY_TOKEN, type Database } from '../../common/db/tokens';
+import {
+  usableMoneyAccount,
+  type UsableMoneyAccount,
+} from '../../common/money-accounts';
 import { uniqueViolation } from '../../common/db/unique-violation';
 import { readPaymentMethods } from '../../common/school-setting/payment-methods';
 import {
@@ -38,7 +41,6 @@ import {
   type PaymentPage,
   type PaymentScope,
   type NewRecordedPayment,
-  type RecordingAccount,
   type RecordingPeople,
 } from './payment.repository';
 
@@ -111,36 +113,11 @@ export class KyselyPaymentRepository extends PaymentRepository {
     return readPaymentMethods(this.db, organizationId);
   }
 
-  async recordingAccount(
+  recordingAccount(
     scope: PaymentScope,
     moneyAccountId: string
-  ): Promise<RecordingAccount> {
-    const row = await this.db
-      .selectFrom('money_account')
-      .select(['ledger_account_id', 'campus_id', 'kind', 'retired_at'])
-      .where('organization_id', '=', scope.organizationId)
-      .where('id', '=', moneyAccountId)
-      .where((eb) =>
-        inCampusScope(eb, 'money_account.campus_id', {
-          scope: scope.campusScope,
-          nullMeans: 'all',
-        })
-      )
-      .executeTakeFirst();
-    if (row === undefined) {
-      return { status: 'missing' };
-    }
-    if (row.kind === 'gateway') {
-      return { status: 'gateway' };
-    }
-    if (row.retired_at !== null) {
-      return { status: 'retired' };
-    }
-    return {
-      status: 'ok',
-      ledgerAccountId: row.ledger_account_id,
-      campusId: row.campus_id,
-    };
+  ): Promise<UsableMoneyAccount> {
+    return usableMoneyAccount(this.db, scope, moneyAccountId);
   }
 
   async guardianName(

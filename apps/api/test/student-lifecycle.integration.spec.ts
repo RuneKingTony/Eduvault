@@ -5,6 +5,7 @@ import { receivableBalance } from './support/factories/billing';
 import { assignClassTeacher, createClass } from './support/factories/classes';
 import { importOpening } from './support/factories/finance';
 import { createStudent } from './support/factories/students';
+import { expectSeatsConsistent } from './support/seats';
 import { makeCurrent } from './support/factories/terms';
 import { schoolsTest } from './support/two-schools';
 
@@ -207,7 +208,7 @@ test.describe('record leaving', () => {
   test('withdraws the enrolment, closes the login and keeps every row', async ({
     api,
     pool,
-    schools: { owner, studentLekki },
+    schools: { orgA, owner, studentLekki },
   }) => {
     const before = await memberRoles(pool, studentLekki.id);
     expect(before).toEqual([{ role: 'student' }]);
@@ -251,6 +252,7 @@ test.describe('record leaving', () => {
       guardians: 1,
       users: 1,
     });
+    await expectSeatsConsistent(pool, orgA.id);
   });
 
   test('names no balance in the leaving activity when the student owes', async ({
