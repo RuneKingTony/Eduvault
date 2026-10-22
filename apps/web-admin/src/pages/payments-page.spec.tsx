@@ -1,4 +1,5 @@
-import { fireEvent, screen, within } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { starterAccess } from '../test-utils';
 import {
   paymentList,
@@ -39,6 +40,12 @@ async function amountCell() {
   const row = await screen.findByRole('row', { name: /RCT-2026-00088/ });
   return within(row).getAllByRole('cell')[column];
 }
+
+let user: ReturnType<typeof userEvent.setup>;
+
+beforeEach(() => {
+  user = userEvent.setup();
+});
 
 describe('PaymentsPage', () => {
   it('shows the summary line and the receipt count', async () => {
@@ -125,7 +132,7 @@ describe('PaymentsPage', () => {
 
   it('asks the page to open the sheet from the header button', async () => {
     const { onSearchChange } = setup({ access: starterAccess('bursar') });
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('button', { name: 'Record payment' })
     );
     expect(onSearchChange).toHaveBeenCalledWith({ record: 1 });
@@ -157,9 +164,8 @@ describe('PaymentsPage', () => {
 
   it('searches as you type and returns to the first page', async () => {
     const { onSearchChange } = setup({ search: { page: 2 } });
-    fireEvent.change(await screen.findByLabelText('Search payments'), {
-      target: { value: 'ngozi' },
-    });
+    await user.click(await screen.findByLabelText('Search payments'));
+    await user.paste('ngozi');
     expect(onSearchChange).toHaveBeenCalledWith({
       q: 'ngozi',
       page: undefined,

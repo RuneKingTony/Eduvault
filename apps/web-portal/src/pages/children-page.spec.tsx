@@ -1,4 +1,5 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { Permission } from '@eduvault/policy';
 import {
   ADA_ID,
@@ -94,6 +95,7 @@ describe('ChildrenPage', () => {
   });
 
   it('opens Home for the chosen child', async () => {
+    const user = userEvent.setup();
     const onOpenChild = vi.fn();
     renderWithApi(
       <ChildrenPage
@@ -105,7 +107,7 @@ describe('ChildrenPage', () => {
       />,
       apiWith([ada, tobi])
     );
-    fireEvent.click(await screen.findByRole('button', { name: /Tobi Okeke/ }));
+    await user.click(await screen.findByRole('button', { name: /Tobi Okeke/ }));
     expect(onOpenChild).toHaveBeenCalledWith(TOBI_ID);
   });
 
@@ -353,10 +355,11 @@ describe('ChildrenPage fees', () => {
   });
 
   it('opens Fees for the child from See fees', async () => {
+    const user = userEvent.setup();
     const onSeeFees = vi.fn();
     showFees([adaOwes, tobiCredit], { onSeeFees });
     await screen.findByRole('heading', { name: 'Family statement' });
-    fireEvent.click(cardOf('Tobi').getByRole('button', { name: 'See fees' }));
+    await user.click(cardOf('Tobi').getByRole('button', { name: 'See fees' }));
     expect(onSeeFees).toHaveBeenCalledWith(TOBI_ID);
   });
 
@@ -519,12 +522,13 @@ describe('ChildrenPage term filter', () => {
   });
 
   it('reports the picked term and the whole history', async () => {
+    const user = userEvent.setup();
     const onTerm = vi.fn();
     showFees([adaOwes, tobiCredit], { onTerm, term: TERM_1 });
 
     const select = await screen.findByRole('combobox', { name: 'Term' });
-    fireEvent.change(select, { target: { value: TERM_2 } });
-    fireEvent.change(select, { target: { value: '' } });
+    await user.selectOptions(select, TERM_2);
+    await user.selectOptions(select, '');
 
     expect(onTerm).toHaveBeenNthCalledWith(1, TERM_2);
     expect(onTerm).toHaveBeenNthCalledWith(2, undefined);

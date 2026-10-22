@@ -1,4 +1,5 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { TermSelect } from './term-select';
 
 const TERMS = [
@@ -27,13 +28,14 @@ describe('TermSelect', () => {
     expect(screen.getByRole('combobox', { name: 'Term' })).toHaveValue('');
   });
 
-  it('reports the picked term and undefined for the whole history', () => {
+  it('reports the picked term and undefined for the whole history', async () => {
+    const user = userEvent.setup();
     const onChange = vi.fn();
     render(<TermSelect terms={TERMS} value={undefined} onChange={onChange} />);
     const select = screen.getByRole('combobox', { name: 'Term' });
-    fireEvent.change(select, { target: { value: 'second' } });
+    await user.selectOptions(select, 'second');
     expect(onChange).toHaveBeenLastCalledWith('second');
-    fireEvent.change(select, { target: { value: '' } });
+    await user.selectOptions(select, 'Whole history');
     expect(onChange).toHaveBeenLastCalledWith(undefined);
   });
 });

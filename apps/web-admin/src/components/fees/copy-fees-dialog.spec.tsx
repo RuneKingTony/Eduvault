@@ -1,4 +1,5 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { ApiError } from '@eduvault/api-contract';
 import { toast } from '@eduvault/ui';
 import { copySource, feesApi, TERM_1 } from '../../test-fees';
@@ -55,8 +56,9 @@ describe('CopyFeesDialog', () => {
   });
 
   it('copies into the target term, then toasts and closes', async () => {
+    const user = userEvent.setup();
     const { api, onOpenChange } = setup();
-    fireEvent.click(await screen.findByRole('button', { name: 'Copy fees' }));
+    await user.click(await screen.findByRole('button', { name: 'Copy fees' }));
     await waitFor(() => {
       expect(api.feeLines.copy).toHaveBeenCalledWith({
         body: { termId: TERM_1 },
@@ -71,13 +73,15 @@ describe('CopyFeesDialog', () => {
   });
 
   it('closes without copying on Cancel', async () => {
+    const user = userEvent.setup();
     const { api, onOpenChange } = setup();
-    fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }));
+    await user.click(await screen.findByRole('button', { name: 'Cancel' }));
     expect(onOpenChange).toHaveBeenCalledWith(false);
     expect(api.feeLines.copy).not.toHaveBeenCalled();
   });
 
   it('toasts the refusal from the server and stays open', async () => {
+    const user = userEvent.setup();
     const { api, onOpenChange } = setup();
     api.feeLines.copy.mockRejectedValue(
       new ApiError(409, {
@@ -86,7 +90,7 @@ describe('CopyFeesDialog', () => {
           'First term, 2026/2027 already has fees. Change them one at a time instead.',
       })
     );
-    fireEvent.click(await screen.findByRole('button', { name: 'Copy fees' }));
+    await user.click(await screen.findByRole('button', { name: 'Copy fees' }));
     await waitFor(() => {
       expect(toast.error).toHaveBeenCalledWith(
         'First term, 2026/2027 already has fees. Change them one at a time instead.'

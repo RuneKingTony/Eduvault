@@ -1,4 +1,5 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { ApiError } from '@eduvault/api-contract';
 import { toast } from '@eduvault/ui';
 import { renderWithApi } from '../test-utils';
@@ -35,25 +36,27 @@ describe('ResetPasswordDialog', () => {
   });
 
   it('shows the new temporary password once, until Done', async () => {
+    const user = userEvent.setup();
     const issued = globalThis.crypto.randomUUID();
     const resetPassword = vi
       .fn()
       .mockResolvedValue({ temporaryPassword: issued });
     const { onOpenChange } = setup(resetPassword);
-    fireEvent.click(screen.getByRole('button', { name: 'Reset password' }));
+    await user.click(screen.getByRole('button', { name: 'Reset password' }));
     expect(await screen.findByText(issued)).toBeInTheDocument();
     expect(resetPassword).toHaveBeenCalledWith({ params: { id: detail().id } });
     expect(onOpenChange).toHaveBeenCalledWith(false);
     expect(
       screen.getByRole('heading', { name: 'New password for Ada Obi' })
     ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    await user.click(screen.getByRole('button', { name: 'Done' }));
     await waitFor(() => {
       expect(screen.queryByText(issued)).not.toBeInTheDocument();
     });
   });
 
   it('shows the server’s message and no password when it refuses', async () => {
+    const user = userEvent.setup();
     const resetPassword = vi.fn().mockRejectedValue(
       new ApiError(409, {
         code: 'SHARED_ACCOUNT',
@@ -61,7 +64,7 @@ describe('ResetPasswordDialog', () => {
       })
     );
     const { onOpenChange } = setup(resetPassword);
-    fireEvent.click(screen.getByRole('button', { name: 'Reset password' }));
+    await user.click(screen.getByRole('button', { name: 'Reset password' }));
     await waitFor(() => {
       expect(toast.error).toHaveBeenCalledWith(
         'Ada Obi also belongs to another school.'

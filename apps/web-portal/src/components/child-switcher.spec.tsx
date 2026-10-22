@@ -1,4 +1,5 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { PortalChild } from '@eduvault/api-contract';
 import { ADA_ID, TOBI_ID } from '../test-utils';
 import { ChildSwitcher } from './child-switcher';
@@ -44,7 +45,8 @@ describe('ChildSwitcher', () => {
     );
   });
 
-  it('reports the chosen child', () => {
+  it('reports the chosen child', async () => {
+    const user = userEvent.setup();
     const onSelect = vi.fn();
     render(
       <ChildSwitcher
@@ -53,7 +55,7 @@ describe('ChildSwitcher', () => {
         onSelect={onSelect}
       />
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Tobi' }));
+    await user.click(screen.getByRole('button', { name: 'Tobi' }));
     expect(onSelect).toHaveBeenCalledWith(TOBI_ID);
   });
 });

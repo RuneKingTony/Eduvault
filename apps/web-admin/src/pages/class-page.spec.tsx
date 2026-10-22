@@ -1,4 +1,5 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import {
   ApiError,
   type ClassDetail,
@@ -109,10 +110,15 @@ function setup({
   return { api, onBack, onOpenGraduated, onOpenStartYear };
 }
 
+let user: ReturnType<typeof userEvent.setup>;
+
+beforeEach(() => {
+  user = userEvent.setup();
+});
+
 const openMenu = async () => {
-  fireEvent.keyDown(
-    await screen.findByRole('button', { name: 'Actions for JSS 2 Gold' }),
-    { key: 'Enter' }
+  await user.click(
+    await screen.findByRole('button', { name: 'Actions for JSS 2 Gold' })
   );
 };
 
@@ -175,7 +181,7 @@ describe('ClassPage', () => {
     expect(
       screen.getByText('Lekki campus · 8 students · First term')
     ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Classes' }));
+    await user.click(screen.getByRole('button', { name: 'Classes' }));
     expect(onBack).toHaveBeenCalled();
   });
 
@@ -267,7 +273,7 @@ describe('ClassPage', () => {
 
     it('opens the add dialog', async () => {
       setup();
-      fireEvent.click(
+      await user.click(
         await screen.findByRole('button', { name: 'Add class teacher' })
       );
       expect(
@@ -279,7 +285,7 @@ describe('ClassPage', () => {
 
     it('removes a teacher and toasts', async () => {
       const { api } = setup();
-      fireEvent.click(
+      await user.click(
         await screen.findByRole('button', { name: 'Remove Ayo Bassey' })
       );
       await waitFor(() => {
@@ -345,7 +351,7 @@ describe('ClassPage', () => {
     it('archives with no confirmation and toasts the PRD copy', async () => {
       const { api } = setup();
       await openMenu();
-      fireEvent.click(
+      await user.click(
         await screen.findByRole('menuitem', { name: 'Archive class' })
       );
       await waitFor(() => {
@@ -367,7 +373,7 @@ describe('ClassPage', () => {
       expect(
         screen.queryByRole('menuitem', { name: 'Archive class' })
       ).not.toBeInTheDocument();
-      fireEvent.click(
+      await user.click(
         await screen.findByRole('menuitem', { name: 'Restore class' })
       );
       await waitFor(() => {
@@ -387,7 +393,7 @@ describe('ClassPage', () => {
         new ApiError(409, { code: 'Conflict', message })
       );
       await openMenu();
-      fireEvent.click(
+      await user.click(
         await screen.findByRole('menuitem', { name: 'Archive class' })
       );
       await waitFor(() => {
@@ -424,7 +430,7 @@ describe('ClassPage', () => {
         'It may have been moved, or it may belong to a campus or class you don’t look after.'
       )
     ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Go back' }));
+    await user.click(screen.getByRole('button', { name: 'Go back' }));
     expect(onBack).toHaveBeenCalled();
   });
 
@@ -499,7 +505,7 @@ describe('ClassPage', () => {
 
     it('lists the roster by last name, all ticked, with the Start note', async () => {
       const { onOpenStartYear } = setup({ row: FINAL });
-      fireEvent.click(await graduateButton());
+      await user.click(await graduateButton());
       expect(await screen.findByText('Graduate SS 3 Gold')).toBeInTheDocument();
       const boxes = screen.getAllByRole('checkbox');
       expect(boxes).toHaveLength(3);
@@ -510,7 +516,7 @@ describe('ClassPage', () => {
         .getAllByText(/^(Ada Adams|Tobi Bello|Zainab Bello)$/)
         .map((node) => node.textContent);
       expect(names).toEqual(['Ada Adams', 'Tobi Bello', 'Zainab Bello']);
-      fireEvent.click(
+      await user.click(
         screen.getByRole('button', { name: 'Start new school year' })
       );
       expect(onOpenStartYear).toHaveBeenCalled();
@@ -521,9 +527,9 @@ describe('ClassPage', () => {
         row: FINAL,
         calendar: calendarIn(3),
       });
-      fireEvent.click(await graduateButton());
-      fireEvent.click(await screen.findByLabelText(/Tobi Bello/));
-      fireEvent.click(
+      await user.click(await graduateButton());
+      await user.click(await screen.findByLabelText(/Tobi Bello/));
+      await user.click(
         screen.getByRole('button', { name: 'Graduate ticked students' })
       );
       await waitFor(() => {
@@ -546,8 +552,8 @@ describe('ClassPage', () => {
     it('asks for a second confirmation before the last term and writes nothing until Graduate now', async () => {
       const { api } = setup({ row: FINAL, calendar: calendarIn(1) });
       await screen.findByText('First term', { exact: false });
-      fireEvent.click(await graduateButton());
-      fireEvent.click(
+      await user.click(await graduateButton());
+      await user.click(
         await screen.findByRole('button', { name: 'Graduate ticked students' })
       );
       expect(
@@ -560,12 +566,12 @@ describe('ClassPage', () => {
       ).toBeInTheDocument();
       expect(api.classes.graduate).not.toHaveBeenCalled();
 
-      fireEvent.click(screen.getByRole('button', { name: 'Go back' }));
+      await user.click(screen.getByRole('button', { name: 'Go back' }));
       expect(await screen.findByText('Graduate SS 3 Gold')).toBeInTheDocument();
-      fireEvent.click(
+      await user.click(
         screen.getByRole('button', { name: 'Graduate ticked students' })
       );
-      fireEvent.click(
+      await user.click(
         await screen.findByRole('button', { name: 'Graduate now' })
       );
       await waitFor(() => {
@@ -575,8 +581,8 @@ describe('ClassPage', () => {
 
     it('asks for the second confirmation while the current term is still loading', async () => {
       const { api } = setup({ row: FINAL, calendar: 'pending' });
-      fireEvent.click(await graduateButton());
-      fireEvent.click(
+      await user.click(await graduateButton());
+      await user.click(
         await screen.findByRole('button', { name: 'Graduate ticked students' })
       );
       expect(
@@ -587,9 +593,9 @@ describe('ClassPage', () => {
 
     it('cannot graduate with nobody ticked', async () => {
       setup({ row: FINAL });
-      fireEvent.click(await graduateButton());
+      await user.click(await graduateButton());
       for (const box of await screen.findAllByRole('checkbox')) {
-        fireEvent.click(box);
+        await user.click(box);
       }
       expect(
         screen.getByRole('button', { name: 'Graduate ticked students' })

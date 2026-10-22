@@ -1,4 +1,5 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import {
   ApiError,
   type CreateSchoolResult,
@@ -34,26 +35,38 @@ function setup(create: ReturnType<typeof vi.fn>) {
   return { list, create };
 }
 
-const type = (label: string, value: string) => {
-  fireEvent.change(screen.getByLabelText(label), { target: { value } });
+let user: ReturnType<typeof userEvent.setup>;
+
+const type = async (label: string, value: string) => {
+  const input = screen.getByLabelText(label);
+  await user.clear(input);
+  await user.type(input, value);
 };
 
 async function openSheet() {
-  fireEvent.click(await screen.findByRole('button', { name: 'Create school' }));
+  await user.click(
+    await screen.findByRole('button', { name: 'Create school' })
+  );
   return screen.findByRole('dialog', { name: 'Create a school' });
 }
 
-const fillValid = () => {
-  type('School name', 'Greenfield College');
-  type('Owner name', 'Funmi Adeyemi');
-  type('Owner email', 'funmi@greenfield.test');
+const fillValid = async () => {
+  await type('School name', 'Greenfield College');
+  await type('Owner name', 'Funmi Adeyemi');
+  await type('Owner email', 'funmi@greenfield.test');
 };
 
-const submit = (sheet: HTMLElement) => {
-  fireEvent.click(within(sheet).getByRole('button', { name: 'Create school' }));
+const submit = async (sheet: HTMLElement) => {
+  await user.click(
+    within(sheet).getByRole('button', { name: 'Create school' })
+  );
 };
 
 describe('CreateSchoolSheet', () => {
+  beforeEach(() => {
+    user = userEvent.setup();
+  });
+
   it('suggests the slug and prefix from the name until they are edited', async () => {
     setup(vi.fn());
     const sheet = await openSheet();
@@ -63,12 +76,12 @@ describe('CreateSchoolSheet', () => {
       )
     ).toBeInTheDocument();
 
-    type('School name', 'Greenfield College');
+    await type('School name', 'Greenfield College');
     expect(screen.getByLabelText('Slug')).toHaveValue('greenfield-college');
     expect(screen.getByLabelText('Admission prefix')).toHaveValue('GC');
 
-    type('Slug', 'gfc');
-    type('School name', 'Greenfield College Lekki');
+    await type('Slug', 'gfc');
+    await type('School name', 'Greenfield College Lekki');
     expect(screen.getByLabelText('Slug')).toHaveValue('gfc');
     expect(screen.getByLabelText('Admission prefix')).toHaveValue('GCL');
   });
@@ -76,10 +89,10 @@ describe('CreateSchoolSheet', () => {
   it('explains what is wrong before it calls the server', async () => {
     const { create } = setup(vi.fn());
     const sheet = await openSheet();
-    type('School name', 'Greenfield College');
-    type('Slug', 'Bad Slug!');
-    type('Admission prefix', 'g1');
-    submit(sheet);
+    await type('School name', 'Greenfield College');
+    await type('Slug', 'Bad Slug!');
+    await type('Admission prefix', 'g1');
+    await submit(sheet);
 
     expect(
       await screen.findByText('Use lowercase letters, numbers and hyphens.')
@@ -98,8 +111,8 @@ describe('CreateSchoolSheet', () => {
       );
     setup(create);
     const sheet = await openSheet();
-    fillValid();
-    submit(sheet);
+    await fillValid();
+    await submit(sheet);
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'That slug is taken.'
@@ -117,9 +130,9 @@ describe('CreateSchoolSheet', () => {
     });
     const { list, create } = setup(vi.fn().mockResolvedValue(created()));
     const sheet = await openSheet();
-    fillValid();
-    type('City', 'Lagos');
-    submit(sheet);
+    await fillValid();
+    await type('City', 'Lagos');
+    await submit(sheet);
 
     const dialog = await screen.findByRole('dialog', {
       name: 'Greenfield College created',
@@ -144,12 +157,12 @@ describe('CreateSchoolSheet', () => {
     ).toBeInTheDocument();
     expect(within(dialog).getByText('Tmp9Pass2Word')).toBeInTheDocument();
 
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Copy' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Copy' }));
     await waitFor(() => {
       expect(writeText).toHaveBeenCalledWith('Tmp9Pass2Word');
     });
 
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Done' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Done' }));
     await waitFor(() => {
       expect(screen.queryByText('Tmp9Pass2Word')).not.toBeInTheDocument();
     });
@@ -163,13 +176,13 @@ describe('CreateSchoolSheet', () => {
     });
     setup(vi.fn().mockResolvedValue(created()));
     const sheet = await openSheet();
-    fillValid();
-    submit(sheet);
+    await fillValid();
+    await submit(sheet);
 
     const dialog = await screen.findByRole('dialog', {
       name: 'Greenfield College created',
     });
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Copy' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Copy' }));
     expect(await within(dialog).findByRole('alert')).toHaveTextContent(
       'Couldn’t copy'
     );
@@ -179,8 +192,8 @@ describe('CreateSchoolSheet', () => {
   it('says an existing owner already has an account', async () => {
     setup(vi.fn().mockResolvedValue(created({ temporaryPassword: null })));
     const sheet = await openSheet();
-    fillValid();
-    submit(sheet);
+    await fillValid();
+    await submit(sheet);
 
     const dialog = await screen.findByRole('dialog', {
       name: 'Greenfield College created',
@@ -198,15 +211,13 @@ describe('CreateSchoolSheet', () => {
   it('keeps the temporary password open through Escape and an outside click', async () => {
     setup(vi.fn().mockResolvedValue(created()));
     const sheet = await openSheet();
-    fillValid();
-    submit(sheet);
+    await fillValid();
+    await submit(sheet);
 
-    const dialog = await screen.findByRole('dialog', {
-      name: 'Greenfield College created',
-    });
-    fireEvent.keyDown(dialog, { key: 'Escape' });
-    fireEvent.pointerDown(document.body);
-    fireEvent.click(document.body);
+    await screen.findByRole('dialog', { name: 'Greenfield College created' });
+    const outsideUser = userEvent.setup({ pointerEventsCheck: 0 });
+    await user.keyboard('{Escape}');
+    await outsideUser.click(document.body);
     expect(
       screen.getByRole('dialog', { name: 'Greenfield College created' })
     ).toBeInTheDocument();
@@ -216,9 +227,9 @@ describe('CreateSchoolSheet', () => {
   it('starts empty each time the sheet is opened', async () => {
     setup(vi.fn());
     const sheet = await openSheet();
-    type('School name', 'Greenfield College');
-    type('City', 'Lagos');
-    fireEvent.click(within(sheet).getByRole('button', { name: 'Cancel' }));
+    await type('School name', 'Greenfield College');
+    await type('City', 'Lagos');
+    await user.click(within(sheet).getByRole('button', { name: 'Cancel' }));
     await waitFor(() => {
       expect(
         screen.queryByRole('dialog', { name: 'Create a school' })

@@ -1,4 +1,5 @@
 import { ForbiddenException } from '@nestjs/common';
+import { missingPermissionMessage } from '@eduvault/api-contract';
 import { holds, type Permission } from '@eduvault/policy';
 import type { OrgContext } from './auth.types';
 
@@ -8,6 +9,6 @@ export function requirePermission(
   permission: Permission
 ): void {
   if (!holds(ctx.permissions, permission)) {
-    throw new ForbiddenException(`Missing permission ${permission}`);
+    throw new ForbiddenException(missingPermissionMessage(permission));
   }
 }

@@ -1,4 +1,5 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { ApiError } from '@eduvault/api-contract';
 import { toast } from '@eduvault/ui';
 import { ADA, BUS, CHIDI, TERM_1, feesApi, optInRoster } from '../../test-fees';
@@ -24,8 +25,11 @@ function setup(
 }
 
 describe('FeeOptInsCard', () => {
+  let user: ReturnType<typeof userEvent.setup>;
+
   beforeEach(() => {
     vi.clearAllMocks();
+    user = userEvent.setup();
   });
 
   it('lists the students with their status under the card copy', async () => {
@@ -53,11 +57,11 @@ describe('FeeOptInsCard', () => {
 
   it('opts every listed student in after select all and toasts the count', async () => {
     const { api } = setup();
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('checkbox', { name: 'Select all' })
     );
     expect(screen.getByText('2 selected')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Opt in' }));
+    await user.click(screen.getByRole('button', { name: 'Opt in' }));
     await waitFor(() => {
       expect(api.feeOptIns.set).toHaveBeenCalledWith({
         params: { feeTypeId: BUS.id },
@@ -74,10 +78,10 @@ describe('FeeOptInsCard', () => {
 
   it('opts one picked student out', async () => {
     const { api } = setup();
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('checkbox', { name: 'Select Ada Okeke' })
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Opt out' }));
+    await user.click(screen.getByRole('button', { name: 'Opt out' }));
     await waitFor(() => {
       expect(api.feeOptIns.set).toHaveBeenCalledWith({
         params: { feeTypeId: BUS.id },
@@ -99,10 +103,10 @@ describe('FeeOptInsCard', () => {
       changed: 0,
       unchanged: 2,
     });
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('checkbox', { name: 'Select all' })
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Opt in' }));
+    await user.click(screen.getByRole('button', { name: 'Opt in' }));
     await waitFor(() => {
       expect(toast.success).toHaveBeenCalledWith(
         'No change: the selected students already take School bus.'
@@ -118,10 +122,10 @@ describe('FeeOptInsCard', () => {
         message: 'That student cannot take this fee.',
       })
     );
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('checkbox', { name: 'Select all' })
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Opt in' }));
+    await user.click(screen.getByRole('button', { name: 'Opt in' }));
     await waitFor(() => {
       expect(toast.error).toHaveBeenCalledWith(
         'That student cannot take this fee.'
@@ -140,9 +144,7 @@ describe('FeeOptInsCard', () => {
 
   it('searches the list through the server', async () => {
     const { api } = setup();
-    fireEvent.change(await screen.findByLabelText('Search students'), {
-      target: { value: 'chidi' },
-    });
+    await user.type(await screen.findByLabelText('Search students'), 'chidi');
     await waitFor(() => {
       expect(api.feeOptIns.list).toHaveBeenCalledWith({
         params: { feeTypeId: BUS.id },
@@ -162,11 +164,11 @@ describe('FeeOptInsCard', () => {
         )
     );
     const search = await screen.findByLabelText('Search students');
-    fireEvent.change(search, { target: { value: 'zzz' } });
+    await user.type(search, 'zzz');
     expect(
       await screen.findByText('No student matches that search')
     ).toBeInTheDocument();
-    fireEvent.change(search, { target: { value: '' } });
+    await user.clear(search);
     expect(screen.getByLabelText('Search students')).toBe(search);
     expect(
       screen.queryByText('No student can take School bus this school year')

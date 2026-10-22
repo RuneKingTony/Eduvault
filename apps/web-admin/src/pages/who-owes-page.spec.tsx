@@ -1,4 +1,5 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { testId } from '../test-api';
 import { starterAccess } from '../test-utils';
 import {
@@ -42,6 +43,12 @@ function setup(
   return { api, onSearchChange };
 }
 
+let user: ReturnType<typeof userEvent.setup>;
+
+beforeEach(() => {
+  user = userEvent.setup();
+});
+
 describe('WhoOwesPage', () => {
   it('shows the three tiles with the scope note and the term’s receipts', async () => {
     setup();
@@ -77,7 +84,7 @@ describe('WhoOwesPage', () => {
 
   it('sets the filter back to Owing from the first two tiles', async () => {
     const { onSearchChange } = setup({ search: { filter: 'all', page: 3 } });
-    fireEvent.click(await screen.findByRole('button', { name: /Total owed/ }));
+    await user.click(await screen.findByRole('button', { name: /Total owed/ }));
     expect(onSearchChange).toHaveBeenCalledWith({
       filter: undefined,
       page: undefined,
@@ -103,16 +110,16 @@ describe('WhoOwesPage', () => {
 
   it('changes the filter and the search and goes back to the first page', async () => {
     const { onSearchChange } = setup({ search: { page: 2 } });
-    fireEvent.change(await screen.findByLabelText('Show'), {
-      target: { value: 'owing_gone' },
-    });
+    await user.selectOptions(
+      await screen.findByLabelText('Show'),
+      'owing_gone'
+    );
     expect(onSearchChange).toHaveBeenCalledWith({
       page: undefined,
       filter: 'owing_gone',
     });
-    fireEvent.change(screen.getByLabelText('Search students'), {
-      target: { value: 'ada' },
-    });
+    await user.click(screen.getByLabelText('Search students'));
+    await user.paste('ada');
     expect(onSearchChange).toHaveBeenLastCalledWith({
       page: undefined,
       q: 'ada',
@@ -194,7 +201,7 @@ describe('WhoOwesPage', () => {
 
   it('opens the sheet in place, prefilled for the paying guardian', async () => {
     setup({ access: starterAccess('bursar') });
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('button', {
         name: 'Record payment for Ada Okeke',
       })

@@ -1,4 +1,5 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { ApiError } from '@eduvault/api-contract';
 import { toast } from '@eduvault/ui';
 import { renderWithApi } from '../test-utils';
@@ -53,8 +54,9 @@ describe('MemberCampusesCard', () => {
   });
 
   it('adds a campus and says so', async () => {
+    const user = userEvent.setup();
     const { updateCampuses } = setup();
-    fireEvent.click(campusSwitch('Ikeja'));
+    await user.click(campusSwitch('Ikeja'));
     await waitFor(() => {
       expect(updateCampuses).toHaveBeenCalledWith({
         params: { id: detail().id },
@@ -67,8 +69,9 @@ describe('MemberCampusesCard', () => {
   });
 
   it('removes a campus and says so', async () => {
+    const user = userEvent.setup();
     const { updateCampuses } = setup({ campusIds: [LEKKI.id, IKEJA.id] });
-    fireEvent.click(campusSwitch('Ikeja'));
+    await user.click(campusSwitch('Ikeja'));
     await waitFor(() => {
       expect(updateCampuses).toHaveBeenCalledWith({
         params: { id: detail().id },
@@ -81,6 +84,7 @@ describe('MemberCampusesCard', () => {
   });
 
   it('shows the server’s refusal', async () => {
+    const user = userEvent.setup();
     setup({
       updateCampuses: vi
         .fn()
@@ -88,7 +92,7 @@ describe('MemberCampusesCard', () => {
           new ApiError(404, { code: 'NotFound', message: 'Campus not found' })
         ),
     });
-    fireEvent.click(campusSwitch('Ikeja'));
+    await user.click(campusSwitch('Ikeja'));
     await waitFor(() => {
       expect(toast.error).toHaveBeenCalledWith('Campus not found');
     });

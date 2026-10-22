@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { EduvaultAuthClient } from '@eduvault/auth-client';
 import { ApiError, type Me } from '@eduvault/api-contract';
 import { ApiProvider, type Api } from './api';
@@ -80,6 +81,7 @@ describe('App', () => {
   });
 
   it('saves the new password and carries on to the app', async () => {
+    const user = userEvent.setup();
     const { api, setPassword, get } = apiWith(
       me({ mustChangePassword: true }),
       me()
@@ -87,13 +89,15 @@ describe('App', () => {
     renderApp(clientWith(signedIn), api);
     await screen.findByRole('heading', { name: 'Choose your own password' });
 
-    fireEvent.change(screen.getByLabelText('New password'), {
-      target: { value: 'long-enough-password' },
-    });
-    fireEvent.change(screen.getByLabelText('Confirm new password'), {
-      target: { value: 'long-enough-password' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Save and continue' }));
+    await user.type(
+      screen.getByLabelText('New password'),
+      'long-enough-password'
+    );
+    await user.type(
+      screen.getByLabelText('Confirm new password'),
+      'long-enough-password'
+    );
+    await user.click(screen.getByRole('button', { name: 'Save and continue' }));
 
     expect(
       await screen.findByText('The router is showing')
@@ -105,6 +109,7 @@ describe('App', () => {
   });
 
   it('carries on when the password was already set elsewhere', async () => {
+    const user = userEvent.setup();
     const { api, setPassword } = apiWith(
       me({ mustChangePassword: true }),
       me()
@@ -118,13 +123,15 @@ describe('App', () => {
     renderApp(clientWith(signedIn), api);
     await screen.findByRole('heading', { name: 'Choose your own password' });
 
-    fireEvent.change(screen.getByLabelText('New password'), {
-      target: { value: 'long-enough-password' },
-    });
-    fireEvent.change(screen.getByLabelText('Confirm new password'), {
-      target: { value: 'long-enough-password' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Save and continue' }));
+    await user.type(
+      screen.getByLabelText('New password'),
+      'long-enough-password'
+    );
+    await user.type(
+      screen.getByLabelText('Confirm new password'),
+      'long-enough-password'
+    );
+    await user.click(screen.getByRole('button', { name: 'Save and continue' }));
 
     expect(
       await screen.findByText('The router is showing')
@@ -149,6 +156,7 @@ describe('App', () => {
   });
 
   it('tells a user without a school that no school has added them', async () => {
+    const user = userEvent.setup();
     const signOut = vi.fn().mockResolvedValue({ data: {}, error: null });
     const { api } = apiWith(me({ schoolCount: 0, activeOrganizationId: null }));
     renderApp(
@@ -167,7 +175,7 @@ describe('App', () => {
     expect(
       screen.queryByRole('heading', { name: 'Create your school' })
     ).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+    await user.click(screen.getByRole('button', { name: 'Sign out' }));
     await waitFor(() => {
       expect(signOut).toHaveBeenCalledOnce();
     });

@@ -12,7 +12,7 @@ import { ALL_PERMISSIONS, READ_PERMS, toPermissionMap } from '@eduvault/policy';
 import { TooltipProvider } from '@eduvault/ui';
 import { ApiProvider, type Api } from './api';
 import { feeSetupQueryOptions } from './queries';
-import { checked } from './test-api';
+import { checked, checkedExcept } from './test-api';
 
 export const platformSchool = (
   overrides: Partial<PlatformSchool> = {}
@@ -85,18 +85,14 @@ export const actingAccess = (writes: boolean): MePermissions =>
 export const starterAccess = (slug: string): MePermissions =>
   accessOfStarter(slug, slug === 'administrator' ? 'all' : ['c1']);
 
-export function renderWithApi(
-  ui: ReactElement,
-  api: Partial<Record<keyof Api, unknown>>,
-  access: MePermissions = ownerAccess()
-) {
+function mount(ui: ReactElement, api: Api, access: MePermissions) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
   return {
     ...render(
       <QueryClientProvider client={queryClient}>
-        <ApiProvider api={checked(api)}>
+        <ApiProvider api={api}>
           <PermissionsProvider value={access}>
             <TooltipProvider>{ui}</TooltipProvider>
           </PermissionsProvider>
@@ -105,6 +101,25 @@ export function renderWithApi(
     ),
     queryClient,
   };
+}
+
+export function renderWithApi(
+  ui: ReactElement,
+  api: Partial<Record<keyof Api, unknown>>,
+  access: MePermissions = ownerAccess()
+) {
+  return mount(ui, checked(api), access);
+}
+
+export function renderWithRefusal(
+  ui: ReactElement,
+  fakes: {
+    api: Partial<Record<keyof Api, unknown>>;
+    raw: Partial<Record<keyof Api, Record<string, unknown>>>;
+  },
+  access: MePermissions = ownerAccess()
+) {
+  return mount(ui, checkedExcept(fakes.api, fakes.raw), access);
 }
 
 export { fakeAccess } from '@eduvault/auth-client/testing';

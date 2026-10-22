@@ -1,8 +1,15 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { NumberedPager } from './numbered-pager';
 
+let user: ReturnType<typeof userEvent.setup>;
+
+beforeEach(() => {
+  user = userEvent.setup();
+});
+
 describe('NumberedPager', () => {
-  it('says which rows are shown and has no previous page on the first', () => {
+  it('says which rows are shown and has no previous page on the first', async () => {
     const onPage = vi.fn();
     render(<NumberedPager page={1} total={24} pageSize={10} onPage={onPage} />);
     expect(screen.getByText('Showing 1 to 10 of 24')).toBeInTheDocument();
@@ -11,23 +18,23 @@ describe('NumberedPager', () => {
       'aria-current',
       'page'
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    await user.click(screen.getByRole('button', { name: 'Next' }));
     expect(onPage).toHaveBeenCalledWith(2);
   });
 
-  it('clips the last page and has no next page at the end', () => {
+  it('clips the last page and has no next page at the end', async () => {
     const onPage = vi.fn();
     render(<NumberedPager page={3} total={24} pageSize={10} onPage={onPage} />);
     expect(screen.getByText('Showing 21 to 24 of 24')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
-    fireEvent.click(screen.getByRole('button', { name: 'Previous' }));
+    await user.click(screen.getByRole('button', { name: 'Previous' }));
     expect(onPage).toHaveBeenCalledWith(2);
   });
 
-  it('jumps to a numbered page', () => {
+  it('jumps to a numbered page', async () => {
     const onPage = vi.fn();
     render(<NumberedPager page={1} total={24} pageSize={10} onPage={onPage} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Page 3' }));
+    await user.click(screen.getByRole('button', { name: 'Page 3' }));
     expect(onPage).toHaveBeenCalledWith(3);
   });
 

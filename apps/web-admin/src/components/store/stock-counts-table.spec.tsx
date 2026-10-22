@@ -1,4 +1,5 @@
-import { fireEvent, screen, within } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { IKEJA, LEKKI } from '../../test-members';
 import { stockCount, stockCountList } from '../../test-store';
 import { renderWithApi } from '../../test-utils';
@@ -52,10 +53,11 @@ describe('StockCountsTable', () => {
     expect(row.getByText('Waiting')).toBeVisible();
   });
 
-  it('links a waiting count to Approvals', () => {
+  it('links a waiting count to Approvals', async () => {
+    const user = userEvent.setup();
     const { onApprovals } = setup();
 
-    fireEvent.click(
+    await user.click(
       within(rowWith('CNT-2026-0001')).getByRole('button', {
         name: 'Approvals',
       })
@@ -64,11 +66,14 @@ describe('StockCountsTable', () => {
     expect(onApprovals).toHaveBeenCalledOnce();
   });
 
-  it('expands to the counted items with signed differences and the value at cost', () => {
+  it('expands to the counted items with signed differences and the value at cost', async () => {
+    const user = userEvent.setup();
     setup();
     expect(screen.queryByText('3 items counted')).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Show counted items' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Show counted items' })
+    );
 
     expect(screen.getByText('3 items counted')).toBeVisible();
     expect(
@@ -94,7 +99,8 @@ describe('StockCountsTable', () => {
     ).toHaveAttribute('aria-expanded', 'true');
   });
 
-  it('colours a surplus as success with a plus sign', () => {
+  it('colours a surplus as success with a plus sign', async () => {
+    const user = userEvent.setup();
     setup({
       data: stockCountList([
         stockCount({
@@ -115,27 +121,33 @@ describe('StockCountsTable', () => {
       ]),
     });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Show counted items' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Show counted items' })
+    );
 
     expect(screen.getByText('+1')).toHaveClass('text-success');
   });
 
-  it('expands from the other cells of the row too', () => {
+  it('expands from the other cells of the row too', async () => {
+    const user = userEvent.setup();
     setup();
 
-    fireEvent.click(screen.getByText('Chika Eze'));
+    await user.click(screen.getByText('Chika Eze'));
 
     expect(screen.getByText('3 items counted')).toBeVisible();
   });
 
-  it('masks the value until Show costs is on, and keeps it masked on the lines', () => {
+  it('masks the value until Show costs is on, and keeps it masked on the lines', async () => {
+    const user = userEvent.setup();
     setup({ showCosts: false });
 
     expect(
       within(rowWith('CNT-2026-0001')).getByLabelText('Hidden')
     ).toHaveTextContent('₦ ••••');
     expect(screen.queryByText('₦8,200')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Show counted items' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Show counted items' })
+    );
     expect(screen.queryByText('₦7,000')).not.toBeInTheDocument();
     expect(screen.getAllByLabelText('Hidden').length).toBeGreaterThan(1);
   });
@@ -161,7 +173,8 @@ describe('StockCountsTable', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('shows Approved, and Declined with the reason on expanding', () => {
+  it('shows Approved, and Declined with the reason on expanding', async () => {
+    const user = userEvent.setup();
     setup({
       data: stockCountList([
         stockCount({ id: 'a', number: 'CNT-2026-0002', status: 'approved' }),
@@ -180,7 +193,7 @@ describe('StockCountsTable', () => {
     expect(
       within(rowWith('CNT-2026-0003')).getByText('Declined')
     ).toBeVisible();
-    fireEvent.click(
+    await user.click(
       within(rowWith('CNT-2026-0003')).getByRole('button', {
         name: 'Show counted items',
       })
@@ -210,12 +223,13 @@ describe('StockCountsTable', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('pages through the counts once there are more than a page', () => {
+  it('pages through the counts once there are more than a page', async () => {
+    const user = userEvent.setup();
     const { onPage } = setup({
       data: { ...stockCountList(), total: 25 },
     });
 
-    fireEvent.click(screen.getByRole('button', { name: /next/i }));
+    await user.click(screen.getByRole('button', { name: /next/i }));
 
     expect(onPage).toHaveBeenCalledWith(2);
   });

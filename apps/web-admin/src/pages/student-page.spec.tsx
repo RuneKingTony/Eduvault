@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import {
   ApiError,
   type FeeOption,
@@ -54,8 +55,14 @@ function StatefulPage({ tab: initial, onTabChange, ...props }: PageProps) {
   );
 }
 
+let user: ReturnType<typeof userEvent.setup>;
+
+beforeEach(() => {
+  user = userEvent.setup();
+});
+
 const openFees = async () => {
-  fireEvent.mouseDown(await screen.findByRole('tab', { name: 'Fees' }));
+  await user.click(await screen.findByRole('tab', { name: 'Fees' }));
 };
 
 function setup(
@@ -254,7 +261,7 @@ describe('StudentPage optional fees', () => {
   it('switches a fee on and toasts in the student’s first name', async () => {
     const { api } = setup({ feeOptions: [busOption(false)] });
     await openFees();
-    fireEvent.click(await screen.findByRole('switch', { name: 'School bus' }));
+    await user.click(await screen.findByRole('switch', { name: 'School bus' }));
     await waitFor(() => {
       expect(api.feeOptions.set).toHaveBeenCalledWith({
         params: { studentId: STUDENT_ID, feeTypeId: BUS_ID },
@@ -271,7 +278,7 @@ describe('StudentPage optional fees', () => {
   it('says no longer takes when switched off', async () => {
     setup({ feeOptions: [busOption(true)] });
     await openFees();
-    fireEvent.click(await screen.findByRole('switch', { name: 'School bus' }));
+    await user.click(await screen.findByRole('switch', { name: 'School bus' }));
     await waitFor(() => {
       expect(toast.success).toHaveBeenCalledWith(
         'Ada no longer takes School bus from the next round of charges.'
@@ -440,7 +447,7 @@ describe('StudentPage Fees tab', () => {
     const { onTabChange } = setup();
     await openFees();
     expect(onTabChange).toHaveBeenLastCalledWith('fees');
-    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Overview' }));
+    await user.click(screen.getByRole('tab', { name: 'Overview' }));
     expect(onTabChange).toHaveBeenLastCalledWith(undefined);
     expect(await screen.findByText('Admission no.')).toBeInTheDocument();
   });
@@ -489,7 +496,7 @@ describe('StudentPage guardians', () => {
     const menu = await screen.findByRole('button', {
       name: 'Actions for Ngozi Okeke',
     });
-    fireEvent.keyDown(menu, { key: 'Enter' });
+    await user.click(menu);
     expect(await screen.findByText('Edit link…')).toBeInTheDocument();
     expect(screen.getByText('Remove from Ada…')).toBeInTheDocument();
   });
@@ -590,7 +597,7 @@ describe('StudentPage states', () => {
     expect(
       screen.getByText('We couldn’t find that student')
     ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Go back' }));
+    await user.click(screen.getByRole('button', { name: 'Go back' }));
     expect(onBack).toHaveBeenCalled();
   });
 
@@ -608,18 +615,13 @@ describe('StudentPage states', () => {
     });
     expect(await screen.findByText('Logins created')).toBeInTheDocument();
     expect(screen.getAllByText('Abcd2345Wxyz').length).toBeGreaterThan(0);
-    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    await user.click(screen.getByRole('button', { name: 'Done' }));
     expect(screen.queryByText('Abcd2345Wxyz')).not.toBeInTheDocument();
   });
 });
 
 const openMenu = async () => {
-  fireEvent.keyDown(
-    await screen.findByRole('button', { name: 'More actions' }),
-    {
-      key: 'Enter',
-    }
-  );
+  await user.click(await screen.findByRole('button', { name: 'More actions' }));
 };
 
 const items = async () =>
@@ -667,7 +669,7 @@ describe('StudentPage menu', () => {
       },
     });
     await openMenu();
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('menuitem', {
         name: 'Reactivate: back in school',
       })
@@ -695,8 +697,8 @@ describe('StudentPage menu', () => {
     });
     await openMenu();
     expect(await items()).toEqual(['Undo leaving…']);
-    fireEvent.click(await screen.findByRole('menuitem'));
-    fireEvent.click(
+    await user.click(await screen.findByRole('menuitem'));
+    await user.click(
       await screen.findByRole('button', { name: 'Undo leaving' })
     );
     await waitFor(() => {
@@ -735,7 +737,7 @@ describe('StudentPage Record leaving', () => {
 
   it('shows the danger callout’s button and opens the leaving dialog from it', async () => {
     setup({ student: due });
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('button', { name: 'Record leaving' })
     );
     expect(
@@ -763,7 +765,7 @@ describe('StudentPage Record leaving', () => {
     expect(
       await screen.findByRole('dialog', { name: 'Record Ada leaving' })
     ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(onDialogClosed).toHaveBeenCalled();
   });
 
@@ -848,7 +850,7 @@ describe('StudentPage edit details', () => {
     const { students } = setup({
       access: accessWith('student:read', 'student:update'),
     });
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('button', { name: 'Edit details' })
     );
     expect(await screen.findByLabelText('First name')).toHaveValue('Ada');
@@ -856,10 +858,10 @@ describe('StudentPage edit details', () => {
     expect(screen.getByLabelText('Gender')).toHaveValue('F');
     expect(screen.getByLabelText('Date of birth')).toHaveValue('2014-03-03');
 
-    fireEvent.change(screen.getByLabelText('Last name'), {
-      target: { value: 'Nwosu' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    const lastName = screen.getByLabelText('Last name');
+    await user.clear(lastName);
+    await user.type(lastName, 'Nwosu');
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
 
     await waitFor(() => {
       expect(students.update).toHaveBeenCalledWith({
@@ -876,16 +878,16 @@ describe('StudentPage edit details', () => {
     const { students } = setup({
       access: accessWith('student:read', 'student:update'),
     });
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('button', { name: 'Edit details' })
     );
-    fireEvent.change(await screen.findByLabelText('First name'), {
-      target: { value: ' ' },
-    });
-    fireEvent.change(screen.getByLabelText('Date of birth'), {
-      target: { value: '2999-01-01' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    const firstName = await screen.findByLabelText('First name');
+    await user.clear(firstName);
+    await user.type(firstName, ' ');
+    const dateOfBirth = screen.getByLabelText('Date of birth');
+    await user.clear(dateOfBirth);
+    await user.type(dateOfBirth, '2999-01-01');
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
 
     expect(
       await screen.findByText('Enter the first name.')
@@ -900,10 +902,10 @@ describe('StudentPage edit details', () => {
     const { students } = setup({
       access: accessWith('student:read', 'student:update'),
     });
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('button', { name: 'Edit details' })
     );
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('button', { name: 'Save changes' })
     );
 
@@ -923,13 +925,13 @@ describe('StudentPage edit details', () => {
         message: 'Ada Okeke is no longer on the roll.',
       })
     );
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('button', { name: 'Edit details' })
     );
-    fireEvent.change(await screen.findByLabelText('First name'), {
-      target: { value: 'Adaeze' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    const firstName = await screen.findByLabelText('First name');
+    await user.clear(firstName);
+    await user.type(firstName, 'Adaeze');
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
 
     expect(
       await screen.findByText('Ada Okeke is no longer on the roll.')
@@ -942,13 +944,15 @@ describe('StudentPage reset login', () => {
     const { students } = setup({
       access: accessWith('student:read', 'student:update'),
     });
-    fireEvent.click(await screen.findByRole('button', { name: 'Reset login' }));
+    await user.click(
+      await screen.findByRole('button', { name: 'Reset login' })
+    );
     expect(
       await screen.findByRole('dialog', { name: 'Reset Ada’s login?' })
     ).toBeInTheDocument();
     expect(students.resetLogin).not.toHaveBeenCalled();
 
-    fireEvent.click(
+    await user.click(
       within(screen.getByRole('dialog')).getByRole('button', {
         name: 'Reset login',
       })
@@ -962,7 +966,7 @@ describe('StudentPage reset login', () => {
     });
     expect(screen.getAllByText('Temp-Pass-0001').length).toBeGreaterThan(0);
     expect(screen.getAllByText('greenfield-0123').length).toBeGreaterThan(0);
-    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    await user.click(screen.getByRole('button', { name: 'Done' }));
     await waitFor(() => {
       expect(screen.queryByText('Temp-Pass-0001')).not.toBeInTheDocument();
     });
@@ -978,8 +982,10 @@ describe('StudentPage reset login', () => {
         message: 'This student has no portal login to reset.',
       })
     );
-    fireEvent.click(await screen.findByRole('button', { name: 'Reset login' }));
-    fireEvent.click(
+    await user.click(
+      await screen.findByRole('button', { name: 'Reset login' })
+    );
+    await user.click(
       within(await screen.findByRole('dialog')).getByRole('button', {
         name: 'Reset login',
       })

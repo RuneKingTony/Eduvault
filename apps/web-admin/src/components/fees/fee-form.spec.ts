@@ -1,6 +1,5 @@
-import type { FeeType } from '@eduvault/api-contract';
+import { FEE_LINE_AMOUNT_MESSAGE, type FeeType } from '@eduvault/api-contract';
 import { EVERY_CAMPUS, defaultFeeTypeId, feeFormBody } from './fee-form';
-import { ENTER_AMOUNT } from './fee-text';
 
 const types: FeeType[] = [
   { id: 'tuition', code: 4010, name: 'Tuition' },
@@ -71,7 +70,7 @@ describe('feeFormBody', () => {
     for (const amount of ['', '0', 'abc']) {
       expect(feeFormBody(formWith({ amount }), extra)).toEqual({
         ok: false,
-        message: ENTER_AMOUNT,
+        message: FEE_LINE_AMOUNT_MESSAGE,
       });
     }
   });

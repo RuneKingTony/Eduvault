@@ -1,4 +1,5 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { ApiError } from '@eduvault/api-contract';
 import { toast } from '@eduvault/ui';
 import {
@@ -21,6 +22,12 @@ import { actingAccess, fakeAccess, starterAccess } from '../test-utils';
 import { toPermissionMap, type Permission } from '@eduvault/policy';
 import type { ApprovalsSearch } from '../approvals-search';
 import { ApprovalsPage } from './approvals-page';
+
+let user: ReturnType<typeof userEvent.setup>;
+
+beforeEach(() => {
+  user = userEvent.setup();
+});
 
 vi.mock('@eduvault/ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@eduvault/ui')>()),
@@ -153,7 +160,7 @@ describe('ApprovalsPage', () => {
   it('approves a cancellation after saying what approving does, then toasts with a Payments action', async () => {
     const api = setup({ list: approvalList([voidApproval()]) });
 
-    fireEvent.click(await screen.findByRole('button', { name: /^Approve/ }));
+    await user.click(await screen.findByRole('button', { name: /^Approve/ }));
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByText('Approve this request?')).toBeVisible();
     expect(
@@ -164,7 +171,7 @@ describe('ApprovalsPage', () => {
         'The receipt is kept but marked cancelled, and the family owes that money again.'
       )
     ).toBeVisible();
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Approve' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Approve' }));
 
     await waitFor(() => {
       expect(api.paymentVoids.approve).toHaveBeenCalledWith({
@@ -183,8 +190,8 @@ describe('ApprovalsPage', () => {
 
   it('toasts the correction outcome with a Who owes action after approving a write-off', async () => {
     setup({ list: approvalList([approvalItem()]) });
-    fireEvent.click(await screen.findByRole('button', { name: /^Approve/ }));
-    fireEvent.click(
+    await user.click(await screen.findByRole('button', { name: /^Approve/ }));
+    await user.click(
       within(await screen.findByRole('dialog')).getByRole('button', {
         name: 'Approve',
       })
@@ -209,7 +216,7 @@ describe('ApprovalsPage', () => {
       )
     ).toBeVisible();
     expect(within(row).getByText('₦8,200')).toBeVisible();
-    fireEvent.click(await screen.findByRole('button', { name: /^Approve/ }));
+    await user.click(await screen.findByRole('button', { name: /^Approve/ }));
     const dialog = await screen.findByRole('dialog');
     expect(
       within(dialog).getByText('Store write-off · asked by Chika Eze')
@@ -219,7 +226,7 @@ describe('ApprovalsPage', () => {
         'Brings store stock in line with the count and records the missing items as a loss at their average cost.'
       )
     ).toBeVisible();
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Approve' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Approve' }));
 
     await waitFor(() => {
       expect(api.stockCounts.approve).toHaveBeenCalledWith({
@@ -244,9 +251,9 @@ describe('ApprovalsPage', () => {
         message: 'This has already been decided.',
       }),
     });
-    fireEvent.click(await screen.findByRole('button', { name: /^Approve/ }));
+    await user.click(await screen.findByRole('button', { name: /^Approve/ }));
     const dialog = await screen.findByRole('dialog');
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Approve' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Approve' }));
     expect(
       await within(dialog).findByText('This has already been decided.')
     ).toBeVisible();
@@ -269,10 +276,10 @@ describe('ApprovalsPage', () => {
       return Promise.resolve(voidRow({ status: 'approved' }));
     });
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Page 2' }));
-    fireEvent.click(await screen.findByRole('button', { name: /^Approve/ }));
+    await user.click(await screen.findByRole('button', { name: 'Page 2' }));
+    await user.click(await screen.findByRole('button', { name: /^Approve/ }));
     const dialog = await screen.findByRole('dialog');
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Approve' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Approve' }));
 
     expect(await screen.findByText('Request 0')).toBeVisible();
     expect(screen.queryByText('Nothing waiting for you')).toBeNull();
@@ -280,11 +287,11 @@ describe('ApprovalsPage', () => {
 
   it('needs a reason to decline, then declines with it and says the request is kept', async () => {
     const api = setup({ list: approvalList([voidApproval()]) });
-    fireEvent.click(await screen.findByRole('button', { name: /^Decline/ }));
+    await user.click(await screen.findByRole('button', { name: /^Decline/ }));
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByText('Decline this request?')).toBeVisible();
 
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Decline' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Decline' }));
     expect(
       await within(dialog).findByText(
         'Say why you are declining. The person who asked will see it.'
@@ -292,10 +299,11 @@ describe('ApprovalsPage', () => {
     ).toBeVisible();
     expect(api.paymentVoids.decline).not.toHaveBeenCalled();
 
-    fireEvent.change(within(dialog).getByLabelText('Reason'), {
-      target: { value: 'Not agreed with the owner' },
-    });
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Decline' }));
+    await user.type(
+      within(dialog).getByLabelText('Reason'),
+      'Not agreed with the owner'
+    );
+    await user.click(within(dialog).getByRole('button', { name: 'Decline' }));
 
     await waitFor(() => {
       expect(api.paymentVoids.decline).toHaveBeenCalledWith({
@@ -377,8 +385,8 @@ describe('ApprovalsPage decisions by kind', () => {
     'approves a $kind request through the $resource route only',
     async ({ item, resource }) => {
       const api = setup({ list: approvalList([item]) });
-      fireEvent.click(await screen.findByRole('button', { name: /^Approve/ }));
-      fireEvent.click(
+      await user.click(await screen.findByRole('button', { name: /^Approve/ }));
+      await user.click(
         within(await screen.findByRole('dialog')).getByRole('button', {
           name: 'Approve',
         })
@@ -401,13 +409,11 @@ describe('ApprovalsPage decisions by kind', () => {
     'declines a $kind request with a reason through the $resource route only, saying what declining does',
     async ({ item, resource, declineEffect }) => {
       const api = setup({ list: approvalList([item]) });
-      fireEvent.click(await screen.findByRole('button', { name: /^Decline/ }));
+      await user.click(await screen.findByRole('button', { name: /^Decline/ }));
       const dialog = await screen.findByRole('dialog');
       expect(dialog).toHaveTextContent(declineEffect);
-      fireEvent.change(within(dialog).getByLabelText('Reason'), {
-        target: { value: 'Not this term' },
-      });
-      fireEvent.click(within(dialog).getByRole('button', { name: 'Decline' }));
+      await user.type(within(dialog).getByLabelText('Reason'), 'Not this term');
+      await user.click(within(dialog).getByRole('button', { name: 'Decline' }));
       await waitFor(() => {
         expect(api[resource].decline).toHaveBeenCalledWith({
           params: { id: item.id },
@@ -503,7 +509,7 @@ describe('ApprovalsPage leave rows', () => {
     expect(await screen.findByText('Someone else')).toBeVisible();
     expect(screen.getByText('Your own')).toBeVisible();
     expect(screen.queryByRole('button', { name: /^Approve/ })).toBeNull();
-    fireEvent.focus(screen.getByText('Someone else'));
+    await user.hover(screen.getByText('Someone else'));
     expect(
       (await screen.findAllByText('Someone with leave approval decides.'))[0]
     ).toBeVisible();
@@ -517,8 +523,7 @@ describe('ApprovalsPage leave rows', () => {
     expect(await screen.findByRole('tab', { name: /All/ })).toBeVisible();
     expect(screen.getByRole('tab', { name: /Money/ })).toHaveTextContent('1');
     expect(screen.getByRole('tab', { name: /Leave/ })).toHaveTextContent('1');
-    fireEvent.mouseDown(screen.getByRole('tab', { name: /Leave/ }));
-    fireEvent.click(screen.getByRole('tab', { name: /Leave/ }));
+    await user.click(screen.getByRole('tab', { name: /Leave/ }));
     await waitFor(() => {
       expect(onSearch).toHaveBeenCalledWith({ tab: 'leave' });
     });
@@ -553,7 +558,7 @@ describe('ApprovalsPage leave rows', () => {
     const toggle = await screen.findByRole('switch', {
       name: 'Include 1 that others approve',
     });
-    fireEvent.click(toggle);
+    await user.click(toggle);
     await waitFor(() => {
       expect(api.approvals.list).toHaveBeenCalledWith({
         query: { page: 1, includeOthers: true },
@@ -569,7 +574,7 @@ describe('ApprovalsPage leave rows', () => {
 
   it('approves leave after saying what it does, then toasts the requester', async () => {
     const api = setup({ list: approvalList([leaveApproval()]) });
-    fireEvent.click(await screen.findByRole('button', { name: /^Approve/ }));
+    await user.click(await screen.findByRole('button', { name: /^Approve/ }));
     const dialog = await screen.findByRole('dialog');
     expect(
       within(dialog).getByText('Leave · asked by Ayo Bassey')
@@ -581,7 +586,7 @@ describe('ApprovalsPage leave rows', () => {
     ).toBeVisible();
     expect(within(dialog).getByText('2 days')).toBeVisible();
 
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Approve' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Approve' }));
 
     await waitFor(() => {
       expect(api.leave.approve).toHaveBeenCalledWith({
@@ -604,8 +609,8 @@ describe('ApprovalsPage leave rows', () => {
         message: 'This has already been decided.',
       })
     );
-    fireEvent.click(await screen.findByRole('button', { name: /^Approve/ }));
-    fireEvent.click(
+    await user.click(await screen.findByRole('button', { name: /^Approve/ }));
+    await user.click(
       within(await screen.findByRole('dialog')).getByRole('button', {
         name: 'Approve',
       })
@@ -663,9 +668,10 @@ describe('ApprovalsPage campus picker', () => {
       search: { tab: 'leave' },
       onSearch,
     });
-    fireEvent.change(await screen.findByRole('combobox', { name: 'Campus' }), {
-      target: { value: IKEJA.id },
-    });
+    await user.selectOptions(
+      await screen.findByRole('combobox', { name: 'Campus' }),
+      IKEJA.id
+    );
     expect(onSearch).toHaveBeenCalledWith({ tab: 'leave', campus: IKEJA.id });
   });
 
@@ -678,16 +684,17 @@ describe('ApprovalsPage campus picker', () => {
         approvalList(page === 1 ? first : [voidApproval()], { total: 11 }),
       campuses: two,
     });
-    fireEvent.click(await screen.findByRole('button', { name: 'Page 2' }));
+    await user.click(await screen.findByRole('button', { name: 'Page 2' }));
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Page 2' })).toHaveAttribute(
         'aria-current',
         'page'
       );
     });
-    fireEvent.change(screen.getByRole('combobox', { name: 'Campus' }), {
-      target: { value: IKEJA.id },
-    });
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Campus' }),
+      IKEJA.id
+    );
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Page 1' })).toHaveAttribute(
         'aria-current',
@@ -706,7 +713,7 @@ describe('ApprovalsPage campus picker', () => {
     });
     expect(await screen.findByText('Campus not found')).toBeVisible();
     expect(screen.getByRole('combobox', { name: 'Campus' })).toBeVisible();
-    fireEvent.click(screen.getByRole('button', { name: 'Show all campuses' }));
+    await user.click(screen.getByRole('button', { name: 'Show all campuses' }));
     expect(onSearch).toHaveBeenCalledWith({ campus: undefined });
   });
 
@@ -720,7 +727,7 @@ describe('ApprovalsPage campus picker', () => {
     });
     expect(await screen.findByText('Campus not found')).toBeVisible();
     expect(screen.queryByRole('combobox', { name: 'Campus' })).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Show all campuses' }));
+    await user.click(screen.getByRole('button', { name: 'Show all campuses' }));
     expect(onSearch).toHaveBeenCalledWith({ campus: undefined });
   });
 
@@ -746,9 +753,10 @@ describe('ApprovalsPage campus picker', () => {
       search: { tab: 'money', campus: IKEJA.id },
       onSearch,
     });
-    fireEvent.change(await screen.findByRole('combobox', { name: 'Campus' }), {
-      target: { value: '' },
-    });
+    await user.selectOptions(
+      await screen.findByRole('combobox', { name: 'Campus' }),
+      ''
+    );
     expect(onSearch).toHaveBeenCalledWith({ tab: 'money', campus: undefined });
   });
 
@@ -761,8 +769,7 @@ describe('ApprovalsPage campus picker', () => {
       onSearch,
     });
     const leave = await screen.findByRole('tab', { name: /Leave/ });
-    fireEvent.mouseDown(leave);
-    fireEvent.click(leave);
+    await user.click(leave);
     await waitFor(() => {
       expect(onSearch).toHaveBeenCalledWith({
         tab: 'leave',

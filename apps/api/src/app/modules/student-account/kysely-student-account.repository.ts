@@ -150,6 +150,7 @@ interface MovementRow {
   receipt_number: string | null;
   payer_name: string | null;
   method: string | null;
+  payment_voided: boolean | null;
   store_sale: boolean;
 }
 
@@ -180,6 +181,7 @@ function toMovement(row: MovementRow): MovementRecord {
             receiptNumber: row.receipt_number ?? '',
             payerName: row.payer_name ?? '',
             method: paymentMethodSchema.parse(row.method),
+            voided: row.payment_voided === true,
           },
   };
 }
@@ -409,6 +411,7 @@ export class KyselyStudentAccountRepository extends StudentAccountRepository {
           WHERE il.invoice_id = inv.id AND il.organization_id = inv.organization_id
         ) AS invoice_lines,
         pay.id AS payment_id, pay.receipt_number, pay.payer_name, pay.method,
+        (pay.status = 'voided') AS payment_voided,
         EXISTS (
           SELECT 1 FROM store_sale ss
           WHERE ss.organization_id = je.organization_id

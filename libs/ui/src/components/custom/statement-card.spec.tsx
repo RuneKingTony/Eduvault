@@ -1,4 +1,5 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { StatementCard, type StatementCardProps } from './statement-card';
 
 const base: StatementCardProps = {
@@ -35,6 +36,12 @@ const base: StatementCardProps = {
   unpaid: [],
   emptyText: 'No entries yet',
 };
+
+let user: ReturnType<typeof userEvent.setup>;
+
+beforeEach(() => {
+  user = userEvent.setup();
+});
 
 describe('StatementCard', () => {
   it('shows the heading, tiles, rows with their status and the footer', () => {
@@ -116,7 +123,7 @@ describe('StatementCard', () => {
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
   });
 
-  it('pages only when the entries outgrow a page', () => {
+  it('pages only when the entries outgrow a page', async () => {
     const onPage = vi.fn();
     const { rerender } = render(
       <StatementCard
@@ -133,7 +140,7 @@ describe('StatementCard', () => {
         pager={{ page: 1, total: 24, pageSize: 10, onPage }}
       />
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    await user.click(screen.getByRole('button', { name: 'Next' }));
     expect(onPage).toHaveBeenCalledWith(2);
   });
 

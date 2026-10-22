@@ -1,7 +1,8 @@
-import type {
-  BillingRunStatus,
-  BillingTerm,
-  InvoiceKind,
+import {
+  BILLING_ONLY_DRAFTS_MESSAGE,
+  type BillingRunStatus,
+  type BillingTerm,
+  type InvoiceKind,
 } from '@eduvault/api-contract';
 import { countOf } from '@eduvault/shared';
 
@@ -53,4 +54,4 @@ export const sentToast = (count: number): string =>
   `${chargesCount(count)} sent.`;
 
 export const cancelledToast = (number: string): string =>
-  `${number} cancelled. Only drafts can be cancelled.`;
+  `${number} cancelled. ${BILLING_ONLY_DRAFTS_MESSAGE}`;

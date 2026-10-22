@@ -1,4 +1,5 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { SHOW_COSTS_KEY, useShowCosts } from './use-show-costs';
 
 function Probe() {
@@ -25,16 +26,17 @@ describe('useShowCosts', () => {
     expect(screen.getByRole('button')).toHaveTextContent('off');
   });
 
-  it('remembers the choice for the next visit', () => {
+  it('remembers the choice for the next visit', async () => {
+    const user = userEvent.setup();
     const { unmount } = render(<Probe />);
-    fireEvent.click(screen.getByRole('button'));
+    await user.click(screen.getByRole('button'));
     expect(localStorage.getItem(SHOW_COSTS_KEY)).toBe('true');
     unmount();
 
     render(<Probe />);
     expect(screen.getByRole('button')).toHaveTextContent('on');
 
-    fireEvent.click(screen.getByRole('button'));
+    await user.click(screen.getByRole('button'));
     expect(localStorage.getItem(SHOW_COSTS_KEY)).toBe('false');
   });
 
