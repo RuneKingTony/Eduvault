@@ -1,4 +1,5 @@
-import { fireEvent, screen, within } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { IKEJA, LEKKI } from '../../test-members';
 import { SECOND_SALE_ID, sale, saleList, secondSale } from '../../test-store';
 import { renderWithApi } from '../../test-utils';
@@ -69,11 +70,12 @@ describe('ItemsSoldTable', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('opens the clicked sale from the reference and from the other cells', () => {
+  it('opens the clicked sale from the reference and from the other cells', async () => {
+    const user = userEvent.setup();
     const { onOpen } = setup({ data: saleList([sale(), secondSale()]) });
 
-    fireEvent.click(screen.getByRole('button', { name: 'ISS-2026-0002' }));
-    fireEvent.click(screen.getByText('School tie × 3'));
+    await user.click(screen.getByRole('button', { name: 'ISS-2026-0002' }));
+    await user.click(screen.getByText('School tie × 3'));
 
     expect(onOpen).toHaveBeenCalledTimes(2);
     expect(onOpen).toHaveBeenNthCalledWith(1, SECOND_SALE_ID);

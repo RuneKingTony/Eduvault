@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { ApiError, type MePermissions } from '@eduvault/api-contract';
 import { toast } from '@eduvault/ui';
 import { toPermissionMap, type Permission } from '@eduvault/policy';
@@ -21,6 +22,12 @@ vi.mock('@eduvault/ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@eduvault/ui')>()),
   toast: { success: vi.fn(), error: vi.fn() },
 }));
+
+let user: ReturnType<typeof userEvent.setup>;
+
+beforeEach(() => {
+  user = userEvent.setup();
+});
 
 const student = {
   id: STUDENT_ID,
@@ -154,7 +161,7 @@ describe('AddGuardianDialog', () => {
       }
     );
     await screen.findByLabelText('Existing guardian');
-    fireEvent.click(screen.getByRole('button', { name: 'Add guardian' }));
+    await user.click(screen.getByRole('button', { name: 'Add guardian' }));
     expect(toast.error).toHaveBeenCalledWith(
       'Choose the existing guardian, or switch to New guardian.'
     );
@@ -176,10 +183,11 @@ describe('AddGuardianDialog', () => {
           }),
         })
     );
-    fireEvent.change(await screen.findByLabelText('Guardian'), {
-      target: { value: OTHER_GUARDIAN_ID },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Add guardian' }));
+    await user.selectOptions(
+      await screen.findByLabelText('Guardian'),
+      OTHER_GUARDIAN_ID
+    );
+    await user.click(screen.getByRole('button', { name: 'Add guardian' }));
     await waitFor(() => {
       expect(toast.success).toHaveBeenCalledWith(
         'Bayo Adewale linked to Ada Okeke.'
@@ -214,17 +222,11 @@ describe('AddGuardianDialog', () => {
         existing: false,
       },
     });
-    fireEvent.change(await screen.findByLabelText('Full name'), {
-      target: { value: 'Mrs Udoh' },
-    });
-    fireEvent.change(screen.getByLabelText('Phone'), {
-      target: { value: '08012345678' },
-    });
-    fireEvent.change(screen.getByLabelText('House address'), {
-      target: { value: '4 Palm Close' },
-    });
-    fireEvent.click(screen.getByLabelText(/With a username/));
-    fireEvent.click(screen.getByRole('button', { name: 'Add guardian' }));
+    await user.type(await screen.findByLabelText('Full name'), 'Mrs Udoh');
+    await user.type(screen.getByLabelText('Phone'), '08012345678');
+    await user.type(screen.getByLabelText('House address'), '4 Palm Close');
+    await user.click(screen.getByLabelText(/With a username/));
+    await user.click(screen.getByRole('button', { name: 'Add guardian' }));
     expect(await screen.findByText('Logins created')).toBeInTheDocument();
     expect(screen.getAllByText('Abcd2345Wxyz').length).toBeGreaterThan(0);
     expect(toast.success).toHaveBeenCalledWith(
@@ -240,19 +242,11 @@ describe('AddGuardianDialog', () => {
         message: 'A student can have at most 4 guardians.',
       })
     );
-    fireEvent.change(await screen.findByLabelText('Full name'), {
-      target: { value: 'Mrs Udoh' },
-    });
-    fireEvent.change(screen.getByLabelText('Phone'), {
-      target: { value: '08012345678' },
-    });
-    fireEvent.change(screen.getByLabelText('House address'), {
-      target: { value: '4 Palm Close' },
-    });
-    fireEvent.change(screen.getByLabelText('Email'), {
-      target: { value: 'udoh@example.test' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Add guardian' }));
+    await user.type(await screen.findByLabelText('Full name'), 'Mrs Udoh');
+    await user.type(screen.getByLabelText('Phone'), '08012345678');
+    await user.type(screen.getByLabelText('House address'), '4 Palm Close');
+    await user.type(screen.getByLabelText('Email'), 'udoh@example.test');
+    await user.click(screen.getByRole('button', { name: 'Add guardian' }));
     expect(
       await screen.findByText('A student can have at most 4 guardians.')
     ).toBeInTheDocument();
@@ -265,13 +259,14 @@ describe('EditLinkDialog', () => {
     expect(
       await screen.findByText('Edit Ngozi Okeke’s link to Ada')
     ).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('Relationship to this child'), {
-      target: { value: 'guardian' },
-    });
-    fireEvent.click(
+    await user.selectOptions(
+      screen.getByLabelText('Relationship to this child'),
+      'guardian'
+    );
+    await user.click(
       screen.getByLabelText('Pays the school fees (receives the charges)')
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => {
       expect(toast.success).toHaveBeenCalledWith('Saved.');
     });
@@ -289,7 +284,7 @@ describe('EditLinkDialog', () => {
         message: 'At least one guardian must pay the school fees.',
       })
     );
-    fireEvent.click(await screen.findByRole('button', { name: 'Save' }));
+    await user.click(await screen.findByRole('button', { name: 'Save' }));
     expect(
       await screen.findByText('At least one guardian must pay the school fees.')
     ).toBeInTheDocument();
@@ -343,7 +338,7 @@ describe('RemoveLinkDialog', () => {
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Remove' })).toBeEnabled();
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Remove' }));
+    await user.click(screen.getByRole('button', { name: 'Remove' }));
     await waitFor(() => {
       expect(toast.success).toHaveBeenCalledWith(
         'Ifeanyi Okeke removed from Ada Okeke.'
@@ -459,16 +454,16 @@ describe('GuardianProfileDialog', () => {
 
   it('opens the edit dialog from the card and saves the new details', async () => {
     const api = setup({ kind: 'profile', guardianId: GUARDIAN_ID });
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('button', { name: 'Edit details' })
     );
     expect(
       await screen.findByText('Edit Ngozi Okeke’s details')
     ).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('Phone'), {
-      target: { value: '08099990000' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    const phone = screen.getByLabelText('Phone');
+    await user.clear(phone);
+    await user.type(phone, '08099990000');
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
     await waitFor(() => {
       expect(toast.success).toHaveBeenCalledWith('Saved.');
     });
@@ -484,13 +479,13 @@ describe('GuardianProfileDialog', () => {
 
   it('refuses a short phone number in the edit dialog with the PRD copy', async () => {
     const api = setup({ kind: 'profile', guardianId: GUARDIAN_ID });
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('button', { name: 'Edit details' })
     );
-    fireEvent.change(await screen.findByLabelText('Phone'), {
-      target: { value: '12' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    const phone = await screen.findByLabelText('Phone');
+    await user.clear(phone);
+    await user.type(phone, '12');
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
     expect(
       await screen.findByText('Enter a phone number.')
     ).toBeInTheDocument();
@@ -499,7 +494,9 @@ describe('GuardianProfileDialog', () => {
 
   it('resets the login and shows the new password once', async () => {
     const api = setup({ kind: 'profile', guardianId: GUARDIAN_ID });
-    fireEvent.click(await screen.findByRole('button', { name: 'Reset login' }));
+    await user.click(
+      await screen.findByRole('button', { name: 'Reset login' })
+    );
     expect(
       await screen.findByText('Reset Ngozi Okeke’s login?')
     ).toBeInTheDocument();
@@ -511,7 +508,7 @@ describe('GuardianProfileDialog', () => {
     expect(
       screen.getByText('Signs in with ngozi@example.test.')
     ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Reset login' }));
+    await user.click(screen.getByRole('button', { name: 'Reset login' }));
     expect(
       await screen.findByText('New login for Ngozi Okeke')
     ).toBeInTheDocument();
@@ -519,7 +516,7 @@ describe('GuardianProfileDialog', () => {
     expect(api.guardians.resetLogin).toHaveBeenCalledWith({
       params: { id: GUARDIAN_ID },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    await user.click(screen.getByRole('button', { name: 'Done' }));
     expect(screen.queryByText('NewPass2345Xy')).not.toBeInTheDocument();
   });
 });

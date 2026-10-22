@@ -1,4 +1,5 @@
-import { fireEvent, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { ApiError } from '@eduvault/api-contract';
 import { IKEJA, LEKKI } from '../../test-members';
 import {
@@ -112,9 +113,10 @@ describe('DeliveryDetailSheet', () => {
   });
 
   it('hands the line to onItem with the delivery campus', async () => {
+    const user = userEvent.setup();
     const { onItem } = setup();
 
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('button', { name: 'School shirt, Size 12' })
     );
 
@@ -126,6 +128,7 @@ describe('DeliveryDetailSheet', () => {
   });
 
   it('offers Close and nothing that changes the delivery', async () => {
+    const user = userEvent.setup();
     const { onClose } = setup();
     await screen.findByRole('heading', { name: 'DEL-2026-0001' });
 
@@ -133,7 +136,7 @@ describe('DeliveryDetailSheet', () => {
       screen.getAllByRole('button').map((button) => button.textContent)
     ).toEqual(['School shirt, Size 12', 'Close', 'Close']);
 
-    fireEvent.click(screen.getByText('Close', { selector: 'button' }));
+    await user.click(screen.getByText('Close', { selector: 'button' }));
 
     expect(onClose).toHaveBeenCalled();
   });

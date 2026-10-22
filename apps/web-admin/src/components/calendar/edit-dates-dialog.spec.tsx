@@ -1,4 +1,5 @@
-import { fireEvent, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { ApiError } from '@eduvault/api-contract';
 import { toast } from '@eduvault/ui';
 import { TERM_2, currentYear, noCalendar, term } from '../../test-calendar';
@@ -41,16 +42,16 @@ describe('EditDatesDialog', () => {
   });
 
   it('saves the dates, toasts the new school days and closes', async () => {
+    const user = userEvent.setup();
     const success = vi.spyOn(toast, 'success').mockReturnValue(1);
     const update = vi.fn(
       ({ body }: { body: { startsOn?: string; endsOn?: string } }) =>
         term({ id: TERM_2, ...body, schoolDays: 55 })
     );
     const onOpenChange = setup(update);
-    fireEvent.change(screen.getByLabelText('Starts'), {
-      target: { value: '2027-01-11' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Save dates' }));
+    await user.clear(screen.getByLabelText('Starts'));
+    await user.type(screen.getByLabelText('Starts'), '2027-01-11');
+    await user.click(screen.getByRole('button', { name: 'Save dates' }));
     await vi.waitFor(() => {
       expect(update).toHaveBeenCalledWith({
         params: { id: TERM_2 },
@@ -64,6 +65,7 @@ describe('EditDatesDialog', () => {
   });
 
   it('shows the API refusal inline and stays open', async () => {
+    const user = userEvent.setup();
     const update = vi.fn().mockRejectedValue(
       new ApiError(400, {
         code: 'BadRequest',
@@ -71,7 +73,7 @@ describe('EditDatesDialog', () => {
       })
     );
     const onOpenChange = setup(update);
-    fireEvent.click(screen.getByRole('button', { name: 'Save dates' }));
+    await user.click(screen.getByRole('button', { name: 'Save dates' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'These dates overlap Third term.'
     );

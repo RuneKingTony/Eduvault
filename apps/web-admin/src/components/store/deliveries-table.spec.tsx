@@ -1,4 +1,5 @@
-import { fireEvent, screen, within } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { IKEJA, LEKKI } from '../../test-members';
 import { OPENING_ID, deliveryList, openingDelivery } from '../../test-store';
 import { renderWithApi } from '../../test-utils';
@@ -22,16 +23,17 @@ function setup() {
 }
 
 describe('DeliveriesTable', () => {
-  it('opens the delivery from the number and the other text cells', () => {
+  it('opens the delivery from the number and the other text cells', async () => {
+    const user = userEvent.setup();
     const { onOpen } = setup();
     const row = within(
       screen.getByRole('row', { name: new RegExp(`OPEN-STORE-${LEKKI.id}`) })
     );
 
-    fireEvent.click(
+    await user.click(
       screen.getByRole('button', { name: `OPEN-STORE-${LEKKI.id}` })
     );
-    fireEvent.click(row.getByText('Opening stock count'));
+    await user.click(row.getByText('Opening stock count'));
 
     expect(onOpen).toHaveBeenCalledTimes(2);
     expect(onOpen).toHaveBeenNthCalledWith(1, OPENING_ID);

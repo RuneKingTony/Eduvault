@@ -12,14 +12,8 @@ import {
   createRoute,
   createRouter,
 } from '@tanstack/react-router';
-import {
-  act,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-  within,
-} from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import {
   AuthClientProvider,
   type EduvaultAuthClient,
@@ -260,8 +254,9 @@ describe('AppShell', () => {
   });
 
   it('collapses a group and remembers it', async () => {
+    const user = userEvent.setup();
     await renderAt('/');
-    fireEvent.click(screen.getByRole('button', { name: 'People' }));
+    await user.click(screen.getByRole('button', { name: 'People' }));
     expect(screen.getByRole('button', { name: 'People' })).toHaveAttribute(
       'aria-expanded',
       'false'
@@ -282,25 +277,21 @@ describe('AppShell', () => {
   });
 
   it('collapses to a rail with the toggle and Cmd+B, and remembers it', async () => {
+    const user = userEvent.setup();
     await renderAt('/');
     expect(groupToggle()).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Toggle sidebar' }));
+    await user.click(screen.getByRole('button', { name: 'Toggle sidebar' }));
     expect(groupToggle()).not.toBeInTheDocument();
     expect(localStorage.getItem('eduvault.sidebar')).toBe('collapsed');
-    fireEvent.keyDown(globalThis as unknown as Window, {
-      key: 'b',
-      metaKey: true,
-    });
+    await user.keyboard('{Meta>}b{/Meta}');
     expect(groupToggle()).toBeInTheDocument();
   });
 
   it('leaves the saved rail alone when Cmd+B is pressed in the phone layout', async () => {
+    const user = userEvent.setup();
     stubMatchMedia({ '(max-width: 820px)': true });
     await renderAt('/');
-    fireEvent.keyDown(globalThis as unknown as Window, {
-      key: 'b',
-      metaKey: true,
-    });
+    await user.keyboard('{Meta>}b{/Meta}');
     expect(localStorage.getItem('eduvault.sidebar')).toBeNull();
   });
 
@@ -326,10 +317,10 @@ describe('AppShell', () => {
   });
 
   it('adds School years and terms to the school menu with session:read', async () => {
+    const user = userEvent.setup();
     await renderAt('/');
-    fireEvent.keyDown(
-      screen.getByRole('button', { name: /Greenfield College/ }),
-      { key: 'Enter' }
+    await user.click(
+      screen.getByRole('button', { name: /Greenfield College/ })
     );
     expect(
       await screen.findByRole('menuitem', { name: 'School years and terms' })
@@ -337,10 +328,10 @@ describe('AppShell', () => {
   });
 
   it('leaves School years and terms out of the school menu without session:read', async () => {
+    const user = userEvent.setup();
     await renderAt('/', { access: starterAccess('teacher') });
-    fireEvent.keyDown(
-      screen.getByRole('button', { name: /Greenfield College/ }),
-      { key: 'Enter' }
+    await user.click(
+      screen.getByRole('button', { name: /Greenfield College/ })
     );
     await screen.findByRole('menuitem', { name: 'Lakeside Academy' });
     expect(
@@ -349,30 +340,26 @@ describe('AppShell', () => {
   });
 
   it('opens and closes the command menu with Cmd+K and finds pages', async () => {
+    const user = userEvent.setup();
     await renderAt('/');
-    fireEvent.keyDown(globalThis as unknown as Window, {
-      key: 'k',
-      ctrlKey: true,
-    });
+    await user.keyboard('{Control>}k{/Control}');
     const input = await screen.findByPlaceholderText(
       'Search pages and actions…'
     );
-    fireEvent.change(input, { target: { value: 'campuses' } });
+    await user.type(input, 'campuses');
     expect(
       screen.getByRole('option', { name: /Campuses/ })
     ).toBeInTheDocument();
-    fireEvent.keyDown(globalThis as unknown as Window, {
-      key: 'k',
-      metaKey: true,
-    });
+    await user.keyboard('{Meta>}k{/Meta}');
     expect(
       screen.queryByPlaceholderText('Search pages and actions…')
     ).not.toBeInTheDocument();
   });
 
   it('opens the command menu from the search button', async () => {
+    const user = userEvent.setup();
     await renderAt('/');
-    fireEvent.click(
+    await user.click(
       screen.getByRole('button', { name: 'Search pages and actions' })
     );
     expect(
@@ -393,14 +380,14 @@ describe('AppShell', () => {
   });
 
   it('drops the previous school data from the cache when the school is switched', async () => {
+    const user = userEvent.setup();
     const queryClient = new QueryClient();
     queryClient.setQueryData(['students'], [{ fullName: 'Ada Obi' }]);
     await renderAt('/students', { queryClient });
-    fireEvent.keyDown(
-      screen.getByRole('button', { name: /Greenfield College/ }),
-      { key: 'Enter' }
+    await user.click(
+      screen.getByRole('button', { name: /Greenfield College/ })
     );
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('menuitem', { name: 'Lakeside Academy' })
     );
     await waitFor(() => {
@@ -413,11 +400,10 @@ describe('AppShell', () => {
   });
 
   it('signs out from the user menu', async () => {
+    const user = userEvent.setup();
     await renderAt('/');
-    fireEvent.keyDown(screen.getByRole('button', { name: /Funmi Adeyemi/ }), {
-      key: 'Enter',
-    });
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Sign out' }));
+    await user.click(screen.getByRole('button', { name: /Funmi Adeyemi/ }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Sign out' }));
     expect(signOut).toHaveBeenCalledOnce();
   });
 });
@@ -467,14 +453,14 @@ describe('AppShell access', () => {
   });
 
   it('reads the access of the school that was switched to, not the previous one', async () => {
+    const user = userEvent.setup();
     const { changeAccessTo, permissions } = await renderAt('/students');
     expect(linkNames()).toContain('Fees');
     changeAccessTo(starterAccess('bursar'));
-    fireEvent.keyDown(
-      screen.getByRole('button', { name: /Greenfield College/ }),
-      { key: 'Enter' }
+    await user.click(
+      screen.getByRole('button', { name: /Greenfield College/ })
     );
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('menuitem', { name: 'Lakeside Academy' })
     );
     await waitFor(() => {
@@ -586,35 +572,32 @@ describe('AppShell access', () => {
   });
 
   it('keeps the command menu to what the member can open', async () => {
+    const user = userEvent.setup();
     await renderAt('/', { access: starterAccess('teacher') });
-    fireEvent.keyDown(globalThis as unknown as Window, {
-      key: 'k',
-      ctrlKey: true,
-    });
+    await user.keyboard('{Control>}k{/Control}');
     const input = await screen.findByPlaceholderText(
       'Search pages and actions…'
     );
-    fireEvent.change(input, { target: { value: 'fees' } });
+    await user.type(input, 'fees');
     expect(
       screen.queryByRole('option', { name: /Fees/ })
     ).not.toBeInTheDocument();
-    fireEvent.change(input, { target: { value: 'students' } });
+    await user.clear(input);
+    await user.type(input, 'students');
     expect(
       screen.getByRole('option', { name: /Students/ })
     ).toBeInTheDocument();
   });
 
   it('offers Add a fee we charge with feeLine:create and hides it from an administrator', async () => {
+    const user = userEvent.setup();
     const { unmount } = await renderAt('/', {
       access: starterAccess('bursar'),
     });
-    fireEvent.keyDown(globalThis as unknown as Window, {
-      key: 'k',
-      ctrlKey: true,
-    });
-    fireEvent.change(
+    await user.keyboard('{Control>}k{/Control}');
+    await user.type(
       await screen.findByPlaceholderText('Search pages and actions…'),
-      { target: { value: 'add a fee' } }
+      'add a fee'
     );
     expect(
       screen.getByRole('option', { name: /Add a fee we charge/ })
@@ -622,13 +605,10 @@ describe('AppShell access', () => {
     unmount();
 
     await renderAt('/', { access: starterAccess('administrator') });
-    fireEvent.keyDown(globalThis as unknown as Window, {
-      key: 'k',
-      ctrlKey: true,
-    });
-    fireEvent.change(
+    await user.keyboard('{Control>}k{/Control}');
+    await user.type(
       await screen.findByPlaceholderText('Search pages and actions…'),
-      { target: { value: 'add a fee' } }
+      'add a fee'
     );
     expect(
       screen.queryByRole('option', { name: /Add a fee we charge/ })
@@ -636,16 +616,14 @@ describe('AppShell access', () => {
   });
 
   it('offers Record a payment with payment:record and hides it from a reader', async () => {
+    const user = userEvent.setup();
     const { unmount } = await renderAt('/', {
       access: starterAccess('bursar'),
     });
-    fireEvent.keyDown(globalThis as unknown as Window, {
-      key: 'k',
-      ctrlKey: true,
-    });
-    fireEvent.change(
+    await user.keyboard('{Control>}k{/Control}');
+    await user.type(
       await screen.findByPlaceholderText('Search pages and actions…'),
-      { target: { value: 'record a payment' } }
+      'record a payment'
     );
     expect(
       screen.getByRole('option', { name: /Record a payment/ })
@@ -653,13 +631,10 @@ describe('AppShell access', () => {
     unmount();
 
     await renderAt('/', { access: starterAccess('administrator') });
-    fireEvent.keyDown(globalThis as unknown as Window, {
-      key: 'k',
-      ctrlKey: true,
-    });
-    fireEvent.change(
+    await user.keyboard('{Control>}k{/Control}');
+    await user.type(
       await screen.findByPlaceholderText('Search pages and actions…'),
-      { target: { value: 'record a payment' } }
+      'record a payment'
     );
     expect(
       screen.queryByRole('option', { name: /Record a payment/ })
@@ -667,16 +642,14 @@ describe('AppShell access', () => {
   });
 
   it('offers See who owes fees with invoice:read and hides it from a teacher', async () => {
+    const user = userEvent.setup();
     const { unmount } = await renderAt('/', {
       access: starterAccess('administrator'),
     });
-    fireEvent.keyDown(globalThis as unknown as Window, {
-      key: 'k',
-      ctrlKey: true,
-    });
-    fireEvent.change(
+    await user.keyboard('{Control>}k{/Control}');
+    await user.type(
       await screen.findByPlaceholderText('Search pages and actions…'),
-      { target: { value: 'see who owes' } }
+      'see who owes'
     );
     expect(
       screen.getByRole('option', { name: /See who owes fees/ })
@@ -684,13 +657,10 @@ describe('AppShell access', () => {
     unmount();
 
     await renderAt('/', { access: starterAccess('teacher') });
-    fireEvent.keyDown(globalThis as unknown as Window, {
-      key: 'k',
-      ctrlKey: true,
-    });
-    fireEvent.change(
+    await user.keyboard('{Control>}k{/Control}');
+    await user.type(
       await screen.findByPlaceholderText('Search pages and actions…'),
-      { target: { value: 'see who owes' } }
+      'see who owes'
     );
     expect(
       screen.queryByRole('option', { name: /See who owes fees/ })
@@ -698,16 +668,14 @@ describe('AppShell access', () => {
   });
 
   it('offers See who owes fees to a member who holds only payment:read', async () => {
+    const user = userEvent.setup();
     await renderAt('/', {
       access: fakeAccess({ permissions: { payment: ['read'] } }),
     });
-    fireEvent.keyDown(globalThis as unknown as Window, {
-      key: 'k',
-      ctrlKey: true,
-    });
-    fireEvent.change(
+    await user.keyboard('{Control>}k{/Control}');
+    await user.type(
       await screen.findByPlaceholderText('Search pages and actions…'),
-      { target: { value: 'see who owes' } }
+      'see who owes'
     );
     expect(
       screen.getByRole('option', { name: /See who owes fees/ })
@@ -715,16 +683,14 @@ describe('AppShell access', () => {
   });
 
   it('offers Charge students with invoice:bill and hides it from a reader', async () => {
+    const user = userEvent.setup();
     const { unmount } = await renderAt('/', {
       access: starterAccess('bursar'),
     });
-    fireEvent.keyDown(globalThis as unknown as Window, {
-      key: 'k',
-      ctrlKey: true,
-    });
-    fireEvent.change(
+    await user.keyboard('{Control>}k{/Control}');
+    await user.type(
       await screen.findByPlaceholderText('Search pages and actions…'),
-      { target: { value: 'charge students' } }
+      'charge students'
     );
     expect(
       screen.getByRole('option', { name: /Charge students/ })
@@ -732,13 +698,10 @@ describe('AppShell access', () => {
     unmount();
 
     await renderAt('/', { access: starterAccess('administrator') });
-    fireEvent.keyDown(globalThis as unknown as Window, {
-      key: 'k',
-      ctrlKey: true,
-    });
-    fireEvent.change(
+    await user.keyboard('{Control>}k{/Control}');
+    await user.type(
       await screen.findByPlaceholderText('Search pages and actions…'),
-      { target: { value: 'charge students' } }
+      'charge students'
     );
     expect(
       screen.queryByRole('option', { name: /Charge students/ })
@@ -746,43 +709,36 @@ describe('AppShell access', () => {
   });
 
   it('offers Add a staff member only with member:create and opens the add sheet route', async () => {
+    const user = userEvent.setup();
     await renderAt('/');
-    fireEvent.keyDown(globalThis as unknown as Window, {
-      key: 'k',
-      ctrlKey: true,
-    });
+    await user.keyboard('{Control>}k{/Control}');
     const input = await screen.findByPlaceholderText(
       'Search pages and actions…'
     );
-    fireEvent.change(input, { target: { value: 'add a staff' } });
+    await user.type(input, 'add a staff');
     expect(
       screen.getByRole('option', { name: /Add a staff member/ })
     ).toBeInTheDocument();
   });
 
   it('offers Admit a student with student:create and hides it from a bursar', async () => {
+    const user = userEvent.setup();
     const { unmount } = await renderAt('/');
-    fireEvent.keyDown(globalThis as unknown as Window, {
-      key: 'k',
-      ctrlKey: true,
-    });
+    await user.keyboard('{Control>}k{/Control}');
     const input = await screen.findByPlaceholderText(
       'Search pages and actions…'
     );
-    fireEvent.change(input, { target: { value: 'admit' } });
+    await user.type(input, 'admit');
     expect(
       screen.getByRole('option', { name: /Admit a student/ })
     ).toBeInTheDocument();
     unmount();
 
     await renderAt('/', { access: starterAccess('bursar') });
-    fireEvent.keyDown(globalThis as unknown as Window, {
-      key: 'k',
-      ctrlKey: true,
-    });
-    fireEvent.change(
+    await user.keyboard('{Control>}k{/Control}');
+    await user.type(
       await screen.findByPlaceholderText('Search pages and actions…'),
-      { target: { value: 'admit' } }
+      'admit'
     );
     expect(
       screen.queryByRole('option', { name: /Admit a student/ })
@@ -790,19 +746,17 @@ describe('AppShell access', () => {
   });
 
   it('hides Admit a student without guardian:link while a guardian is required', async () => {
+    const user = userEvent.setup();
     const access = fakeAccess({
       roles: ['custom'],
       permissions: toPermissionMap(['student:read', 'student:create']),
       campusScope: 'all',
     });
     await renderAt('/', { access, requireGuardian: true });
-    fireEvent.keyDown(globalThis as unknown as Window, {
-      key: 'k',
-      ctrlKey: true,
-    });
-    fireEvent.change(
+    await user.keyboard('{Control>}k{/Control}');
+    await user.type(
       await screen.findByPlaceholderText('Search pages and actions…'),
-      { target: { value: 'admit' } }
+      'admit'
     );
     expect(
       screen.queryByRole('option', { name: /Admit a student/ })
@@ -810,30 +764,26 @@ describe('AppShell access', () => {
   });
 
   it('offers Create a custom role only with ac:create', async () => {
+    const user = userEvent.setup();
     await renderAt('/');
-    fireEvent.keyDown(globalThis as unknown as Window, {
-      key: 'k',
-      ctrlKey: true,
-    });
+    await user.keyboard('{Control>}k{/Control}');
     const input = await screen.findByPlaceholderText(
       'Search pages and actions…'
     );
-    fireEvent.change(input, { target: { value: 'custom role' } });
+    await user.type(input, 'custom role');
     expect(
       screen.getByRole('option', { name: /Create a custom role/ })
     ).toBeInTheDocument();
   });
 
   it('lets an administrator find Roles and permissions but not create a role', async () => {
+    const user = userEvent.setup();
     await renderAt('/', { access: starterAccess('administrator') });
-    fireEvent.keyDown(globalThis as unknown as Window, {
-      key: 'k',
-      ctrlKey: true,
-    });
+    await user.keyboard('{Control>}k{/Control}');
     const input = await screen.findByPlaceholderText(
       'Search pages and actions…'
     );
-    fireEvent.change(input, { target: { value: 'roles' } });
+    await user.type(input, 'roles');
     expect(
       screen.getByRole('option', { name: /Roles and permissions/ })
     ).toBeInTheDocument();
@@ -843,27 +793,26 @@ describe('AppShell access', () => {
   });
 
   it('hides the Add a staff member action from an administrator', async () => {
+    const user = userEvent.setup();
     await renderAt('/', { access: starterAccess('administrator') });
-    fireEvent.keyDown(globalThis as unknown as Window, {
-      key: 'k',
-      ctrlKey: true,
-    });
+    await user.keyboard('{Control>}k{/Control}');
     const input = await screen.findByPlaceholderText(
       'Search pages and actions…'
     );
-    fireEvent.change(input, { target: { value: 'staff' } });
+    await user.type(input, 'staff');
     expect(
       screen.queryByRole('option', { name: /Add a staff member/ })
     ).not.toBeInTheDocument();
   });
 
   it('shows the no-roles Dashboard and opens My access from it', async () => {
+    const user = userEvent.setup();
     await renderAt('/', { access: fakeAccess(), realDashboard: true });
     expect(
       await screen.findByRole('heading', { name: 'Welcome, Funmi' })
     ).toBeInTheDocument();
     expect(screen.getByText('No access yet')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'See my access' }));
+    await user.click(screen.getByRole('button', { name: 'See my access' }));
     expect(
       await screen.findByText('Nothing yet. Ask the owner to give you a role.')
     ).toBeInTheDocument();
@@ -882,12 +831,13 @@ describe('AppShell access', () => {
   });
 
   it('opens My access from the user menu', async () => {
+    const user = userEvent.setup();
     await renderAt('/', { access: starterAccess('administrator') });
-    fireEvent.keyDown(screen.getByRole('button', { name: /Funmi Adeyemi/ }), {
-      key: 'Enter',
-    });
+    await user.click(screen.getByRole('button', { name: /Funmi Adeyemi/ }));
     expect(screen.queryByText('Member, no roles')).not.toBeInTheDocument();
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'My access' }));
+    await user.click(
+      await screen.findByRole('menuitem', { name: 'My access' })
+    );
     expect(
       await screen.findByText('What you can do in Greenfield College, and why.')
     ).toBeInTheDocument();
@@ -904,16 +854,14 @@ describe('AppShell access', () => {
   });
 
   it('offers Discount or refund with adjustment:create and hides it from a principal', async () => {
+    const user = userEvent.setup();
     const { unmount } = await renderAt('/', {
       access: starterAccess('bursar'),
     });
-    fireEvent.keyDown(globalThis as unknown as Window, {
-      key: 'k',
-      ctrlKey: true,
-    });
-    fireEvent.change(
+    await user.keyboard('{Control>}k{/Control}');
+    await user.type(
       await screen.findByPlaceholderText('Search pages and actions…'),
-      { target: { value: 'discount or refund' } }
+      'discount or refund'
     );
     expect(
       screen.getByRole('option', { name: /Discount or refund/ })
@@ -921,13 +869,10 @@ describe('AppShell access', () => {
     unmount();
 
     await renderAt('/', { access: starterAccess('principal') });
-    fireEvent.keyDown(globalThis as unknown as Window, {
-      key: 'k',
-      ctrlKey: true,
-    });
-    fireEvent.change(
+    await user.keyboard('{Control>}k{/Control}');
+    await user.type(
       await screen.findByPlaceholderText('Search pages and actions…'),
-      { target: { value: 'discount or refund' } }
+      'discount or refund'
     );
     expect(
       screen.queryByRole('option', { name: /Discount or refund/ })
@@ -935,50 +880,44 @@ describe('AppShell access', () => {
   });
 
   it('opens Charge students from the palette on its page with the prepare sheet flag', async () => {
+    const user = userEvent.setup();
     const { router } = await renderAt('/', { access: starterAccess('bursar') });
-    fireEvent.keyDown(globalThis as unknown as Window, {
-      key: 'k',
-      ctrlKey: true,
-    });
-    fireEvent.change(
+    await user.keyboard('{Control>}k{/Control}');
+    await user.type(
       await screen.findByPlaceholderText('Search pages and actions…'),
-      { target: { value: 'charge students' } }
+      'charge students'
     );
-    fireEvent.click(screen.getByRole('option', { name: /Charge students/ }));
+    await user.click(screen.getByRole('option', { name: /Charge students/ }));
     expect(await screen.findByText('Charge students page')).toBeVisible();
     expect(router.state.location.pathname).toBe('/finance/billing');
     expect(router.state.location.search).toEqual({ prepare: 1 });
   });
 
   it('opens Record a payment from the palette on Payments with the record flag', async () => {
+    const user = userEvent.setup();
     const { router } = await renderAt('/finance/accounts', {
       access: starterAccess('bursar'),
     });
-    fireEvent.keyDown(globalThis as unknown as Window, {
-      key: 'k',
-      ctrlKey: true,
-    });
-    fireEvent.change(
+    await user.keyboard('{Control>}k{/Control}');
+    await user.type(
       await screen.findByPlaceholderText('Search pages and actions…'),
-      { target: { value: 'record a payment' } }
+      'record a payment'
     );
-    fireEvent.click(screen.getByRole('option', { name: /Record a payment/ }));
+    await user.click(screen.getByRole('option', { name: /Record a payment/ }));
     expect(await screen.findByText('Payments page')).toBeVisible();
     expect(router.state.location.pathname).toBe('/finance/payments');
     expect(router.state.location.search).toEqual({ record: 1 });
   });
 
   it('opens a page entry from the palette', async () => {
+    const user = userEvent.setup();
     const { router } = await renderAt('/');
-    fireEvent.keyDown(globalThis as unknown as Window, {
-      key: 'k',
-      ctrlKey: true,
-    });
-    fireEvent.change(
+    await user.keyboard('{Control>}k{/Control}');
+    await user.type(
       await screen.findByPlaceholderText('Search pages and actions…'),
-      { target: { value: 'students' } }
+      'students'
     );
-    fireEvent.click(screen.getByRole('option', { name: /Students/ }));
+    await user.click(screen.getByRole('option', { name: /Students/ }));
     expect(await screen.findByText('Students page')).toBeVisible();
     expect(router.state.location.search).toEqual({});
   });
@@ -1014,13 +953,14 @@ describe('AppShell on a phone', () => {
   });
 
   it('opens the sidebar in a left sheet and closes it when a link is chosen', async () => {
+    const user = userEvent.setup();
     await renderAt('/');
     expect(
       screen.queryByRole('link', { name: 'Students' })
     ).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Open navigation' }));
+    await user.click(screen.getByRole('button', { name: 'Open navigation' }));
     const sheet = await screen.findByRole('dialog');
-    fireEvent.click(within(sheet).getByRole('link', { name: 'Students' }));
+    await user.click(within(sheet).getByRole('link', { name: 'Students' }));
     await act(() => Promise.resolve());
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });

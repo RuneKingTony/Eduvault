@@ -1,4 +1,5 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { ApiError, type PlatformSchool } from '@eduvault/api-contract';
 import { auditRow, platformSchool, renderWithApi } from '../test-utils';
 import { PlatformSchoolPage } from './platform-school-page';
@@ -19,13 +20,8 @@ const setup = (
   return { get, list, ...handlers };
 };
 
-const openMoreActions = async () => {
-  fireEvent.keyDown(
-    await screen.findByRole('button', { name: /More actions/ }),
-    {
-      key: 'Enter',
-    }
-  );
+const openMoreActions = async (user: ReturnType<typeof userEvent.setup>) => {
+  await user.click(await screen.findByRole('button', { name: /More actions/ }));
 };
 
 describe('PlatformSchoolPage', () => {
@@ -82,8 +78,9 @@ describe('PlatformSchoolPage', () => {
   });
 
   it('starts acting from the primary action', async () => {
+    const user = userEvent.setup();
     const { onActInSchool } = setup();
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('button', { name: 'Act in this school' })
     );
     expect(onActInSchool).toHaveBeenCalledExactlyOnceWith({
@@ -120,8 +117,9 @@ describe('PlatformSchoolPage', () => {
   });
 
   it('offers Replace owner and Suspend in the menu of an active school', async () => {
+    const user = userEvent.setup();
     setup();
-    await openMoreActions();
+    await openMoreActions(user);
     expect(
       await screen.findByRole('menuitem', { name: 'Replace owner…' })
     ).toBeInTheDocument();
@@ -134,8 +132,9 @@ describe('PlatformSchoolPage', () => {
   });
 
   it('offers Reactivate instead of Suspend for a suspended school', async () => {
+    const user = userEvent.setup();
     setup(platformSchool({ status: 'suspended' }));
-    await openMoreActions();
+    await openMoreActions(user);
     expect(
       await screen.findByRole('menuitem', { name: 'Reactivate…' })
     ).toBeInTheDocument();
@@ -145,6 +144,7 @@ describe('PlatformSchoolPage', () => {
   });
 
   it('says the school was not found and goes back', async () => {
+    const user = userEvent.setup();
     const { onBack } = setup(
       new ApiError(404, { code: 'NotFound', message: 'School not found' })
     );
@@ -152,7 +152,7 @@ describe('PlatformSchoolPage', () => {
     expect(
       screen.getByText(/We couldn’t find that school/)
     ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Go back' }));
+    await user.click(screen.getByRole('button', { name: 'Go back' }));
     expect(onBack).toHaveBeenCalledOnce();
     await waitFor(() => {
       expect(

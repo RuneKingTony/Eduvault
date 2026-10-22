@@ -1,4 +1,5 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { LoginCredential } from '@eduvault/api-contract';
 import { toast } from '@eduvault/ui';
 import { LoginsDialog } from './logins-dialog';
@@ -50,9 +51,6 @@ function setup(logins: LoginCredential[] = [student, guardian]) {
 describe('LoginsDialog', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    Object.assign(navigator, {
-      clipboard: { writeText: vi.fn().mockResolvedValue(undefined) },
-    });
   });
 
   it('lists the student first, then the guardians, with who they are and the once-only note', () => {
@@ -89,11 +87,13 @@ describe('LoginsDialog', () => {
   });
 
   it('copies a value and toasts Copied.', async () => {
+    const user = userEvent.setup();
+    const writeText = vi.spyOn(navigator.clipboard, 'writeText');
     setup();
-    fireEvent.click(
+    await user.click(
       screen.getAllByRole('button', { name: 'Copy temporary password' })[0]!
     );
-    expect(navigator.clipboard.writeText).toHaveBeenCalledWith('Abcd2345Wxyz');
+    expect(writeText).toHaveBeenCalledWith('Abcd2345Wxyz');
     await waitFor(() => {
       expect(toast.success).toHaveBeenCalledWith('Copied.');
     });
@@ -107,12 +107,13 @@ describe('LoginsDialog', () => {
     expect(screen.queryByText('Temporary password')).not.toBeInTheDocument();
   });
 
-  it('prints one slip per new login with the portal address and the change-password line', () => {
+  it('prints one slip per new login with the portal address and the change-password line', async () => {
+    const user = userEvent.setup();
     const print = vi
       .spyOn(globalThis, 'print')
       .mockImplementation(() => undefined);
     setup([student, guardian, reused]);
-    fireEvent.click(screen.getByRole('button', { name: 'Print slip' }));
+    await user.click(screen.getByRole('button', { name: 'Print slip' }));
     expect(print).toHaveBeenCalled();
     expect(screen.getAllByText(/^Portal login for /)).toHaveLength(2);
     expect(screen.getByText('Portal login for Peace Udoh')).toBeInTheDocument();
@@ -127,9 +128,10 @@ describe('LoginsDialog', () => {
     ).toHaveLength(2);
   });
 
-  it('closes with Done', () => {
+  it('closes with Done', async () => {
+    const user = userEvent.setup();
     const { onDone } = setup();
-    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    await user.click(screen.getByRole('button', { name: 'Done' }));
     expect(onDone).toHaveBeenCalled();
   });
 });

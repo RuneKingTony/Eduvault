@@ -1,4 +1,5 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { CampusSelect } from './campus-select';
 
 const CAMPUSES = [
@@ -42,15 +43,16 @@ describe('CampusSelect', () => {
     expect(screen.getByRole('combobox', { name: 'Campus' })).toHaveValue('');
   });
 
-  it('reports the picked campus id, and undefined for All campuses', () => {
+  it('reports the picked campus id, and undefined for All campuses', async () => {
+    const user = userEvent.setup();
     const onChange = vi.fn();
     render(
       <CampusSelect campuses={CAMPUSES} value="lekki" onChange={onChange} />
     );
     const select = screen.getByRole('combobox', { name: 'Campus' });
-    fireEvent.change(select, { target: { value: 'ikeja' } });
+    await user.selectOptions(select, 'ikeja');
     expect(onChange).toHaveBeenLastCalledWith('ikeja');
-    fireEvent.change(select, { target: { value: '' } });
+    await user.selectOptions(select, '');
     expect(onChange).toHaveBeenLastCalledWith(undefined);
   });
 });

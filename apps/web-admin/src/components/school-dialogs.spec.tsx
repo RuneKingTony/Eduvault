@@ -1,4 +1,5 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import {
   ApiError,
   type PlatformSchool,
@@ -59,25 +60,28 @@ function setup(school: PlatformSchool = platformSchool()) {
   return platform.schools;
 }
 
+let user: ReturnType<typeof userEvent.setup>;
+
 async function openAction(name: string) {
-  fireEvent.keyDown(
-    await screen.findByRole('button', { name: /More actions/ }),
-    { key: 'Enter' }
-  );
-  fireEvent.click(await screen.findByRole('menuitem', { name }));
+  await user.click(await screen.findByRole('button', { name: /More actions/ }));
+  await user.click(await screen.findByRole('menuitem', { name }));
   return screen.findByRole('dialog');
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
+  user = userEvent.setup();
 });
 
 describe('Act in this school', () => {
   it('says what it does in a tooltip', async () => {
     setup();
-    fireEvent.focus(
-      await screen.findByRole('button', { name: 'Act in this school' })
-    );
+    const button = await screen.findByRole('button', {
+      name: 'Act in this school',
+    });
+    act(() => {
+      button.focus();
+    });
     expect(
       (
         await screen.findAllByText(
@@ -106,7 +110,7 @@ describe('Suspend dialog', () => {
       )
     ).toBeInTheDocument();
 
-    fireEvent.click(
+    await user.click(
       within(dialog).getByRole('button', { name: 'Suspend school' })
     );
     await waitFor(() => {
@@ -125,7 +129,7 @@ describe('Suspend dialog', () => {
   it('cancels without calling the server', async () => {
     const schools = setup();
     const dialog = await openAction('Suspend school…');
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
     await waitFor(() => {
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
@@ -141,7 +145,7 @@ describe('Suspend dialog', () => {
       })
     );
     const dialog = await openAction('Suspend school…');
-    fireEvent.click(
+    await user.click(
       within(dialog).getByRole('button', { name: 'Suspend school' })
     );
     expect(
@@ -166,7 +170,9 @@ describe('Reactivate dialog', () => {
       within(dialog).getByText('Reactivating is immediate.')
     ).toBeInTheDocument();
 
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Reactivate' }));
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Reactivate' })
+    );
     await waitFor(() => {
       expect(schools.reactivate).toHaveBeenCalledWith({ params: { id: 's1' } });
     });
@@ -186,7 +192,9 @@ describe('Reactivate dialog', () => {
       })
     );
     const dialog = await openAction('Reactivate…');
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Reactivate' }));
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Reactivate' })
+    );
     expect(
       await within(dialog).findByText('This school is not suspended.')
     ).toBeInTheDocument();
@@ -229,7 +237,7 @@ describe('Replace owner dialog', () => {
     const dialog = await openAction('Replace owner…');
     await within(dialog).findByRole('option', { name: /Kola Ade/ });
 
-    fireEvent.click(
+    await user.click(
       within(dialog).getByRole('button', { name: 'Replace owner' })
     );
     expect(
@@ -237,10 +245,8 @@ describe('Replace owner dialog', () => {
     ).toBeInTheDocument();
     expect(schools.replaceOwner).not.toHaveBeenCalled();
 
-    fireEvent.change(within(dialog).getByLabelText('Member'), {
-      target: { value: 'm2' },
-    });
-    fireEvent.click(
+    await user.selectOptions(within(dialog).getByLabelText('Member'), 'm2');
+    await user.click(
       within(dialog).getByRole('button', { name: 'Replace owner' })
     );
     await waitFor(() => {
@@ -263,13 +269,11 @@ describe('Replace owner dialog', () => {
     const schools = setup();
     const dialog = await openAction('Replace owner…');
     await within(dialog).findByRole('option', { name: /Kola Ade/ });
-    fireEvent.change(within(dialog).getByLabelText('Member'), {
-      target: { value: 'm2' },
-    });
-    fireEvent.click(
+    await user.selectOptions(within(dialog).getByLabelText('Member'), 'm2');
+    await user.click(
       within(dialog).getByRole('radio', { name: 'Is removed from the school' })
     );
-    fireEvent.click(
+    await user.click(
       within(dialog).getByRole('button', { name: 'Replace owner' })
     );
     await waitFor(() => {
@@ -287,24 +291,23 @@ describe('Replace owner dialog', () => {
       temporaryPassword: 'Tmp9Pass2Word',
     });
     const dialog = await openAction('Replace owner…');
-    fireEvent.click(
+    await user.click(
       within(dialog).getByRole('radio', { name: 'A new person' })
     );
 
-    fireEvent.click(
+    await user.click(
       within(dialog).getByRole('button', { name: 'Replace owner' })
     );
     expect(
       await within(dialog).findByText('Enter the new owner’s name and email.')
     ).toBeInTheDocument();
 
-    fireEvent.change(within(dialog).getByLabelText('Name'), {
-      target: { value: 'Ngozi Eze' },
-    });
-    fireEvent.change(within(dialog).getByLabelText('Email'), {
-      target: { value: 'ngozi@greenfield.test' },
-    });
-    fireEvent.click(
+    await user.type(within(dialog).getByLabelText('Name'), 'Ngozi Eze');
+    await user.type(
+      within(dialog).getByLabelText('Email'),
+      'ngozi@greenfield.test'
+    );
+    await user.click(
       within(dialog).getByRole('button', { name: 'Replace owner' })
     );
 
@@ -331,7 +334,7 @@ describe('Replace owner dialog', () => {
       'Ngozi Eze is now the owner of Greenfield College.'
     );
 
-    fireEvent.click(within(password).getByRole('button', { name: 'Done' }));
+    await user.click(within(password).getByRole('button', { name: 'Done' }));
     await waitFor(() => {
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
@@ -348,10 +351,8 @@ describe('Replace owner dialog', () => {
     );
     const dialog = await openAction('Replace owner…');
     await within(dialog).findByRole('option', { name: /Kola Ade/ });
-    fireEvent.change(within(dialog).getByLabelText('Member'), {
-      target: { value: 'm2' },
-    });
-    fireEvent.click(
+    await user.selectOptions(within(dialog).getByLabelText('Member'), 'm2');
+    await user.click(
       within(dialog).getByRole('button', { name: 'Replace owner' })
     );
     expect(

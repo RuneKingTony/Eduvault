@@ -1,4 +1,5 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { toast } from '@eduvault/ui';
 import { toPermissionMap } from '@eduvault/policy';
 import { fakeAccess, renderWithApi } from '../test-utils';
@@ -99,19 +100,21 @@ describe('StartYearDialog', () => {
   });
 
   it('marks an unticked student as repeating and updates the summary live', async () => {
+    const user = userEvent.setup();
     setup();
-    fireEvent.click(await screen.findByLabelText(/Tobi Lawal/));
+    await user.click(await screen.findByLabelText(/Tobi Lawal/));
     expect(await screen.findByText(/\(repeats JSS 2\)/)).toBeInTheDocument();
     expect(
       screen.getByText('1 move up · 1 repeat · 1 graduate')
     ).toBeInTheDocument();
-    fireEvent.click(screen.getByLabelText(/Tobi Lawal/));
+    await user.click(screen.getByLabelText(/Tobi Lawal/));
     expect(
       screen.getByText('2 move up · 0 repeat · 1 graduate')
     ).toBeInTheDocument();
   });
 
   it('requires a class when none shares the name and disables the confirm button', async () => {
+    const user = userEvent.setup();
     const preview = newSchoolYearPreview();
     const [gold, blue] = preview.groups;
     setup({
@@ -133,9 +136,10 @@ describe('StartYearDialog', () => {
       await screen.findByText('Choose a class for JSS 2 Gold (Lekki).')
     ).toBeInTheDocument();
     expect(await confirm()).toBeDisabled();
-    fireEvent.change(screen.getByLabelText('Choose a JSS 3 class'), {
-      target: { value: ARM_J3 },
-    });
+    await user.selectOptions(
+      screen.getByLabelText('Choose a JSS 3 class'),
+      ARM_J3
+    );
     expect(
       screen.queryByText('Choose a class for JSS 2 Gold (Lekki).')
     ).not.toBeInTheDocument();
@@ -143,6 +147,7 @@ describe('StartYearDialog', () => {
   });
 
   it('asks for a class for those repeating when the current class is archived', async () => {
+    const user = userEvent.setup();
     const preview = newSchoolYearPreview();
     const [gold, blue] = preview.groups;
     setup({
@@ -163,16 +168,17 @@ describe('StartYearDialog', () => {
         ],
       },
     });
-    fireEvent.click(await screen.findByLabelText(/Tobi Lawal/));
+    await user.click(await screen.findByLabelText(/Tobi Lawal/));
     expect(
       await screen.findByText(
         'Choose a class for those repeating in JSS 2 Gold (Lekki).'
       )
     ).toBeInTheDocument();
     expect(await confirm()).toBeDisabled();
-    fireEvent.change(screen.getByLabelText('Class for those repeating'), {
-      target: { value: ARM_ID },
-    });
+    await user.selectOptions(
+      screen.getByLabelText('Class for those repeating'),
+      ARM_ID
+    );
     expect(await confirm()).toBeEnabled();
   });
 
@@ -202,10 +208,11 @@ describe('StartYearDialog', () => {
   });
 
   it('starts the year with a move, a repeat and a graduate, then toasts with a link to the calendar', async () => {
+    const user = userEvent.setup();
     const success = vi.spyOn(toast, 'success').mockReturnValue(1);
     const { students, onOpenChange, onOpenCalendar } = setup();
-    fireEvent.click(await screen.findByLabelText(/Tobi Lawal/));
-    fireEvent.click(await confirm());
+    await user.click(await screen.findByLabelText(/Tobi Lawal/));
+    await user.click(await confirm());
     await waitFor(() => {
       expect(students.startNewSchoolYear).toHaveBeenCalledWith({
         body: {
@@ -235,10 +242,11 @@ describe('StartYearDialog', () => {
   });
 
   it('toasts the server message and stays open', async () => {
+    const user = userEvent.setup();
     const error = vi.spyOn(toast, 'error').mockReturnValue(1);
     const start = vi.fn().mockRejectedValue(new Error('Choose a JSS 3 class.'));
     const { onOpenChange } = setup({ start });
-    fireEvent.click(await confirm());
+    await user.click(await confirm());
     await waitFor(() => {
       expect(error).toHaveBeenCalledWith('Choose a JSS 3 class.');
     });

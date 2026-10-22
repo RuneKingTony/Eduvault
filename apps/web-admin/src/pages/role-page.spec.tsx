@@ -1,11 +1,11 @@
 import {
   configure,
-  fireEvent,
   render,
   screen,
   waitFor,
   within,
 } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import {
   ApiError,
   type CreateRoleInput,
@@ -113,6 +113,12 @@ const level = (area: string, name: 'No access' | 'Can see' | 'Can change') =>
 
 const nameField = () => screen.getByLabelText('Name');
 
+let user: ReturnType<typeof userEvent.setup>;
+
+beforeEach(() => {
+  user = userEvent.setup();
+});
+
 describe('RolePage read-only', () => {
   it('lets an ac:read-only viewer look but not change', async () => {
     setup({
@@ -207,7 +213,7 @@ describe('RolePage read-only', () => {
     expect(
       screen.getByText(/It may have been moved or deleted\./)
     ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Go back' }));
+    await user.click(screen.getByRole('button', { name: 'Go back' }));
     expect(onBack).toHaveBeenCalledOnce();
   });
 });
@@ -229,17 +235,17 @@ describe('RolePage levels', () => {
   it('clears the extras with No access', async () => {
     const { create } = setup();
     await screen.findByRole('heading', { name: 'New role' });
-    fireEvent.click(level('Campuses', 'Can see'));
-    fireEvent.click(screen.getByRole('switch', { name: /Sees every campus/ }));
+    await user.click(level('Campuses', 'Can see'));
+    await user.click(screen.getByRole('switch', { name: /Sees every campus/ }));
     expect(
       screen.getByRole('switch', { name: /Sees every campus/ })
     ).toBeChecked();
-    fireEvent.click(level('Campuses', 'No access'));
+    await user.click(level('Campuses', 'No access'));
     expect(
       screen.getByRole('switch', { name: /Sees every campus/ })
     ).not.toBeChecked();
-    fireEvent.change(nameField(), { target: { value: 'Empty' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create role' }));
+    await user.type(nameField(), 'Empty');
+    await user.click(screen.getByRole('button', { name: 'Create role' }));
     await waitFor(() => {
       expect(create).toHaveBeenCalledWith({
         body: { label: 'Empty', description: null, permissions: {} },
@@ -255,9 +261,9 @@ describe('RolePage levels', () => {
     );
     expect(group.getAllByRole('radio')).toHaveLength(2);
     expect(group.queryByRole('radio', { name: 'Can change' })).toBeNull();
-    fireEvent.click(group.getByRole('radio', { name: 'Can see' }));
-    fireEvent.change(nameField(), { target: { value: 'Family view' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create role' }));
+    await user.click(group.getByRole('radio', { name: 'Can see' }));
+    await user.type(nameField(), 'Family view');
+    await user.click(screen.getByRole('button', { name: 'Create role' }));
     await waitFor(() => {
       expect(create).toHaveBeenCalledWith({
         body: {
@@ -272,10 +278,10 @@ describe('RolePage levels', () => {
   it('sets Can change with its see permissions', async () => {
     const { create } = setup();
     await screen.findByRole('heading', { name: 'New role' });
-    fireEvent.click(level('Students', 'Can change'));
+    await user.click(level('Students', 'Can change'));
     expect(level('Students', 'Can change')).toBeChecked();
-    fireEvent.change(nameField(), { target: { value: 'Admissions' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create role' }));
+    await user.type(nameField(), 'Admissions');
+    await user.click(screen.getByRole('button', { name: 'Create role' }));
     await waitFor(() => {
       expect(create).toHaveBeenCalledWith({
         body: expect.objectContaining({
@@ -304,7 +310,7 @@ describe('RolePage levels', () => {
 
 const openGrid = async () => {
   await screen.findByRole('heading', { name: 'New role' });
-  fireEvent.click(
+  await user.click(
     screen.getByRole('button', {
       name: 'Advanced: every permission, one by one',
     })
@@ -316,14 +322,15 @@ describe('RolePage Advanced grid', () => {
     setup();
     await openGrid();
     const filter = screen.getByLabelText('Filter permissions');
-    fireEvent.change(filter, { target: { value: 'fee' } });
+    await user.type(filter, 'fee');
     expect(
       screen.getByRole('button', { name: 'School and other fees: see' })
     ).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'Staff: see' })
     ).not.toBeInTheDocument();
-    fireEvent.change(filter, { target: { value: 'zzz' } });
+    await user.clear(filter);
+    await user.type(filter, 'zzz');
     expect(screen.getByText('No permissions match')).toBeInTheDocument();
     expect(
       screen.getByText('Try “approve”, “publish” or a pillar name.')
@@ -335,8 +342,8 @@ describe('RolePage Advanced grid', () => {
       access: accessOf('ac:create', 'student:read', 'schoolAccount:read'),
     });
     await openGrid();
-    fireEvent.click(screen.getByRole('button', { name: /Foundation/ }));
-    fireEvent.click(
+    await user.click(screen.getByRole('button', { name: /Foundation/ }));
+    await user.click(
       screen.getAllByRole('button', { name: 'Select all I hold' })[1]!
     );
     expect(
@@ -348,8 +355,8 @@ describe('RolePage Advanced grid', () => {
     expect(
       screen.getByRole('button', { name: 'Students: add' })
     ).toHaveAttribute('aria-pressed', 'false');
-    fireEvent.change(nameField(), { target: { value: 'Looker' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create role' }));
+    await user.type(nameField(), 'Looker');
+    await user.click(screen.getByRole('button', { name: 'Create role' }));
     await waitFor(() => {
       expect(create).toHaveBeenCalledWith({
         body: expect.objectContaining({
@@ -357,7 +364,7 @@ describe('RolePage Advanced grid', () => {
         }),
       });
     });
-    fireEvent.click(screen.getAllByRole('button', { name: 'Clear' })[1]!);
+    await user.click(screen.getAllByRole('button', { name: 'Clear' })[1]!);
     expect(
       screen.getByRole('button', { name: 'Students: see' })
     ).toHaveAttribute('aria-pressed', 'false');
@@ -366,7 +373,7 @@ describe('RolePage Advanced grid', () => {
   it('strikes through and disables a permission the editor does not hold', async () => {
     setup({ access: accessOf('ac:create', 'student:read') });
     await openGrid();
-    fireEvent.click(screen.getByRole('button', { name: /Foundation/ }));
+    await user.click(screen.getByRole('button', { name: /Foundation/ }));
     const unheld = screen.getByRole('button', { name: 'Students: add' });
     expect(unheld).toBeDisabled();
     expect(unheld.className).toContain('line-through');
@@ -382,7 +389,7 @@ describe('RolePage Advanced grid', () => {
       ],
     });
     await screen.findByRole('heading', { name: /^Cashier/ });
-    fireEvent.click(
+    await user.click(
       screen.getByRole('button', {
         name: 'Advanced: every permission, one by one',
       })
@@ -401,9 +408,10 @@ describe('RolePage copy', () => {
     const { create } = setup({
       access: accessOf('ac:create', 'student:read'),
     });
-    fireEvent.change(await screen.findByLabelText('Or copy'), {
-      target: { value: 'administrator' },
-    });
+    await user.selectOptions(
+      await screen.findByLabelText('Or copy'),
+      'administrator'
+    );
     expect(toast.warning).toHaveBeenCalledOnce();
     const message = vi.mocked(toast.warning).mock.calls[0]?.[0] as string;
     expect(message).toMatch(/^Skipped \d+ you don’t hold: /);
@@ -411,7 +419,7 @@ describe('RolePage copy', () => {
     expect(message).not.toContain('member:read');
     expect(nameField()).toHaveValue('Administrator (copy)');
     expect(level('Students', 'Can see')).toBeChecked();
-    fireEvent.click(screen.getByRole('button', { name: 'Create role' }));
+    await user.click(screen.getByRole('button', { name: 'Create role' }));
     await waitFor(() => {
       expect(create).toHaveBeenCalledWith({
         body: expect.objectContaining({
@@ -425,8 +433,8 @@ describe('RolePage copy', () => {
   it('keeps a name that was already typed and does not warn when nothing is skipped', async () => {
     setup();
     const select = await screen.findByLabelText('Or copy');
-    fireEvent.change(nameField(), { target: { value: 'Mine' } });
-    fireEvent.change(select, { target: { value: 'teacher' } });
+    await user.type(nameField(), 'Mine');
+    await user.selectOptions(select, 'teacher');
     expect(nameField()).toHaveValue('Mine');
     expect(toast.warning).not.toHaveBeenCalled();
   });
@@ -446,7 +454,7 @@ describe('RolePage copy', () => {
       'Student',
       'Guardian',
     ]);
-    fireEvent.change(select, { target: { value: 'teacher' } });
+    await user.selectOptions(select, 'teacher');
     expect(level('Students', 'Can see')).toBeChecked();
   });
 
@@ -459,7 +467,7 @@ describe('RolePage copy', () => {
         role('bursar', { label: 'Bursar', held: ['student:read'] }),
       ],
     });
-    fireEvent.click(await screen.findByRole('button', { name: 'Bursar' }));
+    await user.click(await screen.findByRole('button', { name: 'Bursar' }));
     expect(screen.getByRole('button', { name: 'Teacher' })).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'Owner' })
@@ -491,7 +499,7 @@ describe('RolePage templates', () => {
 
   it('fills the draft from Fees approver and creates the role with its slug', async () => {
     const { create } = setup();
-    fireEvent.click(await feesApprover());
+    await user.click(await feesApprover());
     expect(nameField()).toHaveValue('Fees approver');
     expect(screen.getByLabelText('Description')).toHaveValue(
       'Approves refunds, write-offs and discounts; cannot record payments.'
@@ -503,7 +511,7 @@ describe('RolePage templates', () => {
     expect(container).toHaveTextContent(
       'Filled from the Fees approver template. Review, then create.'
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Create role' }));
+    await user.click(screen.getByRole('button', { name: 'Create role' }));
     await waitFor(() => {
       expect(create).toHaveBeenCalledWith({
         body: {
@@ -527,7 +535,7 @@ describe('RolePage templates', () => {
         'adjustment:read'
       ),
     });
-    fireEvent.click(await feesApprover());
+    await user.click(await feesApprover());
     expect(toast.success).not.toHaveBeenCalled();
     expect(toast.warning).toHaveBeenCalledOnce();
     const message = vi.mocked(toast.warning).mock.calls[0]?.[0] as string;
@@ -535,7 +543,7 @@ describe('RolePage templates', () => {
     expect(message).toMatch(/^Skipped 1 you don’t hold: /);
     expect(message).toContain(label);
     expect(message).not.toContain('adjustment:approve');
-    fireEvent.click(screen.getByRole('button', { name: 'Create role' }));
+    await user.click(screen.getByRole('button', { name: 'Create role' }));
     await waitFor(() => {
       expect(create).toHaveBeenCalledOnce();
     });
@@ -550,18 +558,19 @@ describe('RolePage templates', () => {
   it('overwrites a name that was already typed', async () => {
     setup();
     await screen.findByRole('heading', { name: 'New role' });
-    fireEvent.change(nameField(), { target: { value: 'Mine' } });
-    fireEvent.click(await feesApprover());
+    await user.type(nameField(), 'Mine');
+    await user.click(await feesApprover());
     expect(nameField()).toHaveValue('Fees approver');
   });
 
   it('sends no slug when a role is copied after a template', async () => {
     const { create } = setup();
-    fireEvent.click(await feesApprover());
-    fireEvent.change(await screen.findByLabelText('Or copy'), {
-      target: { value: 'teacher' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Create role' }));
+    await user.click(await feesApprover());
+    await user.selectOptions(
+      await screen.findByLabelText('Or copy'),
+      'teacher'
+    );
+    await user.click(screen.getByRole('button', { name: 'Create role' }));
     await waitFor(() => {
       expect(create).toHaveBeenCalledOnce();
     });
@@ -594,18 +603,16 @@ describe('RolePage create and save', () => {
     expect(
       await screen.findByRole('button', { name: 'Create role' })
     ).toBeDisabled();
-    fireEvent.change(nameField(), { target: { value: 'Cashier' } });
+    await user.type(nameField(), 'Cashier');
     expect(screen.getByRole('button', { name: 'Create role' })).toBeEnabled();
   });
 
   it('creates the role, tells the owner and opens it', async () => {
     const { create, onCreated, onAssign } = setup();
     await screen.findByRole('heading', { name: 'New role' });
-    fireEvent.change(nameField(), { target: { value: '  Cashier ' } });
-    fireEvent.change(screen.getByLabelText('Description'), {
-      target: { value: 'Takes cash' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Create role' }));
+    await user.type(nameField(), '  Cashier ');
+    await user.type(screen.getByLabelText('Description'), 'Takes cash');
+    await user.click(screen.getByRole('button', { name: 'Create role' }));
     await waitFor(() => {
       expect(onCreated).toHaveBeenCalledWith('cashier');
     });
@@ -627,8 +634,8 @@ describe('RolePage create and save', () => {
   it('offers Assign it to someone only with member:update', async () => {
     const { onCreated } = setup({ access: accessOf('ac:create') });
     await screen.findByRole('heading', { name: 'New role' });
-    fireEvent.change(nameField(), { target: { value: 'Cashier' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create role' }));
+    await user.type(nameField(), 'Cashier');
+    await user.click(screen.getByRole('button', { name: 'Create role' }));
     await waitFor(() => {
       expect(onCreated).toHaveBeenCalled();
     });
@@ -641,10 +648,11 @@ describe('RolePage create and save', () => {
     expect(
       screen.queryByText('Give the role a name first.')
     ).not.toBeInTheDocument();
-    fireEvent.blur(nameField());
+    await user.click(nameField());
+    await user.tab();
     expect(screen.getByText('Give the role a name first.')).toBeInTheDocument();
     expect(nameField()).toHaveAttribute('aria-invalid', 'true');
-    fireEvent.change(nameField(), { target: { value: 'Cashier' } });
+    await user.type(nameField(), 'Cashier');
     expect(
       screen.queryByText('Give the role a name first.')
     ).not.toBeInTheDocument();
@@ -659,8 +667,8 @@ describe('RolePage create and save', () => {
     );
     setup({ create });
     await screen.findByRole('heading', { name: 'New role' });
-    fireEvent.change(nameField(), { target: { value: 'Bursar' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create role' }));
+    await user.type(nameField(), 'Bursar');
+    await user.click(screen.getByRole('button', { name: 'Create role' }));
     expect(
       await screen.findByText('A role called Bursar already exists.')
     ).toBeInTheDocument();
@@ -672,10 +680,11 @@ describe('RolePage create and save', () => {
     expect(
       await screen.findByRole('button', { name: 'Save changes' })
     ).toBeDisabled();
-    fireEvent.change(nameField(), { target: { value: 'Fees clerk' } });
+    await user.clear(nameField());
+    await user.type(nameField(), 'Fees clerk');
     const save = screen.getByRole('button', { name: 'Save changes' });
     expect(save).toBeEnabled();
-    fireEvent.click(save);
+    await user.click(save);
     await waitFor(() => {
       expect(update).toHaveBeenCalledWith({
         params: { slug: 'bursar' },
@@ -698,10 +707,10 @@ describe('RolePage create and save', () => {
       })
     );
     setup({ slug: 'bursar', update });
-    fireEvent.change(await screen.findByLabelText('Name'), {
-      target: { value: 'Other' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    const name = await screen.findByLabelText('Name');
+    await user.clear(name);
+    await user.type(name, 'Other');
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
     expect(
       await screen.findByText(
         'You can’t give access you don’t have yourself. Switch those parts off and save again.'
@@ -725,7 +734,7 @@ describe('RolePage holders', () => {
 
   it('lists holders and opens their member page', async () => {
     const { onOpenMember } = setup({ slug: 'bursar', roles: withHolders });
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('button', { name: /Kemi Adeyemi/ })
     );
     expect(onOpenMember).toHaveBeenCalledWith(holders[0]?.memberId);
@@ -735,10 +744,10 @@ describe('RolePage holders', () => {
     setup({ slug: 'bursar', roles: withHolders });
     await screen.findByRole('heading', { name: /^Bursar/ });
     expect(screen.queryByText('If you save now')).not.toBeInTheDocument();
-    fireEvent.click(level('Students', 'Can change'));
+    await user.click(level('Students', 'Can change'));
     expect(screen.getByText('If you save now')).toBeInTheDocument();
     expect(screen.getByText('+1')).toBeInTheDocument();
-    fireEvent.click(level('Students', 'No access'));
+    await user.click(level('Students', 'No access'));
     expect(screen.getByText('−1')).toBeInTheDocument();
   });
 
@@ -757,7 +766,7 @@ describe('RolePage holders', () => {
     expect(screen.queryByText('Kemi Adeyemi')).not.toBeInTheDocument();
     resolveList(roleListResponse(withHolders));
     await screen.findByRole('heading', { name: /^Bursar/ });
-    fireEvent.click(level('Students', 'No access'));
+    await user.click(level('Students', 'No access'));
     expect(screen.getByText('−1')).toBeInTheDocument();
     expect(screen.queryByText('no change')).not.toBeInTheDocument();
   });

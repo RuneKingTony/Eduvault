@@ -1,4 +1,5 @@
-import { fireEvent, screen, within } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { ApiError } from '@eduvault/api-contract';
 import {
   billingApi,
@@ -10,6 +11,12 @@ import { currentCalendar } from '../test-calendar';
 import { studentList, studentRow } from '../test-students';
 import { ownerAccess, starterAccess } from '../test-utils';
 import { InvoicesPage } from './invoices-page';
+
+let user: ReturnType<typeof userEvent.setup>;
+
+beforeEach(() => {
+  user = userEvent.setup();
+});
 
 function setup(
   api = billingApi(),
@@ -110,24 +117,19 @@ describe('InvoicesPage', () => {
   it('puts a changed filter or search in the address and returns to page one', async () => {
     const { onSearchChange } = setup(billingApi(), { page: 3 });
     await screen.findByText('Ada Okeke');
-    fireEvent.change(screen.getByLabelText('Kind'), {
-      target: { value: 'store' },
-    });
+    await user.selectOptions(screen.getByLabelText('Kind'), 'store');
     expect(onSearchChange).toHaveBeenLastCalledWith({
       page: undefined,
       kind: 'store',
     });
-    fireEvent.change(screen.getByLabelText('Status'), {
-      target: { value: 'draft' },
-    });
+    await user.selectOptions(screen.getByLabelText('Status'), 'draft');
     expect(onSearchChange).toHaveBeenLastCalledWith({
       page: undefined,
       status: 'draft',
       kind: undefined,
     });
-    fireEvent.change(screen.getByLabelText('Search charges'), {
-      target: { value: 'CHG-2026' },
-    });
+    await user.click(screen.getByLabelText('Search charges'));
+    await user.paste('CHG-2026');
     expect(onSearchChange).toHaveBeenLastCalledWith({
       page: undefined,
       q: 'CHG-2026',
@@ -171,7 +173,7 @@ describe('InvoicesPage', () => {
 
     it('is shown to a member who can charge and puts new=1 in the address', async () => {
       const { onSearchChange } = setup(billingApi(), { q: 'ada' });
-      fireEvent.click(
+      await user.click(
         await screen.findByRole('button', { name: 'New charge' })
       );
       expect(onSearchChange).toHaveBeenLastCalledWith({ q: 'ada', new: 1 });

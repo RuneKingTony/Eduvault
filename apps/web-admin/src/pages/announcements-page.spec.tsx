@@ -1,4 +1,5 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import {
   ApiError,
   type Announcement,
@@ -22,6 +23,12 @@ vi.mock('@eduvault/ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@eduvault/ui')>()),
   toast: { success: vi.fn(), error: vi.fn() },
 }));
+
+let user: ReturnType<typeof userEvent.setup>;
+
+beforeEach(() => {
+  user = userEvent.setup();
+});
 
 const WRITER: Permission[] = [
   'announcement:create',
@@ -155,7 +162,7 @@ function setup(
 }
 
 const openNew = async () => {
-  fireEvent.click(
+  await user.click(
     await screen.findByRole('button', { name: 'New announcement' })
   );
   return screen.findByRole('dialog');
@@ -190,12 +197,12 @@ describe('AnnouncementsPage list', () => {
     expect(
       screen.getByText('Published 9 Oct 2026 by Tunde Bakare')
     ).toBeInTheDocument();
-    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Drafts 1' }));
+    await user.click(screen.getByRole('tab', { name: 'Drafts 1' }));
     expect(
       await screen.findByText('Draft saved 9 Oct 2026 by Tunde Bakare')
     ).toBeInTheDocument();
     expect(screen.getByText('Everyone')).toBeInTheDocument();
-    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Withdrawn 1' }));
+    await user.click(screen.getByRole('tab', { name: 'Withdrawn 1' }));
     expect(
       await screen.findByText('Withdrawn 3 Oct 2026 by Tunde Bakare')
     ).toBeInTheDocument();
@@ -207,10 +214,10 @@ describe('AnnouncementsPage list', () => {
     for (const name of ['Edit', 'Unpin', 'Withdraw']) {
       expect(screen.getByRole('button', { name })).toBeInTheDocument();
     }
-    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Drafts 1' }));
+    await user.click(screen.getByRole('tab', { name: 'Drafts 1' }));
     await screen.findByText('Sports day');
     expect(screen.getByRole('button', { name: 'Publish' })).toBeInTheDocument();
-    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Withdrawn 1' }));
+    await user.click(screen.getByRole('tab', { name: 'Withdrawn 1' }));
     await screen.findByText('Old news');
     expect(
       screen.getByRole('button', { name: 'Publish again' })
@@ -230,7 +237,7 @@ describe('AnnouncementsPage list', () => {
     expect(
       await screen.findByText('Showing 1 to 10 of 23')
     ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Page 2' }));
+    await user.click(screen.getByRole('button', { name: 'Page 2' }));
     await waitFor(() => {
       expect(api.announcements.list).toHaveBeenCalledWith({
         query: { status: 'published', page: 2 },
@@ -260,7 +267,7 @@ describe('AnnouncementsPage list', () => {
         counts: { published: 0, draft: 0, withdrawn: 0 },
       }),
     });
-    fireEvent.mouseDown(await screen.findByRole('tab', { name: `${tab} 0` }));
+    await user.click(await screen.findByRole('tab', { name: `${tab} 0` }));
     expect(await screen.findByText(title)).toBeInTheDocument();
   });
 
@@ -269,7 +276,7 @@ describe('AnnouncementsPage list', () => {
     api.announcements.list.mockRejectedValue(
       new ApiError(500, { code: 'InternalError', message: 'List is down' })
     );
-    fireEvent.mouseDown(await screen.findByRole('tab', { name: 'Drafts 1' }));
+    await user.click(await screen.findByRole('tab', { name: 'Drafts 1' }));
     expect(await screen.findByText('List is down')).toBeInTheDocument();
   });
 });
@@ -341,7 +348,7 @@ describe('AnnouncementsPage editor', () => {
     setup();
     await openNew();
     const message = await screen.findByLabelText('Message');
-    fireEvent.change(message, { target: { value: 'Bring water' } });
+    await user.type(message, 'Bring water');
     expect(screen.getByText('11 / 2,000')).toBeInTheDocument();
     expect(message).toHaveAttribute('maxlength', '2000');
     expect(screen.getByLabelText('Title')).toHaveAttribute('maxlength', '80');
@@ -349,7 +356,7 @@ describe('AnnouncementsPage editor', () => {
 
   it('hides Save as draft when editing a published item', async () => {
     setup();
-    fireEvent.click(await screen.findByRole('button', { name: 'Edit' }));
+    await user.click(await screen.findByRole('button', { name: 'Edit' }));
     expect(
       await screen.findByRole('button', { name: 'Save changes' })
     ).toBeInTheDocument();
@@ -359,9 +366,9 @@ describe('AnnouncementsPage editor', () => {
 
   it('keeps Save as draft when editing a draft', async () => {
     setup();
-    fireEvent.mouseDown(await screen.findByRole('tab', { name: 'Drafts 1' }));
+    await user.click(await screen.findByRole('tab', { name: 'Drafts 1' }));
     await screen.findByText('Sports day');
-    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    await user.click(screen.getByRole('button', { name: 'Edit' }));
     expect(
       await screen.findByRole('button', { name: 'Save as draft' })
     ).toBeInTheDocument();
@@ -397,7 +404,7 @@ describe('AnnouncementsPage editor', () => {
   it('refuses an empty form with the toast and sends nothing', async () => {
     const api = setup();
     await openNew();
-    fireEvent.click(await screen.findByRole('button', { name: 'Publish' }));
+    await user.click(await screen.findByRole('button', { name: 'Publish' }));
     await waitFor(() => {
       expect(toast.error).toHaveBeenCalledWith('Add a title and a message.');
     });
@@ -407,14 +414,10 @@ describe('AnnouncementsPage editor', () => {
   it('saves a draft with its pin ignored and switches to the Drafts tab', async () => {
     const api = setup();
     await openNew();
-    fireEvent.change(await screen.findByLabelText('Title'), {
-      target: { value: 'Sports day' },
-    });
-    fireEvent.change(screen.getByLabelText('Message'), {
-      target: { value: 'Bring water.' },
-    });
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Pin to the top' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Save as draft' }));
+    await user.type(await screen.findByLabelText('Title'), 'Sports day');
+    await user.type(screen.getByLabelText('Message'), 'Bring water.');
+    await user.click(screen.getByRole('checkbox', { name: 'Pin to the top' }));
+    await user.click(screen.getByRole('button', { name: 'Save as draft' }));
     await waitFor(() => {
       expect(api.announcements.create).toHaveBeenCalledWith({
         body: {
@@ -445,13 +448,9 @@ describe('AnnouncementsPage editor', () => {
       campuses: [campus(LEKKI, 'Lekki')],
     });
     await openNew();
-    fireEvent.change(await screen.findByLabelText('Title'), {
-      target: { value: 'PTA meeting' },
-    });
-    fireEvent.change(screen.getByLabelText('Message'), {
-      target: { value: 'Saturday.' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Publish' }));
+    await user.type(await screen.findByLabelText('Title'), 'PTA meeting');
+    await user.type(screen.getByLabelText('Message'), 'Saturday.');
+    await user.click(screen.getByRole('button', { name: 'Publish' }));
     await waitFor(() => {
       expect(toast.success).toHaveBeenCalledWith(
         'Published to Lekki families.'
@@ -474,8 +473,8 @@ describe('AnnouncementsPage editor', () => {
     api.announcements.update.mockRejectedValue(
       new ApiError(404, { code: 'NotFound', message: 'Announcement not found' })
     );
-    fireEvent.click(await screen.findByRole('button', { name: 'Edit' }));
-    fireEvent.click(
+    await user.click(await screen.findByRole('button', { name: 'Edit' }));
+    await user.click(
       await screen.findByRole('button', { name: 'Save changes' })
     );
     await waitFor(() => {
@@ -496,9 +495,9 @@ describe('AnnouncementsPage row actions', () => {
 
   it('publishes a draft from its row and opens the Published tab', async () => {
     const api = setup();
-    fireEvent.mouseDown(await screen.findByRole('tab', { name: 'Drafts 1' }));
+    await user.click(await screen.findByRole('tab', { name: 'Drafts 1' }));
     await screen.findByText('Sports day');
-    fireEvent.click(screen.getByRole('button', { name: 'Publish' }));
+    await user.click(screen.getByRole('button', { name: 'Publish' }));
     await waitFor(() => {
       expect(api.announcements.publish).toHaveBeenCalledWith({
         params: { id: DRAFT_ID },
@@ -519,7 +518,7 @@ describe('AnnouncementsPage row actions', () => {
 
   it('withdraws a published item and opens the Withdrawn tab', async () => {
     const api = setup();
-    fireEvent.click(await screen.findByRole('button', { name: 'Withdraw' }));
+    await user.click(await screen.findByRole('button', { name: 'Withdraw' }));
     await waitFor(() => {
       expect(api.announcements.withdraw).toHaveBeenCalledWith({
         params: { id: LIVE_ID },
@@ -540,7 +539,7 @@ describe('AnnouncementsPage row actions', () => {
 
   it('unpins a pinned item', async () => {
     const api = setup();
-    fireEvent.click(await screen.findByRole('button', { name: 'Unpin' }));
+    await user.click(await screen.findByRole('button', { name: 'Unpin' }));
     await waitFor(() => {
       expect(api.announcements.pin).toHaveBeenCalledWith({
         params: { id: LIVE_ID },
