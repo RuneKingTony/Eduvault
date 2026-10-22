@@ -2,7 +2,7 @@ import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { ReceiptTextIcon } from 'lucide-react';
 import type { StudentStatement } from '@eduvault/api-contract';
-import { useCan, useCanAny } from '@eduvault/auth-client';
+import { useCanAny } from '@eduvault/auth-client';
 import { FINANCE_READ_GATE } from '@eduvault/policy';
 import { statementTiles } from '@eduvault/shared';
 import {
@@ -17,9 +17,8 @@ import {
   Skeleton,
 } from '@eduvault/ui';
 import { useApi } from '../api';
-import { feeOptionsQueryOptions, statementQueryOptions } from '../queries';
+import { statementQueryOptions } from '../queries';
 import { searchFor } from '../route-search-defaults';
-import { OptionalFeesCard } from './fees/optional-fees-card';
 
 function Tiles({ statement }: { statement: UseQueryResult<StudentStatement> }) {
   const { data } = statement;
@@ -72,33 +71,9 @@ function NoFees() {
   );
 }
 
-export function StudentFeesTab({
-  studentId,
-  firstName,
-}: {
-  studentId: string;
-  firstName: string;
-}) {
-  const canFinance = useCanAny(FINANCE_READ_GATE);
-  const canOptions = useCan('feeLine', 'read');
-  const options = useQuery({
-    ...feeOptionsQueryOptions(useApi(), studentId),
-    enabled: canOptions,
-  });
-  const showOptions = canOptions && options.data?.length !== 0;
-  if (!canFinance && !showOptions) {
+export function StudentFeesTab({ studentId }: { studentId: string }) {
+  if (!useCanAny(FINANCE_READ_GATE)) {
     return <NoFees />;
   }
-  return (
-    <div className="flex flex-col gap-4">
-      {canFinance ? <MoneySummary studentId={studentId} /> : null}
-      {showOptions ? (
-        <OptionalFeesCard
-          studentId={studentId}
-          firstName={firstName}
-          options={options}
-        />
-      ) : null}
-    </div>
-  );
+  return <MoneySummary studentId={studentId} />;
 }

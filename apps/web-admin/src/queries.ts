@@ -669,12 +669,6 @@ export const feePreviewQueryOptions = (
     queryFn: () => api.feeLines.preview({ query: { termId, studentId } }),
   });
 
-export const feeOptionsQueryOptions = (api: Api, studentId: string) =>
-  queryOptions({
-    queryKey: [...FEES_KEY, 'options', studentId],
-    queryFn: () => api.feeOptions.list({ params: { studentId }, query: {} }),
-  });
-
 export const feeOptInsQueryOptions = (
   api: Api,
   query: { feeTypeId: string; termId: string; q: string }

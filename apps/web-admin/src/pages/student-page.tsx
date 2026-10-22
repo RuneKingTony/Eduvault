@@ -14,7 +14,7 @@ import type {
   StudentTab,
 } from '@eduvault/api-contract';
 import { Can, useCanAny } from '@eduvault/auth-client';
-import { FINANCE_READ_GATE, type Gate } from '@eduvault/policy';
+import { FINANCE_READ_GATE } from '@eduvault/policy';
 import { fmtDate } from '@eduvault/shared';
 import {
   Badge,
@@ -89,11 +89,6 @@ interface StudentPageProps {
 }
 
 type PageTab = 'fees';
-
-const FEES_TAB_GATE = [
-  ...FINANCE_READ_GATE,
-  'feeLine:read',
-] as const satisfies Gate;
 
 interface Issued {
   logins: LoginCredential[];
@@ -494,7 +489,7 @@ function StudentTabs({
   onTabChange: (tab: PageTab | undefined) => void;
   overview: ReactNode;
 }) {
-  const canSeeFees = useCanAny(FEES_TAB_GATE);
+  const canSeeFees = useCanAny(FINANCE_READ_GATE);
   if (!canSeeFees) {
     return <>{overview}</>;
   }
@@ -511,7 +506,7 @@ function StudentTabs({
       </TabsList>
       <TabsContent value="overview">{overview}</TabsContent>
       <TabsContent value="fees">
-        <StudentFeesTab studentId={student.id} firstName={student.firstName} />
+        <StudentFeesTab studentId={student.id} />
       </TabsContent>
     </Tabs>
   );

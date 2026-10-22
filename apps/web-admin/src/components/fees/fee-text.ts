@@ -49,15 +49,6 @@ export const copiedFeesToast = (count: number, source: string): string =>
 export const feeTypeAddedToast = (name: string): string =>
   `${name} added as a fee type.`;
 
-export const optionToast = (
-  firstName: string,
-  feeType: string,
-  optedIn: boolean
-): string =>
-  optedIn
-    ? `${firstName} now takes ${feeType} from the next round of charges.`
-    : `${firstName} no longer takes ${feeType} from the next round of charges.`;
-
 export const optInsToast = (
   feeType: string,
   optedIn: boolean,
