@@ -8,18 +8,19 @@ import { toPermissionMap, type Permission } from '@eduvault/policy';
 import type {
   AdmitStudent,
   GuardianDraftInput,
+  LoginCredential,
   StudentDetail,
 } from '@eduvault/api-contract';
 import type { AccountService, OrgContext } from '../../common/auth';
 import {
   AdmissionRepository,
   type AdmissionClass,
-  type AdmissionOutcome,
-  type AdmissionWrite,
   type CurrentTerm,
   type DuplicateMatch,
 } from './admission.repository';
+import type { AdmissionTx } from './admission-tx';
 import { AdmissionService } from './admission.service';
+import { FakeAdmissionTx } from './fake-admission-tx';
 import type { StudentService } from './student.service';
 
 const ORG = 'school-a';
@@ -57,8 +58,8 @@ class FakeAdmissions extends AdmissionRepository {
   requireGuardian = true;
   known = new Set<string>([EXISTING]);
   matches: DuplicateMatch[] = [];
-  writes: AdmissionWrite[] = [];
-  newLogin = true;
+  txs: FakeAdmissionTx[] = [];
+  loginEmails: string[] = [];
   currentDay = '2026-10-11';
 
   today() {
@@ -111,38 +112,29 @@ class FakeAdmissions extends AdmissionRepository {
     return Promise.resolve(this.matches);
   }
 
-  admit(write: AdmissionWrite): Promise<AdmissionOutcome> {
-    this.writes.push(write);
-    return Promise.resolve({
-      studentId: 'student-1',
-      admissionNumber: 'GF-0234',
-      studentUsername: 'greenfield-0234',
-      guardians: write.guardians.map((draft, index) =>
-        draft.kind === 'existing'
-          ? {
-              guardianId: draft.guardianId,
-              name: 'Ifeanyi Okeke',
-              relationship: draft.relationship,
-              isNew: false,
-              newLogin: false,
-              email: null,
-              username: null,
-            }
-          : {
-              guardianId: `guardian-${index}`,
-              name: draft.guardian.fullName,
-              relationship: draft.guardian.relationship,
-              isNew: true,
-              newLogin: this.newLogin,
-              email:
-                draft.guardian.login.kind === 'email'
-                  ? draft.guardian.login.email
-                  : null,
-              username:
-                draft.guardian.login.kind === 'username' ? 'udoh-family' : null,
-            }
-      ),
+  transaction<T>(fn: (tx: AdmissionTx) => Promise<T>): Promise<T> {
+    const tx = new FakeAdmissionTx();
+    tx.guardians.set(EXISTING, {
+      id: EXISTING,
+      organizationId: ORG,
+      fullName: 'Ifeanyi Okeke',
+      phone: '08011112222',
+      email: null,
+      address: '4 Palm Close',
+      photoFileId: null,
+      userId: 'user-existing',
+      createdBy: 'staff-1',
     });
+    for (const email of this.loginEmails) {
+      tx.users.set(`user-${email}`, {
+        id: `user-${email}`,
+        email,
+        username: null,
+        passwordHash: null,
+      });
+    }
+    this.txs.push(tx);
+    return fn(tx);
   }
 }
 
@@ -206,15 +198,20 @@ const draft = (id: string) =>
     relationship: 'father',
   }) as GuardianDraftInput;
 
-const firstNewHash = (write: AdmissionWrite | undefined): string => {
-  const first = write?.guardians[0];
-  return first?.kind === 'new' ? first.passwordHash : '';
+const onlyTx = (admissions: FakeAdmissions): FakeAdmissionTx => {
+  const [tx] = admissions.txs;
+  if (tx === undefined) {
+    throw new Error('No transaction was opened');
+  }
+  return tx;
 };
 
-const payersOf = (write: AdmissionWrite | undefined) =>
-  write?.guardians.map((guardian) =>
-    guardian.kind === 'new' ? guardian.guardian.paysFees : guardian.paysFees
-  );
+const hashOf = (tx: FakeAdmissionTx, username: string) =>
+  [...tx.users.values()].find((user) => user.username === username)
+    ?.passwordHash;
+
+const plainOf = (login: LoginCredential | undefined) =>
+  login?.temporaryPassword ?? '';
 
 describe('AdmissionService.admit validation order', () => {
   it('refuses a date of birth after today before anything else', async () => {
@@ -224,7 +221,7 @@ describe('AdmissionService.admit validation order', () => {
     await expect(
       service.admit(admin, input({ dateOfBirth: '2026-10-12' }))
     ).rejects.toThrow('Choose a date of birth on or before today.');
-    expect(admissions.writes).toHaveLength(0);
+    expect(admissions.txs).toHaveLength(0);
   });
 
   it('answers 409 with no current term, before it looks at the class', async () => {
@@ -267,7 +264,7 @@ describe('AdmissionService.admit validation order', () => {
     await expect(service.admit(admin, input({}, []))).rejects.toThrow(
       'Add at least one guardian, or switch off “Guardian needed to admit” in Admissions rules.'
     );
-    expect(admissions.writes).toHaveLength(0);
+    expect(admissions.txs).toHaveLength(0);
   });
 
   it('admits with no guardian when none is required', async () => {
@@ -276,7 +273,7 @@ describe('AdmissionService.admit validation order', () => {
 
     const result = await service.admit(bare, input({}, []));
 
-    expect(admissions.writes[0]?.guardians).toEqual([]);
+    expect(admissions.txs[0]?.links).toEqual([]);
     expect(result.logins).toHaveLength(1);
   });
 });
@@ -288,14 +285,12 @@ describe('AdmissionService.admit term', () => {
     await service.admit(admin, input());
     await service.admit(admin, input({ termId: 'term-1' }));
 
-    expect(admissions.writes.map((write) => write.term.termId)).toEqual([
-      'term-1',
-      'term-1',
-    ]);
-    expect(admissions.writes.map((write) => write.startsLater)).toEqual([
-      false,
-      false,
-    ]);
+    expect(
+      admissions.txs.map((tx) => tx.enrolments.map((row) => row.termId))
+    ).toEqual([['term-1'], ['term-1']]);
+    for (const tx of admissions.txs) {
+      expect(tx.activity[0]?.text).not.toContain(' from ');
+    }
   });
 
   it('places in the next term of the same session when it is named', async () => {
@@ -303,15 +298,14 @@ describe('AdmissionService.admit term', () => {
 
     await service.admit(admin, input({ termId: 'term-2' }));
 
-    expect(admissions.writes[0]).toMatchObject({
-      startsLater: true,
-      term: {
-        termId: 'term-2',
-        termName: 'Second term',
-        sessionId: 'session-1',
-        sessionName: '2026/2027',
-      },
+    const [tx] = admissions.txs;
+    expect(tx?.enrolments[0]).toMatchObject({
+      termId: 'term-2',
+      sessionId: 'session-1',
     });
+    expect(tx?.activity[0]?.text).toContain(
+      'placed in JSS 2 Gold from Second term,'
+    );
   });
 
   it('answers 400 for any other term, and for the next term when there is none', async () => {
@@ -324,7 +318,7 @@ describe('AdmissionService.admit term', () => {
     await expect(
       service.admit(admin, input({ termId: 'term-2' }))
     ).rejects.toBeInstanceOf(BadRequestException);
-    expect(admissions.writes).toHaveLength(0);
+    expect(admissions.txs).toHaveLength(0);
   });
 
   it('offers the next term in the preview, or null in the last term of the year', async () => {
@@ -346,7 +340,7 @@ describe('AdmissionService.admit permission matrix', () => {
     await expect(service.admit(bare, input())).rejects.toBeInstanceOf(
       ForbiddenException
     );
-    expect(admissions.writes).toHaveLength(0);
+    expect(admissions.txs).toHaveLength(0);
   });
 
   it('answers 403 for a new guardian without guardian:create but allows an existing one', async () => {
@@ -360,7 +354,7 @@ describe('AdmissionService.admit permission matrix', () => {
       ForbiddenException
     );
     await service.admit(linkOnly, input({}, [existing]));
-    expect(admissions.writes).toHaveLength(1);
+    expect(admissions.txs).toHaveLength(1);
   });
 
   it('answers 404 for an unknown existing guardian and 400 for the same one twice', async () => {
@@ -393,8 +387,12 @@ describe('AdmissionService.admit write', () => {
       ] as GuardianDraftInput[])
     );
 
-    expect(payersOf(admissions.writes[0])).toEqual([true, false]);
-    expect(payersOf(admissions.writes[1])).toEqual([false, true]);
+    expect(
+      admissions.txs.map((tx) => tx.links.map((row) => row.paysFees))
+    ).toEqual([
+      [true, false],
+      [false, true],
+    ]);
   });
 
   it('hands the repository hashes, never plain passwords, and returns the plain ones once', async () => {
@@ -402,8 +400,9 @@ describe('AdmissionService.admit write', () => {
 
     const result = await service.admit(admin, input());
 
-    const write = admissions.writes[0];
-    expect(write?.studentPasswordHash.startsWith('hash:')).toBe(true);
+    const tx = onlyTx(admissions);
+    const studentHash = hashOf(tx, 'greenfield-0234');
+    expect(studentHash?.startsWith('hash:')).toBe(true);
     const [student, guardian] = result.logins;
     expect(student).toMatchObject({
       who: 'student',
@@ -411,9 +410,7 @@ describe('AdmissionService.admit write', () => {
       username: 'greenfield-0234',
       existing: false,
     });
-    expect(fakeHash(student?.temporaryPassword ?? '')).toBe(
-      write?.studentPasswordHash
-    );
+    expect(fakeHash(plainOf(student))).toBe(studentHash);
     expect(guardian).toMatchObject({
       who: 'guardian',
       name: 'Mrs Udoh',
@@ -421,17 +418,15 @@ describe('AdmissionService.admit write', () => {
       relationship: 'mother',
       existing: false,
     });
-    expect(fakeHash(guardian?.temporaryPassword ?? '')).toBe(
-      firstNewHash(write)
-    );
-    expect(JSON.stringify(write)).not.toContain(
-      student?.temporaryPassword ?? 'x'
+    expect(fakeHash(plainOf(guardian))).toBe(hashOf(tx, 'udoh-family'));
+    expect(JSON.stringify([...tx.users.values()])).not.toContain(
+      plainOf(student)
     );
   });
 
   it('lists a reused login with no password and leaves existing guardians out', async () => {
     const { admissions, service } = setup();
-    admissions.newLogin = false;
+    admissions.loginEmails = ['udoh@example.com'];
     const existing = {
       existingGuardianId: EXISTING,
       relationship: 'father',
