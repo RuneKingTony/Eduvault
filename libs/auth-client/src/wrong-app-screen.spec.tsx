@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { AuthClientProvider } from './auth-client-context';
 import type { EduvaultAuthClient } from './auth-client';
 import { WrongAppScreen } from './wrong-app-screen';
@@ -22,6 +23,12 @@ function setup(queryClient = new QueryClient()) {
   return { signOut, queryClient };
 }
 
+let user: ReturnType<typeof userEvent.setup>;
+
+beforeEach(() => {
+  user = userEvent.setup();
+});
+
 describe('WrongAppScreen', () => {
   it('shows the title and links to the other app, with no nav', () => {
     setup();
@@ -37,7 +44,7 @@ describe('WrongAppScreen', () => {
     queryClient.setQueryData(['students'], ['kept']);
     const { signOut } = setup(queryClient);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+    await user.click(screen.getByRole('button', { name: 'Sign out' }));
 
     await waitFor(() => {
       expect(signOut).toHaveBeenCalledOnce();
