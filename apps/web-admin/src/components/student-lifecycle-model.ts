@@ -5,11 +5,10 @@ import type {
   StudentLife,
 } from '@eduvault/api-contract';
 import {
-  INACTIVE_AFTER_DAYS,
   addDays,
-  daysBetween,
   fmtDate,
   inactiveFrom,
+  isInactiveByAbsence,
 } from '@eduvault/shared';
 
 const NOT_SEEN_DEFAULT_DAYS_AGO = 7;
@@ -101,7 +100,7 @@ export function markAwayToast(
   student: Pick<StudentDetail, 'firstName'>,
   input: { date: string; today: string }
 ): Toast {
-  if (daysBetween(input.date, input.today) >= INACTIVE_AFTER_DAYS) {
+  if (isInactiveByAbsence(input.date, input.today)) {
     return {
       kind: 'warning',
       text: `Over 5 weeks away, so ${student.firstName} is now Inactive and won’t be billed for new terms.`,

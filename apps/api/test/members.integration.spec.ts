@@ -21,6 +21,7 @@ import {
   createSchoolYear,
 } from './support/factories/calendar';
 import { approveLeave, askLeave } from './support/factories/leave';
+import { expectSeatsConsistent } from './support/seats';
 import { assignClassTeacher, createClass } from './support/factories/classes';
 import {
   MATHS,
@@ -1191,7 +1192,7 @@ test.describe('members', () => {
       api,
       pool,
       hire,
-      schools: { owner, lekki },
+      schools: { owner, orgA, lekki },
     }) => {
       const target = await hire(owner, { campusIds: [lekki.id] });
       await api(target.user).get('/campuses').expect(200);
@@ -1218,6 +1219,7 @@ test.describe('members', () => {
       const refused = await api(target.user).get('/campuses').expect(403);
       expect(refused.body.code).toBe('NoSchool');
       await api(owner).get(`/members/${target.member.id}`).expect(404);
+      await expectSeatsConsistent(pool, orgA.id);
     });
   });
 

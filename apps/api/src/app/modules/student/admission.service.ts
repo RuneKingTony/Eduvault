@@ -61,7 +61,6 @@ function stateOf(match: DuplicateMatch, today: string): string {
   const facts = {
     notSeenSince: match.notSeenSince,
     exitKind: match.exitKind,
-    newInCurrentSession: false,
     today,
   };
   return isDueToBeLeft(facts)

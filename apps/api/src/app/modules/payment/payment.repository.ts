@@ -1,5 +1,4 @@
 import type {
-  MoneyAccountKind,
   Payment,
   PaymentListQuery,
   PaymentListSummary,
@@ -8,6 +7,7 @@ import type {
   RecordingChild,
   RecordingPayer,
 } from '@eduvault/api-contract';
+import type { UsableMoneyAccount } from '../../common/money-accounts';
 import type {
   ExistingPayment,
   InsertOutcome,
@@ -21,17 +21,6 @@ export type { ExistingPayment, InsertOutcome } from '../../common/payments';
 export interface NewRecordedPayment extends NewPayment {
   userName: string;
 }
-
-export type RecordingAccount =
-  | { status: 'missing' }
-  | { status: 'retired' }
-  | { status: 'gateway' }
-  | {
-      status: 'ok';
-      ledgerAccountId: string;
-      campusId: string | null;
-      kind: MoneyAccountKind;
-    };
 
 export interface PaymentPage {
   items: PaymentSummary[];
@@ -64,7 +53,7 @@ export abstract class PaymentRepository {
   abstract recordingAccount(
     scope: OrgScope,
     moneyAccountId: string
-  ): Promise<RecordingAccount>;
+  ): Promise<UsableMoneyAccount>;
 
   abstract guardianName(
     scope: OrgScope,

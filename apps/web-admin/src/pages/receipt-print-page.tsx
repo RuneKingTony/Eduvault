@@ -3,20 +3,14 @@ import { createPortal } from 'react-dom';
 import { useQuery } from '@tanstack/react-query';
 import { PrinterIcon } from 'lucide-react';
 import {
-  ApiError,
   type Payment,
   type SchoolProfile,
   PAYMENT_METHOD_LABELS,
 } from '@eduvault/api-contract';
 import { fmtDate, initials, logoSrc, money } from '@eduvault/shared';
-import {
-  Button,
-  ErrorMessage,
-  NotFoundState,
-  PageSkeleton,
-  SchoolCrest,
-} from '@eduvault/ui';
+import { Button, SchoolCrest } from '@eduvault/ui';
 import { useApi } from '../api';
+import { DetailNotFound, DetailPage } from '../components/detail-page';
 import { BackToReceiptButton } from '../components/payments/payment-links';
 import { API_URL } from '../env';
 import {
@@ -188,30 +182,18 @@ export function ReceiptPrintPage({ paymentId }: { paymentId: string }) {
   const payment = useQuery(paymentQueryOptions(api, paymentId));
   const profile = useQuery(schoolProfileQueryOptions(api));
   const settings = useQuery(schoolSettingsQueryOptions(api));
-  if (payment.error instanceof ApiError && payment.error.status === 404) {
-    return (
-      <NotFoundState
-        title="No receipt here"
-        description="It may have been moved, or it may belong to a campus you don’t look after."
-      />
-    );
-  }
-  const failure = payment.error ?? profile.error ?? settings.error;
-  if (failure !== null) {
-    return <ErrorMessage error={failure} />;
-  }
-  if (
-    payment.data === undefined ||
-    profile.data === undefined ||
-    settings.data === undefined
-  ) {
-    return <PageSkeleton rows={2} />;
-  }
   return (
-    <PrintBody
-      payment={payment.data}
-      profile={profile.data}
-      footer={settings.data.receiptFooter}
-    />
+    <DetailPage
+      queries={[payment, profile, settings]}
+      notFound={<DetailNotFound title="No receipt here" />}
+    >
+      {([loaded, school, setting]) => (
+        <PrintBody
+          payment={loaded}
+          profile={school}
+          footer={setting.receiptFooter}
+        />
+      )}
+    </DetailPage>
   );
 }

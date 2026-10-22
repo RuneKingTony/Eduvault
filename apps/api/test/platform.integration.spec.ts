@@ -10,6 +10,7 @@ import {
   type TestUser,
 } from './support/base-test';
 import { createStudent } from './support/factories/students';
+import { expectSeatsConsistent } from './support/seats';
 
 const test = baseTest;
 
@@ -802,17 +803,7 @@ consoleTest.describe('platform console', () => {
         );
         expect(old.rows).toEqual([]);
         expect((await campusRows()).rows).toEqual([]);
-        const counts = await pool.query<{
-          memberCount: number;
-          actual: string;
-        }>(
-          `SELECT t."memberCount", (SELECT count(*) FROM "teamMember" m WHERE m."teamId" = t.id) AS actual
-           FROM team t WHERE t."organizationId" = $1`,
-          [id]
-        );
-        for (const row of counts.rows) {
-          expect(Number(row.actual)).toBe(row.memberCount);
-        }
+        await expectSeatsConsistent(pool, id);
         expect(await kit.ownerCount(id)).toBe(1);
       }
     );

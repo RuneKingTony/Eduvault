@@ -6,28 +6,25 @@ import {
   SendIcon,
   TriangleAlertIcon,
 } from 'lucide-react';
-import { ApiError, type BillingRun } from '@eduvault/api-contract';
+import type { BillingRun } from '@eduvault/api-contract';
 import { Can } from '@eduvault/auth-client';
 import { money } from '@eduvault/shared';
 import {
   Alert,
   AlertDescription,
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
   Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  ErrorMessage,
-  NotFoundState,
-  PageSkeleton,
 } from '@eduvault/ui';
 import { useApi } from '../api';
+import {
+  BackButton,
+  DetailCrumbs,
+  DetailNotFound,
+  DetailPage,
+} from '../components/detail-page';
 import { CancelRoundDialog } from '../components/billing/cancel-round-dialog';
 import { chargesCount } from '../components/billing/billing-text';
 import { RoundChargesCard } from '../components/billing/round-charges-card';
@@ -38,38 +35,25 @@ import { billingRunQueryOptions } from '../queries';
 
 function Crumbs({ last, onBack }: { last: string; onBack: () => void }) {
   return (
-    <Breadcrumb>
-      <BreadcrumbList>
-        <BreadcrumbItem>
-          <BreadcrumbLink asChild>
-            <button type="button" onClick={onBack}>
-              Charge students
-            </button>
-          </BreadcrumbLink>
-        </BreadcrumbItem>
-        <BreadcrumbSeparator />
-        <BreadcrumbItem>
-          <BreadcrumbPage>{last}</BreadcrumbPage>
-        </BreadcrumbItem>
-      </BreadcrumbList>
-    </Breadcrumb>
+    <DetailCrumbs
+      parent={
+        <button type="button" onClick={onBack}>
+          Charge students
+        </button>
+      }
+      last={last}
+    />
   );
 }
 
 function RunNotFound({ onBack }: { onBack: () => void }) {
   return (
-    <section className="flex flex-col gap-4">
-      <Crumbs last="Not found" onBack={onBack} />
-      <h1>Not found</h1>
-      <NotFoundState
-        title="No charge round here"
-        description="It may have been moved, or it may belong to a campus you don’t look after."
-      >
-        <Button type="button" variant="outline" onClick={onBack}>
-          Back to charge students
-        </Button>
-      </NotFoundState>
-    </section>
+    <DetailNotFound
+      heading="Not found"
+      crumbs={<Crumbs last="Not found" onBack={onBack} />}
+      title="No charge round here"
+      back={<BackButton label="Back to charge students" onBack={onBack} />}
+    />
   );
 }
 
@@ -208,14 +192,11 @@ export function BillingRunPage({
   onBack: () => void;
 }) {
   const run = useQuery(billingRunQueryOptions(useApi(), runId, page));
-  if (run.error instanceof ApiError && run.error.status === 404) {
-    return <RunNotFound onBack={onBack} />;
-  }
-  if (run.isError) {
-    return <ErrorMessage error={run.error} />;
-  }
-  if (run.data === undefined) {
-    return <PageSkeleton rows={2} />;
-  }
-  return <RunBody run={run.data} page={page} onPage={onPage} onBack={onBack} />;
+  return (
+    <DetailPage queries={[run]} notFound={<RunNotFound onBack={onBack} />}>
+      {([data]) => (
+        <RunBody run={data} page={page} onPage={onPage} onBack={onBack} />
+      )}
+    </DetailPage>
+  );
 }

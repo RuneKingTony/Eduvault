@@ -8,6 +8,7 @@ import type {
 } from '@eduvault/api-contract';
 import type { ActivityInput } from '../../common/activity';
 import type { OrgScope } from '../../common/scope';
+import type { UsableMoneyAccount } from '../../common/money-accounts';
 
 export type ItemRecord = Omit<Item, 'stock' | 'state'>;
 
@@ -63,12 +64,6 @@ export type ItemUpdateOutcome =
   | { status: 'duplicate' }
   | { status: 'retired' }
   | { status: 'missing' };
-
-export type MoneyAccountCheck =
-  | { status: 'missing' }
-  | { status: 'retired' }
-  | { status: 'gateway' }
-  | { status: 'ok'; ledgerAccountId: string; campusId: string | null };
 
 export interface ExistingDelivery {
   id: string;
@@ -153,7 +148,7 @@ export abstract class StoreRepository {
   abstract moneyAccount(
     scope: OrgScope,
     moneyAccountId: string
-  ): Promise<MoneyAccountCheck>;
+  ): Promise<UsableMoneyAccount>;
 
   abstract hasOpeningStock(
     organizationId: string,

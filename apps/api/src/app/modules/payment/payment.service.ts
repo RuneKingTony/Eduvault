@@ -39,8 +39,8 @@ import {
   PaymentRepository,
   type ExistingPayment,
   type InsertOutcome,
-  type RecordingAccount,
 } from './payment.repository';
+import type { UsableMoneyAccount } from '../../common/money-accounts';
 import { orgScopeOf, type OrgScope } from '../../common/scope';
 
 const sumOf = (rows: readonly { amountMinor: number }[]): number =>
@@ -245,7 +245,7 @@ export class PaymentService {
   private async usableAccount(
     scope: OrgScope,
     input: RecordPayment
-  ): Promise<Extract<RecordingAccount, { status: 'ok' }>> {
+  ): Promise<Extract<UsableMoneyAccount, { status: 'ok' }>> {
     const account = await this.payments.recordingAccount(
       scope,
       input.moneyAccountId
