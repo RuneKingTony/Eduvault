@@ -40,8 +40,8 @@ import {
   type ExistingPayment,
   type InsertOutcome,
   type PaymentScope,
-  type RecordingAccount,
 } from './payment.repository';
+import type { UsableMoneyAccount } from '../../common/money-accounts';
 
 const scopeOf = (ctx: OrgContext): PaymentScope => ({
   organizationId: ctx.organizationId,
@@ -250,7 +250,7 @@ export class PaymentService {
   private async usableAccount(
     scope: PaymentScope,
     input: RecordPayment
-  ): Promise<Extract<RecordingAccount, { status: 'ok' }>> {
+  ): Promise<Extract<UsableMoneyAccount, { status: 'ok' }>> {
     const account = await this.payments.recordingAccount(
       scope,
       input.moneyAccountId

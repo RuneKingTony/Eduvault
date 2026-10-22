@@ -61,6 +61,7 @@ function setup(balanceMinor = 1_200_000) {
   repo.creditAccounts.set(TUITION, { status: 'ok', ledgerAccountId: TUITION });
   repo.refundAccounts.set(GTBANK, {
     status: 'ok',
+    kind: 'bank',
     ledgerAccountId: 'gtbank-ledger',
     campusId: null,
   });

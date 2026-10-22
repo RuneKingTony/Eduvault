@@ -22,6 +22,7 @@ import {
 } from '@eduvault/api-contract';
 import type { OrgContext } from '../../common/auth';
 import { Clock } from '../../common/clock';
+import type { UsableMoneyAccount } from '../../common/money-accounts';
 import type { MoneyAccountService } from '../money-account/money-account.service';
 import { paymentRequestHash, type ProofState } from '../../common/payments';
 import {
@@ -31,7 +32,6 @@ import {
   type NewRecordedPayment,
   type PaymentPage,
   type PaymentScope,
-  type RecordingAccount,
   type RecordingPeople,
 } from './payment.repository';
 import { PaymentService } from './payment.service';
@@ -86,7 +86,7 @@ const stored = (id = 'payment-1'): Omit<Payment, 'currency'> => ({
   voidEntry: null,
 });
 
-const okAccount = (kind: 'bank' | 'cash' | 'pos'): RecordingAccount => ({
+const okAccount = (kind: 'bank' | 'cash' | 'pos'): UsableMoneyAccount => ({
   status: 'ok',
   ledgerAccountId: 'ledger-1',
   campusId: null,
@@ -99,7 +99,7 @@ class FakePayments extends PaymentRepository {
   raced: ExistingPayment | undefined;
   lookups = 0;
   visible: Omit<Payment, 'currency'> | undefined = stored();
-  account: RecordingAccount = okAccount('bank');
+  account: UsableMoneyAccount = okAccount('bank');
   guardian: string | undefined = 'Ngozi Okeke';
   inScope: string[] = [ADA, CHIDI];
   proofState: ProofState = 'free';
