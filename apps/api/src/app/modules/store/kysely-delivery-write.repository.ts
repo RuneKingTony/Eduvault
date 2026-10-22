@@ -8,6 +8,7 @@ import { SYSTEM_REFERENCE_PREFIXES } from '@eduvault/shared';
 import type { DB } from '../../../db/db-types';
 import type { ActivityWriter } from '../../common/activity';
 import { advisoryLock } from '../../common/db/advisory-lock';
+import { claimReference } from '../../common/references/apply-once';
 import { uniqueViolation } from '../../common/db/unique-violation';
 import {
   allocateDocumentNumber,
@@ -206,28 +207,25 @@ async function recordIn(
   input: NewDelivery
 ): Promise<DeliveryOutcome> {
   const { organizationId, reference } = input;
-  await advisoryLock(trx, `delivery:${organizationId}:${reference}`);
+  const claim = await claimReference(trx, {
+    lockKey: `delivery:${organizationId}:${reference}`,
+    requestHash: input.requestHash,
+    find: () => findDeliveryByReference(trx, organizationId, reference),
+  });
+  if (claim.status === 'replayed') {
+    return { status: 'replayed', id: claim.existing.id };
+  }
+  if (claim.status === 'clash') {
+    return { status: 'reference_used', number: claim.existing.number };
+  }
   if (input.isOpening) {
     await advisoryLock(
       trx,
       `delivery-opening:${organizationId}:${input.store.id}`
     );
-  }
-  const existing = await findDeliveryByReference(
-    trx,
-    organizationId,
-    reference
-  );
-  if (existing !== undefined) {
-    return existing.requestHash === input.requestHash
-      ? { status: 'replayed', id: existing.id }
-      : { status: 'reference_used', number: existing.number };
-  }
-  if (
-    input.isOpening &&
-    (await hasOpeningStock(trx, organizationId, input.store.id))
-  ) {
-    return { status: 'opening_exists' };
+    if (await hasOpeningStock(trx, organizationId, input.store.id)) {
+      return { status: 'opening_exists' };
+    }
   }
   return create(trx, deps, input);
 }

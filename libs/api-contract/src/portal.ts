@@ -129,6 +129,7 @@ export const portalStatementRowSchema = z.object({
   effectiveOn: z.iso.date(),
   description: z.string(),
   status: statementRowStatusSchema,
+  voided: z.boolean().optional(),
   amountMinor: z.number().int().positive(),
 });
 export type PortalStatementRow = z.infer<typeof portalStatementRowSchema>;

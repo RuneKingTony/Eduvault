@@ -1,7 +1,7 @@
 import { Link } from '@tanstack/react-router';
 import {
-  ROW_STATUS_LABELS,
-  isOwingStatus,
+  rowStatusLabel,
+  rowTone,
   type StatementRow,
   type StudentStatement,
 } from '@eduvault/api-contract';
@@ -56,8 +56,8 @@ function rowsOf({ rows, currency }: StudentStatement): StatementCardRow[] {
     date: fmtDate(row.effectiveOn),
     what: <Described row={row} />,
     note: row.reference,
-    status: ROW_STATUS_LABELS[row.status],
-    tone: isOwingStatus(row.status) ? 'owe' : 'paid',
+    status: rowStatusLabel(row),
+    tone: rowTone(row),
     amount: money(row.amountMinor, currency),
   }));
 }

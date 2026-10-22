@@ -1,4 +1,5 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
+import userEvent, { type UserEvent } from '@testing-library/user-event';
 import {
   ApiError,
   type MePermissions,
@@ -81,9 +82,9 @@ function setup({ member = detail(), notice, access }: Options = {}) {
   return { onBack, onRemoved, api };
 }
 
-async function openMenu() {
+async function openMenu(user: UserEvent) {
   const trigger = await screen.findByRole('button', { name: 'More actions' });
-  fireEvent.keyDown(trigger, { key: 'Enter' });
+  await user.click(trigger);
 }
 
 describe('MemberPage', () => {
@@ -143,28 +144,31 @@ describe('MemberPage', () => {
   });
 
   it('hides Remove for the school’s last owner', async () => {
+    const user = userEvent.setup();
     setup({
       member: detail({ roles: ['member', 'owner'], lastOwner: true }),
     });
-    await openMenu();
+    await openMenu(user);
     expect(
       screen.queryByRole('menuitem', { name: 'Remove from school…' })
     ).not.toBeInTheDocument();
   });
 
   it('shows Remove for an owner when there is a second owner', async () => {
+    const user = userEvent.setup();
     setup({
       member: detail({ roles: ['member', 'owner'], lastOwner: false }),
     });
-    await openMenu();
+    await openMenu(user);
     expect(
       screen.getByRole('menuitem', { name: 'Remove from school…' })
     ).toBeInTheDocument();
   });
 
   it('hides Remove without member:delete but still offers a reset', async () => {
+    const user = userEvent.setup();
     setup({ access: starterAccess('administrator') });
-    await openMenu();
+    await openMenu(user);
     expect(
       screen.getByRole('menuitem', { name: 'Reset password…' })
     ).toBeInTheDocument();
@@ -174,22 +178,24 @@ describe('MemberPage', () => {
   });
 
   it('offers a reset to an editor and opens its confirmation', async () => {
+    const user = userEvent.setup();
     setup({ member: detail({ roles: ['member', 'teacher'] }) });
-    await openMenu();
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Reset password…' }));
+    await openMenu(user);
+    await user.click(screen.getByRole('menuitem', { name: 'Reset password…' }));
     expect(
       await screen.findByRole('heading', { name: 'Reset Ada Obi’s password?' })
     ).toBeInTheDocument();
   });
 
   it('offers no reset without member:update', async () => {
+    const user = userEvent.setup();
     setup({
       member: detail({ roles: ['member', 'teacher'] }),
       access: fakeAccess({
         permissions: toPermissionMap(['member:read', 'member:delete']),
       }),
     });
-    await openMenu();
+    await openMenu(user);
     expect(
       screen.queryByRole('menuitem', { name: 'Reset password…' })
     ).not.toBeInTheDocument();
@@ -199,16 +205,18 @@ describe('MemberPage', () => {
   });
 
   it('offers no reset for your own page', async () => {
+    const user = userEvent.setup();
     setup({
       member: detail({ roles: ['member', 'teacher'], userId: 'someone-else' }),
     });
-    await openMenu();
+    await openMenu(user);
     expect(
       screen.queryByRole('menuitem', { name: 'Reset password…' })
     ).not.toBeInTheDocument();
   });
 
   it('shows a not found state with Go back', async () => {
+    const user = userEvent.setup();
     const { onBack } = setup({
       member: new ApiError(404, {
         code: 'NotFound',
@@ -216,7 +224,7 @@ describe('MemberPage', () => {
       }),
     });
     expect(await screen.findByText('Member not found')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Go back' }));
+    await user.click(screen.getByRole('button', { name: 'Go back' }));
     expect(onBack).toHaveBeenCalled();
   });
 
@@ -256,8 +264,9 @@ describe('MemberPage', () => {
   });
 
   it('offers Edit job title to an editor and opens its dialog', async () => {
+    const user = userEvent.setup();
     setup();
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('button', { name: 'Edit job title' })
     );
     expect(

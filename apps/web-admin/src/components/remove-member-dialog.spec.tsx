@@ -1,4 +1,5 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { ApiError } from '@eduvault/api-contract';
 import { toast } from '@eduvault/ui';
 import { renderWithApi } from '../test-utils';
@@ -44,8 +45,9 @@ describe('RemoveMemberDialog', () => {
   });
 
   it('removes the member, says so, closes and leaves the page', async () => {
+    const user = userEvent.setup();
     const { remove, onOpenChange, onRemoved } = setup();
-    fireEvent.click(screen.getByRole('button', { name: 'Remove member' }));
+    await user.click(screen.getByRole('button', { name: 'Remove member' }));
     await waitFor(() => {
       expect(remove).toHaveBeenCalledWith({ params: { id: detail().id } });
     });
@@ -57,6 +59,7 @@ describe('RemoveMemberDialog', () => {
   });
 
   it('keeps the dialog and the page when the server refuses', async () => {
+    const user = userEvent.setup();
     const { onOpenChange, onRemoved } = setup({
       remove: vi.fn().mockRejectedValue(
         new ApiError(409, {
@@ -65,7 +68,7 @@ describe('RemoveMemberDialog', () => {
         })
       ),
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Remove member' }));
+    await user.click(screen.getByRole('button', { name: 'Remove member' }));
     await waitFor(() => {
       expect(toast.error).toHaveBeenCalledWith(
         'Ada Obi is the school’s only owner and can’t be removed.'
@@ -75,9 +78,10 @@ describe('RemoveMemberDialog', () => {
     expect(onOpenChange).not.toHaveBeenCalled();
   });
 
-  it('cancels without calling the API', () => {
+  it('cancels without calling the API', async () => {
+    const user = userEvent.setup();
     const { remove, onOpenChange } = setup();
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(onOpenChange).toHaveBeenCalledWith(false);
     expect(remove).not.toHaveBeenCalled();
   });

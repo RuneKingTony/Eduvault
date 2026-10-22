@@ -70,7 +70,6 @@ export const SELF_APPROVAL_MESSAGE =
 export const ALREADY_DECIDED_MESSAGE = 'This has already been decided.';
 export const DECLINE_REASON_MESSAGE =
   'Say why you are declining. The person who asked will see it.';
-export const APPROVAL_NOT_FOUND_MESSAGE = 'Request not found';
 
 export const declineSchema = z.object({
   reason: z

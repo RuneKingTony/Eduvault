@@ -1,4 +1,5 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { platformSchool, renderWithApi, schoolList } from '../test-utils';
 import { PlatformSchoolsPage } from './platform-schools-page';
 
@@ -25,6 +26,12 @@ const manySchools = () =>
       nextCursor: 'next-page',
     }
   );
+
+let user: ReturnType<typeof userEvent.setup>;
+
+beforeEach(() => {
+  user = userEvent.setup();
+});
 
 describe('PlatformSchoolsPage', () => {
   it('shows the head, the three stat cards and a row per school', async () => {
@@ -103,11 +110,11 @@ describe('PlatformSchoolsPage', () => {
     const { onOpenSchool, onOpenAudit } = setup([
       schoolList([platformSchool()]),
     ]);
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('button', { name: 'Greenfield College' })
     );
     expect(onOpenSchool).toHaveBeenCalledExactlyOnceWith('s1');
-    fireEvent.click(screen.getByRole('button', { name: /Acting requests/ }));
+    await user.click(screen.getByRole('button', { name: /Acting requests/ }));
     expect(onOpenAudit).toHaveBeenCalledOnce();
   });
 
@@ -130,7 +137,7 @@ describe('PlatformSchoolsPage', () => {
     const box = await screen.findByRole('searchbox', {
       name: 'Search schools by name or slug',
     });
-    fireEvent.change(box, { target: { value: 'brendan' } });
+    await user.type(box, 'brendan');
     await waitFor(() => {
       expect(list).toHaveBeenLastCalledWith({
         query: expect.objectContaining({ q: 'brendan' }),
@@ -143,7 +150,7 @@ describe('PlatformSchoolsPage', () => {
     await screen.findByText('School 0');
     expect(screen.getByRole('button', { name: 'Previous' })).toBeDisabled();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    await user.click(screen.getByRole('button', { name: 'Next' }));
     await waitFor(() => {
       expect(list).toHaveBeenLastCalledWith({
         query: expect.objectContaining({ cursor: 'next-page' }),
@@ -151,7 +158,7 @@ describe('PlatformSchoolsPage', () => {
     });
     expect(await screen.findByText('Page 2')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Previous' }));
+    await user.click(screen.getByRole('button', { name: 'Previous' }));
     expect(await screen.findByText('Page 1')).toBeInTheDocument();
   });
 });

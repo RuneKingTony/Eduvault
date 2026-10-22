@@ -1,8 +1,10 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { SuspendedScreen } from './suspended-screen';
 
 describe('SuspendedScreen', () => {
-  it('names the paused school and offers sign out', () => {
+  it('names the paused school and offers sign out', async () => {
+    const user = userEvent.setup();
     const onSignOut = vi.fn();
     render(
       <SuspendedScreen
@@ -16,11 +18,12 @@ describe('SuspendedScreen', () => {
       screen.getByText('St Brendan’s is paused on Eduvault')
     ).toBeInTheDocument();
     expect(screen.getByText('Contact the school for details.')).toBeVisible();
-    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+    await user.click(screen.getByRole('button', { name: 'Sign out' }));
     expect(onSignOut).toHaveBeenCalledOnce();
   });
 
-  it('offers to check again, for a school reactivated meanwhile', () => {
+  it('offers to check again, for a school reactivated meanwhile', async () => {
+    const user = userEvent.setup();
     const onRetry = vi.fn();
     render(
       <SuspendedScreen
@@ -30,7 +33,7 @@ describe('SuspendedScreen', () => {
         onRetry={onRetry}
       />
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Check again' }));
+    await user.click(screen.getByRole('button', { name: 'Check again' }));
     expect(onRetry).toHaveBeenCalledOnce();
   });
 

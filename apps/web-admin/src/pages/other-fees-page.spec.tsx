@@ -1,4 +1,5 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { ApiError } from '@eduvault/api-contract';
 import { toast } from '@eduvault/ui';
 import {
@@ -22,6 +23,12 @@ vi.mock('@eduvault/ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@eduvault/ui')>()),
   toast: { success: vi.fn(), error: vi.fn() },
 }));
+
+let user: ReturnType<typeof userEvent.setup>;
+
+beforeEach(() => {
+  user = userEvent.setup();
+});
 
 const ptaLine = feeLine({
   id: FEE_LINE_PTA,
@@ -158,15 +165,13 @@ describe('OtherFeesPage', () => {
 
   it('reports the chip picked', async () => {
     const { onSearchChange } = setup();
-    fireEvent.mouseDown(await screen.findByRole('tab', { name: 'PTA fee' }), {
-      button: 0,
-    });
+    await user.click(await screen.findByRole('tab', { name: 'PTA fee' }));
     expect(onSearchChange).toHaveBeenCalledWith({ type: PTA.id });
   });
 
   it('adds a fee type from the dialog and refreshes the chips', async () => {
     const { api } = setup();
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('button', { name: 'New fee type' })
     );
     const dialog = await screen.findByRole('dialog');
@@ -175,10 +180,8 @@ describe('OtherFeesPage', () => {
         'For example Sports levy or Exam fee. Add the amounts afterwards.'
       )
     ).toBeInTheDocument();
-    fireEvent.change(within(dialog).getByLabelText('Name'), {
-      target: { value: 'Sports levy' },
-    });
-    fireEvent.click(
+    await user.type(within(dialog).getByLabelText('Name'), 'Sports levy');
+    await user.click(
       within(dialog).getByRole('button', { name: 'Add fee type' })
     );
     await waitFor(() => {
@@ -195,11 +198,11 @@ describe('OtherFeesPage', () => {
 
   it('asks for a name and toasts a duplicate refusal', async () => {
     const { api } = setup();
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('button', { name: 'New fee type' })
     );
     const dialog = await screen.findByRole('dialog');
-    fireEvent.click(
+    await user.click(
       within(dialog).getByRole('button', { name: 'Add fee type' })
     );
     expect(
@@ -212,10 +215,8 @@ describe('OtherFeesPage', () => {
         message: 'A fee type called PTA fee already exists.',
       })
     );
-    fireEvent.change(within(dialog).getByLabelText('Name'), {
-      target: { value: 'PTA fee' },
-    });
-    fireEvent.click(
+    await user.type(within(dialog).getByLabelText('Name'), 'PTA fee');
+    await user.click(
       within(dialog).getByRole('button', { name: 'Add fee type' })
     );
     await waitFor(() => {

@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { toast } from '@eduvault/ui';
 import { newDraft, type GuardianDraftState } from '../guardian-draft';
 import { testId } from '../test-api';
@@ -83,6 +84,12 @@ function setup(node: React.ReactElement, list = GUARDIANS) {
   return api;
 }
 
+let user: ReturnType<typeof userEvent.setup>;
+
+beforeEach(() => {
+  user = userEvent.setup();
+});
+
 describe('optionLabel', () => {
   it('joins name, phone and the children, and hides the rest for another campus', () => {
     expect(optionLabel(GUARDIANS[0]!)).toBe(
@@ -130,9 +137,10 @@ describe('GuardianPicker existing mode', () => {
     const api = setup(<Harness start={existing()} />);
     await screen.findByLabelText('Guardian');
     api.guardians.list.mockClear();
-    fireEvent.change(screen.getByLabelText('Or find by exact phone or email'), {
-      target: { value: '0803' },
-    });
+    await user.type(
+      screen.getByLabelText('Or find by exact phone or email'),
+      '0803'
+    );
     await waitFor(() => {
       expect(api.guardians.list).toHaveBeenCalledWith({
         query: { q: '0803', excludeStudentId: STUDENT_ID },
@@ -142,12 +150,13 @@ describe('GuardianPicker existing mode', () => {
 
   it('clears the chosen guardian when the mode switches', async () => {
     setup(<Harness start={existing()} />);
-    fireEvent.change(await screen.findByLabelText('Guardian'), {
-      target: { value: GUARDIAN_ID },
-    });
+    await user.selectOptions(
+      await screen.findByLabelText('Guardian'),
+      GUARDIAN_ID
+    );
     expect(screen.getByLabelText('Guardian')).toHaveValue(GUARDIAN_ID);
-    fireEvent.click(screen.getByLabelText('New guardian'));
-    fireEvent.click(await screen.findByLabelText('Existing guardian'));
+    await user.click(screen.getByLabelText('New guardian'));
+    await user.click(await screen.findByLabelText('Existing guardian'));
     expect(await screen.findByLabelText('Guardian')).toHaveValue('');
   });
 });
@@ -156,13 +165,11 @@ describe('GuardianPicker new mode', () => {
   it('shows the email field for the email login and a username preview for the username login', async () => {
     setup(<Harness start={fresh()} />);
     expect(await screen.findByLabelText('Email')).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('Full name'), {
-      target: { value: 'Mrs Udoh' },
-    });
-    fireEvent.click(screen.getByLabelText(/With a username/));
+    await user.type(screen.getByLabelText('Full name'), 'Mrs Udoh');
+    await user.click(screen.getByLabelText(/With a username/));
     expect(screen.queryByLabelText('Email')).not.toBeInTheDocument();
     expect(screen.getByText('udoh-family')).toBeInTheDocument();
-    fireEvent.click(screen.getByLabelText(/With their email/));
+    await user.click(screen.getByLabelText(/With their email/));
     expect(screen.getByLabelText('Email')).toBeInTheDocument();
   });
 
@@ -177,7 +184,7 @@ describe('GuardianPicker new mode', () => {
       'Pays the school fees (receives the charges)'
     );
     expect(box).toBeChecked();
-    fireEvent.click(box);
+    await user.click(box);
     expect(box).not.toBeChecked();
   });
 });
@@ -196,19 +203,17 @@ describe('photoProblem', () => {
   });
 });
 
-const choose = (file: File) => {
-  fireEvent.change(screen.getByLabelText('Photo file'), {
-    target: { files: [file] },
-  });
-};
+const choose = (file: File) =>
+  user.upload(screen.getByLabelText('Photo file'), file);
 
 describe('PhotoField', () => {
   beforeEach(() => {
+    user = userEvent.setup({ applyAccept: false });
     vi.clearAllMocks();
     vi.stubGlobal('URL', { ...URL, createObjectURL: () => 'blob:preview' });
   });
 
-  it('toasts the PRD copy for the wrong type and an oversized file and uploads nothing', () => {
+  it('toasts the PRD copy for the wrong type and an oversized file and uploads nothing', async () => {
     const onChange = vi.fn();
     const api = setup(
       <PhotoField
@@ -217,11 +222,11 @@ describe('PhotoField', () => {
         onChange={onChange}
       />
     );
-    choose(new File(['x'], 'a.gif', { type: 'image/gif' }));
+    await choose(new File(['x'], 'a.gif', { type: 'image/gif' }));
     expect(toast.error).toHaveBeenCalledWith(
       'Choose a PNG, JPG or WebP photo.'
     );
-    choose(
+    await choose(
       new File([new Uint8Array(1_048_577)], 'a.png', { type: 'image/png' })
     );
     expect(toast.error).toHaveBeenCalledWith(
@@ -240,7 +245,7 @@ describe('PhotoField', () => {
         onChange={onChange}
       />
     );
-    choose(new File(['x'], 'a.png', { type: 'image/png' }));
+    await choose(new File(['x'], 'a.png', { type: 'image/png' }));
     await waitFor(() => {
       expect(onChange).toHaveBeenCalledWith({
         fileId: PHOTO_FILE_ID,
@@ -251,7 +256,7 @@ describe('PhotoField', () => {
     expect(call?.[0].body.get('kind')).toBe('guardian_photo');
   });
 
-  it('offers Change photo and Remove once a photo is chosen', () => {
+  it('offers Change photo and Remove once a photo is chosen', async () => {
     const onChange = vi.fn();
     setup(
       <PhotoField
@@ -263,7 +268,7 @@ describe('PhotoField', () => {
     expect(
       screen.getByRole('button', { name: 'Change photo' })
     ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Remove' }));
+    await user.click(screen.getByRole('button', { name: 'Remove' }));
     expect(onChange).toHaveBeenCalledWith({ fileId: null, preview: null });
   });
 });

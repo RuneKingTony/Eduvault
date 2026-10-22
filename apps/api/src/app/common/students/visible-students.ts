@@ -1,6 +1,7 @@
 import { sql, type RawBuilder } from 'kysely';
 import type { CampusScope } from '../campus-scope';
 import type { ClassScope } from '../class-scope';
+import { effectiveCampusSql } from './effective-campus';
 import { inactiveSql } from './student-life-sql';
 
 interface VisibleStudentsOptions {
@@ -25,6 +26,11 @@ export const inScope = (
     ? sql<boolean>`FALSE`
     : sql<boolean>`${column} IN (${idList(scope)})`;
 };
+
+const EFFECTIVE_CAMPUS = effectiveCampusSql(
+  sql`cp.campus_id`,
+  sql`s.campus_id`
+);
 
 const VISIBLE_COLUMNS = sql`
         s.id,
@@ -51,7 +57,7 @@ const VISIBLE_COLUMNS = sql`
         to_char(s.archived_at AT TIME ZONE 'Africa/Lagos', 'YYYY-MM-DD') AS archived_on,
         ce.is_new_student AS new_in_session,
         cp.class_arm_id AS arm_id,
-        COALESCE(cp.campus_id, s.campus_id) AS campus_id,
+        ${EFFECTIVE_CAMPUS} AS campus_id,
         le.class_level_id AS latest_level_id
 `;
 
@@ -96,7 +102,7 @@ export function visibleStudentsCte(
       ) le ON TRUE
       WHERE s.organization_id = ${options.organizationId}
         ${only}
-        AND ${inScope(sql`COALESCE(cp.campus_id, s.campus_id)`, options.campusScope)}
+        AND ${inScope(EFFECTIVE_CAMPUS, options.campusScope)}
         AND ${inScope(sql`cp.class_arm_id`, options.classScope)}
     )`;
 }

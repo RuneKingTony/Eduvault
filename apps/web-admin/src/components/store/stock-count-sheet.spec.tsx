@@ -1,4 +1,5 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import {
   ApiError,
   STOCK_COUNT_NEGATIVE_MESSAGE,
@@ -62,16 +63,22 @@ function setup(
 const counted = (name: string) =>
   screen.findByLabelText<HTMLInputElement>(`Counted ${name}`);
 
-const change = (input: HTMLInputElement, text: string) => {
-  fireEvent.change(input, { target: { value: text } });
+let user: ReturnType<typeof userEvent.setup>;
+
+const change = async (input: HTMLInputElement, text: string) => {
+  await user.clear(input);
+  if (text !== '') {
+    await user.type(input, text);
+  }
 };
 
-const submit = () => {
-  fireEvent.click(screen.getByRole('button', { name: 'Submit count' }));
+const submit = async () => {
+  await user.click(screen.getByRole('button', { name: 'Submit count' }));
 };
 
 describe('StockCountSheet', () => {
   beforeEach(() => {
+    user = userEvent.setup();
     vi.clearAllMocks();
   });
 
@@ -101,9 +108,7 @@ describe('StockCountSheet', () => {
     const input = await counted('School shirt, Size 12');
     expect(input.value).toBe('0');
 
-    fireEvent.change(screen.getByLabelText('Campus'), {
-      target: { value: LEKKI.id },
-    });
+    await user.selectOptions(screen.getByLabelText('Campus'), LEKKI.id);
 
     expect((await counted('School shirt, Size 12')).value).toBe('12');
   });
@@ -116,12 +121,10 @@ describe('StockCountSheet', () => {
           stockCount({ status: 'matched', netValueMinor: 0, lines: [] })
         ),
     });
-    fireEvent.change(await screen.findByLabelText('Note'), {
-      target: { value: ' Half-term count ' },
-    });
+    await user.type(await screen.findByLabelText('Note'), ' Half-term count ');
     await counted('School tie');
 
-    submit();
+    await submit();
 
     await waitFor(() => {
       expect(api.stockCounts.submit).toHaveBeenCalledWith({
@@ -148,9 +151,9 @@ describe('StockCountSheet', () => {
     setup({
       submit: vi.fn().mockResolvedValue(stockCount({ status: 'approved' })),
     });
-    change(await counted('School tie'), '4');
+    await change(await counted('School tie'), '4');
 
-    submit();
+    await submit();
 
     await waitFor(() => {
       expect(toast.success).toHaveBeenCalledWith(
@@ -161,9 +164,9 @@ describe('StockCountSheet', () => {
 
   it('says what waits for approval and offers an Approvals action', async () => {
     const { api, onApprovals, onSubmitted } = setup();
-    change(await counted('School tie'), '4');
+    await change(await counted('School tie'), '4');
 
-    submit();
+    await submit();
 
     await waitFor(() => {
       expect(toast.success).toHaveBeenCalledWith(
@@ -192,9 +195,9 @@ describe('StockCountSheet', () => {
         })
       ),
     });
-    change(await counted('School tie'), '4');
+    await change(await counted('School tie'), '4');
 
-    submit();
+    await submit();
 
     await waitFor(() => {
       expect(toast.error).toHaveBeenCalledWith(
@@ -207,14 +210,14 @@ describe('StockCountSheet', () => {
 
   it('refuses a blank or negative figure before posting', async () => {
     const { api } = setup();
-    change(await counted('School tie'), '-1');
+    await change(await counted('School tie'), '-1');
 
-    submit();
+    await submit();
 
     expect(await screen.findByText(STOCK_COUNT_NEGATIVE_MESSAGE)).toBeVisible();
     expect(api.stockCounts.submit).not.toHaveBeenCalled();
-    change(await counted('School tie'), '');
-    submit();
+    await change(await counted('School tie'), '');
+    await submit();
     expect(api.stockCounts.submit).not.toHaveBeenCalled();
   });
 
@@ -222,7 +225,7 @@ describe('StockCountSheet', () => {
     const { onOpenChange } = setup();
     await counted('School tie');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
 
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });

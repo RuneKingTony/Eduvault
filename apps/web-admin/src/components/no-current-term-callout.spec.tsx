@@ -5,7 +5,8 @@ import {
   createRoute,
   createRouter,
 } from '@tanstack/react-router';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { PermissionsProvider } from '@eduvault/auth-client';
 import type { MePermissions } from '@eduvault/api-contract';
 import { fakeAccess, ownerAccess, starterAccess } from '../test-utils';
@@ -35,11 +36,12 @@ async function renderCallout(access: MePermissions) {
 
 describe('NoCurrentTermCallout', () => {
   it('offers the first school year to someone who can create one', async () => {
+    const user = userEvent.setup();
     const { router } = await renderCallout(ownerAccess());
     expect(
       screen.getByText('Create the first school year')
     ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'New school year' }));
+    await user.click(screen.getByRole('button', { name: 'New school year' }));
     await waitFor(() => {
       expect(router.state.location.pathname).toBe('/calendar');
     });

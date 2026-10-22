@@ -1,4 +1,5 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import {
   ApiError,
   INVOICE_CHARGE_AMOUNT_MESSAGE,
@@ -65,6 +66,8 @@ function setup(
   };
 }
 
+let user: ReturnType<typeof userEvent.setup>;
+
 const field = async (label: string, index = 0) =>
   (await screen.findAllByLabelText(label))[index]!;
 
@@ -72,30 +75,24 @@ const fillLine = async (
   index: number,
   line: { feeType: string; description: string; amount: string }
 ) => {
-  fireEvent.change(await field('Fee type', index), {
-    target: { value: line.feeType },
-  });
-  fireEvent.change(await field('Description', index), {
-    target: { value: line.description },
-  });
-  fireEvent.change(await field('Amount (₦)', index), {
-    target: { value: line.amount },
-  });
+  await user.selectOptions(await field('Fee type', index), line.feeType);
+  await user.type(await field('Description', index), line.description);
+  await user.type(await field('Amount (₦)', index), line.amount);
 };
 
 const chooseStudent = async () => {
   const select = await field('Student');
   await within(select).findByRole('option', { name: /Ada Okeke/ });
-  fireEvent.change(select, { target: { value: STUDENT_ID } });
+  await user.selectOptions(select, STUDENT_ID);
 };
 
-const submit = () => {
-  fireEvent.click(screen.getByRole('button', { name: 'Add charge' }));
-};
+const submit = () =>
+  user.click(screen.getByRole('button', { name: 'Add charge' }));
 
 describe('NewChargeSheet', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    user = userEvent.setup();
   });
 
   it('opens on one blank line with the current term, the total and both buttons', async () => {
@@ -132,7 +129,7 @@ describe('NewChargeSheet', () => {
       description: 'School trip',
       amount: '15,000',
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Add line' }));
+    await user.click(screen.getByRole('button', { name: 'Add line' }));
     await fillLine(1, {
       feeType: BUS.id,
       description: 'ID card',
@@ -142,7 +139,7 @@ describe('NewChargeSheet', () => {
     expect(screen.getByText('Total: ₦17,500.50')).toBeVisible();
     expect(screen.getAllByLabelText('Fee type')).toHaveLength(2);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Remove line 1' }));
+    await user.click(screen.getByRole('button', { name: 'Remove line 1' }));
 
     expect(screen.getAllByLabelText('Fee type')).toHaveLength(1);
     expect(screen.getByText('Total: ₦2,500.50')).toBeVisible();
@@ -156,9 +153,7 @@ describe('NewChargeSheet', () => {
     await field('Fee type');
     const add = screen.getByRole('button', { name: 'Add line' });
     for (let index = 0; index < 25; index += 1) {
-      if (!(add as HTMLButtonElement).disabled) {
-        fireEvent.click(add);
-      }
+      await user.click(add);
     }
 
     expect(screen.getAllByLabelText('Fee type')).toHaveLength(20);
@@ -173,13 +168,13 @@ describe('NewChargeSheet', () => {
       description: '  School trip  ',
       amount: '15,000',
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Add line' }));
+    await user.click(screen.getByRole('button', { name: 'Add line' }));
     await fillLine(1, {
       feeType: BUS.id,
       description: 'ID card',
       amount: '2500',
     });
-    submit();
+    await submit();
 
     await waitFor(() => {
       expect(toast.success).toHaveBeenCalledWith('Charge CHG-2026-00031 added');
@@ -217,7 +212,7 @@ describe('NewChargeSheet', () => {
       description: 'Trip',
       amount: '100',
     });
-    submit();
+    await submit();
 
     await waitFor(() => {
       expect(toast.warning).toHaveBeenCalledWith(
@@ -245,7 +240,7 @@ describe('NewChargeSheet', () => {
       description: 'Trip',
       amount: '100',
     });
-    submit();
+    await submit();
 
     await waitFor(() => {
       expect(toast.error).toHaveBeenCalledWith(
@@ -254,7 +249,7 @@ describe('NewChargeSheet', () => {
     });
     expect(onOpenChange).not.toHaveBeenCalled();
 
-    submit();
+    await submit();
     await waitFor(() => {
       expect(api.invoices.create).toHaveBeenCalledTimes(2);
     });
@@ -268,7 +263,7 @@ describe('NewChargeSheet', () => {
   it('shows what is missing and sends nothing', async () => {
     const { api } = setup();
     await field('Fee type');
-    submit();
+    await submit();
 
     expect(await screen.findByText(CHOOSE_STUDENT_MESSAGE)).toBeVisible();
     expect(screen.getByText(CHOOSE_FEE_TYPE_MESSAGE)).toBeVisible();
@@ -287,7 +282,7 @@ describe('NewChargeSheet', () => {
       description: 'Trip',
       amount: '0',
     });
-    submit();
+    await submit();
 
     expect(
       await screen.findByText(INVOICE_CHARGE_AMOUNT_MESSAGE)
@@ -306,7 +301,7 @@ describe('NewChargeSheet', () => {
     const { onOpenChange } = setup();
     await field('Fee type');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
 
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
