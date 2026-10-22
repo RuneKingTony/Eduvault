@@ -8,8 +8,7 @@ import {
   type MoneyAccount,
   type RecordDeliveryInput,
 } from '@eduvault/api-contract';
-import { parseNaira } from '@eduvault/shared';
-import { nairaText } from '../payments/record-payment-model';
+import { nairaInputText, parseNaira } from '@eduvault/shared';
 
 export interface LineState {
   quantity: string;
@@ -49,7 +48,7 @@ function linesFor(
   return Object.fromEntries(
     items.map((item) => [
       item.id,
-      { quantity: '', unitCost: nairaText(item.costPriceMinor) },
+      { quantity: '', unitCost: nairaInputText(item.costPriceMinor) },
     ])
   );
 }

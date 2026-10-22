@@ -66,6 +66,10 @@ describe('percentOf', () => {
     expect(percentOf(9, 5)).toBe(0);
     expect(percentOf(30, 5)).toBe(2);
     expect(percentOf(333, 50)).toBe(167);
+    expect(percentOf(1, 50)).toBe(1);
+    expect(percentOf(3, 50)).toBe(2);
+    expect(percentOf(0, 50)).toBe(0);
+    expect(percentOf(12_345_678, 100)).toBe(12_345_678);
   });
 });
 

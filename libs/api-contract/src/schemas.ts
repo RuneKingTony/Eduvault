@@ -31,6 +31,9 @@ export const JOURNAL_REFERENCE_CLASH_MESSAGE =
 export const notReservedReference = (reference: string): boolean =>
   !isReservedReference(reference);
 
+/** A whole amount in minor units; bounds belong to the field that has one. */
+export const minorSchema = z.number().int();
+
 const REFERENCE_SUFFIX_LENGTH = 8;
 
 export const datedReference = (

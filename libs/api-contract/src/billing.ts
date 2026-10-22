@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { FINANCE_PAGE_SIZE, FINANCE_PAGE_SIZE_MAX } from './finance';
 import { invoiceSummarySchema } from './invoices';
-import { currencySchema, idSchema } from './schemas';
+import { currencySchema, idSchema, minorSchema } from './schemas';
 
 export const BILLING_SCOPES = ['school', 'campus', 'level'] as const;
 export const BILLING_RUN_STATUSES = ['draft', 'issued', 'cancelled'] as const;
@@ -24,7 +24,6 @@ export const billingRunStatusSchema = z.enum(BILLING_RUN_STATUSES);
 export type BillingRunStatus = z.infer<typeof billingRunStatusSchema>;
 
 const countSchema = z.number().int().nonnegative();
-const minorSchema = z.number().int();
 
 export const prepareBodySchema = z
   .object({

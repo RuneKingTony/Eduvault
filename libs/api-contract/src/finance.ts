@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { currencySchema, idSchema } from './schemas';
+import { currencySchema, idSchema, minorSchema } from './schemas';
 
 export const MONEY_ACCOUNT_NAME_MAX = 80;
 export const MONEY_ACCOUNT_KINDS = ['cash', 'bank', 'pos', 'gateway'] as const;
@@ -73,7 +73,6 @@ export type LedgerAccountType = z.infer<typeof ledgerAccountTypeSchema>;
 export const journalKindSchema = z.enum(JOURNAL_KINDS);
 export type JournalKind = z.infer<typeof journalKindSchema>;
 
-const minorSchema = z.number().int();
 const nameOf = (required: string) =>
   z.string().trim().min(1, required).max(MONEY_ACCOUNT_NAME_MAX);
 const last4Schema = z.string().regex(/^\d{4}$/, MONEY_ACCOUNT_LAST4_MESSAGE);

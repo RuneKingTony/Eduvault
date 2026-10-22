@@ -5,6 +5,7 @@ export * from './days-off';
 export * from './leave';
 export * from './initials';
 export * from './naira';
+export * from './rounding';
 export * from './slug';
 export * from './route-match';
 export * from './time';

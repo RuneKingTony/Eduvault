@@ -4,7 +4,6 @@ import {
   ADJUSTMENT_STUDENT_AMOUNT_MESSAGE,
 } from '@eduvault/api-contract';
 import {
-  amountText,
   initialRequest,
   toRequestBody,
   validateRequest,
@@ -47,13 +46,6 @@ describe('initialRequest', () => {
         GTBANK
       )
     ).toMatchObject({ kind: 'refund', studentId: ADA, amount: '5000' });
-  });
-});
-
-describe('amountText', () => {
-  it('shows whole naira plainly and kobo with two places', () => {
-    expect(amountText(500_000)).toBe('5000');
-    expect(amountText(500_050)).toBe('5000.50');
   });
 });
 

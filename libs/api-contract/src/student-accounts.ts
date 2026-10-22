@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { FINANCE_PAGE_SIZE, FINANCE_PAGE_SIZE_MAX } from './finance';
-import { currencySchema, idSchema } from './schemas';
+import { currencySchema, idSchema, minorSchema } from './schemas';
 import { studentLifeSchema } from './students';
 
 export const BALANCE_FILTERS = [
@@ -58,8 +58,6 @@ export const rowTone = (row: {
   }
   return isOwingStatus(row.status) ? 'owe' : 'paid';
 };
-
-const minorSchema = z.number().int();
 const countSchema = z.number().int().nonnegative();
 
 export const balanceListQuerySchema = z.object({
