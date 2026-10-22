@@ -1,4 +1,5 @@
-import { fireEvent, screen, within } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
+import userEvent, { type UserEvent } from '@testing-library/user-event';
 import { actingAccess, renderWithApi, starterAccess } from '../test-utils';
 import {
   CATALOGUE,
@@ -58,6 +59,11 @@ function setup(
   return { members, ...handlers };
 }
 
+const typeInto = async (user: UserEvent, field: HTMLElement, value: string) => {
+  await user.clear(field);
+  await user.type(field, value);
+};
+
 describe('MembersPage', () => {
   it('shows the staff count, role badges, No roles and campus names', async () => {
     setup();
@@ -97,10 +103,9 @@ describe('MembersPage', () => {
   });
 
   it('reports typing in the search box and resets to the first page', async () => {
+    const user = userEvent.setup();
     const { onSearchChange } = setup({ search: { page: 3 } });
-    fireEvent.change(await screen.findByLabelText('Search'), {
-      target: { value: 'tunde' },
-    });
+    await typeInto(user, await screen.findByLabelText('Search'), 'tunde');
     expect(onSearchChange).toHaveBeenCalledWith({
       page: undefined,
       q: 'tunde',
@@ -108,8 +113,9 @@ describe('MembersPage', () => {
   });
 
   it('opens a member from the row', async () => {
+    const user = userEvent.setup();
     const { onOpenMember } = setup();
-    fireEvent.click(await screen.findByText('Tunde Bakare'));
+    await user.click(await screen.findByText('Tunde Bakare'));
     expect(onOpenMember).toHaveBeenCalledWith(TUNDE_ID);
   });
 
@@ -119,8 +125,9 @@ describe('MembersPage', () => {
   });
 
   it('offers Add member with member:create and opens the sheet through the search', async () => {
+    const user = userEvent.setup();
     const { onSearchChange } = setup();
-    fireEvent.click(await screen.findByRole('button', { name: 'Add member' }));
+    await user.click(await screen.findByRole('button', { name: 'Add member' }));
     expect(onSearchChange).toHaveBeenCalledWith({ add: 1 });
   });
 

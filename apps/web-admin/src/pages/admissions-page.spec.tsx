@@ -1,11 +1,8 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { ApiError, type SchoolSettings } from '@eduvault/api-contract';
-import { PermissionsProvider } from '@eduvault/auth-client';
 import { toast } from '@eduvault/ui';
-import { ApiProvider } from '../api';
-import { checked } from '../test-api';
-import { ownerAccess, renderWithApi, starterAccess } from '../test-utils';
+import { renderWithApi, renderWithRefusal, starterAccess } from '../test-utils';
 import { settings } from '../test-school';
 import { AdmissionsPage } from './admissions-page';
 
@@ -27,29 +24,6 @@ function setup(access?: ReturnType<typeof starterAccess>) {
   return api;
 }
 
-// The out-of-range number is a request the contract rejects, so only the server's refusal can answer it.
-function setupRefusal(update: ReturnType<typeof vi.fn>) {
-  const guarded = checked({
-    schoolSettings: { get: vi.fn().mockResolvedValue(settings()) },
-  });
-  const api = { schoolSettings: { get: guarded.schoolSettings.get, update } };
-  render(
-    <QueryClientProvider
-      client={
-        new QueryClient({ defaultOptions: { queries: { retry: false } } })
-      }
-    >
-      <ApiProvider
-        api={api as unknown as Parameters<typeof ApiProvider>[0]['api']}
-      >
-        <PermissionsProvider value={ownerAccess()}>
-          <AdmissionsPage />
-        </PermissionsProvider>
-      </ApiProvider>
-    </QueryClientProvider>
-  );
-}
-
 describe('AdmissionsPage (editable)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -67,10 +41,12 @@ describe('AdmissionsPage (editable)', () => {
   });
 
   it('saves the limit when it changes and says what it is now', async () => {
+    const user = userEvent.setup();
     const api = setup();
     const input = await screen.findByLabelText('Most guardians per student');
 
-    fireEvent.change(input, { target: { value: '3' } });
+    await user.clear(input);
+    await user.type(input, '3');
 
     await waitFor(() => {
       expect(api.schoolSettings.update).toHaveBeenCalledWith({
@@ -85,11 +61,14 @@ describe('AdmissionsPage (editable)', () => {
   });
 
   it('waits for typing to pause and saves only the final number', async () => {
+    const user = userEvent.setup();
     const api = setup();
     const input = await screen.findByLabelText('Most guardians per student');
 
-    fireEvent.change(input, { target: { value: '1' } });
-    fireEvent.change(input, { target: { value: '5' } });
+    await user.clear(input);
+    await user.type(input, '1');
+    await user.clear(input);
+    await user.type(input, '5');
 
     await waitFor(
       () => {
@@ -103,10 +82,12 @@ describe('AdmissionsPage (editable)', () => {
   });
 
   it('says "1 guardian" in the singular', async () => {
+    const user = userEvent.setup();
     setup();
     const input = await screen.findByLabelText('Most guardians per student');
 
-    fireEvent.change(input, { target: { value: '1' } });
+    await user.clear(input);
+    await user.type(input, '1');
 
     await waitFor(() => {
       expect(toast.success).toHaveBeenCalledWith(
@@ -116,20 +97,30 @@ describe('AdmissionsPage (editable)', () => {
   });
 
   it('shows the 400 message and puts the number back when the limit is out of range', async () => {
-    setupRefusal(
-      vi.fn().mockRejectedValue(
-        new ApiError(400, {
-          code: 'ValidationError',
-          message: 'Request validation failed',
-          issues: [
-            { path: 'maxGuardians', message: 'Choose a number from 1 to 6.' },
-          ],
-        })
-      )
-    );
+    const user = userEvent.setup();
+    renderWithRefusal(<AdmissionsPage />, {
+      api: { schoolSettings: { get: vi.fn().mockResolvedValue(settings()) } },
+      raw: {
+        schoolSettings: {
+          update: vi.fn().mockRejectedValue(
+            new ApiError(400, {
+              code: 'ValidationError',
+              message: 'Request validation failed',
+              issues: [
+                {
+                  path: 'maxGuardians',
+                  message: 'Choose a number from 1 to 6.',
+                },
+              ],
+            })
+          ),
+        },
+      },
+    });
     const input = await screen.findByLabelText('Most guardians per student');
 
-    fireEvent.change(input, { target: { value: '7' } });
+    await user.clear(input);
+    await user.type(input, '7');
 
     await waitFor(() => {
       expect(toast.error).toHaveBeenCalledWith('Choose a number from 1 to 6.');
@@ -142,10 +133,11 @@ describe('AdmissionsPage (editable)', () => {
   });
 
   it('saves the switch with the matching toast each way', async () => {
+    const user = userEvent.setup();
     const api = setup();
     const toggle = await screen.findByRole('switch');
 
-    fireEvent.click(toggle);
+    await user.click(toggle);
 
     await waitFor(() => {
       expect(api.schoolSettings.update).toHaveBeenCalledWith({

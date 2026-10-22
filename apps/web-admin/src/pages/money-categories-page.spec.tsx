@@ -1,4 +1,5 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type {
   JournalList,
   LedgerAccount,
@@ -17,6 +18,12 @@ vi.mock('@eduvault/ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@eduvault/ui')>()),
   toast: { success: vi.fn(), error: vi.fn() },
 }));
+
+let user: ReturnType<typeof userEvent.setup>;
+
+beforeEach(() => {
+  user = userEvent.setup();
+});
 
 const FEE_INCOME = '00000000-0000-4000-8000-0000000000e1';
 
@@ -145,7 +152,7 @@ describe('MoneyCategoriesPage chart', () => {
     expect(await screen.findByText('Category 1')).toBeInTheDocument();
     expect(screen.getByText('Category 10')).toBeInTheDocument();
     expect(screen.queryByText('Category 11')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Page 2' }));
+    await user.click(screen.getByRole('button', { name: 'Page 2' }));
     expect(await screen.findByText('Category 11')).toBeInTheDocument();
     expect(screen.queryByText('Category 1')).not.toBeInTheDocument();
   });
@@ -186,7 +193,7 @@ describe('MoneyCategoriesPage adding a fee category', () => {
 
   it('offers only Fee income as the parent and refuses a blank name', async () => {
     const { api } = setup();
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('button', { name: 'Add a fee category' })
     );
     const dialog = await screen.findByRole('dialog');
@@ -196,7 +203,7 @@ describe('MoneyCategoriesPage adding a fee category', () => {
     expect(options.map((option) => option.textContent)).toEqual([
       '4000 Fee income',
     ]);
-    fireEvent.click(
+    await user.click(
       within(dialog).getByRole('button', { name: 'Add category' })
     );
     expect(
@@ -207,14 +214,12 @@ describe('MoneyCategoriesPage adding a fee category', () => {
 
   it('adds the category and says it was added as a fee type', async () => {
     const { api } = setup();
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('button', { name: 'Add a fee category' })
     );
     const dialog = await screen.findByRole('dialog');
-    fireEvent.change(within(dialog).getByLabelText('Name'), {
-      target: { value: 'Sports' },
-    });
-    fireEvent.click(
+    await user.type(within(dialog).getByLabelText('Name'), 'Sports');
+    await user.click(
       within(dialog).getByRole('button', { name: 'Add category' })
     );
     await waitFor(() => {
@@ -235,7 +240,7 @@ describe('MoneyCategoriesPage tabs and journal', () => {
 
   it('asks to switch to the journal when its tab is clicked', async () => {
     const { onTabChange } = setup();
-    fireEvent.mouseDown(await screen.findByRole('tab', { name: 'Journal' }));
+    await user.click(await screen.findByRole('tab', { name: 'Journal' }));
     expect(onTabChange).toHaveBeenCalledWith('journal');
   });
 
@@ -245,7 +250,7 @@ describe('MoneyCategoriesPage tabs and journal', () => {
       name: /Opening balance/,
     });
     expect(within(entry).getByText('₦12,000')).toBeInTheDocument();
-    fireEvent.click(entry);
+    await user.click(entry);
     expect(
       await screen.findByText('1100 Fees owed to the school')
     ).toBeInTheDocument();
@@ -265,12 +270,8 @@ describe('MoneyCategoriesPage tabs and journal', () => {
   it('filters by date and kind', async () => {
     const { api } = setup({ tab: 'journal' });
     await screen.findByRole('button', { name: /Opening balance/ });
-    fireEvent.change(screen.getByLabelText('From'), {
-      target: { value: '2026-09-01' },
-    });
-    fireEvent.change(screen.getByLabelText('Kind'), {
-      target: { value: 'payment' },
-    });
+    await user.type(screen.getByLabelText('From'), '2026-09-01');
+    await user.selectOptions(screen.getByLabelText('Kind'), 'payment');
     await waitFor(() => {
       expect(api.journal.list).toHaveBeenLastCalledWith({
         query: { from: '2026-09-01', to: undefined, kind: 'payment', page: 1 },
@@ -282,12 +283,9 @@ describe('MoneyCategoriesPage tabs and journal', () => {
     const { api } = setup({ tab: 'journal' });
     await screen.findByRole('button', { name: /Opening balance/ });
     api.journal.list.mockClear();
-    fireEvent.change(screen.getByLabelText('From'), {
-      target: { value: '2026-10-02' },
-    });
-    fireEvent.change(screen.getByLabelText('To'), {
-      target: { value: '2026-10-01' },
-    });
+    await user.clear(screen.getByLabelText('From'));
+    await user.type(screen.getByLabelText('From'), '2026-10-02');
+    await user.type(screen.getByLabelText('To'), '2026-10-01');
     expect(
       await screen.findByText('The From date can’t be after the To date.')
     ).toBeInTheDocument();

@@ -41,12 +41,15 @@ export function toPortalStatement(
       archived: student.archived,
     },
     totals: own.totals,
-    rows: own.rows.map(({ effectiveOn, description, status, amountMinor }) => ({
-      effectiveOn,
-      description,
-      status,
-      amountMinor,
-    })),
+    rows: own.rows.map(
+      ({ effectiveOn, description, status, voided, amountMinor }) => ({
+        effectiveOn,
+        description,
+        status,
+        voided,
+        amountMinor,
+      })
+    ),
     total: own.total,
     page: own.page,
     pageSize: own.pageSize,

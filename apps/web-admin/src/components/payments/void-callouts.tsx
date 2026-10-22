@@ -16,7 +16,7 @@ export function VoidCallout({ payment }: { payment: Payment }) {
         <ClockIcon />
         <AlertDescription>
           Cancellation asked for by {cancellation.createdBy ?? 'someone'}: “
-          {cancellation.reason}”. Waiting for a boss to approve it.
+          {cancellation.reason}”. Waiting for an approver.
         </AlertDescription>
         <AlertAction>
           <SeeInApprovals />

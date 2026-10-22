@@ -1,4 +1,5 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { toast } from '@eduvault/ui';
 import { ApprovalsPage } from '../../pages/approvals-page';
 import {
@@ -61,8 +62,9 @@ describe('ApprovalsBell', () => {
   });
 
   it('lists the first requests with kind, details and amount, and offers Open approvals', async () => {
+    const user = userEvent.setup();
     setup();
-    fireEvent.click(await screen.findByRole('button', { name: 'Approvals' }));
+    await user.click(await screen.findByRole('button', { name: 'Approvals' }));
 
     expect(await screen.findByText('Waiting for you')).toBeVisible();
     expect(
@@ -78,9 +80,10 @@ describe('ApprovalsBell', () => {
   });
 
   it('opens the page of the request that was chosen', async () => {
+    const user = userEvent.setup();
     const { router } = setup();
-    fireEvent.click(await screen.findByRole('button', { name: 'Approvals' }));
-    fireEvent.click(await screen.findByText('Cancel a payment'));
+    await user.click(await screen.findByRole('button', { name: 'Approvals' }));
+    await user.click(await screen.findByText('Cancel a payment'));
 
     await waitFor(() => {
       expect(router.state.location.pathname).toBe('/finance/adjustments');
@@ -89,6 +92,7 @@ describe('ApprovalsBell', () => {
   });
 
   it('opens the Leave tab of Approvals for a leave request', async () => {
+    const user = userEvent.setup();
     const { router } = setup({
       summary: approvalSummary({
         waitingForMe: 1,
@@ -96,9 +100,9 @@ describe('ApprovalsBell', () => {
         preview: [leaveApproval()],
       }),
     });
-    fireEvent.click(await screen.findByRole('button', { name: 'Approvals' }));
+    await user.click(await screen.findByRole('button', { name: 'Approvals' }));
     expect(await screen.findByText('2 days')).toBeVisible();
-    fireEvent.click(await screen.findByText('Leave'));
+    await user.click(await screen.findByText('Leave'));
 
     await waitFor(() => {
       expect(router.state.location.pathname).toBe('/approvals');
@@ -121,6 +125,7 @@ describe('ApprovalsBell', () => {
   });
 
   it('opens the Stock counts tab for a store write-off', async () => {
+    const user = userEvent.setup();
     const { router } = setup({
       summary: approvalSummary({
         waitingForMe: 1,
@@ -128,8 +133,8 @@ describe('ApprovalsBell', () => {
         preview: [storeWriteOffApproval()],
       }),
     });
-    fireEvent.click(await screen.findByRole('button', { name: 'Approvals' }));
-    fireEvent.click(await screen.findByText('Store write-off'));
+    await user.click(await screen.findByRole('button', { name: 'Approvals' }));
+    await user.click(await screen.findByText('Store write-off'));
 
     await waitFor(() => {
       expect(router.state.location.pathname).toBe('/finance/store');
@@ -138,6 +143,7 @@ describe('ApprovalsBell', () => {
   });
 
   it('says All clear with no count when nothing waits', async () => {
+    const user = userEvent.setup();
     setup({
       summary: approvalSummary({
         waitingForMe: 0,
@@ -146,7 +152,7 @@ describe('ApprovalsBell', () => {
       }),
     });
     const bell = await screen.findByRole('button', { name: 'Approvals' });
-    fireEvent.click(bell);
+    await user.click(bell);
 
     expect(await screen.findByText('All clear')).toBeVisible();
     expect(
@@ -157,20 +163,22 @@ describe('ApprovalsBell', () => {
   });
 
   it('asks nothing of a member who cannot approve and says All clear', async () => {
+    const user = userEvent.setup();
     const { api } = setup({ access: starterAccess('bursar') });
-    fireEvent.click(await screen.findByRole('button', { name: 'Approvals' }));
+    await user.click(await screen.findByRole('button', { name: 'Approvals' }));
     expect(await screen.findByText('All clear')).toBeVisible();
     expect(api.approvals.summary).not.toHaveBeenCalled();
   });
 
   it('counts again after a decision is made on the Approvals page', async () => {
+    const user = userEvent.setup();
     const { api } = setup({ withQueue: true });
     const bell = await screen.findByRole('button', { name: 'Approvals' });
     expect(await within(bell).findByText('7')).toBeVisible();
     const before = api.approvals.summary.mock.calls.length;
 
-    fireEvent.click(await screen.findByRole('button', { name: /^Approve:/ }));
-    fireEvent.click(
+    await user.click(await screen.findByRole('button', { name: /^Approve:/ }));
+    await user.click(
       within(await screen.findByRole('dialog')).getByRole('button', {
         name: 'Approve',
       })

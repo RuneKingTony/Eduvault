@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { InfoIcon, PlusIcon, XIcon } from 'lucide-react';
 import {
+  ADMIT_NO_CLASSES_MESSAGE,
   GUARDIAN_PERMISSION_LINK_MESSAGE,
   GUARDIAN_RELATIONSHIP_LABELS,
   maxGuardiansMessage,
@@ -156,9 +157,7 @@ export function ClassStep({
     return (
       <Alert>
         <InfoIcon />
-        <AlertDescription>
-          No classes on your campuses yet. Add a class first.
-        </AlertDescription>
+        <AlertDescription>{ADMIT_NO_CLASSES_MESSAGE}</AlertDescription>
       </Alert>
     );
   }

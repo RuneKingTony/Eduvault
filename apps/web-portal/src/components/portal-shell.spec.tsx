@@ -7,13 +7,8 @@ import {
   createRoute,
   createRouter,
 } from '@tanstack/react-router';
-import {
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-  within,
-} from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import {
   AuthClientProvider,
   type EduvaultAuthClient,
@@ -176,6 +171,7 @@ describe('PortalShell on a desktop', () => {
   });
 
   it('puts the switcher in the top bar and switches child on the current page', async () => {
+    const user = userEvent.setup();
     const router = await openAt(`/children?child=${ADA_ID}`);
     const bar = within(screen.getByRole('banner'));
     const group = bar.getByRole('group', { name: 'Viewing child' });
@@ -183,7 +179,7 @@ describe('PortalShell on a desktop', () => {
       'aria-pressed',
       'true'
     );
-    fireEvent.click(within(group).getByRole('button', { name: 'Tobi' }));
+    await user.click(within(group).getByRole('button', { name: 'Tobi' }));
     await waitFor(() => {
       expect(router.state.location.search).toEqual({ child: TOBI_ID });
     });
@@ -194,12 +190,13 @@ describe('PortalShell on a desktop', () => {
   });
 
   it('clears the picked term when switching child', async () => {
+    const user = userEvent.setup();
     const router = await openAt(`/children?child=${ADA_ID}&term=first-term`);
     expect(router.state.location.search).toEqual({
       child: ADA_ID,
       term: 'first-term',
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Tobi' }));
+    await user.click(screen.getByRole('button', { name: 'Tobi' }));
     await waitFor(() => {
       expect(router.state.location.search).toEqual({ child: TOBI_ID });
     });
@@ -241,12 +238,12 @@ describe('PortalShell on a desktop', () => {
   });
 
   it('offers light or dark and sign out, but no command menu', async () => {
+    const user = userEvent.setup();
     await openAt('/');
-    fireEvent.keyDown(
+    await user.click(
       within(screen.getByRole('banner')).getByRole('button', {
         name: /Ngozi Okeke/,
-      }),
-      { key: 'Enter' }
+      })
     );
     expect(
       await screen.findByRole('menuitem', { name: 'Light or dark' })
@@ -255,40 +252,40 @@ describe('PortalShell on a desktop', () => {
     expect(
       screen.queryByRole('menuitem', { name: /Command menu/ })
     ).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Sign out' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Sign out' }));
     expect(signOut).toHaveBeenCalledOnce();
   });
 
   it('shows the username in the menu header for a login without a real email', async () => {
+    const user = userEvent.setup();
     await openAt('/', {
       authClient: makeClient({
         email: 'x1@users.eduvault.invalid',
         username: 'okeke-family',
       }),
     });
-    fireEvent.keyDown(
+    await user.click(
       within(screen.getByRole('banner')).getByRole('button', {
         name: /Ngozi Okeke/,
-      }),
-      { key: 'Enter' }
+      })
     );
     expect(await screen.findByText('okeke-family')).toBeInTheDocument();
   });
 
   it('lists the schools when there is more than one and switches back to the default page', async () => {
+    const user = userEvent.setup();
     const router = await openAt(`/children?child=${TOBI_ID}`, {
       authClient: makeClient({ email: 'ngozi@mail.test' }, [
         ...schools,
         { id: 'o2', name: 'Hillcrest Academy' },
       ]),
     });
-    fireEvent.keyDown(
+    await user.click(
       within(screen.getByRole('banner')).getByRole('button', {
         name: /Ngozi Okeke/,
-      }),
-      { key: 'Enter' }
+      })
     );
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('menuitem', { name: 'Hillcrest Academy' })
     );
     await waitFor(() => {
@@ -301,12 +298,12 @@ describe('PortalShell on a desktop', () => {
   });
 
   it('shows no school section with one school', async () => {
+    const user = userEvent.setup();
     await openAt('/');
-    fireEvent.keyDown(
+    await user.click(
       within(screen.getByRole('banner')).getByRole('button', {
         name: /Ngozi Okeke/,
-      }),
-      { key: 'Enter' }
+      })
     );
     await screen.findByRole('menuitem', { name: 'Sign out' });
     expect(screen.queryByText('School')).not.toBeInTheDocument();

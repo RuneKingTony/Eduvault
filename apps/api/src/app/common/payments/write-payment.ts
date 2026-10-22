@@ -5,7 +5,7 @@ import {
   type PaymentMethod,
 } from '@eduvault/api-contract';
 import type { DB } from '../../../db/db-types';
-import { advisoryLock } from '../db/advisory-lock';
+import { claimReference } from '../references/apply-once';
 import { allocateDocumentNumber, formatDocumentNumber } from '../documents';
 import { systemAccountId, type LedgerPoster } from '../ledger';
 import { currentCampusSql } from '../students';
@@ -175,16 +175,21 @@ export async function writePayment(
   poster: LedgerPoster,
   input: NewPayment
 ): Promise<InsertOutcome> {
-  await advisoryLock(trx, `payment:${input.organizationId}:${input.reference}`);
-  const existing = await findPaymentByColumn(trx, {
-    organizationId: input.organizationId,
-    column: 'reference',
-    value: input.reference,
+  const claim = await claimReference(trx, {
+    lockKey: `payment:${input.organizationId}:${input.reference}`,
+    requestHash: input.requestHash,
+    find: () =>
+      findPaymentByColumn(trx, {
+        organizationId: input.organizationId,
+        column: 'reference',
+        value: input.reference,
+      }),
   });
-  if (existing !== undefined) {
-    return existing.requestHash === input.requestHash
-      ? { status: 'replayed', id: existing.id }
-      : { status: 'reference_used' };
+  if (claim.status === 'replayed') {
+    return { status: 'replayed', id: claim.existing.id };
+  }
+  if (claim.status === 'clash') {
+    return { status: 'reference_used' };
   }
   const journalClash = await trx
     .selectFrom('journal_entry')

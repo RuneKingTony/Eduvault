@@ -1,4 +1,5 @@
-import { fireEvent, screen, within } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { toPermissionMap } from '@eduvault/policy';
 import { fakeAccess, ownerAccess, renderWithApi } from '../test-utils';
 import {
@@ -134,9 +135,10 @@ describe('RolesPage', () => {
   });
 
   it('lists Owner and Member under the built-in disclosure', async () => {
+    const user = userEvent.setup();
     render();
     await screen.findByRole('region', { name: 'Your school’s roles' });
-    fireEvent.click(
+    await user.click(
       screen.getByRole('button', {
         name: /Built-in roles \(cannot be edited\)/,
       })
@@ -152,6 +154,7 @@ describe('RolesPage', () => {
   });
 
   it('badges Owner and Member as built in and shows who holds them', async () => {
+    const user = userEvent.setup();
     render([
       role('owner', {
         ...OWNER_ROLE_ENTRY,
@@ -166,7 +169,7 @@ describe('RolesPage', () => {
       ...ROLE_LIST.slice(2),
     ]);
     await screen.findByRole('region', { name: 'Your school’s roles' });
-    fireEvent.click(
+    await user.click(
       screen.getByRole('button', {
         name: /Built-in roles \(cannot be edited\)/,
       })
@@ -191,16 +194,18 @@ describe('RolesPage', () => {
   });
 
   it('explains the kinds of roles in a closed disclosure', async () => {
+    const user = userEvent.setup();
     render();
     await screen.findByRole('region', { name: 'Your school’s roles' });
-    fireEvent.click(screen.getByRole('button', { name: 'Kinds of roles' }));
+    await user.click(screen.getByRole('button', { name: 'Kinds of roles' }));
     expect(screen.getByText(/Ready-made roles/)).toBeInTheDocument();
     expect(screen.getByText(/Your own roles/)).toBeInTheDocument();
   });
 
   it('shows New role only with ac:create and opens it', async () => {
+    const user = userEvent.setup();
     const { onNewRole } = render();
-    fireEvent.click(await screen.findByRole('button', { name: 'New role' }));
+    await user.click(await screen.findByRole('button', { name: 'New role' }));
     expect(onNewRole).toHaveBeenCalledOnce();
   });
 
@@ -216,21 +221,23 @@ describe('RolesPage', () => {
   });
 
   it('opens a role when its card is chosen', async () => {
+    const user = userEvent.setup();
     const { onOpenRole } = render();
-    fireEvent.click(await screen.findByRole('button', { name: 'Bursar' }));
+    await user.click(await screen.findByRole('button', { name: 'Bursar' }));
     expect(onOpenRole).toHaveBeenCalledWith('bursar');
   });
 
   it('pages ten cards at a time', async () => {
+    const user = userEvent.setup();
     const own = Array.from({ length: 6 }, (_, index) =>
       role(`own-${index}`, { label: `Own ${index}` })
     );
     render([...ROLE_LIST, ...own]);
     await screen.findByRole('region', { name: 'Your school’s roles' });
     expect(cards()).toHaveLength(10);
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    await user.click(screen.getByRole('button', { name: 'Next' }));
     expect(cards()).toEqual(['Own 4', 'Own 5']);
-    fireEvent.click(screen.getByRole('button', { name: 'Previous' }));
+    await user.click(screen.getByRole('button', { name: 'Previous' }));
     expect(cards()).toHaveLength(10);
   });
 

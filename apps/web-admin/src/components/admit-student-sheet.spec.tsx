@@ -1,4 +1,5 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { toast } from '@eduvault/ui';
 import {
   ApiError,
@@ -95,42 +96,34 @@ function setup(
   return { api, ...handlers };
 }
 
+let user: ReturnType<typeof userEvent.setup>;
+
+beforeEach(() => {
+  user = userEvent.setup();
+});
+
 const fillStudent = async () => {
-  fireEvent.change(await screen.findByLabelText('First name'), {
-    target: { value: 'Peace' },
-  });
-  fireEvent.change(screen.getByLabelText('Last name'), {
-    target: { value: 'Udoh' },
-  });
-  fireEvent.change(screen.getByLabelText('Date of birth'), {
-    target: { value: '2014-03-03' },
-  });
+  await user.type(await screen.findByLabelText('First name'), 'Peace');
+  await user.type(screen.getByLabelText('Last name'), 'Udoh');
+  await user.type(screen.getByLabelText('Date of birth'), '2014-03-03');
 };
 
-const next = () => {
-  fireEvent.click(screen.getByRole('button', { name: /Next/ }));
+const next = async () => {
+  await user.click(screen.getByRole('button', { name: /Next/ }));
 };
 
-const fillGuardian = () => {
-  fireEvent.change(screen.getByLabelText('Full name'), {
-    target: { value: 'Mrs Udoh' },
-  });
-  fireEvent.change(screen.getByLabelText('Phone'), {
-    target: { value: '08012345678' },
-  });
-  fireEvent.change(screen.getByLabelText('House address'), {
-    target: { value: '4 Palm Close' },
-  });
-  fireEvent.change(screen.getByLabelText('Email'), {
-    target: { value: 'udoh@example.test' },
-  });
+const fillGuardian = async () => {
+  await user.type(screen.getByLabelText('Full name'), 'Mrs Udoh');
+  await user.type(screen.getByLabelText('Phone'), '08012345678');
+  await user.type(screen.getByLabelText('House address'), '4 Palm Close');
+  await user.type(screen.getByLabelText('Email'), 'udoh@example.test');
 };
 
 const toGuardianStep = async () => {
   await fillStudent();
-  next();
+  await next();
   await screen.findByLabelText('Class for First term');
-  next();
+  await next();
 };
 
 describe('AdmitStudentSheet step 1', () => {
@@ -150,7 +143,7 @@ describe('AdmitStudentSheet step 1', () => {
   it('refuses blanks with the server copy and does not advance', async () => {
     setup();
     await screen.findByLabelText('First name');
-    next();
+    await next();
     expect(screen.getByText('Enter the first name.')).toBeInTheDocument();
     expect(screen.getByText('Enter the last name.')).toBeInTheDocument();
     expect(
@@ -166,7 +159,7 @@ describe('AdmitStudentSheet step 2', () => {
   it('names the term and year and offers the classes with the first selected', async () => {
     setup();
     await fillStudent();
-    next();
+    await next();
     const select = await screen.findByLabelText('Class for First term');
     expect(select).toHaveValue(ARM_ID);
     expect(
@@ -187,9 +180,9 @@ describe('AdmitStudentSheet step 2', () => {
   it('keeps what was typed when going Back', async () => {
     setup();
     await fillStudent();
-    next();
+    await next();
     await screen.findByLabelText('Class for First term');
-    fireEvent.click(screen.getByRole('button', { name: /Back/ }));
+    await user.click(screen.getByRole('button', { name: /Back/ }));
     expect(await screen.findByLabelText('First name')).toHaveValue('Peace');
     expect(screen.getByLabelText('Last name')).toHaveValue('Udoh');
     expect(screen.getByLabelText('Date of birth')).toHaveValue('2014-03-03');
@@ -198,7 +191,7 @@ describe('AdmitStudentSheet step 2', () => {
   it('says there are no classes and disables Next', async () => {
     setup({ preview: preview({ classes: [] }) });
     await fillStudent();
-    next();
+    await next();
     expect(
       await screen.findByText(
         'No classes on your campuses yet. Add a class first.'
@@ -222,7 +215,7 @@ describe('AdmitStudentSheet with no current term', () => {
     expect(
       screen.queryByRole('button', { name: /Next/ })
     ).not.toBeInTheDocument();
-    fireEvent.click(
+    await user.click(
       screen.getByRole('button', { name: 'School years and terms' })
     );
     expect(onOpenCalendar).toHaveBeenCalled();
@@ -259,7 +252,7 @@ describe('AdmitStudentSheet step 3', () => {
   it('lets Guardian 1 go when a guardian is not required and then shows the empty callout', async () => {
     setup({ preview: preview({ requireGuardian: false }) });
     await toGuardianStep();
-    fireEvent.click(await screen.findByRole('button', { name: /Remove/ }));
+    await user.click(await screen.findByRole('button', { name: /Remove/ }));
     expect(
       screen.getByText(
         'No guardian for now. You can add one later from the student’s row.'
@@ -273,7 +266,7 @@ describe('AdmitStudentSheet step 3', () => {
   it('adds another guardian as an existing father who does not pay, then stops at the maximum', async () => {
     setup({ preview: preview({ maxGuardians: 2 }) });
     await toGuardianStep();
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('button', { name: 'Add another guardian' })
     );
     expect(await screen.findByText('Guardian 2')).toBeInTheDocument();
@@ -289,10 +282,10 @@ describe('AdmitStudentSheet step 3', () => {
   it('toasts when an existing guardian is not chosen and stays on the step', async () => {
     setup();
     await toGuardianStep();
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('button', { name: 'Add another guardian' })
     );
-    next();
+    await next();
     expect(toast.error).toHaveBeenCalledWith(
       'Choose the existing guardian, or switch to New guardian.'
     );
@@ -302,7 +295,7 @@ describe('AdmitStudentSheet step 3', () => {
   it('asks for the new guardian fields before the review', async () => {
     setup();
     await toGuardianStep();
-    next();
+    await next();
     expect(
       await screen.findByText('Enter the guardian’s full name.')
     ).toBeInTheDocument();
@@ -340,8 +333,8 @@ describe('AdmitStudentSheet step 3', () => {
 
 const toReview = async () => {
   await toGuardianStep();
-  fillGuardian();
-  next();
+  await fillGuardian();
+  await next();
   await screen.findByText('Student login');
 };
 
@@ -351,7 +344,7 @@ describe('AdmitStudentSheet term picker', () => {
   it('offers no picker in the last term of the year', async () => {
     setup();
     await fillStudent();
-    next();
+    await next();
     await screen.findByLabelText('Class for First term');
     expect(screen.queryByLabelText('Admit for')).not.toBeInTheDocument();
   });
@@ -359,7 +352,7 @@ describe('AdmitStudentSheet term picker', () => {
   it('offers the current and the next term, defaulting to the current one', async () => {
     setup({ preview: preview({ nextTerm: SECOND }) });
     await fillStudent();
-    next();
+    await next();
     const picker = await screen.findByLabelText('Admit for');
     expect(picker).toHaveValue(TERM_FIRST_ID);
     expect(
@@ -372,10 +365,11 @@ describe('AdmitStudentSheet term picker', () => {
   it('retitles the class step and says the student has no class until the term starts', async () => {
     setup({ preview: preview({ nextTerm: SECOND }) });
     await fillStudent();
-    next();
-    fireEvent.change(await screen.findByLabelText('Admit for'), {
-      target: { value: TERM_SECOND_ID },
-    });
+    await next();
+    await user.selectOptions(
+      await screen.findByLabelText('Admit for'),
+      TERM_SECOND_ID
+    );
     expect(screen.getByLabelText('Class for Second term')).toBeInTheDocument();
     expect(
       screen.getByText(
@@ -394,17 +388,18 @@ describe('AdmitStudentSheet term picker', () => {
     const create = vi.fn(admitted);
     setup({ preview: preview({ nextTerm: SECOND }), create });
     await fillStudent();
-    next();
-    fireEvent.change(await screen.findByLabelText('Admit for'), {
-      target: { value: TERM_SECOND_ID },
-    });
-    next();
-    fillGuardian();
-    next();
+    await next();
+    await user.selectOptions(
+      await screen.findByLabelText('Admit for'),
+      TERM_SECOND_ID
+    );
+    await next();
+    await fillGuardian();
+    await next();
     await screen.findByText('Student login');
     expect(screen.getByText('Term')).toBeInTheDocument();
     expect(screen.getByText('Second term')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Admit and enrol' }));
+    await user.click(screen.getByRole('button', { name: 'Admit and enrol' }));
     await waitFor(() => {
       expect(create).toHaveBeenCalled();
     });
@@ -417,7 +412,7 @@ describe('AdmitStudentSheet term picker', () => {
     const create = vi.fn(admitted);
     setup({ preview: preview({ nextTerm: SECOND }), create });
     await toReview();
-    fireEvent.click(screen.getByRole('button', { name: 'Admit and enrol' }));
+    await user.click(screen.getByRole('button', { name: 'Admit and enrol' }));
     await waitFor(() => {
       expect(create).toHaveBeenCalled();
     });
@@ -480,14 +475,14 @@ describe('AdmitStudentSheet step 4', () => {
     const create = vi.fn(admitted);
     const { onAdmitted } = setup({ create });
     await toGuardianStep();
-    fireEvent.click(
+    await user.click(
       screen.getByLabelText('Pays the school fees (receives the charges)')
     );
-    fillGuardian();
-    next();
+    await fillGuardian();
+    await next();
     await screen.findByText('Student login');
     expect(screen.getByText('Pays fees')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Admit and enrol' }));
+    await user.click(screen.getByRole('button', { name: 'Admit and enrol' }));
     await waitFor(() => {
       expect(create).toHaveBeenCalled();
     });
@@ -522,7 +517,7 @@ describe('AdmitStudentSheet step 4', () => {
     );
     setup({ create });
     await toReview();
-    fireEvent.click(screen.getByRole('button', { name: 'Admit and enrol' }));
+    await user.click(screen.getByRole('button', { name: 'Admit and enrol' }));
     expect(
       await screen.findByText(/already belongs to Ngozi/)
     ).toBeInTheDocument();

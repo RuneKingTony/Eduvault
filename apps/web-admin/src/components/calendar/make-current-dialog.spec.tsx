@@ -1,4 +1,5 @@
-import { fireEvent, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { fakeAccess, renderWithApi, seedFeeSetup } from '../../test-utils';
 import {
   TERM_4,
@@ -93,8 +94,9 @@ describe('MakeCurrentDialog', () => {
   });
 
   it('makes the term current and closes', async () => {
+    const user = userEvent.setup();
     const { makeCurrent, onOpenChange } = setup(357);
-    fireEvent.click(
+    await user.click(
       screen.getByRole('button', { name: 'Make current anyway' })
     );
     await vi.waitFor(() => {
@@ -104,9 +106,10 @@ describe('MakeCurrentDialog', () => {
   });
 
   it('drops the cached fee setup', async () => {
+    const user = userEvent.setup();
     const { queryClient } = setup(357);
     const { key } = seedFeeSetup(queryClient);
-    fireEvent.click(
+    await user.click(
       screen.getByRole('button', { name: 'Make current anyway' })
     );
     await vi.waitFor(() => {
@@ -122,9 +125,10 @@ describe('MakeCurrentDialog', () => {
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
   });
 
-  it('offers Start {year} first to a holder of enrollment:place', () => {
+  it('offers Start {year} first to a holder of enrollment:place', async () => {
+    const user = userEvent.setup();
     const { onStartYear } = setup(357);
-    fireEvent.click(
+    await user.click(
       screen.getByRole('button', { name: 'Start 2027/2028 first' })
     );
     expect(onStartYear).toHaveBeenCalled();

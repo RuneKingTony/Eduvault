@@ -26,6 +26,7 @@ export interface MovementRecord extends KindMovement {
     receiptNumber: string;
     payerName: string;
     method: PaymentMethod;
+    voided: boolean;
   } | null;
 }
 
@@ -139,6 +140,7 @@ export function statementRowsOf(
       reference: movement.reference,
       description: describe(movement, status),
       status,
+      voided: movement.kind === 'payment' && movement.payment?.voided === true,
       amountMinor,
       link: movementLink(movement),
     }))
@@ -152,6 +154,15 @@ export const withNet = (
   netMinor: movement.debitMinor - movement.creditMinor,
 });
 
+const unpaidLabel = (movement: MovementRecord): string => {
+  if (movement.kind === 'opening') {
+    return OPENING;
+  }
+  return movement.kind === 'payment_void'
+    ? familyVoidDescription(movement)
+    : movement.reference;
+};
+
 export function unpaidOf(
   movementsOldestFirst: readonly MovementRecord[]
 ): StatementUnpaid[] {
@@ -159,7 +170,7 @@ export function unpaidOf(
     .filter((movement) => !movement.storeSale)
     .map((movement) => withNet(movement));
   return unpaidCharges(nets).map((charge) => ({
-    reference: charge.kind === 'opening' ? OPENING : charge.reference,
+    reference: unpaidLabel(charge),
     outstandingMinor: charge.outstandingMinor,
     link: movementLink(charge),
   }));

@@ -1,4 +1,5 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { ApiError, type ApprovalRules } from '@eduvault/api-contract';
 import { ALL_PERMISSIONS, toPermissionMap } from '@eduvault/policy';
 import { toast } from '@eduvault/ui';
@@ -72,6 +73,12 @@ function setup(
   return api;
 }
 
+let user: ReturnType<typeof userEvent.setup>;
+
+beforeEach(() => {
+  user = userEvent.setup();
+});
+
 describe('ApprovalRulesPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -103,7 +110,7 @@ describe('ApprovalRulesPage', () => {
     'switches $label off, sends only $key and shows it off',
     async ({ key, label }) => {
       const api = setup();
-      fireEvent.click(await screen.findByRole('switch', { name: label }));
+      await user.click(await screen.findByRole('switch', { name: label }));
 
       await waitFor(() => {
         expect(api.schoolSettings.updateApprovalRules).toHaveBeenCalledWith({
@@ -126,7 +133,7 @@ describe('ApprovalRulesPage', () => {
     'switches $label back on, sends only $key and shows it on',
     async ({ key, label }) => {
       const api = setup({ rules: { ...allOn, [key]: false } });
-      fireEvent.click(await screen.findByRole('switch', { name: label }));
+      await user.click(await screen.findByRole('switch', { name: label }));
 
       await waitFor(() => {
         expect(api.schoolSettings.updateApprovalRules).toHaveBeenCalledWith({
@@ -149,7 +156,7 @@ describe('ApprovalRulesPage', () => {
         message: 'Missing permission',
       }),
     });
-    fireEvent.click(await screen.findByRole('switch', { name: 'Refunds' }));
+    await user.click(await screen.findByRole('switch', { name: 'Refunds' }));
 
     await waitFor(() => {
       expect(toast.error).toHaveBeenCalledWith(
