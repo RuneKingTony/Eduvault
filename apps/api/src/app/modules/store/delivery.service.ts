@@ -36,6 +36,7 @@ import {
   type StoreScope,
 } from './store.repository';
 import { deliveryInScope, scopeOf, storeInView } from './store-view';
+import { replayOf } from '../../common/references/apply-once';
 
 interface Checked {
   store: StoreRef;
@@ -127,15 +128,15 @@ export class DeliveryService {
     existing: ExistingDelivery,
     request: { input: RecordDelivery; requestHash: string }
   ): Promise<RecordedDelivery> {
-    const visible = await this.store.findDelivery(scopeOf(ctx), existing.id);
-    if (visible === undefined) {
-      throw new ConflictException(DELIVERY_REFERENCE_TAKEN_MESSAGE);
-    }
-    if (existing.requestHash !== request.requestHash) {
-      throw new ConflictException(
-        deliveryReferenceUsedMessage(request.input.reference, existing.number)
-      );
-    }
+    const visible = replayOf({
+      visible: await this.store.findDelivery(scopeOf(ctx), existing.id),
+      sameRequest: () => existing.requestHash === request.requestHash,
+      taken: () => new ConflictException(DELIVERY_REFERENCE_TAKEN_MESSAGE),
+      used: () =>
+        new ConflictException(
+          deliveryReferenceUsedMessage(request.input.reference, existing.number)
+        ),
+    });
     return { ...visible, replayed: true };
   }
 
