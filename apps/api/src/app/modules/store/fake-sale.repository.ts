@@ -10,6 +10,7 @@ import {
   type ExistingSale,
   type NewSale,
   type OptionStudents,
+  type OptionStudentsRequest,
   type SaleAccount,
   type SaleOutcome,
   type SalePage,
@@ -68,7 +69,7 @@ export class FakeSaleRepository extends SaleRepository {
   inserted: NewSale[] = [];
   figures: StoreTermFigures = noTermFigures;
   optionRows: OptionStudents = [];
-  optionRequests: { today: string; withBalance: boolean }[] = [];
+  optionRequests: OptionStudentsRequest[] = [];
   purchases: PortalPurchases = {
     termName: null,
     spentThisTermMinor: 0,
@@ -102,7 +103,7 @@ export class FakeSaleRepository extends SaleRepository {
 
   optionStudents(
     _scope: OrgScope,
-    request: { today: string; withBalance: boolean }
+    request: OptionStudentsRequest
   ): Promise<OptionStudents> {
     this.optionRequests.push(request);
     return Promise.resolve(this.optionRows);

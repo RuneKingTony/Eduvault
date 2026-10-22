@@ -1,5 +1,6 @@
 import { sql, type RawBuilder } from 'kysely';
 import {
+  SALE_STUDENT_CHOICES,
   itemDisplayName,
   paymentMethodSchema,
   studentLifeSchema,
@@ -10,6 +11,7 @@ import {
   type StoreTermFigures,
 } from '@eduvault/api-contract';
 import type { Database } from '../../common/db/tokens';
+import { escapeLike } from '../../common/db/escape-like';
 import { receivableBalanceSql } from '../../common/ledger';
 import {
   currentCampusSql,
@@ -20,6 +22,7 @@ import {
 } from '../../common/students';
 import type {
   OptionStudents,
+  OptionStudentsRequest,
   SalePage,
   SalePageQuery,
   SaleStudent,
@@ -283,8 +286,13 @@ interface OptionRow {
 export async function optionStudents(
   db: Database,
   scope: OrgScope,
-  request: { today: string; withBalance: boolean }
+  request: OptionStudentsRequest
 ): Promise<OptionStudents> {
+  const pattern =
+    request.q === undefined || request.q === ''
+      ? null
+      : `%${escapeLike(request.q)}%`;
+  const chosen = request.studentId ?? null;
   const { rows } = await sql<OptionRow>`
     WITH ${visibleStudentsCte({
       organizationId: scope.organizationId,
@@ -302,7 +310,14 @@ export async function optionStudents(
     LEFT JOIN class_level cl
       ON cl.id = v.latest_level_id AND cl.organization_id = v.organization_id
     WHERE v.life = 'active'
-    ORDER BY v.first_name, v.last_name, v.id`.execute(db);
+      AND (
+        v.id = ${chosen}::uuid
+        OR ${pattern}::text IS NULL
+        OR (v.first_name || ' ' || v.last_name) ILIKE ${pattern}
+        OR v.admission_number ILIKE ${pattern}
+      )
+    ORDER BY (v.id = ${chosen}::uuid) DESC, v.first_name, v.last_name, v.id
+    LIMIT ${SALE_STUDENT_CHOICES}`.execute(db);
   return rows.map((row) => ({
     id: row.id,
     name: `${row.first_name} ${row.last_name}`,

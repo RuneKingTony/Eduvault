@@ -204,7 +204,7 @@ describe('StoreReadService sales', () => {
     ];
     sales.methods = { cash: true, transfer: false, pos: true };
 
-    const options = await service.saleOptions(ctx());
+    const options = await service.saleOptions(ctx(), {});
 
     expect(options.accounts).toEqual([
       { id: 'cash', name: 'Lekki cash box', kind: 'cash', campusId: 'lekki' },
@@ -214,10 +214,19 @@ describe('StoreReadService sales', () => {
 
   it('asks for fee balances only from a caller who can read payments', async () => {
     const { sales, service } = setup();
-    await service.saleOptions(ctx('all', ['store:issue']));
+    await service.saleOptions(ctx('all', ['store:issue']), {});
     expect(sales.optionRequests.at(-1)).toMatchObject({ withBalance: false });
-    await service.saleOptions(ctx());
+    await service.saleOptions(ctx(), {});
     expect(sales.optionRequests.at(-1)).toMatchObject({ withBalance: true });
+  });
+
+  it('passes the search text and the chosen student to the lookup', async () => {
+    const { sales, service } = setup();
+    await service.saleOptions(ctx(), { q: 'ada', studentId: 'stu-1' });
+    expect(sales.optionRequests.at(-1)).toMatchObject({
+      q: 'ada',
+      studentId: 'stu-1',
+    });
   });
 });
 

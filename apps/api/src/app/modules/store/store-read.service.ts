@@ -14,6 +14,7 @@ import {
   type SaleList,
   type SaleListQuery,
   type SaleOptions,
+  type SaleOptionsQuery,
   type StoreSummary,
 } from '@eduvault/api-contract';
 import { can } from '@eduvault/policy';
@@ -107,12 +108,17 @@ export class StoreReadService {
     return found;
   }
 
-  async saleOptions(ctx: OrgContext): Promise<SaleOptions> {
+  async saleOptions(
+    ctx: OrgContext,
+    query: SaleOptionsQuery
+  ): Promise<SaleOptions> {
     const scope = orgScopeOf(ctx);
     const [students, methods, accounts] = await Promise.all([
       this.sales.optionStudents(scope, {
         today: this.clock.today(),
         withBalance: can(ctx.permissions, 'payment', 'read'),
+        q: query.q,
+        studentId: query.studentId,
       }),
       this.sales.paymentMethods(ctx.organizationId),
       this.sales.accounts(scope),

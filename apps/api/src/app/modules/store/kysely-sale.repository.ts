@@ -30,6 +30,7 @@ import {
   type ExistingSale,
   type NewSale,
   type OptionStudents,
+  type OptionStudentsRequest,
   type SaleAccount,
   type SaleOutcome,
   type SalePage,
@@ -73,7 +74,7 @@ export class KyselySaleRepository extends SaleRepository {
 
   optionStudents(
     scope: OrgScope,
-    request: { today: string; withBalance: boolean }
+    request: OptionStudentsRequest
   ): Promise<OptionStudents> {
     return optionStudents(this.db, scope, request);
   }

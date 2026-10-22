@@ -117,6 +117,26 @@ describe('SaleSheet', () => {
     vi.clearAllMocks();
   });
 
+  it('searches students on the server and asks again with the chosen one', async () => {
+    const { api } = setup();
+    await user.type(await screen.findByLabelText('Find a student'), 'tobi');
+
+    await waitFor(() => {
+      expect(api.store.saleOptions).toHaveBeenLastCalledWith({
+        query: { q: 'tobi', studentId: undefined },
+      });
+    });
+
+    await choose(ADA_ID);
+
+    await waitFor(() => {
+      expect(api.store.saleOptions).toHaveBeenLastCalledWith({
+        query: { q: 'tobi', studentId: ADA_ID },
+      });
+    });
+    expect(screen.getByLabelText('Student')).toHaveValue(ADA_ID);
+  });
+
   it('asks for a student first and holds Record purchase back', async () => {
     setup();
 
