@@ -121,8 +121,8 @@ function VoidForm({
         </DialogDescription>
       </DialogHeader>
       <p className="text-sm">
-        The receipt is kept. Once a boss approves, the payment is cancelled and
-        the family owes that money again.
+        The receipt is kept. Once an approver agrees, the payment is cancelled
+        and the family owes that money again.
       </p>
       <ReasonField missing={missing} />
       <ErrorMessage error={request.error} />

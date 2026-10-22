@@ -320,7 +320,7 @@ describe('ReceiptPage cancellation', () => {
     expect(within(dialog).getByText('₦240,000 from Ngozi Okeke')).toBeVisible();
     expect(
       within(dialog).getByText(
-        'The receipt is kept. Once a boss approves, the payment is cancelled and the family owes that money again.'
+        'The receipt is kept. Once an approver agrees, the payment is cancelled and the family owes that money again.'
       )
     ).toBeVisible();
 
@@ -425,7 +425,7 @@ describe('ReceiptPage cancellation', () => {
     setupVoid({ payment: waiting() });
     expect(
       await screen.findByText(
-        /Cancellation asked for by Chika Eze: “Keyed the wrong amount”\. Waiting for a boss to approve it\./
+        /Cancellation asked for by Chika Eze: “Keyed the wrong amount”\. Waiting for an approver\./
       )
     ).toBeVisible();
     expect(
