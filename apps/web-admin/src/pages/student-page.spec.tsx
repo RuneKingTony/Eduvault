@@ -3,14 +3,12 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import {
   ApiError,
-  type FeeOption,
   type LoginCredential,
   type MePermissions,
   type StudentDetail,
   type StudentStatement,
 } from '@eduvault/api-contract';
 import { toPermissionMap, type Permission } from '@eduvault/policy';
-import { toast } from '@eduvault/ui';
 import { testId } from '../test-api';
 import { currentCalendar } from '../test-calendar';
 import { classSummary } from '../test-classes';
@@ -36,7 +34,6 @@ const accessWith = (...permissions: Permission[]): MePermissions =>
     campusScope: 'all',
   });
 
-const BUS_ID = testId(0x3_00_01);
 const TUNDE_ID = testId(0x3_00_02);
 
 type PageProps = Parameters<typeof StudentPage>[0];
@@ -72,7 +69,6 @@ function setup(
     access?: MePermissions;
     logins?: LoginCredential[];
     initialDialog?: 'leave';
-    feeOptions?: FeeOption[];
     tab?: 'fees';
     statement?: Partial<StudentStatement>;
     statementError?: Error;
@@ -106,21 +102,6 @@ function setup(
     guardians: { list: vi.fn().mockResolvedValue([]), get: vi.fn() },
     classes: { list: vi.fn().mockResolvedValue([classSummary()]) },
     calendar: { current: vi.fn().mockResolvedValue(currentCalendar()) },
-    feeOptions: {
-      list: vi.fn().mockResolvedValue(options.feeOptions ?? []),
-      set: vi
-        .fn()
-        .mockImplementation(
-          (request: {
-            params: { feeTypeId: string };
-            body: { optedIn: boolean };
-          }) =>
-            Promise.resolve({
-              feeTypeId: request.params.feeTypeId,
-              optedIn: request.body.optedIn,
-            })
-        ),
-    },
     studentAccounts: {
       statement: options.statementError
         ? vi.fn().mockRejectedValue(options.statementError)
@@ -215,96 +196,6 @@ describe('StudentPage', () => {
     expect(
       screen.getByText(/1 Oct 2026 · marked by Tunde Bakare/)
     ).toBeInTheDocument();
-  });
-});
-
-const busOption = (optedIn: boolean): FeeOption => ({
-  feeTypeId: BUS_ID,
-  name: 'School bus',
-  optedIn,
-});
-
-describe('StudentPage optional fees', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('lists the optional fee types with a switch for each', async () => {
-    setup({ feeOptions: [busOption(true)] });
-    await openFees();
-    const row = await screen.findByRole('switch', { name: 'School bus' });
-    expect(row).toBeChecked();
-    expect(screen.getByText('Optional fees')).toBeInTheDocument();
-  });
-
-  it('is not on Overview any more', async () => {
-    const { api } = setup({ feeOptions: [busOption(true)] });
-    await screen.findByText('Admission no.');
-    expect(screen.queryByText('Optional fees')).not.toBeInTheDocument();
-    expect(screen.queryByRole('switch')).not.toBeInTheDocument();
-    expect(api.feeOptions.list).not.toHaveBeenCalled();
-  });
-
-  it('has no card when the student’s level has no optional fee', async () => {
-    const { api } = setup({ feeOptions: [] });
-    await openFees();
-    await screen.findByText('Open statement');
-    await waitFor(() => {
-      expect(api.feeOptions.list).toHaveBeenCalledWith({
-        params: { studentId: STUDENT_ID },
-        query: {},
-      });
-    });
-    expect(screen.queryByText('Optional fees')).not.toBeInTheDocument();
-  });
-
-  it('switches a fee on and toasts in the student’s first name', async () => {
-    const { api } = setup({ feeOptions: [busOption(false)] });
-    await openFees();
-    await user.click(await screen.findByRole('switch', { name: 'School bus' }));
-    await waitFor(() => {
-      expect(api.feeOptions.set).toHaveBeenCalledWith({
-        params: { studentId: STUDENT_ID, feeTypeId: BUS_ID },
-        body: { optedIn: true },
-      });
-    });
-    await waitFor(() => {
-      expect(toast.success).toHaveBeenCalledWith(
-        'Ada now takes School bus from the next round of charges.'
-      );
-    });
-  });
-
-  it('says no longer takes when switched off', async () => {
-    setup({ feeOptions: [busOption(true)] });
-    await openFees();
-    await user.click(await screen.findByRole('switch', { name: 'School bus' }));
-    await waitFor(() => {
-      expect(toast.success).toHaveBeenCalledWith(
-        'Ada no longer takes School bus from the next round of charges.'
-      );
-    });
-  });
-
-  it('shows the switches read-only without feeLine:update', async () => {
-    setup({
-      feeOptions: [busOption(true)],
-      access: accessWith('student:read', 'feeLine:read'),
-    });
-    await openFees();
-    expect(
-      await screen.findByRole('switch', { name: 'School bus' })
-    ).toBeDisabled();
-  });
-
-  it('hides the card without feeLine:read', async () => {
-    const { api } = setup({
-      feeOptions: [busOption(true)],
-      access: accessWith('student:read'),
-    });
-    await screen.findByRole('heading', { name: /Ada Okeke/ });
-    expect(screen.queryByText('Optional fees')).not.toBeInTheDocument();
-    expect(api.feeOptions.list).not.toHaveBeenCalled();
   });
 });
 
@@ -410,32 +301,18 @@ describe('StudentPage Fees tab', () => {
     expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
   });
 
-  it('shows the Optional fees card but no money with feeLine:read only', async () => {
+  it('shows no Fees tab with feeLine:read only', async () => {
     const { api } = setup({
-      feeOptions: [busOption(true)],
       access: accessWith('student:read', 'feeLine:read'),
     });
-    await openFees();
-    expect(await screen.findByText('Optional fees')).toBeInTheDocument();
-    expect(screen.queryByText('Owing')).not.toBeInTheDocument();
-    expect(screen.queryByText('Open statement')).not.toBeInTheDocument();
+    await screen.findByText('Admission no.');
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
     expect(api.studentAccounts.statement).not.toHaveBeenCalled();
   });
 
-  it('says No fees to show when there is nothing the viewer can see', async () => {
-    setup({
-      feeOptions: [],
-      access: accessWith('student:read', 'feeLine:read'),
-    });
-    await openFees();
-    expect(await screen.findByText('No fees to show')).toBeInTheDocument();
-  });
-
   it('opens on Fees for tab=fees', async () => {
-    setup({ tab: 'fees', feeOptions: [busOption(true)] });
-    expect(
-      await screen.findByRole('switch', { name: 'School bus' })
-    ).toBeInTheDocument();
+    setup({ tab: 'fees' });
+    expect(await screen.findByText('Owing')).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Fees' })).toHaveAttribute(
       'aria-selected',
       'true'
@@ -1019,7 +896,7 @@ describe('StudentPage Statement button', () => {
     expect(
       screen.queryByRole('link', { name: 'Statement' })
     ).not.toBeInTheDocument();
-    await openFees();
+    expect(screen.queryByRole('tab', { name: 'Fees' })).not.toBeInTheDocument();
     expect(screen.queryByText('Owing')).not.toBeInTheDocument();
   });
 
