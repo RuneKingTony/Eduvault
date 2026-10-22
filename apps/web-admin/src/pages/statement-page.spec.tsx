@@ -1,4 +1,5 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { ApiError } from '@eduvault/api-contract';
 import { starterAccess } from '../test-utils';
 import {
@@ -87,6 +88,12 @@ function setup(
   );
   return { api, onSearchChange };
 }
+
+let user: ReturnType<typeof userEvent.setup>;
+
+beforeEach(() => {
+  user = userEvent.setup();
+});
 
 describe('StatementPage (one child)', () => {
   it('titles the page with the student and shows the card heading', async () => {
@@ -202,7 +209,7 @@ describe('StatementPage (one child)', () => {
     const { onSearchChange } = setup({
       statement: statement({ total: 25, page: 3 }),
     });
-    fireEvent.click(await screen.findByRole('button', { name: 'Page 2' }));
+    await user.click(await screen.findByRole('button', { name: 'Page 2' }));
     expect(onSearchChange).toHaveBeenCalledWith({ page: 2 });
   });
 
@@ -239,7 +246,7 @@ describe('StatementPage actions', () => {
 
   it('shows Record payment to a bursar, opening the sheet in place', async () => {
     setup({ access: starterAccess('bursar') });
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('button', { name: 'Record payment' })
     );
     expect(
@@ -382,9 +389,10 @@ describe('StatementPage term filter', () => {
       search: { term: TERM_ID, page: 3 },
     });
 
-    fireEvent.change(await screen.findByRole('combobox', { name: 'Term' }), {
-      target: { value: '' },
-    });
+    await user.selectOptions(
+      await screen.findByRole('combobox', { name: 'Term' }),
+      ''
+    );
 
     expect(onSearchChange).toHaveBeenCalledWith({
       term: undefined,
@@ -398,9 +406,10 @@ describe('StatementPage term filter', () => {
       search: { page: 2 },
     });
 
-    fireEvent.change(await screen.findByRole('combobox', { name: 'Term' }), {
-      target: { value: TERM_ID },
-    });
+    await user.selectOptions(
+      await screen.findByRole('combobox', { name: 'Term' }),
+      TERM_ID
+    );
 
     expect(onSearchChange).toHaveBeenCalledWith({
       term: TERM_ID,
@@ -516,9 +525,10 @@ describe('StatementPage family term filter', () => {
       family: guardianStatement(familyChildren(), { termOptions: OPTIONS }),
     });
 
-    fireEvent.change(await screen.findByRole('combobox', { name: 'Term' }), {
-      target: { value: TERM_ID },
-    });
+    await user.selectOptions(
+      await screen.findByRole('combobox', { name: 'Term' }),
+      TERM_ID
+    );
 
     expect(onSearchChange).toHaveBeenCalledWith({
       view: 'family',
@@ -533,9 +543,10 @@ describe('StatementPage family term filter', () => {
       family: inTerm(),
     });
 
-    fireEvent.change(await screen.findByRole('combobox', { name: 'Term' }), {
-      target: { value: '' },
-    });
+    await user.selectOptions(
+      await screen.findByRole('combobox', { name: 'Term' }),
+      ''
+    );
 
     expect(onSearchChange).toHaveBeenCalledWith({
       view: 'family',

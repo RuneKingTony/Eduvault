@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import {
   AuthClientProvider,
   type EduvaultAuthClient,
@@ -36,8 +37,9 @@ describe('PortalOnlyScreen', () => {
   });
 
   it('signs out', async () => {
+    const user = userEvent.setup();
     const { signOut } = setup();
-    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+    await user.click(screen.getByRole('button', { name: 'Sign out' }));
     await waitFor(() => {
       expect(signOut).toHaveBeenCalledOnce();
     });

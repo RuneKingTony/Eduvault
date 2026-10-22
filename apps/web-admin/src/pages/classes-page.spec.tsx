@@ -1,4 +1,5 @@
-import { fireEvent, screen, within } from '@testing-library/react';
+import { act, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type {
   ClassStatus,
   ClassSummary,
@@ -103,6 +104,12 @@ const tableOf = async (title: string) => {
   return table;
 };
 
+let user: ReturnType<typeof userEvent.setup>;
+
+beforeEach(() => {
+  user = userEvent.setup();
+});
+
 describe('describeClasses', () => {
   it('counts active classes in the year, or names the classes a scoped caller teaches', () => {
     expect(describeClasses(ACTIVE, false, '2026/2027')).toBe(
@@ -170,7 +177,10 @@ describe('ClassesPage', () => {
       await screen.findByRole('row', { name: /JSS 1 Silver/ })
     );
     expect(silver.getByText('Ikeja')).toBeInTheDocument();
-    fireEvent.focus(silver.getByRole('button', { name: '2 teachers' }));
+    const teachers = silver.getByRole('button', { name: '2 teachers' });
+    act(() => {
+      teachers.focus();
+    });
     expect(
       (await screen.findAllByText('Ayo Bassey (Lead), Claire Ade (Assistant)'))
         .length
@@ -192,15 +202,16 @@ describe('ClassesPage', () => {
         .getAllByRole('option')
         .map((option) => option.textContent)
     ).toEqual(['Active classes', 'Archived', 'All']);
-    fireEvent.change(show, { target: { value: 'archived' } });
+    await user.selectOptions(show, 'archived');
     expect(onStatusChange).toHaveBeenCalledWith('archived');
   });
 
   it('explains the classes for a school-wide caller in the tooltip', async () => {
     setup();
-    fireEvent.focus(
-      await screen.findByRole('button', { name: 'About classes' })
-    );
+    const about = await screen.findByRole('button', { name: 'About classes' });
+    act(() => {
+      about.focus();
+    });
     expect(
       (
         await screen.findAllByText(
@@ -229,7 +240,10 @@ describe('ClassesPage', () => {
       expect(
         screen.queryByRole('button', { name: 'New class' })
       ).not.toBeInTheDocument();
-      fireEvent.focus(screen.getByRole('button', { name: 'About classes' }));
+      const about = screen.getByRole('button', { name: 'About classes' });
+      act(() => {
+        about.focus();
+      });
       expect(
         (
           await screen.findAllByText(
@@ -251,7 +265,9 @@ describe('ClassesPage', () => {
   describe('New class', () => {
     it('is offered to a class:create holder and opens the sheet', async () => {
       setup();
-      fireEvent.click(await screen.findByRole('button', { name: 'New class' }));
+      await user.click(
+        await screen.findByRole('button', { name: 'New class' })
+      );
       expect(
         await screen.findByText('New class', {
           selector: '[data-slot="sheet-title"]',
@@ -276,10 +292,10 @@ describe('ClassesPage', () => {
   it('opens a class from its row and from its name', async () => {
     const { onOpenClass } = setup();
     const name = await screen.findByRole('button', { name: 'JSS 1 Gold' });
-    fireEvent.click(name);
+    await user.click(name);
     expect(onOpenClass).toHaveBeenCalledWith(IDS.gold);
     onOpenClass.mockClear();
-    fireEvent.click(await screen.findByRole('row', { name: /JSS 1 Silver/ }));
+    await user.click(await screen.findByRole('row', { name: /JSS 1 Silver/ }));
     expect(onOpenClass).toHaveBeenCalledWith(IDS.silver);
   });
 
@@ -314,7 +330,7 @@ describe('ClassesPage', () => {
     const level = within(await tableOf('JSS 1'));
     expect(level.getAllByRole('row')).toHaveLength(11);
     expect(screen.getByText('Showing 1 to 10 of 12')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Page 2' }));
+    await user.click(screen.getByRole('button', { name: 'Page 2' }));
     expect(level.getAllByRole('row')).toHaveLength(3);
     expect(level.getByText('JSS 1 Arm 12')).toBeInTheDocument();
   });

@@ -172,8 +172,8 @@ function PreviewBody({
           <TriangleAlertIcon />
           <AlertDescription>
             Pending discount not applied yet:{' '}
-            {preview.data.pendingDiscounts.join(', ')}. It applies once a boss
-            approves it.
+            {preview.data.pendingDiscounts.join(', ')}. It applies once an
+            approver agrees.
           </AlertDescription>
         </Alert>
       )}

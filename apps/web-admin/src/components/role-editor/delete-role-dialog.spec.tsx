@@ -1,4 +1,5 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { ApiError } from '@eduvault/api-contract';
 import { toast } from '@eduvault/ui';
 import { renderWithApi } from '../../test-utils';
@@ -62,10 +63,11 @@ describe('DeleteRoleDialog', () => {
   });
 
   it('deletes, says so, closes and leaves the page', async () => {
+    const user = userEvent.setup();
     const { remove, onOpenChange, onDeleted } = setup(
       role('cashier', { label: 'Cashier' })
     );
-    fireEvent.click(deleteButton());
+    await user.click(deleteButton());
     await waitFor(() => {
       expect(remove).toHaveBeenCalledWith({ params: { slug: 'cashier' } });
     });
@@ -108,6 +110,7 @@ describe('DeleteRoleDialog', () => {
   });
 
   it('shows the server refusal and stays open', async () => {
+    const user = userEvent.setup();
     const remove = vi.fn().mockRejectedValue(
       new ApiError(409, {
         code: 'ROLE_IN_USE',
@@ -118,7 +121,7 @@ describe('DeleteRoleDialog', () => {
       role('cashier', { label: 'Cashier' }),
       remove
     );
-    fireEvent.click(deleteButton());
+    await user.click(deleteButton());
     expect(
       await screen.findByText(
         'Kemi still has this role. Take it off them first.'
@@ -128,9 +131,10 @@ describe('DeleteRoleDialog', () => {
     expect(onOpenChange).not.toHaveBeenCalledWith(false);
   });
 
-  it('closes on Cancel without deleting', () => {
+  it('closes on Cancel without deleting', async () => {
+    const user = userEvent.setup();
     const { remove, onOpenChange } = setup(role('cashier'));
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(onOpenChange).toHaveBeenCalledWith(false);
     expect(remove).not.toHaveBeenCalled();
   });

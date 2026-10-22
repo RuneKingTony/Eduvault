@@ -1,4 +1,5 @@
-import { fireEvent, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { ApiError } from '@eduvault/api-contract';
 import { toPermissionMap } from '@eduvault/policy';
 import { ADA_ID, PROOF_ID, SALE_ID, sale } from '../../test-store';
@@ -59,9 +60,10 @@ describe('SaleDetailSheet', () => {
   });
 
   it('opens the statement for someone who can read finance', async () => {
+    const user = userEvent.setup();
     const { onStatement } = setup();
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Statement' }));
+    await user.click(await screen.findByRole('button', { name: 'Statement' }));
 
     expect(onStatement).toHaveBeenCalledWith(ADA_ID);
   });
@@ -108,9 +110,10 @@ describe('SaleDetailSheet', () => {
   });
 
   it('closes from the Close button', async () => {
+    const user = userEvent.setup();
     const { onClose } = setup();
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Close' }));
+    await user.click(await screen.findByRole('button', { name: 'Close' }));
 
     expect(onClose).toHaveBeenCalled();
   });

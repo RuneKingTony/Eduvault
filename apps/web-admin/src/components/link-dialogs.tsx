@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { InfoIcon } from 'lucide-react';
 import {
+  GUARDIAN_LAST_REQUIRED_MESSAGE,
   GUARDIAN_RELATIONSHIPS,
   GUARDIAN_RELATIONSHIP_LABELS,
   type GuardianLink,
@@ -169,7 +170,7 @@ function removalBlock(input: {
     return 'Tick another guardian as paying fees first.';
   }
   if (links.length === 1 && input.requireGuardian === true && input.onRoll) {
-    return 'A student needs at least one guardian. Add another guardian first.';
+    return GUARDIAN_LAST_REQUIRED_MESSAGE;
   }
   return null;
 }

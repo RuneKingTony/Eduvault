@@ -1,4 +1,5 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { ActivityItem } from '@eduvault/api-contract';
 import { dashboardApi, renderInRouter } from '../../test-dashboard';
 import { ActivityCard } from './activity-card';
@@ -22,15 +23,17 @@ describe('ActivityCard', () => {
   });
 
   it('shows the Lagos time, the pillar and the text once opened', async () => {
+    const user = userEvent.setup();
     const api = dashboardApi({ activity: { items: [item(1)], total: 1 } });
     renderInRouter(<ActivityCard />, api);
-    fireEvent.click(await screen.findByText('Recent activity'));
+    await user.click(await screen.findByText('Recent activity'));
     expect(await screen.findByText('Event 1')).toBeInTheDocument();
     expect(screen.getByText('2026-10-07 10:05')).toBeInTheDocument();
     expect(screen.getByText('Foundation')).toBeInTheDocument();
   });
 
   it('pages ten at a time', async () => {
+    const user = userEvent.setup();
     const api = dashboardApi({
       activity: {
         items: Array.from({ length: 10 }, (_, n) => item(n + 1)),
@@ -38,16 +41,17 @@ describe('ActivityCard', () => {
       },
     });
     renderInRouter(<ActivityCard />, api);
-    fireEvent.click(await screen.findByText('Recent activity'));
-    fireEvent.click(await screen.findByRole('button', { name: 'Page 2' }));
+    await user.click(await screen.findByText('Recent activity'));
+    await user.click(await screen.findByRole('button', { name: 'Page 2' }));
     await waitFor(() => {
       expect(api.activity.list).toHaveBeenCalledWith({ query: { page: 2 } });
     });
   });
 
   it('says there is no activity yet', async () => {
+    const user = userEvent.setup();
     renderInRouter(<ActivityCard />, dashboardApi());
-    fireEvent.click(await screen.findByText('Recent activity'));
+    await user.click(await screen.findByText('Recent activity'));
     expect(await screen.findByText('No activity yet')).toBeInTheDocument();
   });
 

@@ -1,4 +1,5 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { ApiError } from '@eduvault/api-contract';
 import { toast } from '@eduvault/ui';
 import {
@@ -53,6 +54,12 @@ const lekkiOverride = feeLine({
   amountMinor: 17_000_000,
 });
 
+let user: ReturnType<typeof userEvent.setup>;
+
+beforeEach(() => {
+  user = userEvent.setup();
+});
+
 describe('SchoolFeesPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -85,7 +92,7 @@ describe('SchoolFeesPage', () => {
         query: { termId: TERM_2, group: 'school' },
       });
     });
-    fireEvent.change(term, { target: { value: TERM_1 } });
+    await user.selectOptions(term, TERM_1);
     expect(onSearchChange).toHaveBeenCalledWith({ term: TERM_1 });
   });
 
@@ -141,7 +148,7 @@ describe('SchoolFeesPage', () => {
 
   it('changes an amount and toasts the new figure', async () => {
     const { api } = setup();
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('button', { name: 'Edit amount of Tuition' })
     );
     const dialog = await screen.findByRole('dialog');
@@ -151,8 +158,9 @@ describe('SchoolFeesPage', () => {
     ).toBeInTheDocument();
     const amount = within(dialog).getByLabelText('Amount (₦)');
     expect(amount).toHaveValue('180,000');
-    fireEvent.change(amount, { target: { value: '₦250,000' } });
-    fireEvent.click(
+    await user.clear(amount);
+    await user.type(amount, '₦250,000');
+    await user.click(
       within(dialog).getByRole('button', { name: 'Save amount' })
     );
     await waitFor(() => {
@@ -170,15 +178,17 @@ describe('SchoolFeesPage', () => {
 
   it('answers Enter an amount for a zero or unreadable amount and sends nothing', async () => {
     const { api } = setup();
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('button', { name: 'Edit amount of Tuition' })
     );
     const dialog = await screen.findByRole('dialog');
     for (const value of ['0', 'abc', '']) {
-      fireEvent.change(within(dialog).getByLabelText('Amount (₦)'), {
-        target: { value },
-      });
-      fireEvent.click(
+      const field = within(dialog).getByLabelText('Amount (₦)');
+      await user.clear(field);
+      if (value) {
+        await user.type(field, value);
+      }
+      await user.click(
         within(dialog).getByRole('button', { name: 'Save amount' })
       );
       expect(
@@ -190,7 +200,7 @@ describe('SchoolFeesPage', () => {
 
   it('retires a line after confirming and toasts that it is kept', async () => {
     const { api } = setup();
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('button', { name: 'Retire line Tuition' })
     );
     const dialog = await screen.findByRole('dialog');
@@ -199,7 +209,7 @@ describe('SchoolFeesPage', () => {
     expect(
       within(dialog).getByText(/Charges already sent don’t change/)
     ).toBeInTheDocument();
-    fireEvent.click(
+    await user.click(
       within(dialog).getByRole('button', { name: 'Retire line' })
     );
     await waitFor(() => {
@@ -222,11 +232,11 @@ describe('SchoolFeesPage', () => {
         message: "This term has ended. Fees for it can't change.",
       })
     );
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('button', { name: 'Edit amount of Tuition' })
     );
     const dialog = await screen.findByRole('dialog');
-    fireEvent.click(
+    await user.click(
       within(dialog).getByRole('button', { name: 'Save amount' })
     );
     await waitFor(() => {
@@ -247,16 +257,12 @@ describe('SchoolFeesPage', () => {
     ).toBeInTheDocument();
     expect(within(sheet).getByLabelText('Fee type')).toHaveValue(TUITION.id);
     expect(within(sheet).getByLabelText('Campus')).toHaveValue('every-campus');
-    fireEvent.change(within(sheet).getByLabelText('Name'), {
-      target: { value: 'Excursion' },
-    });
-    fireEvent.change(within(sheet).getByLabelText('Amount (₦)'), {
-      target: { value: '₦15,000' },
-    });
-    fireEvent.click(
+    await user.type(within(sheet).getByLabelText('Name'), 'Excursion');
+    await user.type(within(sheet).getByLabelText('Amount (₦)'), '₦15,000');
+    await user.click(
       within(sheet).getByRole('checkbox', { name: /Optional fee/ })
     );
-    fireEvent.click(within(sheet).getByRole('button', { name: 'Add a fee' }));
+    await user.click(within(sheet).getByRole('button', { name: 'Add a fee' }));
     await waitFor(() => {
       expect(api.feeLines.create).toHaveBeenCalledWith({
         body: {
@@ -283,13 +289,9 @@ describe('SchoolFeesPage', () => {
     const { api } = setup({}, ownerAccess(), { add: 1 });
     const sheet = await screen.findByRole('dialog');
     await within(sheet).findByLabelText('Fee type');
-    fireEvent.change(within(sheet).getByLabelText('Name'), {
-      target: { value: 'Excursion' },
-    });
-    fireEvent.change(within(sheet).getByLabelText('Amount (₦)'), {
-      target: { value: 'abc' },
-    });
-    fireEvent.click(within(sheet).getByRole('button', { name: 'Add a fee' }));
+    await user.type(within(sheet).getByLabelText('Name'), 'Excursion');
+    await user.type(within(sheet).getByLabelText('Amount (₦)'), 'abc');
+    await user.click(within(sheet).getByRole('button', { name: 'Add a fee' }));
     expect(
       await within(sheet).findByText('Enter an amount.')
     ).toBeInTheDocument();
@@ -298,7 +300,7 @@ describe('SchoolFeesPage', () => {
 
   it('opens the add sheet from the Add a fee button', async () => {
     const { onSearchChange } = setup();
-    fireEvent.click(await screen.findByRole('button', { name: 'Add a fee' }));
+    await user.click(await screen.findByRole('button', { name: 'Add a fee' }));
     expect(onSearchChange).toHaveBeenCalledWith({ add: 1 });
   });
 
@@ -395,7 +397,7 @@ describe('the Copy from last term button', () => {
 
   it('opens the confirm dialog and copies into the chosen term', async () => {
     const { api } = setup();
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('button', { name: 'Copy from last term' })
     );
     const dialog = await screen.findByRole('dialog');
@@ -405,7 +407,7 @@ describe('the Copy from last term button', () => {
     expect(
       within(dialog).getByText('Into First term, 2026/2027.')
     ).toBeInTheDocument();
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Copy fees' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Copy fees' }));
     await waitFor(() => {
       expect(api.feeLines.copy).toHaveBeenCalledWith({
         body: { termId: TERM_1 },
@@ -505,7 +507,7 @@ describe('the preview card', () => {
     const picker = await screen.findByRole('combobox', {
       name: 'Preview student',
     });
-    fireEvent.change(picker, { target: { value: CHIDI } });
+    await user.selectOptions(picker, CHIDI);
     await waitFor(() => {
       expect(api.feeLines.preview).toHaveBeenCalledWith({
         query: { termId: TERM_1, studentId: CHIDI },
@@ -515,11 +517,9 @@ describe('the preview card', () => {
 
   it('searches the candidates and says how many match', async () => {
     const { api } = setup();
-    fireEvent.change(
+    await user.type(
       await screen.findByRole('textbox', { name: 'Search students' }),
-      {
-        target: { value: 'chidi' },
-      }
+      'chidi'
     );
     await waitFor(() => {
       expect(api.feeLines.candidates).toHaveBeenCalledWith({
@@ -535,9 +535,10 @@ describe('the preview card', () => {
     const { api } = setup();
     await screen.findByRole('combobox', { name: 'Preview student' });
     api.feeLines.candidates.mockResolvedValue({ items: [], total: 0 });
-    fireEvent.change(screen.getByRole('textbox', { name: 'Search students' }), {
-      target: { value: 'zzz' },
-    });
+    await user.type(
+      screen.getByRole('textbox', { name: 'Search students' }),
+      'zzz'
+    );
     expect(
       await screen.findByText('No student matches that search')
     ).toBeInTheDocument();
@@ -588,7 +589,7 @@ describe('the preview card', () => {
     expect(await screen.findByText('Already charged')).toBeInTheDocument();
     expect(
       screen.getByText(
-        /Pending discount not applied yet: Academic scholarship, Staff child\. It applies once a boss approves it\./
+        /Pending discount not applied yet: Academic scholarship, Staff child\. It applies once an approver agrees\./
       )
     ).toBeInTheDocument();
   });

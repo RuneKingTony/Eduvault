@@ -1,4 +1,5 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { ApiError } from '@eduvault/api-contract';
 import { ChangePasswordForm } from './change-password-form';
 
@@ -8,14 +9,11 @@ function setup(onSubmit = vi.fn().mockResolvedValue(undefined)) {
   return { onSubmit, onSignOut };
 }
 
-const fill = (newPassword: string, confirm: string) => {
-  fireEvent.change(screen.getByLabelText('New password'), {
-    target: { value: newPassword },
-  });
-  fireEvent.change(screen.getByLabelText('Confirm new password'), {
-    target: { value: confirm },
-  });
-  fireEvent.click(screen.getByRole('button', { name: 'Save and continue' }));
+const fill = async (newPassword: string, confirm: string) => {
+  const user = userEvent.setup();
+  await user.type(screen.getByLabelText('New password'), newPassword);
+  await user.type(screen.getByLabelText('Confirm new password'), confirm);
+  await user.click(screen.getByRole('button', { name: 'Save and continue' }));
 };
 
 describe('ChangePasswordForm', () => {
@@ -26,16 +24,16 @@ describe('ChangePasswordForm', () => {
     ).toBeInTheDocument();
   });
 
-  it('refuses a short password without calling the server', () => {
+  it('refuses a short password without calling the server', async () => {
     const { onSubmit } = setup();
-    fill('nine-char', 'nine-char');
+    await fill('nine-char', 'nine-char');
     expect(screen.getByText('Use at least 10 characters.')).toBeInTheDocument();
     expect(onSubmit).not.toHaveBeenCalled();
   });
 
-  it('refuses a mismatch', () => {
+  it('refuses a mismatch', async () => {
     const { onSubmit } = setup();
-    fill('long-enough-password', 'another-long-password');
+    await fill('long-enough-password', 'another-long-password');
     expect(screen.getByText('The passwords don’t match.')).toBeInTheDocument();
     expect(onSubmit).not.toHaveBeenCalled();
   });
@@ -51,23 +49,25 @@ describe('ChangePasswordForm', () => {
         })
       )
     );
-    fill('long-enough-password', 'long-enough-password');
+    await fill('long-enough-password', 'long-enough-password');
     expect(await screen.findByText(message)).toBeInTheDocument();
     expect(onSubmit).toHaveBeenCalledWith('long-enough-password');
   });
 
   it('submits a valid password', async () => {
     const { onSubmit } = setup();
-    fill('long-enough-password', 'long-enough-password');
+    await fill('long-enough-password', 'long-enough-password');
     await waitFor(() => {
       expect(onSubmit).toHaveBeenCalledWith('long-enough-password');
     });
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
-  it('lets the person leave with Sign out', () => {
+  it('lets the person leave with Sign out', async () => {
     const { onSignOut } = setup();
-    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+    await userEvent
+      .setup()
+      .click(screen.getByRole('button', { name: 'Sign out' }));
     expect(onSignOut).toHaveBeenCalledOnce();
   });
 });

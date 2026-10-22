@@ -1,4 +1,5 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { ApiError } from '@eduvault/api-contract';
 import { toast } from '@eduvault/ui';
 import {
@@ -33,6 +34,12 @@ function setup(
   );
   return { api, onSearchChange };
 }
+
+let user: ReturnType<typeof userEvent.setup>;
+
+beforeEach(() => {
+  user = userEvent.setup();
+});
 
 describe('BillingPage', () => {
   beforeEach(() => {
@@ -110,7 +117,7 @@ describe('BillingPage', () => {
   it('asks the page to set the prepare flag when the button is pressed', async () => {
     const { onSearchChange } = setup();
     await screen.findByText('BR-2026-0001');
-    fireEvent.click(screen.getByRole('button', { name: 'Charge students' }));
+    await user.click(screen.getByRole('button', { name: 'Charge students' }));
     expect(onSearchChange).toHaveBeenCalledWith({ prepare: 1 });
   });
 });
@@ -158,10 +165,10 @@ describe('the prepare sheet', () => {
     });
     const who = await within(sheet).findByLabelText('Who to charge');
     expect(within(sheet).queryByLabelText('Campus')).not.toBeInTheDocument();
-    fireEvent.change(who, { target: { value: 'campus' } });
+    await user.selectOptions(who, 'campus');
     expect(within(sheet).getByLabelText('Campus')).toBeVisible();
     expect(within(sheet).queryByLabelText('Level')).not.toBeInTheDocument();
-    fireEvent.change(who, { target: { value: 'level' } });
+    await user.selectOptions(who, 'level');
     expect(within(sheet).getByLabelText('Level')).toBeVisible();
     expect(within(sheet).queryByLabelText('Campus')).not.toBeInTheDocument();
   });
@@ -187,15 +194,13 @@ describe('the prepare sheet', () => {
       name: 'Charge students',
     });
     const who = await within(sheet).findByLabelText('Who to charge');
-    fireEvent.change(who, { target: { value: 'level' } });
+    await user.selectOptions(who, 'level');
     const levelNames = () =>
       within(within(sheet).getByLabelText('Level'))
         .getAllByRole('option')
         .map((option) => option.textContent);
     expect(levelNames()).toEqual(['JSS 1', 'JSS 2']);
-    fireEvent.change(within(sheet).getByLabelText('Term'), {
-      target: { value: TERM_ONE },
-    });
+    await user.selectOptions(within(sheet).getByLabelText('Term'), TERM_ONE);
     expect(levelNames()).toEqual(['JSS 1']);
   });
 
@@ -205,7 +210,7 @@ describe('the prepare sheet', () => {
       name: 'Charge students',
     });
     await within(sheet).findByLabelText('Term');
-    fireEvent.click(
+    await user.click(
       within(sheet).getByRole('button', { name: 'Prepare charges' })
     );
     await waitFor(() => {
@@ -240,7 +245,7 @@ describe('the prepare sheet', () => {
       name: 'Charge students',
     });
     await within(sheet).findByLabelText('Term');
-    fireEvent.click(
+    await user.click(
       within(sheet).getByRole('button', { name: 'Prepare charges' })
     );
     expect(await screen.findByText(/2 had no fees that apply/)).toBeVisible();
@@ -257,7 +262,7 @@ describe('the prepare sheet', () => {
       name: 'Charge students',
     });
     await within(sheet).findByLabelText('Term');
-    fireEvent.click(
+    await user.click(
       within(sheet).getByRole('button', { name: 'Prepare charges' })
     );
     expect(
@@ -279,12 +284,10 @@ describe('the prepare sheet', () => {
       name: 'Charge students',
     });
     const who = await within(sheet).findByLabelText('Who to charge');
-    fireEvent.change(who, { target: { value: 'campus' } });
+    await user.selectOptions(who, 'campus');
     const campus = within(sheet).getByLabelText('Campus');
-    fireEvent.change(campus, {
-      target: { value: (campus as HTMLSelectElement).options[1]?.value },
-    });
-    fireEvent.click(
+    await user.selectOptions(campus, within(campus).getAllByRole('option')[1]!);
+    await user.click(
       within(sheet).getByRole('button', { name: 'Prepare charges' })
     );
     await waitFor(() => {
@@ -311,7 +314,7 @@ describe('the prepare sheet', () => {
       name: 'Charge students',
     });
     await within(sheet).findByLabelText('Term');
-    fireEvent.click(
+    await user.click(
       within(sheet).getByRole('button', { name: 'Prepare charges' })
     );
     await waitFor(() => {

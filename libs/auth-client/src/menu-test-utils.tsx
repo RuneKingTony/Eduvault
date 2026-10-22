@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { SidebarProvider, TooltipProvider } from '@eduvault/ui';
 import type { EduvaultAuthClient } from './auth-client';
 
@@ -14,6 +15,6 @@ export function renderInSidebar(ui: ReactNode) {
   );
 }
 
-export function openMenu(name: string | RegExp) {
-  fireEvent.keyDown(screen.getByRole('button', { name }), { key: 'Enter' });
+export async function openMenu(name: string | RegExp) {
+  await userEvent.setup().click(screen.getByRole('button', { name }));
 }

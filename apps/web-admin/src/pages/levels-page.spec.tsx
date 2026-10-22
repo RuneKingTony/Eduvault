@@ -1,4 +1,5 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
+import userEvent, { type UserEvent } from '@testing-library/user-event';
 import { ApiError } from '@eduvault/api-contract';
 import { toast } from '@eduvault/ui';
 import {
@@ -41,10 +42,9 @@ const rowOf = async (name: string) => {
   return within(row);
 };
 
-const openMenu = async (name: string) => {
-  fireEvent.keyDown(
-    (await rowOf(name)).getByRole('button', { name: `Actions for ${name}` }),
-    { key: 'Enter' }
+const openMenu = async (user: UserEvent, name: string) => {
+  await user.click(
+    (await rowOf(name)).getByRole('button', { name: `Actions for ${name}` })
   );
 };
 
@@ -74,11 +74,12 @@ describe('LevelsPage', () => {
   });
 
   it('gives a class:update holder Add, Edit and the move controls', async () => {
+    const user = userEvent.setup();
     setup();
     expect(
       await screen.findByRole('button', { name: 'Add level' })
     ).toBeInTheDocument();
-    await openMenu('JSS 1');
+    await openMenu(user, 'JSS 1');
     expect(
       await screen.findByRole('menuitem', { name: 'Edit' })
     ).toBeInTheDocument();
@@ -105,42 +106,40 @@ describe('LevelsPage', () => {
   });
 
   it('moves a level up or down by one place and refuses to move past the ends', async () => {
+    const user = userEvent.setup();
     const levels = setup(ownerAccess());
-    await openMenu('JSS 1');
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Move up' }));
+    await openMenu(user, 'JSS 1');
+    await user.click(await screen.findByRole('menuitem', { name: 'Move up' }));
     await waitFor(() => {
       expect(levels.update).toHaveBeenCalledWith({
         params: { id: IDS.jss1 },
         body: { sequence: 1 },
       });
     });
-    await openMenu('JSS 1');
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Move down' }));
+    await openMenu(user, 'JSS 1');
+    await user.click(
+      await screen.findByRole('menuitem', { name: 'Move down' })
+    );
     await waitFor(() => {
       expect(levels.update).toHaveBeenLastCalledWith({
         params: { id: IDS.jss1 },
         body: { sequence: 3 },
       });
     });
-    await openMenu('Primary 1');
+    await openMenu(user, 'Primary 1');
     expect(
       await screen.findByRole('menuitem', { name: 'Move up' })
     ).toHaveAttribute('aria-disabled', 'true');
   });
 
   it('adds a level with its code in capitals and toasts', async () => {
+    const user = userEvent.setup();
     const levels = setup();
-    fireEvent.click(await screen.findByRole('button', { name: 'Add level' }));
-    fireEvent.change(await screen.findByLabelText('Code'), {
-      target: { value: 'cre' },
-    });
-    fireEvent.change(screen.getByLabelText('Name'), {
-      target: { value: 'Creche' },
-    });
-    fireEvent.change(screen.getByLabelText('Next level'), {
-      target: { value: IDS.p1 },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Add level' }));
+    await user.click(await screen.findByRole('button', { name: 'Add level' }));
+    await user.type(await screen.findByLabelText('Code'), 'cre');
+    await user.type(screen.getByLabelText('Name'), 'Creche');
+    await user.selectOptions(screen.getByLabelText('Next level'), IDS.p1);
+    await user.click(screen.getByRole('button', { name: 'Add level' }));
     await waitFor(() => {
       expect(levels.create).toHaveBeenCalledWith({
         body: { code: 'CRE', name: 'Creche', nextLevelId: IDS.p1 },
@@ -150,19 +149,16 @@ describe('LevelsPage', () => {
   });
 
   it('offers Final year first in the next-level select and sends null for it', async () => {
+    const user = userEvent.setup();
     const levels = setup();
-    fireEvent.click(await screen.findByRole('button', { name: 'Add level' }));
+    await user.click(await screen.findByRole('button', { name: 'Add level' }));
     const next = await screen.findByLabelText<HTMLSelectElement>('Next level');
     expect(within(next).getAllByRole('option')[0]).toHaveTextContent(
       'Final year'
     );
-    fireEvent.change(await screen.findByLabelText('Code'), {
-      target: { value: 'A1' },
-    });
-    fireEvent.change(screen.getByLabelText('Name'), {
-      target: { value: 'Alumni' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Add level' }));
+    await user.type(await screen.findByLabelText('Code'), 'A1');
+    await user.type(screen.getByLabelText('Name'), 'Alumni');
+    await user.click(screen.getByRole('button', { name: 'Add level' }));
     await waitFor(() => {
       expect(levels.create).toHaveBeenCalledWith({
         body: { code: 'A1', name: 'Alumni', nextLevelId: null },
@@ -171,18 +167,15 @@ describe('LevelsPage', () => {
   });
 
   it('shows a taken code inline and keeps the dialog open', async () => {
+    const user = userEvent.setup();
     const levels = setup();
     levels.create.mockRejectedValue(
       new ApiError(409, { code: 'Conflict', message: 'CRE already exists.' })
     );
-    fireEvent.click(await screen.findByRole('button', { name: 'Add level' }));
-    fireEvent.change(await screen.findByLabelText('Code'), {
-      target: { value: 'CRE' },
-    });
-    fireEvent.change(screen.getByLabelText('Name'), {
-      target: { value: 'Creche' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Add level' }));
+    await user.click(await screen.findByRole('button', { name: 'Add level' }));
+    await user.type(await screen.findByLabelText('Code'), 'CRE');
+    await user.type(screen.getByLabelText('Name'), 'Creche');
+    await user.click(screen.getByRole('button', { name: 'Add level' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'CRE already exists.'
     );
@@ -191,15 +184,12 @@ describe('LevelsPage', () => {
   });
 
   it('refuses a bad code before calling the API', async () => {
+    const user = userEvent.setup();
     const levels = setup();
-    fireEvent.click(await screen.findByRole('button', { name: 'Add level' }));
-    fireEvent.change(await screen.findByLabelText('Code'), {
-      target: { value: 'x' },
-    });
-    fireEvent.change(screen.getByLabelText('Name'), {
-      target: { value: 'Creche' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Add level' }));
+    await user.click(await screen.findByRole('button', { name: 'Add level' }));
+    await user.type(await screen.findByLabelText('Code'), 'x');
+    await user.type(screen.getByLabelText('Name'), 'Creche');
+    await user.click(screen.getByRole('button', { name: 'Add level' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Use 2 to 8 capital letters or digits, for example JSS1.'
     );
@@ -207,6 +197,7 @@ describe('LevelsPage', () => {
   });
 
   it('edits a level without its code and shows a self-reference refusal inline', async () => {
+    const user = userEvent.setup();
     const levels = setup();
     levels.update.mockRejectedValue(
       new ApiError(400, {
@@ -214,28 +205,29 @@ describe('LevelsPage', () => {
         message: 'A level can’t lead to itself.',
       })
     );
-    await openMenu('JSS 1');
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Edit' }));
+    await openMenu(user, 'JSS 1');
+    await user.click(await screen.findByRole('menuitem', { name: 'Edit' }));
     expect(await screen.findByLabelText('Name')).toHaveValue('JSS 1');
     expect(screen.queryByLabelText('Code')).not.toBeInTheDocument();
     const next = screen.getByLabelText<HTMLSelectElement>('Next level');
     expect(
       within(next).queryByRole('option', { name: 'JSS 1' })
     ).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'A level can’t lead to itself.'
     );
   });
 
   it('saves an edit and toasts the saved name', async () => {
+    const user = userEvent.setup();
     const levels = setup();
-    await openMenu('JSS 1');
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Edit' }));
-    fireEvent.change(await screen.findByLabelText('Name'), {
-      target: { value: 'Year 1' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    await openMenu(user, 'JSS 1');
+    await user.click(await screen.findByRole('menuitem', { name: 'Edit' }));
+    const name = await screen.findByLabelText('Name');
+    await user.clear(name);
+    await user.type(name, 'Year 1');
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
     await waitFor(() => {
       expect(levels.update).toHaveBeenCalledWith({
         params: { id: IDS.jss1 },

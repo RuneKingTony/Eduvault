@@ -1,4 +1,5 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { ApiError } from '@eduvault/api-contract';
 import { toast } from '@eduvault/ui';
 import type { AdjustmentsSearch } from '../adjustments-search';
@@ -191,6 +192,12 @@ function setup(
   return { api, onSearchChange };
 }
 
+let user: ReturnType<typeof userEvent.setup>;
+
+beforeEach(() => {
+  user = userEvent.setup();
+});
+
 describe('AdjustmentsPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -366,8 +373,7 @@ describe('AdjustmentsPage', () => {
 
   it('switches tab through the search and drops the page', async () => {
     const { onSearchChange } = setup({ search: { page: 2 } });
-    fireEvent.mouseDown(await screen.findByRole('tab', { name: /Discounts/ }));
-    fireEvent.click(screen.getByRole('tab', { name: /Discounts/ }));
+    await user.click(await screen.findByRole('tab', { name: /Discounts/ }));
     await waitFor(() => {
       expect(onSearchChange).toHaveBeenCalledWith({ tab: 'discounts' });
     });
@@ -414,9 +420,7 @@ describe('the New request sheet', () => {
     const { api, sheet } = await openSheet();
     await within(sheet).findByLabelText('Student');
 
-    fireEvent.change(within(sheet).getByLabelText('Find a student'), {
-      target: { value: 'bol' },
-    });
+    await user.type(within(sheet).getByLabelText('Find a student'), 'bol');
 
     await waitFor(() => {
       expect(api.students.list).toHaveBeenCalledWith({
@@ -429,9 +433,16 @@ describe('the New request sheet', () => {
     const { sheet } = await openSheet();
     const search = await within(sheet).findByLabelText('Find a student');
 
-    const notPrevented = fireEvent.keyDown(search, { key: 'Enter' });
+    let defaultPrevented = false;
+    const record = (event: KeyboardEvent) => {
+      defaultPrevented = event.defaultPrevented;
+    };
+    document.addEventListener('keydown', record);
+    await user.click(search);
+    await user.keyboard('{Enter}');
+    document.removeEventListener('keydown', record);
 
-    expect(notPrevented).toBe(false);
+    expect(defaultPrevented).toBe(true);
   });
 
   it('keeps a student sent from "Pay the extra back" when the first results do not hold them', async () => {
@@ -483,7 +494,7 @@ describe('the New request sheet', () => {
     const { api, sheet } = await openSheet();
     await within(sheet).findByLabelText('Student');
 
-    fireEvent.click(
+    await user.click(
       within(sheet).getByRole('button', { name: 'Submit for approval' })
     );
 
@@ -502,17 +513,11 @@ describe('the New request sheet', () => {
       expect(within(sheet).getByLabelText('Student')).toBeEnabled();
     });
     await within(sheet).findByRole('option', { name: 'Ada Okeke · GF-0123' });
-    fireEvent.change(within(sheet).getByLabelText('Student'), {
-      target: { value: ADA },
-    });
-    fireEvent.change(within(sheet).getByLabelText('Amount (₦)'), {
-      target: { value: '10,000' },
-    });
-    fireEvent.change(within(sheet).getByLabelText('Reason'), {
-      target: { value: 'Late enrolment' },
-    });
+    await user.selectOptions(within(sheet).getByLabelText('Student'), ADA);
+    await user.type(within(sheet).getByLabelText('Amount (₦)'), '10,000');
+    await user.type(within(sheet).getByLabelText('Reason'), 'Late enrolment');
 
-    fireEvent.click(
+    await user.click(
       within(sheet).getByRole('button', { name: 'Submit for approval' })
     );
 
@@ -544,16 +549,10 @@ describe('the New request sheet', () => {
     });
     const sheet = await screen.findByRole('dialog');
     await within(sheet).findByRole('option', { name: 'Ada Okeke · GF-0123' });
-    fireEvent.change(within(sheet).getByLabelText('Student'), {
-      target: { value: ADA },
-    });
-    fireEvent.change(within(sheet).getByLabelText('Amount (₦)'), {
-      target: { value: '100' },
-    });
-    fireEvent.change(within(sheet).getByLabelText('Reason'), {
-      target: { value: 'Late' },
-    });
-    fireEvent.click(
+    await user.selectOptions(within(sheet).getByLabelText('Student'), ADA);
+    await user.type(within(sheet).getByLabelText('Amount (₦)'), '100');
+    await user.type(within(sheet).getByLabelText('Reason'), 'Late');
+    await user.click(
       within(sheet).getByRole('button', { name: 'Submit for approval' })
     );
 
@@ -578,10 +577,8 @@ describe('the New request sheet', () => {
     });
     const sheet = await screen.findByRole('dialog');
     await within(sheet).findByRole('option', { name: 'Ada Okeke · GF-0123' });
-    fireEvent.change(within(sheet).getByLabelText('Reason'), {
-      target: { value: 'Overpaid' },
-    });
-    fireEvent.click(
+    await user.type(within(sheet).getByLabelText('Reason'), 'Overpaid');
+    await user.click(
       within(sheet).getByRole('button', { name: 'Submit for approval' })
     );
 
@@ -597,10 +594,8 @@ describe('the New request sheet', () => {
     await waitFor(() => {
       expect(api.moneyAccounts.forRecording).toHaveBeenCalled();
     });
-    fireEvent.change(within(sheet).getByLabelText('Reason'), {
-      target: { value: 'Overpaid' },
-    });
-    fireEvent.click(
+    await user.type(within(sheet).getByLabelText('Reason'), 'Overpaid');
+    await user.click(
       within(sheet).getByRole('button', { name: 'Submit for approval' })
     );
 
@@ -677,23 +672,17 @@ describe('the New discount sheet', () => {
     const sheet = await screen.findByRole('dialog');
     await within(sheet).findByRole('option', { name: 'Ada Okeke · GF-0123' });
 
-    fireEvent.click(
+    await user.click(
       within(sheet).getByRole('button', { name: 'Submit for approval' })
     );
     expect(
       await within(sheet).findByText('Choose a student and enter a value.')
     ).toBeVisible();
 
-    fireEvent.change(within(sheet).getByLabelText('Student'), {
-      target: { value: ADA },
-    });
-    fireEvent.change(within(sheet).getByLabelText('Value'), {
-      target: { value: '120' },
-    });
-    fireEvent.change(within(sheet).getByLabelText('Reason'), {
-      target: { value: 'Staff child' },
-    });
-    fireEvent.click(
+    await user.selectOptions(within(sheet).getByLabelText('Student'), ADA);
+    await user.type(within(sheet).getByLabelText('Value'), '120');
+    await user.type(within(sheet).getByLabelText('Reason'), 'Staff child');
+    await user.click(
       within(sheet).getByRole('button', { name: 'Submit for approval' })
     );
     expect(
@@ -706,17 +695,11 @@ describe('the New discount sheet', () => {
     const { api } = setup({ search: { tab: 'discounts', new: 1 } });
     const sheet = await screen.findByRole('dialog');
     await within(sheet).findByRole('option', { name: 'Ada Okeke · GF-0123' });
-    fireEvent.change(within(sheet).getByLabelText('Student'), {
-      target: { value: ADA },
-    });
-    fireEvent.change(within(sheet).getByLabelText('Value'), {
-      target: { value: '10' },
-    });
-    fireEvent.change(within(sheet).getByLabelText('Reason'), {
-      target: { value: 'Staff child' },
-    });
+    await user.selectOptions(within(sheet).getByLabelText('Student'), ADA);
+    await user.type(within(sheet).getByLabelText('Value'), '10');
+    await user.type(within(sheet).getByLabelText('Reason'), 'Staff child');
 
-    fireEvent.click(
+    await user.click(
       within(sheet).getByRole('button', { name: 'Submit for approval' })
     );
 
@@ -749,16 +732,10 @@ describe('the New discount sheet', () => {
     });
     const sheet = await screen.findByRole('dialog');
     await within(sheet).findByRole('option', { name: 'Ada Okeke · GF-0123' });
-    fireEvent.change(within(sheet).getByLabelText('Student'), {
-      target: { value: ADA },
-    });
-    fireEvent.change(within(sheet).getByLabelText('Value'), {
-      target: { value: '10' },
-    });
-    fireEvent.change(within(sheet).getByLabelText('Reason'), {
-      target: { value: 'Staff child' },
-    });
-    fireEvent.click(
+    await user.selectOptions(within(sheet).getByLabelText('Student'), ADA);
+    await user.type(within(sheet).getByLabelText('Value'), '10');
+    await user.type(within(sheet).getByLabelText('Reason'), 'Staff child');
+    await user.click(
       within(sheet).getByRole('button', { name: 'Submit for approval' })
     );
 
@@ -785,7 +762,7 @@ describe('the End discount dialog', () => {
         }),
       ]),
     });
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('button', { name: /End discount/ })
     );
     const dialog = await screen.findByRole('dialog');
@@ -808,9 +785,9 @@ describe('the End discount dialog', () => {
         TERM_3,
       ]);
     });
-    fireEvent.change(last, { target: { value: TERM_2 } });
+    await user.selectOptions(last, TERM_2);
 
-    fireEvent.click(
+    await user.click(
       within(dialog).getByRole('button', { name: 'End discount' })
     );
 

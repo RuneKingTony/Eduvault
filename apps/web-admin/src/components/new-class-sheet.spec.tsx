@@ -1,4 +1,5 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { ApiError, type Campus } from '@eduvault/api-contract';
 import { toast } from '@eduvault/ui';
 import { IDS, classSummary, ladder } from '../test-classes';
@@ -41,8 +42,8 @@ function setup(activeCampusId: string | null = IDS.ikeja) {
   return { api, onOpenChange };
 }
 
-const submit = () =>
-  fireEvent.click(screen.getByRole('button', { name: 'Create class' }));
+const submit = (user: ReturnType<typeof userEvent.setup>) =>
+  user.click(screen.getByRole('button', { name: 'Create class' }));
 
 describe('NewClassSheet', () => {
   beforeEach(() => {
@@ -78,17 +79,12 @@ describe('NewClassSheet', () => {
   });
 
   it('creates the class, toasts with the display name and campus and closes', async () => {
+    const user = userEvent.setup();
     const { api, onOpenChange } = setup();
-    fireEvent.change(await screen.findByLabelText('Level'), {
-      target: { value: IDS.jss1 },
-    });
-    fireEvent.change(screen.getByLabelText('Campus'), {
-      target: { value: IDS.lekki },
-    });
-    fireEvent.change(screen.getByLabelText('Name'), {
-      target: { value: ' Gold ' },
-    });
-    submit();
+    await user.selectOptions(await screen.findByLabelText('Level'), IDS.jss1);
+    await user.selectOptions(screen.getByLabelText('Campus'), IDS.lekki);
+    await user.type(screen.getByLabelText('Name'), ' Gold ');
+    await submit(user);
     await waitFor(() => {
       expect(api.classes.create).toHaveBeenCalledWith({
         body: { levelId: IDS.jss1, campusId: IDS.lekki, name: 'Gold' },
@@ -101,9 +97,10 @@ describe('NewClassSheet', () => {
   });
 
   it('asks for a name before calling the API', async () => {
+    const user = userEvent.setup();
     const { api } = setup();
     await screen.findByLabelText('Level');
-    submit();
+    await submit(user);
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Give the class a name, for example Gold.'
     );
@@ -114,14 +111,13 @@ describe('NewClassSheet', () => {
     'JSS 1 Gold already exists on Lekki.',
     'JSS 1 Gold already exists on Lekki and is archived. Restore it instead.',
   ])('shows the 409 "%s" inline and stays open', async (message) => {
+    const user = userEvent.setup();
     const { api, onOpenChange } = setup();
     api.classes.create.mockRejectedValue(
       new ApiError(409, { code: 'Conflict', message })
     );
-    fireEvent.change(await screen.findByLabelText('Name'), {
-      target: { value: 'Gold' },
-    });
-    submit();
+    await user.type(await screen.findByLabelText('Name'), 'Gold');
+    await submit(user);
     expect(await screen.findByRole('alert')).toHaveTextContent(message);
     expect(onOpenChange).not.toHaveBeenCalled();
     expect(toast.success).not.toHaveBeenCalled();

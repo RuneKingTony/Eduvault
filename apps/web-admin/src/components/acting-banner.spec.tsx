@@ -1,4 +1,5 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { allowWrites, clearActing, startActing } from '../acting-store';
 import { ActingBanner } from './acting-banner';
 
@@ -22,7 +23,8 @@ describe('ActingBanner', () => {
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
-  it('reads read-only with a reason field and Leave school', () => {
+  it('reads read-only with a reason field and Leave school', async () => {
+    const user = userEvent.setup();
     startActing('s1', 'Greenfield College');
     render(<ActingBanner />);
     const banner = screen.getByRole('status');
@@ -36,30 +38,29 @@ describe('ActingBanner', () => {
     expect(
       screen.queryByRole('button', { name: 'Back to read-only' })
     ).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Leave school' }));
+    await user.click(screen.getByRole('button', { name: 'Leave school' }));
     expect(actions.leave).toHaveBeenCalledOnce();
   });
 
-  it('allows writes with the reason that was typed', () => {
+  it('allows writes with the reason that was typed', async () => {
+    const user = userEvent.setup();
     startActing('s1', 'Greenfield College');
     render(<ActingBanner />);
-    fireEvent.change(screen.getByLabelText('Reason for writes'), {
-      target: { value: 'SUP-2214' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Allow writes' }));
+    await user.type(screen.getByLabelText('Reason for writes'), 'SUP-2214');
+    await user.click(screen.getByRole('button', { name: 'Allow writes' }));
     expect(actions.allow).toHaveBeenCalledExactlyOnceWith('SUP-2214');
   });
 
-  it('keeps Allow writes off for a blank reason', () => {
+  it('keeps Allow writes off for a blank reason', async () => {
+    const user = userEvent.setup();
     startActing('s1', 'Greenfield College');
     render(<ActingBanner />);
-    fireEvent.change(screen.getByLabelText('Reason for writes'), {
-      target: { value: '   ' },
-    });
+    await user.type(screen.getByLabelText('Reason for writes'), '   ');
     expect(screen.getByRole('button', { name: 'Allow writes' })).toBeDisabled();
   });
 
-  it('reads writes allowed with the reason and offers Back to read-only', () => {
+  it('reads writes allowed with the reason and offers Back to read-only', async () => {
+    const user = userEvent.setup();
     startActing('s1', 'Greenfield College');
     allowWrites('SUP-2214');
     render(<ActingBanner />);
@@ -69,9 +70,9 @@ describe('ActingBanner', () => {
     expect(
       screen.queryByLabelText('Reason for writes')
     ).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Back to read-only' }));
+    await user.click(screen.getByRole('button', { name: 'Back to read-only' }));
     expect(actions.back).toHaveBeenCalledOnce();
-    fireEvent.click(screen.getByRole('button', { name: 'Leave school' }));
+    await user.click(screen.getByRole('button', { name: 'Leave school' }));
     expect(actions.leave).toHaveBeenCalledOnce();
   });
 

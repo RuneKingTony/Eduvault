@@ -1,4 +1,5 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { ApiError, type CampusSummary } from '@eduvault/api-contract';
 import { toast } from '@eduvault/ui';
 import { testId } from '../test-api';
@@ -39,6 +40,12 @@ const ikeja = summary(IKEJA_ID, 'Ikeja');
 
 const apiWith = (campuses: CampusSummary[], extra: object = {}) => ({
   campuses: { summary: vi.fn().mockResolvedValue(campuses), ...extra },
+});
+
+let user: ReturnType<typeof userEvent.setup>;
+
+beforeEach(() => {
+  user = userEvent.setup();
 });
 
 describe('describeCampuses', () => {
@@ -153,15 +160,11 @@ describe('CampusesPage', () => {
     );
     await screen.findByText('Lekki');
 
-    fireEvent.click(screen.getByRole('button', { name: 'New campus' }));
+    await user.click(screen.getByRole('button', { name: 'New campus' }));
     const dialog = within(await screen.findByRole('dialog'));
-    fireEvent.change(dialog.getByLabelText('Name'), {
-      target: { value: 'Ajah' },
-    });
-    fireEvent.change(dialog.getByLabelText('Address'), {
-      target: { value: '22 Addo Road, Ajah' },
-    });
-    fireEvent.click(dialog.getByRole('button', { name: 'Create campus' }));
+    await user.type(dialog.getByLabelText('Name'), 'Ajah');
+    await user.type(dialog.getByLabelText('Address'), '22 Addo Road, Ajah');
+    await user.click(dialog.getByRole('button', { name: 'Create campus' }));
 
     await waitFor(() => {
       expect(create).toHaveBeenCalledWith({
@@ -184,9 +187,9 @@ describe('CampusesPage', () => {
     );
     await screen.findByText('Lekki');
 
-    fireEvent.click(screen.getByRole('button', { name: 'New campus' }));
+    await user.click(screen.getByRole('button', { name: 'New campus' }));
     const dialog = within(await screen.findByRole('dialog'));
-    fireEvent.click(dialog.getByRole('button', { name: 'Create campus' }));
+    await user.click(dialog.getByRole('button', { name: 'Create campus' }));
 
     expect(
       await dialog.findByText('Give the campus a name.')
@@ -207,12 +210,10 @@ describe('CampusesPage', () => {
     );
     await screen.findByText('Lekki');
 
-    fireEvent.click(screen.getByRole('button', { name: 'New campus' }));
+    await user.click(screen.getByRole('button', { name: 'New campus' }));
     const dialog = within(await screen.findByRole('dialog'));
-    fireEvent.change(dialog.getByLabelText('Name'), {
-      target: { value: 'ajah' },
-    });
-    fireEvent.click(dialog.getByRole('button', { name: 'Create campus' }));
+    await user.type(dialog.getByLabelText('Name'), 'ajah');
+    await user.click(dialog.getByRole('button', { name: 'Create campus' }));
 
     expect(await dialog.findByText('ajah already exists.')).toBeInTheDocument();
     expect(toast.success).not.toHaveBeenCalled();
@@ -234,14 +235,12 @@ describe('CampusesPage', () => {
     );
     await screen.findByText('Lekki');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Edit Lekki' }));
+    await user.click(screen.getByRole('button', { name: 'Edit Lekki' }));
     const dialog = within(await screen.findByRole('dialog'));
     expect(dialog.getByLabelText('Name')).toHaveValue('Lekki');
     expect(dialog.getByLabelText('Address')).toHaveValue('12 Admiralty Way');
-    fireEvent.change(dialog.getByLabelText('Address'), {
-      target: { value: '' },
-    });
-    fireEvent.click(dialog.getByRole('button', { name: 'Save changes' }));
+    await user.clear(dialog.getByLabelText('Address'));
+    await user.click(dialog.getByRole('button', { name: 'Save changes' }));
 
     await waitFor(() => {
       expect(update).toHaveBeenCalledWith({

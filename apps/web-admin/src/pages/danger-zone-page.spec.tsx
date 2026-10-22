@@ -1,4 +1,5 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { HandoverCandidate } from '@eduvault/api-contract';
 import {
   AuthClientProvider,
@@ -13,6 +14,12 @@ vi.mock('@eduvault/ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@eduvault/ui')>()),
   toast: { success: vi.fn(), error: vi.fn() },
 }));
+
+let user: ReturnType<typeof userEvent.setup>;
+
+beforeEach(() => {
+  user = userEvent.setup();
+});
 
 const tunde: HandoverCandidate = {
   userId: 'u-tunde',
@@ -142,7 +149,7 @@ describe('handing the school over', () => {
     const { api, onHandedOver } = setup();
     await screen.findByLabelText('New owner');
 
-    fireEvent.click(
+    await user.click(
       screen.getByRole('button', { name: 'Hand over the school…' })
     );
     const dialog = within(await screen.findByRole('dialog'));
@@ -167,7 +174,7 @@ describe('handing the school over', () => {
         'You will lose access to this page as soon as you confirm.'
       )
     ).toBeInTheDocument();
-    fireEvent.click(
+    await user.click(
       dialog.getByRole('button', { name: 'Hand over the school' })
     );
 
@@ -189,9 +196,9 @@ describe('handing the school over', () => {
   it('leaves out the senior-role clause for someone who holds none', async () => {
     setup();
     const select = await screen.findByLabelText('New owner');
-    fireEvent.change(select, { target: { value: 'u-emeka' } });
+    await user.selectOptions(select, 'u-emeka');
 
-    fireEvent.click(
+    await user.click(
       screen.getByRole('button', { name: 'Hand over the school…' })
     );
     const dialog = within(await screen.findByRole('dialog'));
@@ -233,21 +240,19 @@ describe('deleting the school', () => {
       expect(open).toBeEnabled();
     });
 
-    fireEvent.click(open);
+    await user.click(open);
     const dialog = within(await screen.findByRole('dialog'));
     expect(
       dialog.getByRole('heading', { name: 'Delete Greenfield College?' })
     ).toBeInTheDocument();
     const confirm = dialog.getByRole('button', { name: 'Delete school' });
     expect(confirm).toBeDisabled();
-    fireEvent.change(
+    await user.type(
       dialog.getByLabelText('Type the school’s name to confirm'),
-      {
-        target: { value: 'Greenfield College' },
-      }
+      'Greenfield College'
     );
     expect(confirm).toBeEnabled();
-    fireEvent.click(confirm);
+    await user.click(confirm);
 
     await waitFor(() => {
       expect(api.school.remove).toHaveBeenCalledWith({

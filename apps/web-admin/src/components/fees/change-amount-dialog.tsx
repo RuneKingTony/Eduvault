@@ -1,6 +1,6 @@
 import { useState, type SubmitEvent } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import type { FeeLine } from '@eduvault/api-contract';
+import { FEE_LINE_AMOUNT_MESSAGE, type FeeLine } from '@eduvault/api-contract';
 import { money } from '@eduvault/shared';
 import {
   Button,
@@ -18,7 +18,7 @@ import {
 import { useApi } from '../../api';
 import { amountInputText, parseFeeAmount } from '../../fee-amount';
 import { invalidateFees } from '../../queries';
-import { ENTER_AMOUNT, amountChangedToast } from './fee-text';
+import { amountChangedToast } from './fee-text';
 
 function useChange(currency: string, onClose: () => void) {
   const api = useApi();
@@ -59,7 +59,7 @@ function Form({
       fieldValue(new FormData(event.currentTarget), 'amount')
     );
     if (amountMinor === undefined) {
-      setError(ENTER_AMOUNT);
+      setError(FEE_LINE_AMOUNT_MESSAGE);
       return;
     }
     setError(null);

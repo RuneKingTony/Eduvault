@@ -6,7 +6,10 @@ import {
   type ExecutionContext,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import type { ApiErrorCode } from '@eduvault/api-contract';
+import {
+  missingPermissionMessage,
+  type ApiErrorCode,
+} from '@eduvault/api-contract';
 import {
   can,
   canAll,
@@ -60,7 +63,7 @@ export class OrganizationAuthGuard implements CanActivate {
     );
     if (required && !can(org.permissions, required.resource, required.action)) {
       throw new ForbiddenException(
-        `Missing permission ${required.resource}:${required.action}`
+        missingPermissionMessage(`${required.resource}:${required.action}`)
       );
     }
 
@@ -69,7 +72,9 @@ export class OrganizationAuthGuard implements CanActivate {
       context.getHandler()
     );
     if (anyOf !== undefined && !canAny(org.permissions, anyOf)) {
-      throw new ForbiddenException(`Missing permission ${anyOf.join(' or ')}`);
+      throw new ForbiddenException(
+        missingPermissionMessage(anyOf.join(' or '))
+      );
     }
 
     const allOf = this.reflector.get<readonly Permission[] | undefined>(
@@ -81,7 +86,7 @@ export class OrganizationAuthGuard implements CanActivate {
         (permission) => !canAny(org.permissions, [permission])
       );
       throw new ForbiddenException(
-        `Missing permission ${missing.join(' and ')}`
+        missingPermissionMessage(missing.join(' and '))
       );
     }
 

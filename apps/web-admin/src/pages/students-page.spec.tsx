@@ -1,4 +1,5 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
+import userEvent, { type UserEvent } from '@testing-library/user-event';
 import type { MePermissions } from '@eduvault/api-contract';
 import { toPermissionMap, type Permission } from '@eduvault/policy';
 import {
@@ -117,6 +118,11 @@ function setup(
   return { students, api, ...handlers };
 }
 
+const typeInto = async (user: UserEvent, field: HTMLElement, value: string) => {
+  await user.clear(field);
+  await user.type(field, value);
+};
+
 describe('StudentsPage', () => {
   it('shows the scope note, the shown count, the tabs with counts and each student', async () => {
     setup();
@@ -166,11 +172,11 @@ describe('StudentsPage', () => {
   });
 
   it('reports a tab change and leaves the default tab out of the URL', async () => {
+    const user = userEvent.setup();
     const { onSearchChange } = setup({
       props: { search: { tab: 'left', page: 2 } },
     });
-    fireEvent.mouseDown(await screen.findByRole('tab', { name: 'Active 2' }));
-    fireEvent.click(screen.getByRole('tab', { name: 'Active 2' }));
+    await user.click(await screen.findByRole('tab', { name: 'Active 2' }));
     expect(onSearchChange).toHaveBeenCalledWith({
       tab: undefined,
       page: undefined,
@@ -178,24 +184,22 @@ describe('StudentsPage', () => {
   });
 
   it('uses the school prefix in the search box and reports typing from page one', async () => {
+    const user = userEvent.setup();
     const { onSearchChange } = setup({ props: { search: { page: 3 } } });
     const box = await screen.findByPlaceholderText('Search name or GF number');
-    fireEvent.change(box, { target: { value: 'ada' } });
+    await typeInto(user, box, 'ada');
     expect(onSearchChange).toHaveBeenCalledWith({ page: undefined, q: 'ada' });
   });
 
   it('offers the Campus and Level filters, the Campus one only with more than one campus', async () => {
+    const user = userEvent.setup();
     const { onSearchChange } = setup();
-    fireEvent.change(await screen.findByLabelText('Campus'), {
-      target: { value: IKEJA.id },
-    });
+    await user.selectOptions(await screen.findByLabelText('Campus'), IKEJA.id);
     expect(onSearchChange).toHaveBeenCalledWith({
       campusId: IKEJA.id,
       page: undefined,
     });
-    fireEvent.change(await screen.findByLabelText('Level'), {
-      target: { value: LEVEL_ID },
-    });
+    await user.selectOptions(await screen.findByLabelText('Level'), LEVEL_ID);
     expect(onSearchChange).toHaveBeenCalledWith({
       levelId: LEVEL_ID,
       page: undefined,
@@ -246,8 +250,9 @@ describe('StudentsPage permissions', () => {
   });
 
   it('opens the guardians row with the heading, the lines and no Add guardian without guardian:link', async () => {
+    const user = userEvent.setup();
     setup({ access: accessWith('student:read', 'guardian:read') });
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('button', { name: 'Show guardians of Ada Okeke' })
     );
     expect(await screen.findByText('Guardians of Ada')).toBeInTheDocument();
@@ -261,6 +266,7 @@ describe('StudentsPage permissions', () => {
   });
 
   it('offers Add guardian with guardian:link and disables it at the maximum', async () => {
+    const user = userEvent.setup();
     setup({
       access: accessWith(
         'student:read',
@@ -270,7 +276,7 @@ describe('StudentsPage permissions', () => {
       ),
       settings: { maxGuardians: 1, requireGuardian: true },
     });
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('button', { name: 'Show guardians of Ada Okeke' })
     );
     await screen.findByText('Ngozi Okeke');
@@ -314,8 +320,9 @@ describe('StudentsPage permissions', () => {
   });
 
   it('opens the sheet from the button through the admit search flag', async () => {
+    const user = userEvent.setup();
     const { onSearchChange } = setup();
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('button', { name: 'Admit student' })
     );
     expect(onSearchChange).toHaveBeenCalledWith({ admit: 1 });
@@ -385,8 +392,9 @@ describe('StudentsPage states', () => {
   });
 
   it('opens a student from the row', async () => {
+    const user = userEvent.setup();
     const { onOpenStudent } = setup();
-    fireEvent.click(await screen.findByText('Ada Okeke', { exact: false }));
+    await user.click(await screen.findByText('Ada Okeke', { exact: false }));
     expect(onOpenStudent).toHaveBeenCalledWith(STUDENT_ID);
   });
 });
@@ -554,8 +562,9 @@ describe('Start the school year', () => {
   });
 
   it('shows Start {year} to a holder of enrollment:place while the action is offered', async () => {
+    const user = userEvent.setup();
     const { onSearchChange } = setup({ list: withStart });
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('button', { name: 'Start 2027/2028' })
     );
     expect(onSearchChange).toHaveBeenCalledWith({ dialog: 'start-year' });
@@ -586,6 +595,7 @@ describe('Start the school year', () => {
   });
 
   it('opens the dialog from the start-year search param and reports closing it', async () => {
+    const user = userEvent.setup();
     const { onSearchChange } = setup({
       list: withStart,
       props: { search: { dialog: 'start-year' } },
@@ -598,7 +608,7 @@ describe('Start the school year', () => {
         }
       )
     ).toBeInTheDocument();
-    fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }));
+    await user.click(await screen.findByRole('button', { name: 'Cancel' }));
     expect(onSearchChange).toHaveBeenCalledWith({
       dialog: undefined,
     });
@@ -638,6 +648,7 @@ describe('Record leaving on the Inactive tab', () => {
   const onInactive = { props: { search: { tab: 'inactive' as const } } };
 
   it('shows the button for a due student only, and opens the leaving dialog instead of the row', async () => {
+    const user = userEvent.setup();
     const { onRecordLeaving, onOpenStudent } = setup({
       ...onInactive,
       list: studentList([due, away]),
@@ -648,7 +659,7 @@ describe('Record leaving on the Inactive tab', () => {
     expect(
       screen.queryByRole('button', { name: 'Record leaving for Uche Mba' })
     ).not.toBeInTheDocument();
-    fireEvent.click(button);
+    await user.click(button);
     expect(onRecordLeaving).toHaveBeenCalledWith(KUNLE_ID);
     expect(onOpenStudent).not.toHaveBeenCalled();
   });

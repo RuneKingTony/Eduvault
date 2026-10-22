@@ -4,13 +4,8 @@ import {
   createMemoryHistory,
   createRouter,
 } from '@tanstack/react-router';
-import {
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-  within,
-} from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import {
   AuthClientProvider,
   type EduvaultAuthClient,
@@ -205,9 +200,12 @@ describe('the portal routes', () => {
     );
     const router = openAt(`/children?child=${TOBI_ID}`, api);
 
-    fireEvent.change(await screen.findByRole('combobox', { name: 'Term' }), {
-      target: { value: TERM_ID },
-    });
+    await userEvent
+      .setup()
+      .selectOptions(
+        await screen.findByRole('combobox', { name: 'Term' }),
+        TERM_ID
+      );
 
     await waitFor(() => {
       expect(router.state.location.search).toEqual({
@@ -219,6 +217,7 @@ describe('the portal routes', () => {
   });
 
   it('opens the full announcements list for the chosen child and goes back to Home', async () => {
+    const user = userEvent.setup();
     const api = fakeApi(guardianWithoutFees());
     const router = openAt(`/announcements?child=${TOBI_ID}`, api);
     expect(
@@ -228,7 +227,7 @@ describe('the portal routes', () => {
       params: { studentId: TOBI_ID },
       query: { page: 1, pageSize: 10 },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Back to Home' }));
+    await user.click(screen.getByRole('button', { name: 'Back to Home' }));
     await waitFor(() => {
       expect(router.state.location.pathname).toBe('/');
     });
@@ -351,6 +350,7 @@ describe('the portal routes', () => {
   });
 
   it('switches child in place on Fees with the real switcher', async () => {
+    const user = userEvent.setup();
     const api = fakeApi(guardianAccess());
     const base = portalStatement();
     const firstNames: Record<string, string> = {
@@ -372,7 +372,7 @@ describe('the portal routes', () => {
     await screen.findByText('Ada Okeke');
 
     const group = screen.getByRole('group', { name: 'Viewing child' });
-    fireEvent.click(within(group).getByRole('button', { name: 'Tobi' }));
+    await user.click(within(group).getByRole('button', { name: 'Tobi' }));
 
     expect(await screen.findByText('Tobi Okeke')).toBeInTheDocument();
     expect(router.state.location.pathname).toBe('/fees');
