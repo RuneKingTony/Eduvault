@@ -16,7 +16,7 @@ import {
   toast,
 } from '@eduvault/ui';
 import { useApi } from '../../api';
-import { invalidateBilling } from '../../queries';
+import { invalidateCharges } from '../../queries';
 import { searchFor } from '../../route-search-defaults';
 import { chargesCount, sentToast } from './billing-text';
 
@@ -28,7 +28,7 @@ function useSend(onClose: () => void) {
     mutationFn: (runId: string) =>
       api.billingRuns.issue({ params: { id: runId } }),
     onSuccess: async (sent) => {
-      await invalidateBilling(queryClient);
+      await invalidateCharges(queryClient);
       toast.success(sentToast(sent.sentCount), {
         action: {
           label: 'See charges',

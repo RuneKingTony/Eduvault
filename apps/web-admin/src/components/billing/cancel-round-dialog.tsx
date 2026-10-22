@@ -12,7 +12,7 @@ import {
   toast,
 } from '@eduvault/ui';
 import { useApi } from '../../api';
-import { invalidateBilling } from '../../queries';
+import { invalidateCharges } from '../../queries';
 import { cancelledToast } from './billing-text';
 
 function useCancel(onClose: () => void) {
@@ -22,7 +22,7 @@ function useCancel(onClose: () => void) {
     mutationFn: (runId: string) =>
       api.billingRuns.cancel({ params: { id: runId } }),
     onSuccess: async (cancelled) => {
-      await invalidateBilling(queryClient);
+      await invalidateCharges(queryClient);
       toast.warning(cancelledToast(cancelled.number));
       onClose();
     },

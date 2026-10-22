@@ -24,7 +24,7 @@ import {
   statementQueryOptions,
   invalidateCalendar,
   invalidateAfterRemoval,
-  invalidateBilling,
+  invalidateCharges,
   billingRunQueryOptions,
   billingRunsQueryOptions,
   invoiceQueryOptions,
@@ -408,7 +408,7 @@ describe('billing queries', () => {
       setTimeout(resolve, 0);
     });
 
-    await invalidateBilling(queryClient);
+    await invalidateCharges(queryClient);
 
     await vi.waitFor(() => {
       expect(api.billingRuns.list).toHaveBeenCalledTimes(2);
