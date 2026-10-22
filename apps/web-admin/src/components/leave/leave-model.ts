@@ -22,7 +22,7 @@ export interface LeaveForm {
 export type LeaveField = 'startsOn' | 'endsOn' | 'reason' | 'cover';
 export type LeaveErrors = Partial<Record<LeaveField, string>>;
 
-export const DEFAULT_LEAVE_TYPE = 'annual';
+export const DEFAULT_LEAVE_TYPE = 'sick';
 
 const tooLong = (max: number) => `Use ${max} characters or fewer.`;
 

@@ -70,7 +70,7 @@ function setup(holidays: string[] = []) {
 }
 
 const request = (over: Partial<CreateLeaveInput> = {}): CreateLeaveInput => ({
-  type: 'annual',
+  type: 'sick',
   startsOn: '2026-10-22',
   reason: 'Family wedding',
   ...over,
@@ -437,7 +437,7 @@ describe('LeaveService.cancel', () => {
       subjectType: 'staff_leave',
       subjectId: row.id,
       campusId: null,
-      text: 'Emeka Obi’s annual leave (22 Oct 2026 – 23 Oct 2026) was cancelled.',
+      text: 'Emeka Obi’s sick leave (22 Oct 2026 – 23 Oct 2026) was cancelled.',
     });
   });
 

@@ -1332,7 +1332,7 @@ CREATE TABLE public.staff_leave (
     CONSTRAINT staff_leave_rejected_columns CHECK (((status = 'rejected'::text) = ((rejected_by IS NOT NULL) AND (rejected_at IS NOT NULL) AND (rejection_reason IS NOT NULL)))),
     CONSTRAINT staff_leave_rejection_reason_check CHECK (((char_length(btrim(rejection_reason)) >= 1) AND (char_length(btrim(rejection_reason)) <= 500))),
     CONSTRAINT staff_leave_status_check CHECK ((status = ANY (ARRAY['submitted'::text, 'approved'::text, 'rejected'::text, 'cancelled'::text]))),
-    CONSTRAINT staff_leave_type_check CHECK ((type = ANY (ARRAY['annual'::text, 'sick'::text, 'personal'::text, 'study'::text, 'parental'::text])))
+    CONSTRAINT staff_leave_type_check CHECK ((type = ANY (ARRAY['sick'::text, 'maternity'::text, 'bereavement'::text])))
 );
 
 --
@@ -4988,4 +4988,5 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20261017110100'),
     ('20261018090000'),
     ('20261018100000'),
-    ('20261022120000');
+    ('20261022120000'),
+    ('20261022130000');

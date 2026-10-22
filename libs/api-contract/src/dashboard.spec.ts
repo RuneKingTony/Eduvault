@@ -35,7 +35,7 @@ describe('dashboardTaskSchema', () => {
       count: 2,
       items: [
         {
-          type: 'annual',
+          type: 'sick',
           startsOn: '2026-10-22',
           endsOn: '2026-10-23',
           status: 'cancelled',

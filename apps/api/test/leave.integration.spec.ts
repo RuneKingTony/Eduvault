@@ -85,10 +85,10 @@ test.describe('requesting leave', () => {
       }
     );
 
-    const leave = await askLeave(api, emeka, { type: 'annual' });
+    const leave = await askLeave(api, emeka, { type: 'sick' });
 
     expect(leave).toMatchObject({
-      type: 'annual',
+      type: 'sick',
       startsOn: '2026-10-22',
       endsOn: '2026-10-22',
       days: 1,
@@ -118,7 +118,7 @@ test.describe('requesting leave', () => {
     const res = await api(owner)
       .post('/leave')
       .send({
-        type: 'annual',
+        type: 'sick',
         reason: 'Sabbatical',
         startsOn: '2026-10-22',
         endsOn: '9999-12-31',
@@ -157,14 +157,14 @@ test.describe('requesting leave', () => {
   }) => {
     const past = await api(owner)
       .post('/leave')
-      .send({ type: 'annual', startsOn: '2026-10-09', reason: 'Trip' })
+      .send({ type: 'sick', startsOn: '2026-10-09', reason: 'Trip' })
       .expect(400);
     expect(past.body.message).toBe(LEAVE_PAST_START_MESSAGE);
 
     const reversed = await api(owner)
       .post('/leave')
       .send({
-        type: 'annual',
+        type: 'sick',
         startsOn: '2026-10-22',
         endsOn: '2026-10-21',
         reason: 'Trip',
@@ -176,7 +176,7 @@ test.describe('requesting leave', () => {
 
     await api(owner)
       .post('/leave')
-      .send({ type: 'annual', startsOn: '2026-10-22', reason: '  ' })
+      .send({ type: 'sick', startsOn: '2026-10-22', reason: '  ' })
       .expect(400);
   });
 
@@ -189,7 +189,7 @@ test.describe('requesting leave', () => {
     const clash = await api(lekkiOnly)
       .post('/leave')
       .send({
-        type: 'annual',
+        type: 'sick',
         startsOn: '2026-10-21',
         endsOn: '2026-10-23',
         reason: 'Again',
@@ -200,7 +200,7 @@ test.describe('requesting leave', () => {
     await approveLeave(api, owner, first.id);
     await api(lekkiOnly)
       .post('/leave')
-      .send({ type: 'annual', startsOn: '2026-10-22', reason: 'Again' })
+      .send({ type: 'sick', startsOn: '2026-10-22', reason: 'Again' })
       .expect(409);
 
     const other = await askLeave(api, lekkiOnly, { startsOn: '2026-11-02' });
@@ -241,7 +241,7 @@ test.describe('requesting leave', () => {
     for (const portal of [student, guardian]) {
       await api(portal)
         .post('/leave')
-        .send({ type: 'annual', startsOn: '2026-10-22', reason: 'Trip' })
+        .send({ type: 'sick', startsOn: '2026-10-22', reason: 'Trip' })
         .expect(403);
       await api(portal).get('/me/leave').expect(403);
     }
@@ -255,7 +255,7 @@ test.describe('requesting leave', () => {
     const res = await api(lekkiOnly)
       .post('/leave')
       .send({
-        type: 'study',
+        type: 'bereavement',
         startsOn: '2026-10-22',
         reason: 'Exam',
         cover: '  Ayo takes JSS 2  ',
@@ -333,7 +333,7 @@ test.describe('deciding leave', () => {
       endsOn: '2026-10-13',
     });
     const nearTwo = await askLeave(api, emeka, {
-      type: 'personal',
+      type: 'maternity',
       startsOn: '2026-10-20',
     });
     const far = await askLeave(api, ayo, { startsOn: '2026-10-22' });
@@ -573,7 +573,7 @@ test.describe('cancelling approved leave', () => {
     );
     expect(rows[0]?.kind).toBe('leave.cancelled');
     expect(rows[0]?.text).toMatch(
-      /’s annual leave \(22 Oct 2026\) was cancelled\.$/
+      /’s sick leave \(22 Oct 2026\) was cancelled\.$/
     );
   });
 
@@ -1176,7 +1176,7 @@ test.describe('isolation', () => {
     schools: { lekkiOnly },
   }) => {
     const leave = await askLeave(api, lekkiOnly, { startsOn: '2026-10-22' });
-    const body = { type: 'annual', startsOn: '2026-10-22', reason: 'Trip' };
+    const body = { type: 'sick', startsOn: '2026-10-22', reason: 'Trip' };
     await api().get('/me/leave').expect(401);
     await api().post('/leave').send(body).expect(401);
     await api().get('/leave').expect(401);
@@ -1227,7 +1227,7 @@ test.describe('isolation', () => {
   }) => {
     const leave = await askLeave(api, lekkiOnly, { startsOn: '2026-10-22' });
     const admin = await makeSuperAdmin(await createUser());
-    const body = { type: 'annual', startsOn: '2026-10-22', reason: 'Trip' };
+    const body = { type: 'sick', startsOn: '2026-10-22', reason: 'Trip' };
     const create = (headers: Record<string, string>) =>
       api(admin).post('/leave').set(headers).send(body);
     const withdraw = (headers: Record<string, string>) =>

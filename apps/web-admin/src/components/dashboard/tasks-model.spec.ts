@@ -197,14 +197,14 @@ describe('taskRow charges', () => {
         },
         {
           label: 'Leave',
-          details: 'Emeka Obi · Personal leave · 20 Oct 2026. Family',
+          details: 'Emeka Obi · Maternity leave · 20 Oct 2026. Family',
         },
       ],
     });
     expect(row).toMatchObject({
       title: '2 requests waiting for your approval',
       subline:
-        'Leave: Ayo Bassey · Sick leave · 12 Oct 2026 – 13 Oct 2026. Malaria · Leave: Emeka Obi · Personal leave · 20 Oct 2026. Family',
+        'Leave: Ayo Bassey · Sick leave · 12 Oct 2026 – 13 Oct 2026. Malaria · Leave: Emeka Obi · Maternity leave · 20 Oct 2026. Family',
       action: { label: 'Review', target: { to: '/approvals' } },
     });
   });
@@ -227,7 +227,7 @@ describe('taskRow leave decided', () => {
         count: 1,
         items: [
           {
-            type: 'annual',
+            type: 'sick',
             startsOn: '2026-10-22',
             endsOn: '2026-10-23',
             status: 'cancelled',
@@ -239,7 +239,7 @@ describe('taskRow leave decided', () => {
       kind: 'leaveDecided',
       tone: 'default',
       title: 'Your leave request was decided',
-      subline: 'Annual leave 22 Oct 2026 – 23 Oct 2026: Cancelled',
+      subline: 'Sick leave 22 Oct 2026 – 23 Oct 2026: Cancelled',
       action: { label: 'See', target: { to: '/approvals' } },
       extra: null,
     });
@@ -257,7 +257,7 @@ describe('taskRow leave decided', () => {
           status: 'approved',
         },
         {
-          type: 'study',
+          type: 'bereavement',
           startsOn: '2026-11-02',
           endsOn: '2026-11-03',
           status: 'rejected',
@@ -266,7 +266,7 @@ describe('taskRow leave decided', () => {
     });
     expect(row.title).toBe('4 decisions on your leave');
     expect(row.subline).toBe(
-      'Sick leave 26 Oct 2026: Approved · Study leave 2 Nov 2026 – 3 Nov 2026: Declined'
+      'Sick leave 26 Oct 2026: Approved · Bereavement leave 2 Nov 2026 – 3 Nov 2026: Declined'
     );
   });
 });
