@@ -11,7 +11,7 @@ interface Decision {
   isOwner: boolean;
 }
 
-export const isOwnRequest = ({ actorId, createdBy }: Decision): boolean =>
+const isOwnRequest = ({ actorId, createdBy }: Decision): boolean =>
   createdBy !== null && createdBy === actorId;
 
 export function assertNotOwn(decision: Decision): void {
