@@ -23,6 +23,7 @@ import {
   childrenFor,
   owedTotal,
   splitTotal,
+  accountsFor,
   type SheetErrors,
   type SheetState,
 } from './record-payment-model';
@@ -148,7 +149,7 @@ function AccountFields({ options, state, act }: FieldsProps) {
           act.patch({ accountId: event.target.value });
         }}
       >
-        {options.accounts.map((account) => (
+        {accountsFor(options.accounts, state.method).map((account) => (
           <NativeSelectOption key={account.id} value={account.id}>
             {account.label}
           </NativeSelectOption>

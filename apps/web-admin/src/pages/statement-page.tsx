@@ -1,10 +1,9 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { BanknoteIcon, UsersIcon } from 'lucide-react';
-import {
-  ApiError,
-  type GuardianStatement,
-  type StudentStatement,
+import type {
+  GuardianStatement,
+  StudentStatement,
 } from '@eduvault/api-contract';
 import { useCan } from '@eduvault/auth-client';
 import {
@@ -15,61 +14,40 @@ import {
   termKeyOf,
   type TermPick,
 } from '@eduvault/shared';
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-  Button,
-  ErrorMessage,
-  NotFoundState,
-  PageSkeleton,
-  TermSelect,
-} from '@eduvault/ui';
+import { Button, ErrorMessage, PageSkeleton, TermSelect } from '@eduvault/ui';
 import { withTerm, type StatementSearch } from '../accounts-search';
 import {
   AccountsLink,
   FamilyViewButton,
 } from '../components/payments/payment-links';
 import { useApi } from '../api';
+import {
+  DetailCrumbs,
+  DetailNotFound,
+  DetailPage,
+} from '../components/detail-page';
 import { RecordPaymentSheet } from '../components/payments/record-payment-sheet';
 import { StatementCard } from '../components/payments/statement-card';
 import { familyStatementQueryOptions, statementQueryOptions } from '../queries';
 
 function Crumbs({ last }: { last: string }) {
   return (
-    <Breadcrumb>
-      <BreadcrumbList>
-        <BreadcrumbItem>
-          <BreadcrumbLink asChild>
-            <AccountsLink>Who owes</AccountsLink>
-          </BreadcrumbLink>
-        </BreadcrumbItem>
-        <BreadcrumbSeparator />
-        <BreadcrumbItem>
-          <BreadcrumbPage>{last}</BreadcrumbPage>
-        </BreadcrumbItem>
-      </BreadcrumbList>
-    </Breadcrumb>
+    <DetailCrumbs parent={<AccountsLink>Who owes</AccountsLink>} last={last} />
   );
 }
 
 function NotFound() {
   return (
-    <section className="flex flex-col gap-4">
-      <Crumbs last="Not found" />
-      <h1>Not found</h1>
-      <NotFoundState
-        title="No student account here"
-        description="It may have been moved, or it may belong to a campus you don’t look after."
-      >
+    <DetailNotFound
+      heading="Not found"
+      crumbs={<Crumbs last="Not found" />}
+      title="No student account here"
+      back={
         <Button asChild variant="outline">
           <AccountsLink>Back to who owes</AccountsLink>
         </Button>
-      </NotFoundState>
-    </section>
+      }
+    />
   );
 }
 
@@ -335,36 +313,30 @@ export function StatementPage({
     })
   );
   const canRecord = useCan('payment', 'record');
-  if (statement.error instanceof ApiError && statement.error.status === 404) {
-    return <NotFound />;
-  }
-  if (statement.isError) {
-    return <ErrorMessage error={statement.error} />;
-  }
-  if (statement.data === undefined) {
-    return <PageSkeleton rows={2} />;
-  }
-  const data = statement.data;
   return (
-    <section className="flex flex-col gap-4">
-      <Crumbs last={data.student.name} />
-      <StatementBody
-        studentId={studentId}
-        data={data}
-        search={search}
-        onSearchChange={onSearchChange}
-        onRecord={() => {
-          setRecording(true);
-        }}
-      />
-      {canRecord ? (
-        <RecordPaymentSheet
-          open={recording}
-          prefill={{ guardianId: data.family?.guardianId, studentId }}
-          stay
-          onOpenChange={setRecording}
-        />
-      ) : null}
-    </section>
+    <DetailPage queries={[statement]} notFound={<NotFound />}>
+      {([data]) => (
+        <section className="flex flex-col gap-4">
+          <Crumbs last={data.student.name} />
+          <StatementBody
+            studentId={studentId}
+            data={data}
+            search={search}
+            onSearchChange={onSearchChange}
+            onRecord={() => {
+              setRecording(true);
+            }}
+          />
+          {canRecord ? (
+            <RecordPaymentSheet
+              open={recording}
+              prefill={{ guardianId: data.family?.guardianId, studentId }}
+              stay
+              onOpenChange={setRecording}
+            />
+          ) : null}
+        </section>
+      )}
+    </DetailPage>
   );
 }

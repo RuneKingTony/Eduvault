@@ -1,7 +1,5 @@
 import {
   canUndoLeaving,
-  daysBetween,
-  inactiveAtOnce,
   isDueToBeLeft,
   isNewIntake,
   leaveDateError,
@@ -24,14 +22,6 @@ const facts = (overrides: Partial<LifecycleFacts> = {}): LifecycleFacts => ({
 const daysAgo = (days: number): string =>
   new Date(Date.parse(today) - days * 86_400_000).toISOString().slice(0, 10);
 
-describe('daysBetween', () => {
-  it('counts calendar days across month and year ends', () => {
-    expect(daysBetween('2026-10-11', '2026-10-11')).toBe(0);
-    expect(daysBetween('2026-09-30', '2026-10-01')).toBe(1);
-    expect(daysBetween('2025-12-31', '2026-01-01')).toBe(1);
-  });
-});
-
 describe('lifeOf', () => {
   it('is active when nobody has marked the student away', () => {
     expect(lifeOf(facts())).toBe('active');
@@ -47,6 +37,17 @@ describe('lifeOf', () => {
       'left'
     );
     expect(lifeOf(facts({ exitKind: 'graduated' }))).toBe('graduated');
+  });
+});
+
+describe('a malformed not-seen date', () => {
+  it('throws instead of reading as Active', () => {
+    expect(() => lifeOf(facts({ notSeenSince: 'garbage' }))).toThrow(
+      RangeError
+    );
+    expect(() => weeksAway(facts({ notSeenSince: 'garbage' }))).toThrow(
+      RangeError
+    );
   });
 });
 
@@ -127,14 +128,6 @@ describe('leaveDateError', () => {
     );
     expect(leaveDateError(today, today)).toBeNull();
     expect(leaveDateError('2026-01-01', today)).toBeNull();
-  });
-});
-
-describe('inactiveAtOnce', () => {
-  it('is true from 35 days ago, not from 34', () => {
-    expect(inactiveAtOnce(daysAgo(34), today)).toBe(false);
-    expect(inactiveAtOnce(daysAgo(35), today)).toBe(true);
-    expect(inactiveAtOnce(daysAgo(132), today)).toBe(true);
   });
 });
 

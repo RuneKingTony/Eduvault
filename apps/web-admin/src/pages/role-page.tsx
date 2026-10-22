@@ -1,26 +1,22 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { SearchXIcon } from 'lucide-react';
-import { ApiError, type Role } from '@eduvault/api-contract';
+import type { Role } from '@eduvault/api-contract';
 import { OWNER_ROLE, ROLE_LABEL_MAX } from '@eduvault/policy';
 import {
-  Button,
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
   ErrorMessage,
   NavIcon,
-  PageSkeleton,
 } from '@eduvault/ui';
 import { useApi } from '../api';
+import {
+  BackButton,
+  DetailNotFound,
+  DetailPage,
+} from '../components/detail-page';
 import { DeleteRoleDialog } from '../components/role-editor/delete-role-dialog';
 import { RoleAdvancedGrid } from '../components/role-editor/role-advanced-grid';
 import {
@@ -61,22 +57,11 @@ interface RolePageProps extends RoleEditorHandlers {
 
 function RoleNotFound({ onBack }: { onBack: () => void }) {
   return (
-    <Empty className="border">
-      <EmptyHeader>
-        <EmptyMedia variant="icon">
-          <SearchXIcon />
-        </EmptyMedia>
-        <EmptyTitle>Role not found</EmptyTitle>
-        <EmptyDescription>
-          We couldn’t find that role. It may have been moved or deleted.
-        </EmptyDescription>
-      </EmptyHeader>
-      <EmptyContent>
-        <Button type="button" onClick={onBack}>
-          Go back
-        </Button>
-      </EmptyContent>
-    </Empty>
+    <DetailNotFound
+      title="Role not found"
+      description="We couldn’t find that role. It may have been moved or deleted."
+      back={<BackButton label="Go back" variant="default" onBack={onBack} />}
+    />
   );
 }
 
@@ -254,24 +239,21 @@ function ExistingRole({ slug, props }: { slug: string; props: RolePageProps }) {
   const api = useApi();
   const role = useQuery(roleQueryOptions(api, slug));
   const roles = useQuery(rolesQueryOptions(api));
-  if (role.error instanceof ApiError && role.error.status === 404) {
-    return <RoleNotFound onBack={props.onBack} />;
-  }
-  if (role.data === undefined || roles.data === undefined) {
-    const error = role.error ?? roles.error;
-    return error === null ? (
-      <PageSkeleton rows={3} />
-    ) : (
-      <ErrorMessage error={error} />
-    );
-  }
   return (
-    <RoleEditor
-      key={role.data.slug}
-      role={role.data}
-      catalogue={roles.data.items}
-      props={props}
-    />
+    <DetailPage
+      queries={[role, roles]}
+      rows={3}
+      notFound={<RoleNotFound onBack={props.onBack} />}
+    >
+      {([loaded, catalogue]) => (
+        <RoleEditor
+          key={loaded.slug}
+          role={loaded}
+          catalogue={catalogue.items}
+          props={props}
+        />
+      )}
+    </DetailPage>
   );
 }
 
