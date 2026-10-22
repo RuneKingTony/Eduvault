@@ -267,6 +267,23 @@ describe('unpaidOf', () => {
     ]);
   });
 
+  it('names a cancelled receipt rather than showing its internal void reference', () => {
+    const reversal: MovementRecord = {
+      ...base,
+      kind: 'payment_void',
+      reference: 'VOID-CASH-1',
+      memo: 'Void of RCT-2026-00098: Wrong child',
+      debitMinor: 2_000_000,
+    };
+    expect(unpaidOf([reversal])).toEqual([
+      {
+        reference: 'Payment RCT-2026-00098 cancelled',
+        outstandingMinor: 2_000_000,
+        link: null,
+      },
+    ]);
+  });
+
   it('leaves a store sale and its payment out, so older debt keeps its full amount', () => {
     const sale: MovementRecord = {
       ...base,
