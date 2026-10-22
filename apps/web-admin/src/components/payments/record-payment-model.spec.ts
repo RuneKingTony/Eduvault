@@ -159,6 +159,14 @@ describe('changing the payer, student and amount', () => {
     expect(cash.accountId).toBe(BANK_ACCOUNT);
   });
 
+  it('opens a cash payment on the cash account even when the bank is listed first', () => {
+    const bankFirst: RecordingOptions = {
+      ...options,
+      accounts: options.accounts.toReversed(),
+    };
+    expect(initialState(bankFirst, {}, random).accountId).toBe(ACCOUNT);
+  });
+
   it('keeps the reference once typed, and follows the method until then', () => {
     const state = initialState(options, {}, random);
     expect(
