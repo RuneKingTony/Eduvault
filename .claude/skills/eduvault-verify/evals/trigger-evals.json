@@ -1,0 +1,26 @@
+[
+  {
+    "query": "Walk through the whole payments area as bursar and owner and tell me what is broken before the demo",
+    "should_trigger": true
+  },
+  {
+    "query": "Take a baseline of the whole app before we fix anything and tell me which known problems it catches",
+    "should_trigger": true
+  },
+  {
+    "query": "Verify the store flow end to end, with screenshots per section and a list of findings",
+    "should_trigger": true
+  },
+  {
+    "query": "Fix the findings from the last verify run and recheck them",
+    "should_trigger": true
+  },
+  {
+    "query": "Run the e2e gate for my diff",
+    "should_trigger": false
+  },
+  {
+    "query": "Run the API integration tests",
+    "should_trigger": false
+  }
+]
