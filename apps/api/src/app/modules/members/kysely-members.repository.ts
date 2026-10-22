@@ -23,8 +23,8 @@ import {
   MembersRepository,
   type MemberListQuery,
   type MemberRecord,
-  type Viewer,
 } from './members.repository';
+import type { CampusClassScope } from '../../common/scope';
 
 interface Teacher {
   organizationId: string;
@@ -352,7 +352,7 @@ export class KyselyMembersRepository extends MembersRepository {
   async taughtClasses(
     organizationId: string,
     userId: string,
-    viewer: Viewer
+    viewer: CampusClassScope
   ): Promise<TaughtClass[]> {
     const rows = await this.db
       .selectFrom('class_arm')

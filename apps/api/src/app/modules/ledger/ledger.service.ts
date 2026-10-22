@@ -26,21 +26,13 @@ import {
   rollUpChart,
   visibleChart,
 } from '../../common/ledger';
-import {
-  LedgerRepository,
-  type LedgerScope,
-  type SystemAccounts,
-} from './ledger.repository';
+import { LedgerRepository, type SystemAccounts } from './ledger.repository';
 import {
   planMoneyAccountEntry,
   planStudentEntry,
   type PlannedEntry,
 } from './opening-balances';
-
-const scopeOf = (ctx: OrgContext): LedgerScope => ({
-  organizationId: ctx.organizationId,
-  campusScope: ctx.campusScope,
-});
+import { orgScopeOf } from '../../common/scope';
 
 @Injectable()
 export class LedgerService {
@@ -51,7 +43,7 @@ export class LedgerService {
 
   async listAccounts(ctx: OrgContext): Promise<LedgerAccountList> {
     const [chart, currency] = await Promise.all([
-      this.ledger.chart(scopeOf(ctx)),
+      this.ledger.chart(orgScopeOf(ctx)),
       this.ledger.currency(ctx.organizationId),
     ]);
     return {
@@ -100,7 +92,7 @@ export class LedgerService {
   }
 
   journal(ctx: OrgContext, query: JournalQuery): Promise<JournalList> {
-    return this.ledger.journal(scopeOf(ctx), query);
+    return this.ledger.journal(orgScopeOf(ctx), query);
   }
 
   async postOpening(
@@ -125,7 +117,7 @@ export class LedgerService {
     ctx: OrgContext,
     input: OpeningBalances
   ): Promise<PlannedEntry[]> {
-    const scope = scopeOf(ctx);
+    const scope = orgScopeOf(ctx);
     const [campuses, accounts, system] = await Promise.all([
       this.ledger.studentCampuses(scope, {
         studentIds: input.items.map((item) => item.studentId),

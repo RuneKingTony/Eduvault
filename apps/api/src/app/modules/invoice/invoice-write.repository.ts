@@ -1,6 +1,6 @@
 import type { OneOffChargeLine } from '@eduvault/api-contract';
 import type { CampusScope } from '../../common/campus-scope';
-import type { InvoiceScope } from './invoice.repository';
+import type { OrgScope } from '../../common/scope';
 
 export interface ExistingCharge {
   id: string;
@@ -51,7 +51,7 @@ export abstract class InvoiceWriteRepository {
   ): Promise<ExistingCharge | undefined>;
 
   abstract chargeableStudent(
-    scope: InvoiceScope,
+    scope: OrgScope,
     studentId: string
   ): Promise<ChargeableStudent | undefined>;
 

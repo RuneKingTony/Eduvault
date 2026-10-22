@@ -7,7 +7,7 @@ import type {
 import type { ActivityRecorder, CampusAmount } from '../../common/activity';
 import type { WaitingApproval } from '../../common/approvals';
 import type { LedgerLine, PostInput } from '../../common/ledger';
-import type { PaymentScope } from './payment.repository';
+import type { OrgScope } from '../../common/scope';
 
 export interface VoidablePayment {
   id: string;
@@ -64,20 +64,20 @@ export interface PaymentVoidTx {
 
 export abstract class PaymentVoidRepository {
   abstract withTx<T>(
-    scope: PaymentScope,
+    scope: OrgScope,
     userId: string,
     work: (tx: PaymentVoidTx) => Promise<T>
   ): Promise<T>;
 
   abstract findVoid(
-    scope: PaymentScope,
+    scope: OrgScope,
     id: string
   ): Promise<PaymentVoidItem | undefined>;
 
   abstract listVoids(
-    scope: PaymentScope,
+    scope: OrgScope,
     query: PaymentVoidListQuery
   ): Promise<VoidPage>;
 
-  abstract waiting(scope: PaymentScope): Promise<WaitingApproval[]>;
+  abstract waiting(scope: OrgScope): Promise<WaitingApproval[]>;
 }

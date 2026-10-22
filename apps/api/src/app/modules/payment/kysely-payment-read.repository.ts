@@ -20,13 +20,14 @@ import {
   studentClassNameSql,
   anyAllocationInScopeSql,
 } from '../../common/students';
-import type { PaymentPage, PaymentScope } from './payment.repository';
+import type { PaymentPage } from './payment.repository';
+import type { OrgScope } from '../../common/scope';
 
 const labelOf = (name: string, last4: string | null): string =>
   last4 === null ? name : `${name} · ending ${last4}`;
 
 function listFilters(
-  scope: PaymentScope,
+  scope: OrgScope,
   query: Pick<PaymentListQuery, 'q' | 'status'>
 ): RawBuilder<unknown> {
   const parts: RawBuilder<unknown>[] = [
@@ -106,7 +107,7 @@ const toSummary = (
 
 async function listSummary(
   db: Database,
-  scope: PaymentScope
+  scope: OrgScope
 ): Promise<PaymentListSummary> {
   const { rows } = await sql<{
     receipts: number;
@@ -133,7 +134,7 @@ async function listSummary(
 
 async function allocationsOf(
   db: Database,
-  scope: PaymentScope,
+  scope: OrgScope,
   paymentIds: readonly string[]
 ): Promise<Map<string, PaymentAllocationSummary[]>> {
   const grouped = new Map<string, PaymentAllocationSummary[]>();
@@ -159,7 +160,7 @@ async function allocationsOf(
 
 export async function listPayments(
   db: Database,
-  scope: PaymentScope,
+  scope: OrgScope,
   query: PaymentListQuery
 ): Promise<PaymentPage> {
   const { rows } = await sql<SummaryRow>`
@@ -247,7 +248,7 @@ const toAllocation = (row: AllocationRow): PaymentAllocation => ({
 
 async function allocationDetail(
   db: Database,
-  scope: PaymentScope,
+  scope: OrgScope,
   paymentId: string
 ): Promise<PaymentAllocation[]> {
   const inside = inScope(currentCampusSql('st'), scope.campusScope);
@@ -266,7 +267,7 @@ async function allocationDetail(
 
 async function entryOf(
   db: Database,
-  scope: PaymentScope,
+  scope: OrgScope,
   row: Pick<DetailRow, 'entry_reference' | 'journal_entry_id'>
 ): Promise<NonNullable<Payment['entry']>> {
   const { rows } = await sql<JournalRow>`
@@ -312,7 +313,7 @@ interface VoidDetailRow {
 
 async function voidDetail(
   db: Database,
-  scope: PaymentScope,
+  scope: OrgScope,
   paymentId: string
 ): Promise<{ void: Payment['void']; voidEntry: Payment['voidEntry'] }> {
   const { rows } = await sql<VoidDetailRow>`
@@ -390,7 +391,7 @@ function toPayment(
 
 export async function findPayment(
   db: Database,
-  scope: PaymentScope,
+  scope: OrgScope,
   id: string
 ): Promise<Omit<Payment, 'currency'> | undefined> {
   const { rows } = await sql<DetailRow>`

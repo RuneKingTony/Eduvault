@@ -1,4 +1,3 @@
-import type { InvoiceScope } from './invoice.repository';
 import {
   InvoiceWriteRepository,
   type ChargeableStudent,
@@ -6,6 +5,7 @@ import {
   type NewOneOffCharge,
   type OneOffOutcome,
 } from './invoice-write.repository';
+import type { OrgScope } from '../../common/scope';
 
 export const chargeableStudent = (
   overrides: Partial<ChargeableStudent> = {}
@@ -33,7 +33,7 @@ export class FakeInvoiceWriteRepository extends InvoiceWriteRepository {
   }
 
   chargeableStudent(
-    _scope: InvoiceScope,
+    _scope: OrgScope,
     studentId: string
   ): Promise<ChargeableStudent | undefined> {
     return Promise.resolve(this.students.get(studentId));

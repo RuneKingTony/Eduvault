@@ -20,10 +20,10 @@ import {
   MoneyAccountRepository,
   type MoneyAccountChange,
   type MoneyAccountOutcome,
-  type MoneyAccountScope,
   type NewMoneyAccount,
   type RecordingOption,
 } from './money-account.repository';
+import type { OrgScope } from '../../common/scope';
 
 interface AccountRow {
   id: string;
@@ -127,7 +127,7 @@ export class KyselyMoneyAccountRepository extends MoneyAccountRepository {
       ]);
   }
 
-  private visible(db: Database, scope: MoneyAccountScope) {
+  private visible(db: Database, scope: OrgScope) {
     return this.accounts(db, scope.organizationId).where((eb) =>
       inCampusScope(eb, 'money_account.campus_id', {
         scope: scope.campusScope,
@@ -135,7 +135,7 @@ export class KyselyMoneyAccountRepository extends MoneyAccountRepository {
     );
   }
 
-  private async hiddenSchoolWide(scope: MoneyAccountScope): Promise<number> {
+  private async hiddenSchoolWide(scope: OrgScope): Promise<number> {
     if (scope.campusScope === 'all') {
       return 0;
     }
@@ -149,7 +149,7 @@ export class KyselyMoneyAccountRepository extends MoneyAccountRepository {
     return Number(row.count);
   }
 
-  async list(scope: MoneyAccountScope): Promise<MoneyAccountList> {
+  async list(scope: OrgScope): Promise<MoneyAccountList> {
     const [rows, hiddenSchoolWideCount, currency] = await Promise.all([
       this.visible(this.db, scope)
         .orderBy(sql`money_account.retired_at IS NOT NULL`)
@@ -166,7 +166,7 @@ export class KyselyMoneyAccountRepository extends MoneyAccountRepository {
   }
 
   async findById(
-    scope: MoneyAccountScope,
+    scope: OrgScope,
     id: string
   ): Promise<MoneyAccount | undefined> {
     const row = await this.visible(this.db, scope)
@@ -176,7 +176,7 @@ export class KyselyMoneyAccountRepository extends MoneyAccountRepository {
   }
 
   async cashBook(
-    scope: MoneyAccountScope,
+    scope: OrgScope,
     account: MoneyAccount,
     paging: { page: number; pageSize: number }
   ): Promise<{ items: CashBookItem[]; total: number; currency: string }> {
@@ -270,7 +270,7 @@ export class KyselyMoneyAccountRepository extends MoneyAccountRepository {
   }
 
   update(
-    scope: MoneyAccountScope,
+    scope: OrgScope,
     id: string,
     change: MoneyAccountChange
   ): Promise<MoneyAccountOutcome | undefined> {
@@ -281,7 +281,7 @@ export class KyselyMoneyAccountRepository extends MoneyAccountRepository {
 
   private async updateIn(
     trx: Database,
-    target: { scope: MoneyAccountScope; id: string; change: MoneyAccountChange }
+    target: { scope: OrgScope; id: string; change: MoneyAccountChange }
   ): Promise<MoneyAccountOutcome | undefined> {
     const { scope, id, change } = target;
     const current = await this.visible(trx, scope)
@@ -313,7 +313,7 @@ export class KyselyMoneyAccountRepository extends MoneyAccountRepository {
     return { status: 'saved', account: toAccount(row) };
   }
 
-  async recordingOptions(scope: MoneyAccountScope): Promise<RecordingOption[]> {
+  async recordingOptions(scope: OrgScope): Promise<RecordingOption[]> {
     const rows = await this.accounts(this.db, scope.organizationId)
       .where('money_account.kind', '<>', 'gateway')
       .where('money_account.retired_at', 'is', null)

@@ -43,6 +43,7 @@ import { canSeeCampus, type CampusScope } from '../../common/campus-scope';
 import { computeClassScope } from '../../common/class-scope';
 import { CampusService } from '../campus/campus.service';
 import { MembersRepository, type MemberRecord } from './members.repository';
+import { campusClassScopeOf } from '../../common/scope';
 
 interface ListInput {
   q?: string;
@@ -355,7 +356,7 @@ export class MembersService {
     const classes = await this.members.taughtClasses(
       ctx.organizationId,
       record.userId,
-      { campusScope: ctx.campusScope, classScope: ctx.classScope }
+      campusClassScopeOf(ctx)
     );
     return {
       ...visible,

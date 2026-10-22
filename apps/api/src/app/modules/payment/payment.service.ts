@@ -39,15 +39,10 @@ import {
   PaymentRepository,
   type ExistingPayment,
   type InsertOutcome,
-  type PaymentScope,
 } from './payment.repository';
 import type { UsableMoneyAccount } from '../../common/money-accounts';
+import { orgScopeOf, type OrgScope } from '../../common/scope';
 import { replayOf } from '../../common/references/apply-once';
-
-const scopeOf = (ctx: OrgContext): PaymentScope => ({
-  organizationId: ctx.organizationId,
-  campusScope: ctx.campusScope,
-});
 
 const sumOf = (rows: readonly { amountMinor: number }[]): number =>
   rows.reduce((total, row) => total + row.amountMinor, 0);
@@ -71,7 +66,7 @@ export class PaymentService {
   async list(ctx: OrgContext, query: PaymentListQuery): Promise<PaymentList> {
     const [currency, page] = await Promise.all([
       this.payments.currency(ctx.organizationId),
-      this.payments.list(scopeOf(ctx), query),
+      this.payments.list(orgScopeOf(ctx), query),
     ]);
     return { currency, ...page };
   }
@@ -79,7 +74,7 @@ export class PaymentService {
   async get(ctx: OrgContext, id: string): Promise<Payment> {
     const [currency, found] = await Promise.all([
       this.payments.currency(ctx.organizationId),
-      this.payments.find(scopeOf(ctx), id),
+      this.payments.find(orgScopeOf(ctx), id),
     ]);
     if (found === undefined) {
       throw notFound();
@@ -92,7 +87,7 @@ export class PaymentService {
       this.payments.currency(ctx.organizationId),
       this.payments.paymentMethods(ctx.organizationId),
       this.moneyAccounts.listForRecording(ctx),
-      this.payments.recordingPeople(scopeOf(ctx)),
+      this.payments.recordingPeople(orgScopeOf(ctx)),
     ]);
     return {
       currency,
@@ -200,7 +195,7 @@ export class PaymentService {
     if (existing === undefined) {
       return undefined;
     }
-    const visible = await this.payments.find(scopeOf(ctx), existing.id);
+    const visible = await this.payments.find(orgScopeOf(ctx), existing.id);
     return visible === undefined ? undefined : existing.receiptNumber;
   }
 
@@ -210,7 +205,7 @@ export class PaymentService {
     request: { reference: string; requestHash: string }
   ): Promise<RecordedPayment> {
     const visible = replayOf({
-      visible: await this.payments.find(scopeOf(ctx), existing.id),
+      visible: await this.payments.find(orgScopeOf(ctx), existing.id),
       sameRequest: () => existing.requestHash === request.requestHash,
       taken: () => new ConflictException(PAYMENT_REFERENCE_TAKEN_MESSAGE),
       used: () =>
@@ -226,7 +221,7 @@ export class PaymentService {
     ctx: OrgContext,
     input: RecordPayment
   ): Promise<Checked> {
-    const scope = scopeOf(ctx);
+    const scope = orgScopeOf(ctx);
     const methods = await this.payments.paymentMethods(scope.organizationId);
     if (!methods[input.method]) {
       throw new BadRequestException(PAYMENT_METHOD_OFF_MESSAGE);
@@ -249,7 +244,7 @@ export class PaymentService {
   }
 
   private async usableAccount(
-    scope: PaymentScope,
+    scope: OrgScope,
     input: RecordPayment
   ): Promise<Extract<UsableMoneyAccount, { status: 'ok' }>> {
     const account = await this.payments.recordingAccount(
@@ -272,7 +267,7 @@ export class PaymentService {
   }
 
   private async checkPeople(
-    scope: PaymentScope,
+    scope: OrgScope,
     input: RecordPayment
   ): Promise<Checked> {
     const account = await this.usableAccount(scope, input);

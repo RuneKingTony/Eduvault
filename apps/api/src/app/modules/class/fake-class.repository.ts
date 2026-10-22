@@ -11,8 +11,8 @@ import {
   type NewClassTeacher,
   type NewLevel,
   type SchoolMemberRecord,
-  type Visibility,
 } from './class.repository';
+import type { CampusClassScope } from '../../common/scope';
 
 interface FakeClass {
   id: string;
@@ -26,7 +26,7 @@ interface FakeTeacher extends ClassTeacherRecord {
   sessionId: string;
 }
 
-const visible = (record: ClassRecord, visibility: Visibility): boolean =>
+const visible = (record: ClassRecord, visibility: CampusClassScope): boolean =>
   (visibility.campusScope === 'all' ||
     visibility.campusScope.includes(record.campusId)) &&
   (visibility.classScope === 'all' ||
@@ -144,7 +144,7 @@ export class FakeClassRepository extends ClassRepository {
   findClass(
     _org: string,
     id: string,
-    visibility: Visibility
+    visibility: CampusClassScope
   ): Promise<ClassRecord | undefined> {
     const arm = this.classes.find((candidate) => candidate.id === id);
     const record = arm && this.record(arm);

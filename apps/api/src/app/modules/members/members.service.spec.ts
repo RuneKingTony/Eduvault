@@ -17,9 +17,9 @@ import {
   MembersRepository,
   type MemberListQuery,
   type MemberRecord,
-  type Viewer,
 } from './members.repository';
 import { MembersService, teachingEndOnRoleChange } from './members.service';
+import type { CampusClassScope } from '../../common/scope';
 
 const ORG = 'school-a';
 const LEKKI = 'campus-lekki';
@@ -89,7 +89,7 @@ const person = (
 class FakeMembers extends MembersRepository {
   readonly elsewhere = new Set<string>();
   readonly taught: TaughtClass[] = [];
-  viewer: Viewer | undefined;
+  viewer: CampusClassScope | undefined;
 
   constructor(readonly records: MemberRecord[]) {
     super();
@@ -124,7 +124,11 @@ class FakeMembers extends MembersRepository {
     return Promise.resolve();
   }
 
-  taughtClasses(_organizationId: string, _userId: string, viewer: Viewer) {
+  taughtClasses(
+    _organizationId: string,
+    _userId: string,
+    viewer: CampusClassScope
+  ) {
     this.viewer = viewer;
     return Promise.resolve(this.taught);
   }

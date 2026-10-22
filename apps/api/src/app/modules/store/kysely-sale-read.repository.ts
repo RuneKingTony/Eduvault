@@ -26,7 +26,7 @@ import type {
   StudentPlacement,
 } from './sale.repository';
 import { averageCost } from './stock-value';
-import type { StoreScope } from './store.repository';
+import type { OrgScope } from '../../common/scope';
 
 interface SaleRow {
   id: string;
@@ -169,7 +169,7 @@ async function withLines(
 }
 
 function listFilters(
-  scope: StoreScope,
+  scope: OrgScope,
   query: Pick<SalePageQuery, 'campusId' | 'studentId'>
 ): RawBuilder<unknown> {
   const parts = [
@@ -187,7 +187,7 @@ function listFilters(
 
 export async function listSales(
   db: Database,
-  scope: StoreScope,
+  scope: OrgScope,
   query: SalePageQuery
 ): Promise<SalePage> {
   const { rows } = await sql<SaleRow>`
@@ -205,7 +205,7 @@ export async function listSales(
 
 export async function findSale(
   db: Database,
-  scope: StoreScope,
+  scope: OrgScope,
   id: string
 ): Promise<Sale | undefined> {
   const { rows } = await sql<SaleRow>`
@@ -228,7 +228,7 @@ interface StudentRow {
 
 export async function findSaleStudent(
   db: Database,
-  scope: StoreScope,
+  scope: OrgScope,
   request: { studentId: string; today: string }
 ): Promise<SaleStudent | undefined> {
   const { rows } = await sql<StudentRow>`
@@ -282,7 +282,7 @@ interface OptionRow {
 
 export async function optionStudents(
   db: Database,
-  scope: StoreScope,
+  scope: OrgScope,
   request: { today: string; withBalance: boolean }
 ): Promise<OptionStudents> {
   const { rows } = await sql<OptionRow>`
@@ -326,7 +326,7 @@ const NO_FIGURES = {
 
 export async function termFigures(
   db: Database,
-  scope: StoreScope,
+  scope: OrgScope,
   campusId: string | undefined
 ): Promise<StoreTermFigures> {
   const { rows } = await sql<{

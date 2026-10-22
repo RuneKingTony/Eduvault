@@ -34,6 +34,7 @@ import {
   type TermStart,
 } from './student-account.repository';
 import { termOptionsOf, termWindowsOf, type TermWindow } from './term-window';
+import { orgScopeOf } from '../../common/scope';
 
 export type OwnStatement = Omit<StudentStatement, 'student' | 'family'>;
 
@@ -148,8 +149,7 @@ export class StudentAccountService {
 
   private scopeOf(ctx: OrgContext): AccountScope {
     return {
-      organizationId: ctx.organizationId,
-      campusScope: ctx.campusScope,
+      ...orgScopeOf(ctx),
       today: this.clock.today(),
     };
   }

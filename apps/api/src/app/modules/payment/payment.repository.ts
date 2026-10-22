@@ -7,7 +7,6 @@ import type {
   RecordingChild,
   RecordingPayer,
 } from '@eduvault/api-contract';
-import type { CampusScope } from '../../common/campus-scope';
 import type { UsableMoneyAccount } from '../../common/money-accounts';
 import type {
   ExistingPayment,
@@ -15,16 +14,12 @@ import type {
   NewPayment,
   ProofState,
 } from '../../common/payments';
+import type { OrgScope } from '../../common/scope';
 
 export type { ExistingPayment, InsertOutcome } from '../../common/payments';
 
 export interface NewRecordedPayment extends NewPayment {
   userName: string;
-}
-
-export interface PaymentScope {
-  organizationId: string;
-  campusScope: CampusScope;
 }
 
 export interface PaymentPage {
@@ -41,13 +36,10 @@ export interface RecordingPeople {
 export abstract class PaymentRepository {
   abstract currency(organizationId: string): Promise<string>;
 
-  abstract list(
-    scope: PaymentScope,
-    query: PaymentListQuery
-  ): Promise<PaymentPage>;
+  abstract list(scope: OrgScope, query: PaymentListQuery): Promise<PaymentPage>;
 
   abstract find(
-    scope: PaymentScope,
+    scope: OrgScope,
     id: string
   ): Promise<Omit<Payment, 'currency'> | undefined>;
 
@@ -59,17 +51,17 @@ export abstract class PaymentRepository {
   abstract paymentMethods(organizationId: string): Promise<PaymentMethods>;
 
   abstract recordingAccount(
-    scope: PaymentScope,
+    scope: OrgScope,
     moneyAccountId: string
   ): Promise<UsableMoneyAccount>;
 
   abstract guardianName(
-    scope: PaymentScope,
+    scope: OrgScope,
     guardianId: string
   ): Promise<string | undefined>;
 
   abstract studentsInScope(
-    scope: PaymentScope,
+    scope: OrgScope,
     studentIds: readonly string[]
   ): Promise<string[]>;
 
@@ -86,5 +78,5 @@ export abstract class PaymentRepository {
 
   abstract insert(input: NewRecordedPayment): Promise<InsertOutcome>;
 
-  abstract recordingPeople(scope: PaymentScope): Promise<RecordingPeople>;
+  abstract recordingPeople(scope: OrgScope): Promise<RecordingPeople>;
 }

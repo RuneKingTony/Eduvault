@@ -10,7 +10,7 @@ import type { Database } from '../../common/db/tokens';
 import { invoiceTotalSql } from '../../common/fees';
 import { currentCampusSql, inScope } from '../../common/students';
 import { scopeLabel } from './billing-round';
-import type { BillingScope } from './billing-scope';
+import type { OrgScope } from '../../common/scope';
 import type { RunHeader, RunPage } from './billing-run.repository';
 
 interface RunRow {
@@ -66,7 +66,7 @@ const toHeader = (row: RunRow): RunHeader => ({
   feesChangedSincePrepared: row.fees_changed,
 });
 
-function chargeTotals(scope: BillingScope) {
+function chargeTotals(scope: OrgScope) {
   return sql`
     CROSS JOIN LATERAL (
       SELECT
@@ -87,7 +87,7 @@ function chargeTotals(scope: BillingScope) {
 }
 
 function runRows(
-  scope: BillingScope,
+  scope: OrgScope,
   options: {
     id?: string;
     status?: string;
@@ -140,7 +140,7 @@ function runRows(
 
 export async function listRuns(
   db: Database,
-  scope: BillingScope,
+  scope: OrgScope,
   query: BillingRunListQuery
 ): Promise<RunPage> {
   const { rows } = await runRows(scope, {
@@ -155,7 +155,7 @@ export async function listRuns(
 
 export async function findRun(
   db: Database,
-  scope: BillingScope,
+  scope: OrgScope,
   id: string
 ): Promise<RunHeader | undefined> {
   const { rows } = await runRows(scope, { id }).execute(db);

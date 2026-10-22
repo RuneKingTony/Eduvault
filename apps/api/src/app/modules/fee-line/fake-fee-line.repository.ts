@@ -20,7 +20,6 @@ import {
   type CopyFeeLines,
   type CopyOutcome,
   type FeeLineOutcome,
-  type FeeScope,
   type FeeTypeOutcome,
   type LevelRef,
   type LineActivity,
@@ -31,6 +30,7 @@ import {
   type TermRef,
   type TypeActivity,
 } from './fee-line.repository';
+import type { OrgScope } from '../../common/scope';
 
 export class FakeFeeLineRepository extends FeeLineRepository {
   rows: FeeLine[] = [];
@@ -51,7 +51,7 @@ export class FakeFeeLineRepository extends FeeLineRepository {
     );
   }
 
-  private visible(scope: FeeScope): FeeLine[] {
+  private visible(scope: OrgScope): FeeLine[] {
     return this.rows.filter(
       (row) =>
         row.campusId === null || canSeeCampus(scope.campusScope, row.campusId)
@@ -59,7 +59,7 @@ export class FakeFeeLineRepository extends FeeLineRepository {
   }
 
   list(
-    scope: FeeScope,
+    scope: OrgScope,
     query: { termId: string; includeRetired: boolean }
   ): Promise<FeeLine[]> {
     return Promise.resolve(
@@ -71,7 +71,7 @@ export class FakeFeeLineRepository extends FeeLineRepository {
     );
   }
 
-  findById(scope: FeeScope, id: string): Promise<FeeLine | undefined> {
+  findById(scope: OrgScope, id: string): Promise<FeeLine | undefined> {
     const row = this.visible(scope).find((candidate) => candidate.id === id);
     return Promise.resolve(row && { ...row });
   }
@@ -258,7 +258,7 @@ export class FakeFeeStudentRepository extends FeeStudentRepository {
   byId = new Map<string, StudentFeeContext | undefined>();
 
   findStudent(
-    _scope: FeeScope,
+    _scope: OrgScope,
     query: { studentId: string }
   ): Promise<StudentFeeContext | undefined> {
     return Promise.resolve(
@@ -293,7 +293,7 @@ export class FakeFeeOptionRepository extends FeeOptionRepository {
   recorded: ActivityInput[] = [];
   roster: Pick<FeeOptIns, 'items' | 'total'> = { items: [], total: 0 };
   rosterQueries: {
-    scope: FeeScope;
+    scope: OrgScope;
     query: { sessionId: string; feeTypeId: string; q: string | undefined };
   }[] = [];
 
@@ -329,7 +329,7 @@ export class FakeFeeOptionRepository extends FeeOptionRepository {
   }
 
   optInRoster(
-    scope: FeeScope,
+    scope: OrgScope,
     query: { sessionId: string; feeTypeId: string; q: string | undefined }
   ): Promise<Pick<FeeOptIns, 'items' | 'total'>> {
     this.rosterQueries.push({ scope, query });

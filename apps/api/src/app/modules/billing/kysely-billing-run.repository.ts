@@ -38,7 +38,7 @@ import {
   type RunAction,
   type RunOutcome,
 } from './billing-run.repository';
-import type { BillingScope } from './billing-scope';
+import type { OrgScope } from '../../common/scope';
 import { findRun, listRuns } from './kysely-billing-run-read.repository';
 import { sendOrder } from './send-order';
 
@@ -77,11 +77,11 @@ export class KyselyBillingRunRepository extends BillingRunRepository {
     return schoolCurrency(this.db, organizationId);
   }
 
-  listRuns(scope: BillingScope, query: BillingRunListQuery): Promise<RunPage> {
+  listRuns(scope: OrgScope, query: BillingRunListQuery): Promise<RunPage> {
     return listRuns(this.db, scope, query);
   }
 
-  findRun(scope: BillingScope, id: string): Promise<RunHeader | undefined> {
+  findRun(scope: OrgScope, id: string): Promise<RunHeader | undefined> {
     return findRun(this.db, scope, id);
   }
 

@@ -43,12 +43,12 @@ import {
   ClassRepository,
   type ClassRecord,
   type ClassTeacherRecord,
-  type Visibility,
 } from './class.repository';
+import { campusClassScopeOf, type CampusClassScope } from '../../common/scope';
 
 const classNotFound = () => new NotFoundException(CLASS_NOT_FOUND_MESSAGE);
 
-const everything: Visibility = { campusScope: 'all', classScope: 'all' };
+const everything: CampusClassScope = { campusScope: 'all', classScope: 'all' };
 
 const displayOf = (record: ClassRecord): string =>
   classDisplayName(record.levelName, record.name);
@@ -79,14 +79,10 @@ export class ClassService {
     private readonly lock: SchoolLock
   ) {}
 
-  private visibility(ctx: OrgContext): Visibility {
-    return { campusScope: ctx.campusScope, classScope: ctx.classScope };
-  }
-
   private async requireClass(
     ctx: OrgContext,
     id: string,
-    visibility: Visibility = this.visibility(ctx)
+    visibility: CampusClassScope = campusClassScopeOf(ctx)
   ): Promise<ClassRecord> {
     const record = await this.classes.findClass(
       ctx.organizationId,
@@ -141,7 +137,7 @@ export class ClassService {
       await this.campuses.assertInScope(ctx, query.campusId);
     }
     const records = await this.classes.listClasses(ctx.organizationId, {
-      ...this.visibility(ctx),
+      ...campusClassScopeOf(ctx),
       campusId: query.campusId,
       levelId: query.levelId,
       status: ctx.classScope === 'all' ? (query.status ?? 'active') : 'active',
@@ -255,7 +251,7 @@ export class ClassService {
 
   async listVisible(ctx: OrgContext): Promise<ClassRef[]> {
     const records = await this.classes.listClasses(ctx.organizationId, {
-      ...this.visibility(ctx),
+      ...campusClassScopeOf(ctx),
       status: 'active',
     });
     return records.map((record) => toRef(record));

@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { sql } from 'kysely';
 import { classTeacherRoleSchema, type RosterRow } from '@eduvault/api-contract';
 import { splitRoles, type PermissionMap } from '@eduvault/policy';
-import { customRolePermissions } from '../../common/auth';
+import { schoolRolePermissions } from '../../common/auth';
 import { currentSessionId } from '../../common/db/current-session';
 import { inCampusScope } from '../../common/db/in-campus-scope';
 import { isoOrNull } from '../../common/db/rows';
@@ -20,8 +20,8 @@ import {
   type NewClassTeacher,
   type NewLevel,
   type SchoolMemberRecord,
-  type Visibility,
 } from './class.repository';
+import type { CampusClassScope } from '../../common/scope';
 
 interface LevelRow {
   id: string;
@@ -103,7 +103,7 @@ export class KyselyClassRepository extends ClassRepository {
       ]);
   }
 
-  private visible(organizationId: string, visibility: Visibility) {
+  private visible(organizationId: string, visibility: CampusClassScope) {
     return this.classes(organizationId)
       .where((eb) =>
         inCampusScope(eb, 'class_arm.campus_id', {
@@ -232,7 +232,7 @@ export class KyselyClassRepository extends ClassRepository {
   async findClass(
     organizationId: string,
     id: string,
-    visibility: Visibility
+    visibility: CampusClassScope
   ): Promise<ClassRecord | undefined> {
     const row = await this.visible(organizationId, visibility)
       .where('class_arm.id', '=', id)
@@ -456,15 +456,10 @@ export class KyselyClassRepository extends ClassRepository {
     }));
   }
 
-  async rolePermissions(
+  rolePermissions(
     organizationId: string
   ): Promise<Record<string, PermissionMap>> {
-    const rows = await this.db
-      .selectFrom('organizationRole')
-      .where('organizationId', '=', organizationId)
-      .select(['role', 'permission'])
-      .execute();
-    return customRolePermissions(rows);
+    return schoolRolePermissions(this.db, organizationId);
   }
 
   async insertTeacher(

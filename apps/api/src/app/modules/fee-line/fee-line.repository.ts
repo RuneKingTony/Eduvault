@@ -8,14 +8,9 @@ import type {
   FeeType,
 } from '@eduvault/api-contract';
 import type { ActivityInput, CopiedShare } from '../../common/activity';
-import type { CampusScope } from '../../common/campus-scope';
 import type { DiscountFacts, TermPosition } from '../../common/fees';
 import type { StudentIdentity } from '../../common/students';
-
-export interface FeeScope {
-  organizationId: string;
-  campusScope: CampusScope;
-}
+import type { OrgScope } from '../../common/scope';
 
 export interface TermRef {
   id: string;
@@ -79,11 +74,11 @@ export type FeeTypeOutcome =
 
 export abstract class FeeLineRepository {
   abstract list(
-    scope: FeeScope,
+    scope: OrgScope,
     query: { termId: string; includeRetired: boolean }
   ): Promise<FeeLine[]>;
 
-  abstract findById(scope: FeeScope, id: string): Promise<FeeLine | undefined>;
+  abstract findById(scope: OrgScope, id: string): Promise<FeeLine | undefined>;
 
   abstract findTerm(
     organizationId: string,
@@ -191,7 +186,7 @@ export interface ChargeFacts {
 export abstract class FeeStudentRepository {
   /** Undefined unless the student is on a campus in the caller's scope; class scope never applies to finance. */
   abstract findStudent(
-    scope: FeeScope,
+    scope: OrgScope,
     query: {
       studentId: string;
       sessionId: string | undefined;
@@ -205,7 +200,7 @@ export abstract class FeeStudentRepository {
   ): Promise<ChargeFacts>;
 
   abstract candidates(
-    scope: FeeScope,
+    scope: OrgScope,
     query: { sessionId: string; q: string | undefined }
   ): Promise<FeeCandidates>;
 }
@@ -247,7 +242,7 @@ export abstract class FeeOptionRepository {
   ): Promise<number>;
 
   abstract optInRoster(
-    scope: FeeScope,
+    scope: OrgScope,
     query: { sessionId: string; feeTypeId: string; q: string | undefined }
   ): Promise<Pick<FeeOptIns, 'items' | 'total'>>;
 }

@@ -27,7 +27,6 @@ import {
   toStudentIdentity,
   type StudentIdentity,
 } from '../../common/students';
-import type { AdjustmentScope } from './adjustment.repository';
 import {
   DiscountRepository,
   type DiscountEnding,
@@ -40,6 +39,7 @@ import {
   type NewDiscount,
   type TermInfo,
 } from './discount.repository';
+import type { OrgScope } from '../../common/scope';
 
 interface DiscountRow {
   id: string;
@@ -92,7 +92,7 @@ const JOINS = sql`
   LEFT JOIN "user" cu ON cu.id = d.created_by
   LEFT JOIN "user" au ON au.id = d.approved_by`;
 
-const visible = (scope: AdjustmentScope) =>
+const visible = (scope: OrgScope) =>
   sql`d.organization_id = ${scope.organizationId}
     AND ${inScope(currentCampusSql('st'), scope.campusScope)}`;
 
@@ -165,7 +165,7 @@ class KyselyDiscountTx implements DiscountTx {
   constructor(
     private readonly trx: Kysely<DB>,
     activity: ActivityRecorder,
-    private readonly who: { scope: AdjustmentScope; userId: string }
+    private readonly who: { scope: OrgScope; userId: string }
   ) {
     this.activity = activity;
     this.decisions = decisionsFor(trx, {
@@ -264,7 +264,7 @@ export class KyselyDiscountRepository extends DiscountRepository {
   }
 
   withTx<T>(
-    scope: AdjustmentScope,
+    scope: OrgScope,
     userId: string,
     work: (tx: DiscountTx) => Promise<T>
   ): Promise<T> {
@@ -282,10 +282,7 @@ export class KyselyDiscountRepository extends DiscountRepository {
     return schoolCurrency(this.db, organizationId);
   }
 
-  async studentInScope(
-    scope: AdjustmentScope,
-    studentId: string
-  ): Promise<boolean> {
+  async studentInScope(scope: OrgScope, studentId: string): Promise<boolean> {
     return (await findStudentIdentity(this.db, scope, studentId)) !== undefined;
   }
 
@@ -350,7 +347,7 @@ export class KyselyDiscountRepository extends DiscountRepository {
   }
 
   async findById(
-    scope: AdjustmentScope,
+    scope: OrgScope,
     id: string
   ): Promise<DiscountRecord | undefined> {
     const { rows } = await sql<DiscountRow>`
@@ -368,7 +365,7 @@ export class KyselyDiscountRepository extends DiscountRepository {
   }
 
   async list(
-    scope: AdjustmentScope,
+    scope: OrgScope,
     query: StudentDiscountListQuery
   ): Promise<DiscountPage> {
     const status =
@@ -397,7 +394,7 @@ export class KyselyDiscountRepository extends DiscountRepository {
     };
   }
 
-  async waiting(scope: AdjustmentScope): Promise<WaitingApproval[]> {
+  async waiting(scope: OrgScope): Promise<WaitingApproval[]> {
     const { rows } = await sql<DiscountRow & { campus_id: string }>`
       SELECT ${COLUMNS}, ${currentCampusSql('st')} AS campus_id ${JOINS}
       WHERE ${visible(scope)} AND d.status = 'submitted'

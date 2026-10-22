@@ -2,7 +2,6 @@ import {
   SubjectRepository,
   type ArmSubjectRecord,
   type ElectiveLevelRecord,
-  type ElectiveScope,
   type ElectiveStudentQuery,
   type ElectiveStudentRecord,
   type ElectiveTakerRow,
@@ -20,6 +19,7 @@ import {
   type TermAssignment,
   type TermRecord,
 } from './subject.repository';
+import type { CampusClassScope } from '../../common/scope';
 
 interface FakeSubject {
   id: string;
@@ -303,7 +303,7 @@ export class FakeSubjectRepository extends SubjectRepository {
     return Promise.resolve(this.sessions.find((session) => session.id === id));
   }
 
-  private isVisible(student: FakeStudent, scope: ElectiveScope): boolean {
+  private isVisible(student: FakeStudent, scope: CampusClassScope): boolean {
     const campusOk =
       scope.campusScope === 'all' ||
       scope.campusScope.includes(student.campusId);
@@ -315,7 +315,7 @@ export class FakeSubjectRepository extends SubjectRepository {
 
   visibleElectiveStudents(
     _org: string,
-    scope: ElectiveScope,
+    scope: CampusClassScope,
     query: ElectiveStudentQuery
   ): Promise<ElectiveStudentRecord[]> {
     const electiveLevelIds = new Set(

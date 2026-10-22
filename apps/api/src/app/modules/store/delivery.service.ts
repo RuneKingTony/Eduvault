@@ -33,9 +33,9 @@ import {
   type DeliveryActivity,
   type ExistingDelivery,
   type StoreRef,
-  type StoreScope,
 } from './store.repository';
-import { deliveryInScope, scopeOf, storeInView } from './store-view';
+import { deliveryInScope, storeInView } from './store-view';
+import { orgScopeOf, type OrgScope } from '../../common/scope';
 import { replayOf } from '../../common/references/apply-once';
 
 interface Checked {
@@ -129,7 +129,7 @@ export class DeliveryService {
     request: { input: RecordDelivery; requestHash: string }
   ): Promise<RecordedDelivery> {
     const visible = replayOf({
-      visible: await this.store.findDelivery(scopeOf(ctx), existing.id),
+      visible: await this.store.findDelivery(orgScopeOf(ctx), existing.id),
       sameRequest: () => existing.requestHash === request.requestHash,
       taken: () => new ConflictException(DELIVERY_REFERENCE_TAKEN_MESSAGE),
       used: () =>
@@ -144,7 +144,7 @@ export class DeliveryService {
     ctx: OrgContext,
     input: RecordDelivery
   ): Promise<Checked> {
-    const scope = scopeOf(ctx);
+    const scope = orgScopeOf(ctx);
     const store = await storeInView(this.store, ctx, input.campusId);
     if (
       input.isOpening === true &&
@@ -164,7 +164,7 @@ export class DeliveryService {
   }
 
   private async checkLines(
-    scope: StoreScope,
+    scope: OrgScope,
     input: RecordDelivery
   ): Promise<void> {
     if (input.lines.length === 0) {
@@ -187,7 +187,7 @@ export class DeliveryService {
   }
 
   private async checkAccount(
-    scope: StoreScope,
+    scope: OrgScope,
     input: RecordDelivery
   ): Promise<Checked['moneyAccount']> {
     if (input.isOpening === true) {

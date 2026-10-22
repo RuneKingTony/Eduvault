@@ -37,7 +37,7 @@ import {
   type SaleStudent,
   type StudentPlacement,
 } from './sale.repository';
-import type { StoreScope } from './store.repository';
+import type { OrgScope } from '../../common/scope';
 
 @Injectable()
 export class KyselySaleRepository extends SaleRepository {
@@ -56,23 +56,23 @@ export class KyselySaleRepository extends SaleRepository {
     return findSaleByReference(this.db, organizationId, reference);
   }
 
-  find(scope: StoreScope, id: string): Promise<Sale | undefined> {
+  find(scope: OrgScope, id: string): Promise<Sale | undefined> {
     return findSale(this.db, scope, id);
   }
 
-  list(scope: StoreScope, query: SalePageQuery): Promise<SalePage> {
+  list(scope: OrgScope, query: SalePageQuery): Promise<SalePage> {
     return listSales(this.db, scope, query);
   }
 
   student(
-    scope: StoreScope,
+    scope: OrgScope,
     request: { studentId: string; today: string }
   ): Promise<SaleStudent | undefined> {
     return findSaleStudent(this.db, scope, request);
   }
 
   optionStudents(
-    scope: StoreScope,
+    scope: OrgScope,
     request: { today: string; withBalance: boolean }
   ): Promise<OptionStudents> {
     return optionStudents(this.db, scope, request);
@@ -93,7 +93,7 @@ export class KyselySaleRepository extends SaleRepository {
     return readPaymentMethods(this.db, organizationId);
   }
 
-  async accounts(scope: StoreScope): Promise<SaleAccount[]> {
+  async accounts(scope: OrgScope): Promise<SaleAccount[]> {
     const rows = await this.db
       .selectFrom('money_account')
       .select([
@@ -140,7 +140,7 @@ export class KyselySaleRepository extends SaleRepository {
     );
   }
 
-  termFigures(scope: StoreScope, campusId?: string): Promise<StoreTermFigures> {
+  termFigures(scope: OrgScope, campusId?: string): Promise<StoreTermFigures> {
     return termFigures(this.db, scope, campusId);
   }
 

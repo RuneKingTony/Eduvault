@@ -23,18 +23,14 @@ import { Clock } from '../../common/clock';
 import { documentYear } from '../../common/documents';
 import { chargeRequestHash } from '../../common/fees';
 import { balanceToday, broughtForward } from '../../common/ledger';
-import { InvoiceRepository, type InvoiceScope } from './invoice.repository';
+import { InvoiceRepository } from './invoice.repository';
 import {
   distinctFeeTypeIds,
   InvoiceWriteRepository,
   type ExistingCharge,
   type OneOffOutcome,
 } from './invoice-write.repository';
-
-const scopeOf = (ctx: OrgContext): InvoiceScope => ({
-  organizationId: ctx.organizationId,
-  campusScope: ctx.campusScope,
-});
+import { orgScopeOf } from '../../common/scope';
 
 @Injectable()
 export class InvoiceService {
@@ -48,7 +44,7 @@ export class InvoiceService {
     ctx: OrgContext,
     query: InvoiceListQuery
   ): Promise<Omit<InvoiceList, 'counts' | 'summary'>> {
-    const scope = scopeOf(ctx);
+    const scope = orgScopeOf(ctx);
     if (
       query.studentId !== undefined &&
       !(await this.invoices.studentVisible(scope, query.studentId))
@@ -63,7 +59,7 @@ export class InvoiceService {
   }
 
   async list(ctx: OrgContext, query: InvoiceListQuery): Promise<InvoiceList> {
-    const scope = scopeOf(ctx);
+    const scope = orgScopeOf(ctx);
     const [page, counts, summary] = await Promise.all([
       this.listPage(ctx, query),
       this.invoices.counts(scope),
@@ -78,13 +74,13 @@ export class InvoiceService {
   ): Promise<{ currency: string; count: number; totalMinor: number }> {
     const [currency, totals] = await Promise.all([
       this.invoices.currency(ctx.organizationId),
-      this.invoices.termTotals(scopeOf(ctx), termId),
+      this.invoices.termTotals(orgScopeOf(ctx), termId),
     ]);
     return { currency, ...totals };
   }
 
   async get(ctx: OrgContext, id: string): Promise<Invoice> {
-    const record = await this.invoices.find(scopeOf(ctx), id);
+    const record = await this.invoices.find(orgScopeOf(ctx), id);
     if (record === undefined) {
       throw new NotFoundException(INVOICE_NOT_FOUND_MESSAGE);
     }
@@ -154,7 +150,7 @@ export class InvoiceService {
     input: CreateOneOffCharge
   ): Promise<string> {
     const student = await this.writes.chargeableStudent(
-      scopeOf(ctx),
+      orgScopeOf(ctx),
       input.studentId
     );
     if (student === undefined) {

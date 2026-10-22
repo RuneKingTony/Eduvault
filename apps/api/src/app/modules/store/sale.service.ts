@@ -40,7 +40,8 @@ import {
   type SaleStudent,
 } from './sale.repository';
 import { StoreRepository, type StoreRef } from './store.repository';
-import { scopeOf, storeInView } from './store-view';
+import { storeInView } from './store-view';
+import { orgScopeOf } from '../../common/scope';
 import { replayOf } from '../../common/references/apply-once';
 
 interface Checked {
@@ -109,7 +110,7 @@ export class SaleService {
     switch (outcome.status) {
       case 'recorded':
       case 'replayed': {
-        const sale = await this.sales.find(scopeOf(ctx), outcome.id);
+        const sale = await this.sales.find(orgScopeOf(ctx), outcome.id);
         if (sale === undefined) {
           throw new NotFoundException(PAYMENT_STUDENT_NOT_FOUND_MESSAGE);
         }
@@ -150,7 +151,7 @@ export class SaleService {
     input: RecordSale
   ): Promise<RecordedSale> {
     const visible = replayOf({
-      visible: await this.sales.find(scopeOf(ctx), existing.id),
+      visible: await this.sales.find(orgScopeOf(ctx), existing.id),
       sameRequest: () =>
         existing.requestHash ===
         saleRequestHash({
@@ -169,7 +170,7 @@ export class SaleService {
   }
 
   private async validate(ctx: OrgContext, input: RecordSale): Promise<Checked> {
-    const scope = scopeOf(ctx);
+    const scope = orgScopeOf(ctx);
     const student = await this.sales.student(scope, {
       studentId: input.studentId,
       today: this.clock.today(),
@@ -260,7 +261,7 @@ export class SaleService {
     sale: { input: RecordSale; student: SaleStudent }
   ): Promise<SaleAccount> {
     const { input, student } = sale;
-    const accounts = await this.sales.accounts(scopeOf(ctx));
+    const accounts = await this.sales.accounts(orgScopeOf(ctx));
     const fits = fittingSaleAccounts(input.method, student.campusId, accounts);
     if (input.moneyAccountId !== undefined) {
       return this.named(input.moneyAccountId, { accounts, fits, sale });

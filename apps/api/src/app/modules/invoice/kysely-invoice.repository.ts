@@ -21,8 +21,8 @@ import {
   InvoiceRepository,
   type InvoicePage,
   type InvoiceRecord,
-  type InvoiceScope,
 } from './invoice.repository';
+import type { OrgScope } from '../../common/scope';
 
 interface SummaryRow {
   id: string;
@@ -146,10 +146,7 @@ export class KyselyInvoiceRepository extends InvoiceRepository {
     return schoolCurrency(this.db, organizationId);
   }
 
-  async studentVisible(
-    scope: InvoiceScope,
-    studentId: string
-  ): Promise<boolean> {
+  async studentVisible(scope: OrgScope, studentId: string): Promise<boolean> {
     const { rows } = await sql<{ id: string }>`
       SELECT st.id FROM student st
       WHERE st.id = ${studentId}
@@ -161,7 +158,7 @@ export class KyselyInvoiceRepository extends InvoiceRepository {
   }
 
   private filters(
-    scope: InvoiceScope,
+    scope: OrgScope,
     query: Partial<InvoiceListQuery> = {}
   ): RawBuilder<unknown> {
     const parts: RawBuilder<unknown>[] = [
@@ -190,10 +187,7 @@ export class KyselyInvoiceRepository extends InvoiceRepository {
     return sql.join(parts, sql` AND `);
   }
 
-  async list(
-    scope: InvoiceScope,
-    query: InvoiceListQuery
-  ): Promise<InvoicePage> {
+  async list(scope: OrgScope, query: InvoiceListQuery): Promise<InvoicePage> {
     const { rows } = await sql<SummaryRow>`
       SELECT
         i.id, i.number, i.student_id, st.first_name, st.last_name, st.admission_number,
@@ -228,7 +222,7 @@ export class KyselyInvoiceRepository extends InvoiceRepository {
     };
   }
 
-  async counts(scope: InvoiceScope): Promise<InvoiceCounts> {
+  async counts(scope: OrgScope): Promise<InvoiceCounts> {
     const { rows } = await sql<{ kind: string; total: number }>`
       SELECT i.kind, count(*)::int AS total
       FROM invoice i
@@ -244,7 +238,7 @@ export class KyselyInvoiceRepository extends InvoiceRepository {
     };
   }
 
-  async summary(scope: InvoiceScope): Promise<InvoiceListSummary> {
+  async summary(scope: OrgScope): Promise<InvoiceListSummary> {
     const { rows } = await sql<{
       sent_count: number;
       sent_total: string;
@@ -266,7 +260,7 @@ export class KyselyInvoiceRepository extends InvoiceRepository {
   }
 
   async termTotals(
-    scope: InvoiceScope,
+    scope: OrgScope,
     termId: string
   ): Promise<{ count: number; totalMinor: number }> {
     const { rows } = await sql<{ total: number; total_minor: string }>`
@@ -282,10 +276,7 @@ export class KyselyInvoiceRepository extends InvoiceRepository {
     };
   }
 
-  async find(
-    scope: InvoiceScope,
-    id: string
-  ): Promise<InvoiceRecord | undefined> {
+  async find(scope: OrgScope, id: string): Promise<InvoiceRecord | undefined> {
     const { rows } = await sql<DetailRow>`
       SELECT
         i.id, i.number, i.kind, i.status, i.student_id,

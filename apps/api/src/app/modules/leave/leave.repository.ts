@@ -6,12 +6,7 @@ import {
   type LeaveType,
 } from '@eduvault/shared';
 import type { ActivityInput } from '../../common/activity';
-import type { CampusScope } from '../../common/campus-scope';
-
-export interface LeaveScope {
-  organizationId: string;
-  campusScope: CampusScope;
-}
+import type { OrgScope } from '../../common/scope';
 
 export type LeaveEntry = Omit<LeaveDto, 'days'>;
 export type DecidedEntry = LeaveEntry & { status: DecidedLeaveStatus };
@@ -73,7 +68,7 @@ export interface LeaveTx {
 
 export abstract class LeaveRepository {
   abstract withTx<T>(
-    scope: LeaveScope,
+    scope: OrgScope,
     userId: string,
     work: (tx: LeaveTx) => Promise<T>
   ): Promise<T>;
@@ -87,7 +82,7 @@ export abstract class LeaveRepository {
   abstract mine(organizationId: string, userId: string): Promise<LeaveEntry[]>;
 
   abstract list(
-    scope: LeaveScope,
+    scope: OrgScope,
     viewerId: string,
     query: LeaveListQuery
   ): Promise<LeaveEntry[]>;
@@ -108,5 +103,5 @@ export abstract class LeaveRepository {
     at: Date
   ): Promise<void>;
 
-  abstract waiting(scope: LeaveScope): Promise<WaitingLeave[]>;
+  abstract waiting(scope: OrgScope): Promise<WaitingLeave[]>;
 }

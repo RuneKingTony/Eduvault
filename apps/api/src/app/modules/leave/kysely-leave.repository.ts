@@ -10,7 +10,7 @@ import { holds, resolvePermissions, splitRoles } from '@eduvault/policy';
 import type { DB } from '../../../db/db-types';
 import { ActivityWriter, type ActivityInput } from '../../common/activity';
 import { decisionsFor } from '../../common/approvals';
-import { customRolePermissions } from '../../common/auth';
+import { schoolRolePermissions } from '../../common/auth';
 import { day, iso, isoOrNull } from '../../common/db/rows';
 import { KYSELY_TOKEN, type Database } from '../../common/db/tokens';
 import { inScope } from '../../common/students';
@@ -18,13 +18,13 @@ import {
   LeaveRepository,
   asDecided,
   type LeaveEntry,
-  type LeaveScope,
   type LeaveTx,
   type LockedLeave,
   type NewLeave,
   type UnseenDecisions,
   type WaitingLeave,
 } from './leave.repository';
+import type { OrgScope } from '../../common/scope';
 
 interface EntryRow {
   id: string;
@@ -101,7 +101,7 @@ const LOCKED_COLUMNS = sql`
   ${day('sl.starts_on')} AS starts_on, ${day('sl.ends_on')} AS ends_on,
   sl.status`;
 
-const requesterInScope = (scope: LeaveScope): RawBuilder<boolean> =>
+const requesterInScope = (scope: OrgScope): RawBuilder<boolean> =>
   scope.campusScope === 'all'
     ? sql<boolean>`TRUE`
     : sql<boolean>`EXISTS (
@@ -164,7 +164,7 @@ class KyselyLeaveTx implements LeaveTx {
   constructor(
     private readonly trx: Kysely<DB>,
     private readonly activity: ActivityWriter,
-    private readonly who: { scope: LeaveScope; userId: string }
+    private readonly who: { scope: OrgScope; userId: string }
   ) {
     this.decisions = decisionsFor(trx, {
       table: 'staff_leave',
@@ -288,7 +288,7 @@ export class KyselyLeaveRepository extends LeaveRepository {
   }
 
   withTx<T>(
-    scope: LeaveScope,
+    scope: OrgScope,
     userId: string,
     work: (tx: LeaveTx) => Promise<T>
   ): Promise<T> {
@@ -321,7 +321,7 @@ export class KyselyLeaveRepository extends LeaveRepository {
   }
 
   async list(
-    scope: LeaveScope,
+    scope: OrgScope,
     viewerId: string,
     query: LeaveListQuery
   ): Promise<LeaveEntry[]> {
@@ -379,20 +379,15 @@ export class KyselyLeaveRepository extends LeaveRepository {
     organizationId: string,
     userId: string
   ): Promise<boolean> {
-    const [members, roles] = await Promise.all([
+    const [members, custom] = await Promise.all([
       this.db
         .selectFrom('member')
         .select('role')
         .where('organizationId', '=', organizationId)
         .where('userId', '<>', userId)
         .execute(),
-      this.db
-        .selectFrom('organizationRole')
-        .select(['role', 'permission'])
-        .where('organizationId', '=', organizationId)
-        .execute(),
+      schoolRolePermissions(this.db, organizationId),
     ]);
-    const custom = customRolePermissions(roles);
     return members.some((member) =>
       holds(
         resolvePermissions(splitRoles(member.role), custom),
@@ -401,7 +396,7 @@ export class KyselyLeaveRepository extends LeaveRepository {
     );
   }
 
-  async waiting(scope: LeaveScope): Promise<WaitingLeave[]> {
+  async waiting(scope: OrgScope): Promise<WaitingLeave[]> {
     const { rows } = await sql<WaitingRow>`
       SELECT sl.id, sl.created_by, cu.name AS requester_name, sl.type,
         ${day('sl.starts_on')} AS starts_on, ${day('sl.ends_on')} AS ends_on,

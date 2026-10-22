@@ -20,7 +20,6 @@ import {
   systemAccountId,
 } from '../../common/ledger';
 import { currentCampusSql, findStudentIdentity } from '../../common/students';
-import type { InvoiceScope } from './invoice.repository';
 import {
   distinctFeeTypeIds,
   InvoiceWriteRepository,
@@ -29,6 +28,7 @@ import {
   type NewOneOffCharge,
   type OneOffOutcome,
 } from './invoice-write.repository';
+import type { OrgScope } from '../../common/scope';
 
 interface ChargeWriters {
   poster: LedgerPoster;
@@ -64,7 +64,7 @@ async function findByReference(
 
 async function findStudent(
   db: Kysely<DB>,
-  scope: InvoiceScope,
+  scope: OrgScope,
   studentId: string
 ): Promise<ChargeableStudent | undefined> {
   const identity = await findStudentIdentity(db, scope, studentId);
@@ -228,7 +228,7 @@ export class KyselyInvoiceWriteRepository extends InvoiceWriteRepository {
   }
 
   chargeableStudent(
-    scope: InvoiceScope,
+    scope: OrgScope,
     studentId: string
   ): Promise<ChargeableStudent | undefined> {
     return findStudent(this.db, scope, studentId);

@@ -23,7 +23,7 @@ import {
   type StudentFeeContext,
   type TermRef,
 } from './fee-line.repository';
-import { feeScopeOf } from './fee-scope';
+import { orgScopeOf } from '../../common/scope';
 
 const DISCOUNTS_GIVEN_NAME = 'Discounts given';
 
@@ -93,7 +93,7 @@ export class FeePreviewService {
     if (term === undefined) {
       throw new NotFoundException(FEE_TERM_NOT_FOUND_MESSAGE);
     }
-    return this.students.candidates(feeScopeOf(ctx), {
+    return this.students.candidates(orgScopeOf(ctx), {
       sessionId: term.sessionId,
       q: query.q,
     });
@@ -118,7 +118,7 @@ export class FeePreviewService {
     studentId: string,
     term: TermRef
   ): Promise<EnrolledStudent> {
-    const student = await this.students.findStudent(feeScopeOf(ctx), {
+    const student = await this.students.findStudent(orgScopeOf(ctx), {
       studentId,
       sessionId: term.sessionId,
       termId: term.id,

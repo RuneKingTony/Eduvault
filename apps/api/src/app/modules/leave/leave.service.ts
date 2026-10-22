@@ -37,18 +37,13 @@ import { CalendarService } from '../calendar/calendar.service';
 import {
   LeaveRepository,
   type LeaveEntry,
-  type LeaveScope,
   type LeaveTx,
   type LockedLeave,
   type UnseenDecisions,
 } from './leave.repository';
+import { orgScopeOf } from '../../common/scope';
 
 const HOLIDAY_CARD_SIZE = 20;
-
-const scopeOf = (ctx: OrgContext): LeaveScope => ({
-  organizationId: ctx.organizationId,
-  campusScope: ctx.campusScope,
-});
 
 const notFound = () => new NotFoundException(LEAVE_NOT_FOUND_MESSAGE);
 
@@ -138,7 +133,7 @@ export class LeaveService {
 
   async list(ctx: OrgContext, query: LeaveListQuery): Promise<LeaveDto[]> {
     const [entries, holidays] = await Promise.all([
-      this.leave.list(scopeOf(ctx), ctx.user.id, query),
+      this.leave.list(orgScopeOf(ctx), ctx.user.id, query),
       this.calendar.holidayDates(ctx.organizationId),
     ]);
     return entries.map((entry) => toDto(entry, holidays));
@@ -155,7 +150,7 @@ export class LeaveService {
       throw new BadRequestException(LEAVE_NO_SCHOOL_DAY_MESSAGE);
     }
     const id = await this.leave.withTx(
-      scopeOf(ctx),
+      orgScopeOf(ctx),
       ctx.user.id,
       async (tx) => {
         if (await tx.hasOverlap(input.startsOn, endsOn)) {
@@ -190,7 +185,7 @@ export class LeaveService {
 
   async withdraw(ctx: OrgContext, id: string): Promise<LeaveDto> {
     assertNotActing(ctx);
-    await this.leave.withTx(scopeOf(ctx), ctx.user.id, async (tx) => {
+    await this.leave.withTx(orgScopeOf(ctx), ctx.user.id, async (tx) => {
       const found = await tx.lockOwn(id);
       if (found === undefined) {
         throw notFound();
@@ -240,7 +235,7 @@ export class LeaveService {
   async cancel(ctx: OrgContext, id: string, reason: string): Promise<LeaveDto> {
     const cancelReason = assertDeclineReason(reason);
     const today = this.clock.today();
-    await this.leave.withTx(scopeOf(ctx), ctx.user.id, async (tx) => {
+    await this.leave.withTx(orgScopeOf(ctx), ctx.user.id, async (tx) => {
       const found = await tx.lockInScope(id);
       if (found === undefined) {
         throw notFound();
@@ -269,7 +264,7 @@ export class LeaveService {
     id: string,
     apply: (tx: LeaveTx, found: LockedLeave) => Promise<boolean>
   ): Promise<void> {
-    return this.leave.withTx(scopeOf(ctx), ctx.user.id, async (tx) => {
+    return this.leave.withTx(orgScopeOf(ctx), ctx.user.id, async (tx) => {
       const found = await tx.lockInScope(id);
       if (found === undefined) {
         throw notFound();

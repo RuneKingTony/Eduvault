@@ -14,10 +14,10 @@ import { KYSELY_TOKEN, type Database } from '../../common/db/tokens';
 import { findStudentIdentity, visibleStudentsCte } from '../../common/students';
 import {
   FeeOptionRepository,
-  type FeeScope,
   type OptionActivity,
   type OptionChange,
 } from './fee-line.repository';
+import type { OrgScope } from '../../common/scope';
 
 const liveOptionalLine = (student: {
   classLevelId: RawBuilder<unknown>;
@@ -155,7 +155,7 @@ export class KyselyFeeOptionRepository extends FeeOptionRepository {
   }
 
   async optInRoster(
-    scope: FeeScope,
+    scope: OrgScope,
     query: { sessionId: string; feeTypeId: string; q: string | undefined }
   ): Promise<Pick<FeeOptIns, 'items' | 'total'>> {
     const { organizationId, campusScope } = scope;

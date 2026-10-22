@@ -32,7 +32,7 @@ import {
   type StudentListParams,
   type StudentListResult,
 } from './student.repository';
-import type { StudentVisibility } from './visibility';
+import type { CampusClassScope } from '../../common/scope';
 
 interface RowFacts {
   id: string;
@@ -247,7 +247,7 @@ const rowsCte = ({
 
 interface ListInput {
   organizationId: string;
-  scope: StudentVisibility;
+  scope: CampusClassScope;
   params: StudentListParams;
   today: string;
 }
@@ -274,7 +274,7 @@ function listStatement({ organizationId, scope, params, today }: ListInput) {
 
 interface DetailInput extends StudentDetailTarget {
   organizationId: string;
-  scope: StudentVisibility;
+  scope: CampusClassScope;
   today: string;
 }
 
@@ -449,7 +449,7 @@ export class KyselyStudentRepository extends StudentRepository {
 
   async list(
     organizationId: string,
-    scope: StudentVisibility,
+    scope: CampusClassScope,
     params: StudentListParams
   ): Promise<StudentListResult> {
     const today = schoolToday({ organizationId }, this.clock);
@@ -475,7 +475,7 @@ export class KyselyStudentRepository extends StudentRepository {
 
   async findDetail(
     organizationId: string,
-    scope: StudentVisibility,
+    scope: CampusClassScope,
     { id, withFinance }: StudentDetailTarget
   ): Promise<StudentDetail | undefined> {
     const today = schoolToday({ organizationId }, this.clock);
@@ -514,7 +514,7 @@ export class KyselyStudentRepository extends StudentRepository {
 
   async isVisible(
     organizationId: string,
-    scope: StudentVisibility,
+    scope: CampusClassScope,
     id: string
   ): Promise<boolean> {
     const today = schoolToday({ organizationId }, this.clock);

@@ -31,10 +31,10 @@ import {
   type InsertOutcome,
   type NewRecordedPayment,
   type PaymentPage,
-  type PaymentScope,
   type RecordingPeople,
 } from './payment.repository';
 import { PaymentService } from './payment.service';
+import type { OrgScope } from '../../common/scope';
 
 const ADA = '0b0c8a8e-8a3e-4c6c-a8c4-0e2f0f6b1f11';
 const CHIDI = '5d7e0f2a-3c1b-4e0a-9d7c-2f6a1b8c9d10';
@@ -116,7 +116,7 @@ class FakePayments extends PaymentRepository {
     return Promise.resolve('NGN');
   }
 
-  list(_scope: PaymentScope, _query: unknown): Promise<PaymentPage> {
+  list(_scope: OrgScope, _query: unknown): Promise<PaymentPage> {
     return Promise.resolve({
       items: [],
       total: 0,
@@ -145,7 +145,7 @@ class FakePayments extends PaymentRepository {
     return Promise.resolve(this.guardian);
   }
 
-  studentsInScope(_scope: PaymentScope, ids: readonly string[]) {
+  studentsInScope(_scope: OrgScope, ids: readonly string[]) {
     return Promise.resolve(ids.filter((id) => this.inScope.includes(id)));
   }
 

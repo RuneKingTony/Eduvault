@@ -41,8 +41,8 @@ import {
   type NewItem,
   type StockTotals,
   type StoreRef,
-  type StoreScope,
 } from './store.repository';
+import type { OrgScope } from '../../common/scope';
 
 const toStoreRef = (row: {
   id: string;
@@ -116,7 +116,7 @@ export class KyselyStoreRepository extends StoreRepository {
     return updateItem(this.db, change);
   }
 
-  async storesInScope(scope: StoreScope): Promise<StoreRef[]> {
+  async storesInScope(scope: OrgScope): Promise<StoreRef[]> {
     const rows = await this.db
       .selectFrom('store')
       .innerJoin('team', 'team.id', 'store.campus_id')
@@ -166,7 +166,7 @@ export class KyselyStoreRepository extends StoreRepository {
   }
 
   moneyAccount(
-    scope: StoreScope,
+    scope: OrgScope,
     moneyAccountId: string
   ): Promise<UsableMoneyAccount> {
     return usableMoneyAccount(this.db, scope, moneyAccountId);
@@ -192,14 +192,14 @@ export class KyselyStoreRepository extends StoreRepository {
   }
 
   listDeliveries(
-    scope: StoreScope,
+    scope: OrgScope,
     query: DeliveryPageQuery
   ): Promise<DeliveryPage> {
     return listDeliveries(this.db, scope, query);
   }
 
   findDelivery(
-    scope: StoreScope,
+    scope: OrgScope,
     id: string
   ): Promise<DeliveryDetail | undefined> {
     return findDelivery(this.db, scope, id);

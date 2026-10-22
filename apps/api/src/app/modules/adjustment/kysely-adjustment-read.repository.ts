@@ -13,7 +13,8 @@ import {
 import { iso } from '../../common/db/rows';
 import type { Database } from '../../common/db/tokens';
 import { currentCampusSql, inScope } from '../../common/students';
-import type { AdjustmentPage, AdjustmentScope } from './adjustment.repository';
+import type { AdjustmentPage } from './adjustment.repository';
+import type { OrgScope } from '../../common/scope';
 
 interface AdjustmentRow {
   id: string;
@@ -49,7 +50,7 @@ const JOINS = sql`
   LEFT JOIN "user" cu ON cu.id = a.created_by
   LEFT JOIN "user" au ON au.id = a.approved_by`;
 
-const visible = (scope: AdjustmentScope) =>
+const visible = (scope: OrgScope) =>
   sql`a.organization_id = ${scope.organizationId}
     AND ${inScope(currentCampusSql('st'), scope.campusScope)}`;
 
@@ -77,7 +78,7 @@ const toAdjustment = (row: AdjustmentRow): Adjustment => ({
 
 export async function findAdjustment(
   db: Database,
-  scope: AdjustmentScope,
+  scope: OrgScope,
   id: string
 ): Promise<Adjustment | undefined> {
   const { rows } = await sql<AdjustmentRow>`
@@ -101,7 +102,7 @@ function filtersOf(query: AdjustmentListQuery) {
 
 export async function listAdjustments(
   db: Database,
-  scope: AdjustmentScope,
+  scope: OrgScope,
   query: AdjustmentListQuery
 ): Promise<AdjustmentPage> {
   const [{ rows }, waitingCount] = await Promise.all([
@@ -126,7 +127,7 @@ export async function listAdjustments(
 
 export async function waitingAdjustments(
   db: Database,
-  scope: AdjustmentScope
+  scope: OrgScope
 ): Promise<WaitingApproval[]> {
   const { rows } = await sql<
     AdjustmentRow & { created_by: string | null; campus_id: string }

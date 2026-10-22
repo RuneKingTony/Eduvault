@@ -34,7 +34,6 @@ import {
   currentCampusSql,
   inScope,
 } from '../../common/students';
-import type { PaymentScope } from './payment.repository';
 import {
   PaymentVoidRepository,
   type PaymentVoidTx,
@@ -43,6 +42,7 @@ import {
   type VoidRecord,
   type VoidablePayment,
 } from './payment-void.repository';
+import type { OrgScope } from '../../common/scope';
 
 interface PaymentRow {
   id: string;
@@ -83,7 +83,7 @@ class KyselyVoidTx implements PaymentVoidTx {
   constructor(
     private readonly trx: Kysely<DB>,
     private readonly deps: { poster: LedgerPoster; activity: ActivityRecorder },
-    private readonly who: { scope: PaymentScope; userId: string }
+    private readonly who: { scope: OrgScope; userId: string }
   ) {
     this.activity = deps.activity;
     this.decisions = decisionsFor(trx, {
@@ -306,7 +306,7 @@ export class KyselyPaymentVoidRepository extends PaymentVoidRepository {
   }
 
   withTx<T>(
-    scope: PaymentScope,
+    scope: OrgScope,
     userId: string,
     work: (tx: PaymentVoidTx) => Promise<T>
   ): Promise<T> {
@@ -325,7 +325,7 @@ export class KyselyPaymentVoidRepository extends PaymentVoidRepository {
   }
 
   async findVoid(
-    scope: PaymentScope,
+    scope: OrgScope,
     id: string
   ): Promise<PaymentVoidItem | undefined> {
     const { rows } = await sql<ItemRow>`
@@ -338,7 +338,7 @@ export class KyselyPaymentVoidRepository extends PaymentVoidRepository {
   }
 
   async listVoids(
-    scope: PaymentScope,
+    scope: OrgScope,
     query: PaymentVoidListQuery
   ): Promise<VoidPage> {
     const status =
@@ -365,7 +365,7 @@ export class KyselyPaymentVoidRepository extends PaymentVoidRepository {
     };
   }
 
-  async waiting(scope: PaymentScope): Promise<WaitingApproval[]> {
+  async waiting(scope: OrgScope): Promise<WaitingApproval[]> {
     const { rows } = await sql<
       ItemRow & { created_by: string | null; campus_id: string | null }
     >`

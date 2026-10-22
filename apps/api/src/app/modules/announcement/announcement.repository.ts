@@ -5,13 +5,8 @@ import type {
   AnnouncementSummary,
 } from '@eduvault/api-contract';
 import type { ActivityInput } from '../../common/activity';
-import type { CampusScope } from '../../common/campus-scope';
 import type { AnnouncementFields } from './announcement-rules';
-
-export interface AnnouncementScope {
-  organizationId: string;
-  campusScope: CampusScope;
-}
+import type { OrgScope } from '../../common/scope';
 
 export interface AnnouncementWrite {
   organizationId: string;
@@ -27,7 +22,7 @@ export interface AnnouncementChange {
 }
 
 export interface AnnouncementTarget {
-  scope: AnnouncementScope;
+  scope: OrgScope;
   id: string;
   userId: string;
   at: Date;
@@ -35,29 +30,23 @@ export interface AnnouncementTarget {
 
 export abstract class AnnouncementRepository {
   abstract list(
-    scope: AnnouncementScope,
+    scope: OrgScope,
     query: AnnouncementListQuery
   ): Promise<AnnouncementList>;
 
   abstract findById(
-    scope: AnnouncementScope,
+    scope: OrgScope,
     id: string
   ): Promise<Announcement | undefined>;
 
-  abstract feed(
-    scope: AnnouncementScope,
-    limit: number
-  ): Promise<AnnouncementSummary[]>;
+  abstract feed(scope: OrgScope, limit: number): Promise<AnnouncementSummary[]>;
 
   abstract publishedPage(
-    scope: AnnouncementScope,
+    scope: OrgScope,
     paging: { page: number; pageSize: number }
   ): Promise<{ items: AnnouncementSummary[]; total: number }>;
 
-  abstract countPublishedSince(
-    scope: AnnouncementScope,
-    since: string
-  ): Promise<number>;
+  abstract countPublishedSince(scope: OrgScope, since: string): Promise<number>;
 
   abstract create(
     write: AnnouncementWrite,

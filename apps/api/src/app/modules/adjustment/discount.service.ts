@@ -29,18 +29,13 @@ import {
 } from '../../common/activity';
 import { assertDeclineReason, decide } from '../../common/approvals';
 import type { OrgContext } from '../../common/auth';
-import type { AdjustmentScope } from './adjustment.repository';
 import { endProblem, termsProblem } from './discount-rules';
 import {
   DiscountRepository,
   type TermChoice,
   type TermInfo,
 } from './discount.repository';
-
-const scopeOf = (ctx: OrgContext): AdjustmentScope => ({
-  organizationId: ctx.organizationId,
-  campusScope: ctx.campusScope,
-});
+import { orgScopeOf, type OrgScope } from '../../common/scope';
 
 const notFound = () => new NotFoundException(DISCOUNT_NOT_FOUND_MESSAGE);
 
@@ -54,7 +49,7 @@ export class DiscountService {
   ): Promise<StudentDiscountList> {
     const [currency, page] = await Promise.all([
       this.discounts.currency(ctx.organizationId),
-      this.discounts.list(scopeOf(ctx), query),
+      this.discounts.list(orgScopeOf(ctx), query),
     ]);
     return { currency, ...page };
   }
@@ -67,7 +62,7 @@ export class DiscountService {
     ctx: OrgContext,
     input: CreateStudentDiscount
   ): Promise<CreatedStudentDiscount> {
-    const scope = scopeOf(ctx);
+    const scope = orgScopeOf(ctx);
     if (input.kind === 'percent' && input.value > 100) {
       throw new BadRequestException(DISCOUNT_PERCENT_MESSAGE);
     }
@@ -121,7 +116,7 @@ export class DiscountService {
   }
 
   async approve(ctx: OrgContext, id: string): Promise<StudentDiscount> {
-    const scope = scopeOf(ctx);
+    const scope = orgScopeOf(ctx);
     await this.discounts.withTx(scope, ctx.user.id, async (tx) => {
       const found = await tx.lock(id);
       if (found === undefined) {
@@ -153,7 +148,7 @@ export class DiscountService {
     reason: string
   ): Promise<StudentDiscount> {
     const declineReason = assertDeclineReason(reason);
-    const scope = scopeOf(ctx);
+    const scope = orgScopeOf(ctx);
     await this.discounts.withTx(scope, ctx.user.id, async (tx) => {
       const found = await tx.lock(id);
       if (found === undefined) {
@@ -184,7 +179,7 @@ export class DiscountService {
     id: string,
     input: EndStudentDiscountInput
   ): Promise<StudentDiscount> {
-    const scope = scopeOf(ctx);
+    const scope = orgScopeOf(ctx);
     const found = await this.discounts.findById(scope, id);
     if (found === undefined) {
       throw notFound();
@@ -281,10 +276,7 @@ export class DiscountService {
     return term;
   }
 
-  private async item(
-    scope: AdjustmentScope,
-    id: string
-  ): Promise<StudentDiscount> {
+  private async item(scope: OrgScope, id: string): Promise<StudentDiscount> {
     const found = await this.discounts.findById(scope, id);
     if (found === undefined) {
       throw notFound();

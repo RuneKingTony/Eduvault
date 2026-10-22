@@ -4,7 +4,7 @@ import type {
   TermPosition,
 } from '../../common/fees';
 import type { RoundFilter } from './billing-round';
-import type { BillingScope } from './billing-scope';
+import type { OrgScope } from '../../common/scope';
 import type { RoundCandidate } from './round-plan';
 
 export interface TermInfo {
@@ -57,13 +57,13 @@ export abstract class BillingPlanRepository {
   ): Promise<LevelRef | undefined>;
 
   abstract roundCandidates(
-    scope: BillingScope,
+    scope: OrgScope,
     term: TermInfo,
     options: RoundCandidateOptions
   ): Promise<RoundCandidates>;
 
   abstract chargeSummary(
-    scope: BillingScope,
+    scope: OrgScope,
     term: TermInfo,
     options: ChargeSummaryOptions
   ): Promise<ChargeSummary>;

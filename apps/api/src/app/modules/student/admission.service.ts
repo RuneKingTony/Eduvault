@@ -38,6 +38,7 @@ import {
 } from './admission.repository';
 import { isDueToBeLeft, lifeOf } from './lifecycle';
 import { StudentService } from './student.service';
+import { campusClassScopeOf } from '../../common/scope';
 
 type Existing = Extract<GuardianDraft, { existingGuardianId: string }>;
 
@@ -107,7 +108,7 @@ export class AdmissionService {
     const today = this.admissions.today(ctx.organizationId);
     const matches = await this.admissions.duplicates(
       ctx.organizationId,
-      { campusScope: ctx.campusScope, classScope: ctx.classScope },
+      campusClassScopeOf(ctx),
       query
     );
     return {

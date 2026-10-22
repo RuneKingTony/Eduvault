@@ -9,10 +9,10 @@ import { canSeeCampus } from '../../common/campus-scope';
 import {
   AnnouncementRepository,
   type AnnouncementChange,
-  type AnnouncementScope,
   type AnnouncementTarget,
   type AnnouncementWrite,
 } from './announcement.repository';
+import type { OrgScope } from '../../common/scope';
 
 export class FakeAnnouncementRepository extends AnnouncementRepository {
   rows: Announcement[] = [];
@@ -25,7 +25,7 @@ export class FakeAnnouncementRepository extends AnnouncementRepository {
     this.organizationOf.set(row.id, organizationId);
   }
 
-  private visible(scope: AnnouncementScope): Announcement[] {
+  private visible(scope: OrgScope): Announcement[] {
     return this.rows.filter(
       (row) =>
         this.organizationOf.get(row.id) === scope.organizationId &&
@@ -34,7 +34,7 @@ export class FakeAnnouncementRepository extends AnnouncementRepository {
   }
 
   list(
-    scope: AnnouncementScope,
+    scope: OrgScope,
     query: AnnouncementListQuery
   ): Promise<AnnouncementList> {
     const all = this.visible(scope);
@@ -55,17 +55,11 @@ export class FakeAnnouncementRepository extends AnnouncementRepository {
     });
   }
 
-  findById(
-    scope: AnnouncementScope,
-    id: string
-  ): Promise<Announcement | undefined> {
+  findById(scope: OrgScope, id: string): Promise<Announcement | undefined> {
     return Promise.resolve(this.visible(scope).find((row) => row.id === id));
   }
 
-  feed(
-    scope: AnnouncementScope,
-    limit: number
-  ): Promise<AnnouncementSummary[]> {
+  feed(scope: OrgScope, limit: number): Promise<AnnouncementSummary[]> {
     return Promise.resolve(
       this.visible(scope)
         .filter((row) => row.status === 'published')
@@ -88,7 +82,7 @@ export class FakeAnnouncementRepository extends AnnouncementRepository {
   }
 
   async publishedPage(
-    scope: AnnouncementScope,
+    scope: OrgScope,
     paging: { page: number; pageSize: number }
   ): Promise<{ items: AnnouncementSummary[]; total: number }> {
     const all = await this.feed(scope, Number.MAX_SAFE_INTEGER);
@@ -99,10 +93,7 @@ export class FakeAnnouncementRepository extends AnnouncementRepository {
     };
   }
 
-  countPublishedSince(
-    scope: AnnouncementScope,
-    since: string
-  ): Promise<number> {
+  countPublishedSince(scope: OrgScope, since: string): Promise<number> {
     return Promise.resolve(
       this.visible(scope).filter(
         (row) =>

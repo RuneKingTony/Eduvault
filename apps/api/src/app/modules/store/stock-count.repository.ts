@@ -8,7 +8,8 @@ import type { ActivityRecorder } from '../../common/activity';
 import type { ApprovalProvider } from '../../common/approvals';
 import type { PostInput } from '../../common/ledger';
 import type { CountLineFacts, CountMovement, StockLevel } from './stock-count';
-import type { ItemRecord, StoreRef, StoreScope } from './store.repository';
+import type { ItemRecord, StoreRef } from './store.repository';
+import type { OrgScope } from '../../common/scope';
 
 export interface StockCountRecord {
   id: string;
@@ -70,22 +71,22 @@ export class WaitingCountClash extends Error {
 
 export abstract class StockCountRepository implements ApprovalProvider {
   abstract withTx<T>(
-    scope: StoreScope,
+    scope: OrgScope,
     userId: string,
     work: (tx: StockCountTx) => Promise<T>
   ): Promise<T>;
 
   abstract waitingNumber(
-    scope: StoreScope,
+    scope: OrgScope,
     campusId: string
   ): Promise<string | undefined>;
 
   abstract list(
-    scope: StoreScope,
+    scope: OrgScope,
     query: StockCountListQuery
   ): Promise<StockCountList>;
 
-  abstract find(scope: StoreScope, id: string): Promise<StockCount | undefined>;
+  abstract find(scope: OrgScope, id: string): Promise<StockCount | undefined>;
 
-  abstract waiting(scope: StoreScope): ReturnType<ApprovalProvider['waiting']>;
+  abstract waiting(scope: OrgScope): ReturnType<ApprovalProvider['waiting']>;
 }

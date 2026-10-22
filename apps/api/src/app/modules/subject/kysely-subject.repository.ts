@@ -11,7 +11,6 @@ import {
   SubjectRepository,
   type ArmSubjectRecord,
   type ElectiveLevelRecord,
-  type ElectiveScope,
   type ElectiveStudentQuery,
   type ElectiveStudentRecord,
   type ElectiveTakerRow,
@@ -29,6 +28,7 @@ import {
   type TermAssignment,
   type TermRecord,
 } from './subject.repository';
+import type { CampusClassScope } from '../../common/scope';
 
 interface SubjectRow {
   id: string;
@@ -63,7 +63,7 @@ interface ElectiveStudentRow {
 
 interface ElectiveStudentsInput {
   organizationId: string;
-  scope: ElectiveScope;
+  scope: CampusClassScope;
   today: string;
   query: ElectiveStudentQuery;
 }
@@ -492,7 +492,7 @@ export class KyselySubjectRepository extends SubjectRepository {
 
   async visibleElectiveStudents(
     organizationId: string,
-    scope: ElectiveScope,
+    scope: CampusClassScope,
     query: ElectiveStudentQuery
   ): Promise<ElectiveStudentRecord[]> {
     if (query.studentIds?.length === 0) {

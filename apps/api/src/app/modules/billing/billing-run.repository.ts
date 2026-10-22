@@ -4,7 +4,7 @@ import type {
   BillingRunSummary,
 } from '@eduvault/api-contract';
 import type { RoundFilter } from './billing-round';
-import type { BillingScope } from './billing-scope';
+import type { OrgScope } from '../../common/scope';
 import type { PlannedCharge } from './round-plan';
 
 export type RunHeader = Omit<BillingRun, 'charges' | 'currency'>;
@@ -30,7 +30,7 @@ export interface CreatedRound {
 }
 
 export interface RunAction {
-  scope: BillingScope;
+  scope: OrgScope;
   runId: string;
   userId: string;
   userName: string;
@@ -51,14 +51,11 @@ export abstract class BillingRunRepository {
   abstract currency(organizationId: string): Promise<string>;
 
   abstract listRuns(
-    scope: BillingScope,
+    scope: OrgScope,
     query: BillingRunListQuery
   ): Promise<RunPage>;
 
-  abstract findRun(
-    scope: BillingScope,
-    id: string
-  ): Promise<RunHeader | undefined>;
+  abstract findRun(scope: OrgScope, id: string): Promise<RunHeader | undefined>;
 
   abstract createRound(input: NewRound): Promise<CreatedRound>;
 

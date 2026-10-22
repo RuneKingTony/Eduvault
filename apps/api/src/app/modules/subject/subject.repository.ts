@@ -1,6 +1,5 @@
 import type { LevelSubjectKind } from '@eduvault/api-contract';
-import type { CampusScope } from '../../common/campus-scope';
-import type { ClassScope } from '../../common/class-scope';
+import type { CampusClassScope } from '../../common/scope';
 
 export interface SubjectRecord {
   id: string;
@@ -57,11 +56,6 @@ export interface ElectiveLevelRecord {
   subjectId: string;
   subjectName: string;
   classLevelId: string;
-}
-
-export interface ElectiveScope {
-  campusScope: CampusScope;
-  classScope: ClassScope;
 }
 
 export interface ElectiveStudentQuery {
@@ -193,7 +187,7 @@ export abstract class SubjectRepository {
   /** Without `studentIds`: visible students with an active enrolment that session at a level that has an elective. With them: those ids that are visible, enrolment fields null when they have none. */
   abstract visibleElectiveStudents(
     organizationId: string,
-    scope: ElectiveScope,
+    scope: CampusClassScope,
     query: ElectiveStudentQuery
   ): Promise<ElectiveStudentRecord[]>;
 

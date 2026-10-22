@@ -21,7 +21,7 @@ import type { OrgContext } from '../../common/auth';
 import { InvoiceService } from '../invoice/invoice.service';
 import { settleCounts } from './billing-round';
 import { BillingPlanService } from './billing-plan.service';
-import { scopeOf } from './billing-scope';
+import { orgScopeOf } from '../../common/scope';
 import {
   BillingRunRepository,
   type RunOutcome,
@@ -65,7 +65,7 @@ export class BillingService {
   ): Promise<BillingRunList> {
     const [currency, page] = await Promise.all([
       this.runs.currency(ctx.organizationId),
-      this.runs.listRuns(scopeOf(ctx), query),
+      this.runs.listRuns(orgScopeOf(ctx), query),
     ]);
     return { currency, ...page };
   }
@@ -79,7 +79,7 @@ export class BillingService {
     id: string,
     query: BillingRunListQuery = FIRST_PAGE
   ): Promise<BillingRun> {
-    const header = await this.runs.findRun(scopeOf(ctx), id);
+    const header = await this.runs.findRun(orgScopeOf(ctx), id);
     if (header === undefined) {
       throw new NotFoundException(BILLING_RUN_NOT_FOUND_MESSAGE);
     }
@@ -126,7 +126,7 @@ export class BillingService {
 
   async issue(ctx: OrgContext, id: string): Promise<BillingRun> {
     const outcome = await this.runs.issue({
-      scope: scopeOf(ctx),
+      scope: orgScopeOf(ctx),
       runId: id,
       userId: ctx.user.id,
       userName: ctx.user.name,
@@ -141,7 +141,7 @@ export class BillingService {
 
   async cancel(ctx: OrgContext, id: string): Promise<BillingRun> {
     const outcome = await this.runs.cancel({
-      scope: scopeOf(ctx),
+      scope: orgScopeOf(ctx),
       runId: id,
       userId: ctx.user.id,
       userName: ctx.user.name,

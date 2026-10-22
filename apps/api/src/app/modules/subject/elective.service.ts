@@ -19,18 +19,13 @@ import type { OrgContext } from '../../common/auth';
 import { SchoolLock } from '../../common/db/school-lock';
 import {
   SubjectRepository,
-  type ElectiveScope,
   type ElectiveStudentRecord,
   type SessionRecord,
 } from './subject.repository';
+import { campusClassScopeOf } from '../../common/scope';
 
 type ListQuery = RouteQuery<typeof contract.electives.list>;
 type SetBody = RouteBody<typeof contract.electives.set>;
-
-const scopeOf = (ctx: OrgContext): ElectiveScope => ({
-  campusScope: ctx.campusScope,
-  classScope: ctx.classScope,
-});
 
 const sessionNotFound = () =>
   new NotFoundException(SUBJECT_SESSION_NOT_FOUND_MESSAGE);
@@ -66,9 +61,13 @@ export class ElectiveService {
     }
     const [levels, visible] = await Promise.all([
       this.subjects.electiveLevels(organizationId),
-      this.subjects.visibleElectiveStudents(organizationId, scopeOf(ctx), {
-        sessionId: session.id,
-      }),
+      this.subjects.visibleElectiveStudents(
+        organizationId,
+        campusClassScopeOf(ctx),
+        {
+          sessionId: session.id,
+        }
+      ),
     ]);
     const students = visible.flatMap(
       ({ enrollmentId, classLevelId, ...student }) =>
@@ -122,7 +121,7 @@ export class ElectiveService {
       if (session === undefined) {
         throw sessionNotFound();
       }
-      const scope = scopeOf(ctx);
+      const scope = campusClassScopeOf(ctx);
       const listed = await this.subjects.visibleElectiveStudents(
         organizationId,
         scope,

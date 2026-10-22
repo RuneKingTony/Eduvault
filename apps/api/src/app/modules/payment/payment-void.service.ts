@@ -33,12 +33,8 @@ import {
   type PaymentVoidTx,
   type VoidablePayment,
 } from './payment-void.repository';
-import { PaymentRepository, type PaymentScope } from './payment.repository';
-
-const scopeOf = (ctx: OrgContext): PaymentScope => ({
-  organizationId: ctx.organizationId,
-  campusScope: ctx.campusScope,
-});
+import { PaymentRepository } from './payment.repository';
+import { orgScopeOf, type OrgScope } from '../../common/scope';
 
 const paymentNotFound = () => new NotFoundException(PAYMENT_NOT_FOUND_MESSAGE);
 const voidNotFound = () =>
@@ -76,7 +72,7 @@ export class PaymentVoidService {
   ): Promise<PaymentVoidList> {
     const [currency, page] = await Promise.all([
       this.payments.currency(ctx.organizationId),
-      this.voids.listVoids(scopeOf(ctx), query),
+      this.voids.listVoids(orgScopeOf(ctx), query),
     ]);
     return { currency, ...page };
   }
@@ -90,7 +86,7 @@ export class PaymentVoidService {
     if (reason === '') {
       throw new BadRequestException(PAYMENT_VOID_REASON_MESSAGE);
     }
-    const scope = scopeOf(ctx);
+    const scope = orgScopeOf(ctx);
     const made = await this.voids.withTx(scope, ctx.user.id, async (tx) => {
       const payment = await tx.lockPayment(paymentId);
       if (payment === undefined) {
@@ -116,7 +112,7 @@ export class PaymentVoidService {
   }
 
   async approve(ctx: OrgContext, id: string): Promise<PaymentVoidItem> {
-    const scope = scopeOf(ctx);
+    const scope = orgScopeOf(ctx);
     await this.voids.withTx(scope, ctx.user.id, async (tx) => {
       const found = await tx.lockVoid(id);
       if (found === undefined) {
@@ -155,7 +151,7 @@ export class PaymentVoidService {
     reason: string
   ): Promise<PaymentVoidItem> {
     const declineReason = assertDeclineReason(reason);
-    const scope = scopeOf(ctx);
+    const scope = orgScopeOf(ctx);
     await this.voids.withTx(scope, ctx.user.id, async (tx) => {
       const found = await tx.lockVoid(id);
       if (found === undefined) {
@@ -182,10 +178,7 @@ export class PaymentVoidService {
     return this.item(scope, id);
   }
 
-  private async item(
-    scope: PaymentScope,
-    id: string
-  ): Promise<PaymentVoidItem> {
+  private async item(scope: OrgScope, id: string): Promise<PaymentVoidItem> {
     const found = await this.voids.findVoid(scope, id);
     if (found === undefined) {
       throw voidNotFound();

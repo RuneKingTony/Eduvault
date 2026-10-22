@@ -5,7 +5,7 @@ import type {
   GuardianSummary,
 } from '@eduvault/api-contract';
 import type { GuardianTx, StudentFacts } from '../../common/people';
-import type { StudentVisibility } from '../student/visibility';
+import type { CampusClassScope } from '../../common/scope';
 
 export interface GuardianPickerQuery {
   q?: string;
@@ -28,31 +28,31 @@ export type PhotoChange =
 export abstract class GuardianRepository {
   abstract list(
     organizationId: string,
-    scope: StudentVisibility,
+    scope: CampusClassScope,
     query: GuardianPickerQuery
   ): Promise<GuardianSummary[]>;
 
   abstract findDetail(
     organizationId: string,
-    scope: StudentVisibility,
+    scope: CampusClassScope,
     input: { id: string }
   ): Promise<GuardianDetail | undefined>;
 
   abstract findVisible(
     organizationId: string,
-    scope: StudentVisibility,
+    scope: CampusClassScope,
     input: { id: string }
   ): Promise<VisibleGuardian | undefined>;
 
   abstract linksOf(
     organizationId: string,
-    scope: StudentVisibility,
+    scope: CampusClassScope,
     input: { studentId: string }
   ): Promise<GuardianLink[] | undefined>;
 
   abstract findStudent(
     organizationId: string,
-    scope: StudentVisibility,
+    scope: CampusClassScope,
     input: { studentId: string }
   ): Promise<StudentFacts | undefined>;
 

@@ -4,12 +4,7 @@ import type {
   MoneyAccountKind,
   MoneyAccountList,
 } from '@eduvault/api-contract';
-import type { CampusScope } from '../../common/campus-scope';
-
-export interface MoneyAccountScope {
-  organizationId: string;
-  campusScope: CampusScope;
-}
+import type { OrgScope } from '../../common/scope';
 
 export interface NewMoneyAccount {
   organizationId: string;
@@ -40,15 +35,15 @@ export interface RecordingOption {
 }
 
 export abstract class MoneyAccountRepository {
-  abstract list(scope: MoneyAccountScope): Promise<MoneyAccountList>;
+  abstract list(scope: OrgScope): Promise<MoneyAccountList>;
 
   abstract findById(
-    scope: MoneyAccountScope,
+    scope: OrgScope,
     id: string
   ): Promise<MoneyAccount | undefined>;
 
   abstract cashBook(
-    scope: MoneyAccountScope,
+    scope: OrgScope,
     account: MoneyAccount,
     paging: { page: number; pageSize: number }
   ): Promise<{ items: CashBookItem[]; total: number; currency: string }>;
@@ -56,12 +51,10 @@ export abstract class MoneyAccountRepository {
   abstract create(input: NewMoneyAccount): Promise<MoneyAccountOutcome>;
 
   abstract update(
-    scope: MoneyAccountScope,
+    scope: OrgScope,
     id: string,
     change: MoneyAccountChange
   ): Promise<MoneyAccountOutcome | undefined>;
 
-  abstract recordingOptions(
-    scope: MoneyAccountScope
-  ): Promise<RecordingOption[]>;
+  abstract recordingOptions(scope: OrgScope): Promise<RecordingOption[]>;
 }

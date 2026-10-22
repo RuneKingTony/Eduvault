@@ -14,20 +14,15 @@ import type {
   StockTotals,
   StoreRef,
   StoreRepository,
-  StoreScope,
 } from './store.repository';
-
-export const scopeOf = (ctx: OrgContext): StoreScope => ({
-  organizationId: ctx.organizationId,
-  campusScope: ctx.campusScope,
-});
+import { orgScopeOf } from '../../common/scope';
 
 export async function storesInView(
   repository: StoreRepository,
   ctx: OrgContext,
   campusId?: string
 ): Promise<StoreRef[]> {
-  const stores = await repository.storesInScope(scopeOf(ctx));
+  const stores = await repository.storesInScope(orgScopeOf(ctx));
   if (campusId === undefined) {
     return stores;
   }
@@ -54,7 +49,7 @@ export async function deliveryInScope(
   ctx: OrgContext,
   id: string
 ): Promise<DeliveryDetail> {
-  const found = await repository.findDelivery(scopeOf(ctx), id);
+  const found = await repository.findDelivery(orgScopeOf(ctx), id);
   if (found === undefined) {
     throw new NotFoundException(DELIVERY_NOT_FOUND_MESSAGE);
   }

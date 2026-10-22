@@ -30,8 +30,9 @@ import {
   type VoidRecord,
   type VoidablePayment,
 } from './payment-void.repository';
-import type { PaymentRepository, PaymentScope } from './payment.repository';
+import type { PaymentRepository } from './payment.repository';
 import { PaymentVoidService } from './payment-void.service';
+import type { OrgScope } from '../../common/scope';
 
 const PAYMENT = '0b0c8a8e-8a3e-4c6c-a8c4-0e2f0f6b1f11';
 
@@ -100,7 +101,7 @@ class FakeVoids extends PaymentVoidRepository {
   private userId = '';
 
   withTx<T>(
-    _scope: PaymentScope,
+    _scope: OrgScope,
     userId: string,
     work: (tx: PaymentVoidTx) => Promise<T>
   ): Promise<T> {
@@ -191,10 +192,7 @@ class FakeVoids extends PaymentVoidRepository {
     );
   }
 
-  findVoid(
-    _scope: PaymentScope,
-    id: string
-  ): Promise<PaymentVoidItem | undefined> {
+  findVoid(_scope: OrgScope, id: string): Promise<PaymentVoidItem | undefined> {
     const found = this.voids.find((row) => row.id === id);
     return Promise.resolve(
       found && {

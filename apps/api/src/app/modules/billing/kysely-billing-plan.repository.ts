@@ -22,7 +22,7 @@ import {
   type RoundCandidates,
   type TermInfo,
 } from './billing-plan.repository';
-import type { BillingScope } from './billing-scope';
+import type { OrgScope } from '../../common/scope';
 import {
   chargedSql,
   hasLineSql,
@@ -169,7 +169,7 @@ export class KyselyBillingPlanRepository extends BillingPlanRepository {
   }
 
   async roundCandidates(
-    scope: BillingScope,
+    scope: OrgScope,
     term: TermInfo,
     options: RoundCandidateOptions
   ): Promise<RoundCandidates> {
@@ -217,7 +217,7 @@ export class KyselyBillingPlanRepository extends BillingPlanRepository {
   }
 
   async chargeSummary(
-    scope: BillingScope,
+    scope: OrgScope,
     term: TermInfo,
     options: ChargeSummaryOptions
   ): Promise<ChargeSummary> {

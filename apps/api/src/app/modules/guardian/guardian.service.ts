@@ -41,8 +41,8 @@ import {
   type LoginHolds,
   type StudentFacts,
 } from '../../common/people';
-import { scopeOf } from '../student/visibility';
 import { GuardianRepository } from './guardian.repository';
+import { campusClassScopeOf } from '../../common/scope';
 
 const studentNotFound = () => new NotFoundException(STUDENT_NOT_FOUND_MESSAGE);
 const guardianNotFound = () =>
@@ -86,13 +86,17 @@ export class GuardianService {
     if (query.excludeStudentId !== undefined) {
       await this.visibleStudent(ctx, query.excludeStudentId);
     }
-    return this.guardians.list(ctx.organizationId, scopeOf(ctx), query);
+    return this.guardians.list(
+      ctx.organizationId,
+      campusClassScopeOf(ctx),
+      query
+    );
   }
 
   async get(ctx: OrgContext, id: string): Promise<GuardianDetail> {
     const detail = await this.guardians.findDetail(
       ctx.organizationId,
-      scopeOf(ctx),
+      campusClassScopeOf(ctx),
       { id }
     );
     if (detail === undefined) {
@@ -104,7 +108,7 @@ export class GuardianService {
   async linksOf(ctx: OrgContext, studentId: string): Promise<GuardianLink[]> {
     const links = await this.guardians.linksOf(
       ctx.organizationId,
-      scopeOf(ctx),
+      campusClassScopeOf(ctx),
       { studentId }
     );
     if (links === undefined) {
@@ -260,7 +264,7 @@ export class GuardianService {
   ): Promise<StudentFacts> {
     const student = await this.guardians.findStudent(
       ctx.organizationId,
-      scopeOf(ctx),
+      campusClassScopeOf(ctx),
       { studentId }
     );
     if (student === undefined) {
@@ -272,7 +276,7 @@ export class GuardianService {
   private async visibleGuardian(ctx: OrgContext, id: string) {
     const guardian = await this.guardians.findVisible(
       ctx.organizationId,
-      scopeOf(ctx),
+      campusClassScopeOf(ctx),
       { id }
     );
     if (guardian === undefined) {

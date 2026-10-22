@@ -38,9 +38,9 @@ import {
 } from './announcement-rules';
 import {
   AnnouncementRepository,
-  type AnnouncementScope,
   type AnnouncementWrite,
 } from './announcement.repository';
+import { orgScopeOf, type OrgScope } from '../../common/scope';
 
 const EVENT_WORDS: Record<AnnouncementEvent, string> = {
   created: 'saved as a draft',
@@ -50,11 +50,6 @@ const EVENT_WORDS: Record<AnnouncementEvent, string> = {
   pinned: 'pinned',
   unpinned: 'unpinned',
 };
-
-const scopeOf = (ctx: OrgContext): AnnouncementScope => ({
-  organizationId: ctx.organizationId,
-  campusScope: ctx.campusScope,
-});
 
 function assertAudience(
   ctx: OrgContext,
@@ -79,7 +74,7 @@ export class AnnouncementService {
   ) {}
 
   private async require(ctx: OrgContext, id: string): Promise<Announcement> {
-    const found = await this.announcements.findById(scopeOf(ctx), id);
+    const found = await this.announcements.findById(orgScopeOf(ctx), id);
     if (found === undefined) {
       throw new NotFoundException(ANNOUNCEMENT_NOT_FOUND_MESSAGE);
     }
@@ -134,7 +129,7 @@ export class AnnouncementService {
     await this.assertTarget(ctx, options.target);
     const changed = await this.announcements.update(
       {
-        scope: scopeOf(ctx),
+        scope: orgScopeOf(ctx),
         id,
         userId: ctx.user.id,
         at: new Date(this.clock.now()),
@@ -158,7 +153,7 @@ export class AnnouncementService {
     ctx: OrgContext,
     query: AnnouncementListQuery
   ): Promise<AnnouncementList> {
-    return this.announcements.list(scopeOf(ctx), query);
+    return this.announcements.list(orgScopeOf(ctx), query);
   }
 
   get(ctx: OrgContext, id: string): Promise<Announcement> {
@@ -169,14 +164,14 @@ export class AnnouncementService {
     ctx: OrgContext,
     query: AnnouncementFeedQuery
   ): Promise<AnnouncementSummary[]> {
-    return this.announcements.feed(scopeOf(ctx), query.limit);
+    return this.announcements.feed(orgScopeOf(ctx), query.limit);
   }
 
   async forPortal(
     ctx: Pick<OrgContext, 'organizationId'>,
     options: { campusId: string; limit: number }
   ): Promise<PortalAnnouncements> {
-    const scope: AnnouncementScope = {
+    const scope: OrgScope = {
       organizationId: ctx.organizationId,
       campusScope: [options.campusId],
     };

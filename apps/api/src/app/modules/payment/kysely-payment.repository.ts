@@ -39,10 +39,10 @@ import { findPayment, listPayments } from './kysely-payment-read.repository';
 import {
   PaymentRepository,
   type PaymentPage,
-  type PaymentScope,
   type NewRecordedPayment,
   type RecordingPeople,
 } from './payment.repository';
+import type { OrgScope } from '../../common/scope';
 
 const PROVIDER_REFERENCE_KEY = 'payment_provider_reference_key';
 const PROOF_FILE_KEY = 'payment_proof_file_key';
@@ -76,12 +76,12 @@ export class KyselyPaymentRepository extends PaymentRepository {
     return schoolCurrency(this.db, organizationId);
   }
 
-  list(scope: PaymentScope, query: PaymentListQuery): Promise<PaymentPage> {
+  list(scope: OrgScope, query: PaymentListQuery): Promise<PaymentPage> {
     return listPayments(this.db, scope, query);
   }
 
   find(
-    scope: PaymentScope,
+    scope: OrgScope,
     id: string
   ): Promise<Omit<Payment, 'currency'> | undefined> {
     return findPayment(this.db, scope, id);
@@ -114,14 +114,14 @@ export class KyselyPaymentRepository extends PaymentRepository {
   }
 
   recordingAccount(
-    scope: PaymentScope,
+    scope: OrgScope,
     moneyAccountId: string
   ): Promise<UsableMoneyAccount> {
     return usableMoneyAccount(this.db, scope, moneyAccountId);
   }
 
   async guardianName(
-    scope: PaymentScope,
+    scope: OrgScope,
     guardianId: string
   ): Promise<string | undefined> {
     const { rows } = await sql<{ full_name: string }>`
@@ -139,7 +139,7 @@ export class KyselyPaymentRepository extends PaymentRepository {
   }
 
   async studentsInScope(
-    scope: PaymentScope,
+    scope: OrgScope,
     studentIds: readonly string[]
   ): Promise<string[]> {
     if (studentIds.length === 0) {
@@ -222,7 +222,7 @@ export class KyselyPaymentRepository extends PaymentRepository {
     throw error;
   }
 
-  async recordingPeople(scope: PaymentScope): Promise<RecordingPeople> {
+  async recordingPeople(scope: OrgScope): Promise<RecordingPeople> {
     const inside = inScope(currentCampusSql('st'), scope.campusScope);
     const { rows } = await sql<PersonRow & { archived: boolean }>`
       SELECT st.id AS student_id, st.first_name, st.last_name, st.admission_number,
@@ -238,7 +238,7 @@ export class KyselyPaymentRepository extends PaymentRepository {
   }
 
   private async payers(
-    scope: PaymentScope,
+    scope: OrgScope,
     students: readonly RecordingChild[]
   ): Promise<RecordingPayer[]> {
     const byStudent = new Map(

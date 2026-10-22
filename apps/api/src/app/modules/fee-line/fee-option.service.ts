@@ -23,7 +23,6 @@ import {
   type FinanceActor,
 } from '../../common/activity';
 import type { OrgContext } from '../../common/auth';
-import { feeScopeOf } from './fee-scope';
 import {
   FeeLineRepository,
   FeeOptionRepository,
@@ -32,6 +31,7 @@ import {
   type OptionChange,
   type StudentFeeContext,
 } from './fee-line.repository';
+import { orgScopeOf } from '../../common/scope';
 
 type EnrolledStudent = StudentFeeContext & {
   enrollment: NonNullable<StudentFeeContext['enrollment']>;
@@ -92,7 +92,7 @@ export class FeeOptionService {
     query: FeeOptInsQuery
   ): Promise<FeeOptIns> {
     const term = await this.feeTypeAndTerm(ctx, feeTypeId, query.termId);
-    const roster = await this.options.optInRoster(feeScopeOf(ctx), {
+    const roster = await this.options.optInRoster(orgScopeOf(ctx), {
       sessionId: term.sessionId,
       feeTypeId,
       q: query.q,
@@ -265,7 +265,7 @@ export class FeeOptionService {
     studentId: string,
     sessionId: string | undefined
   ): Promise<StudentFeeContext> {
-    const student = await this.students.findStudent(feeScopeOf(ctx), {
+    const student = await this.students.findStudent(orgScopeOf(ctx), {
       studentId,
       sessionId,
     });

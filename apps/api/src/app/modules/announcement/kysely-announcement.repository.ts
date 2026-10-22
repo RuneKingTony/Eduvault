@@ -16,10 +16,10 @@ import { KYSELY_TOKEN, type Database } from '../../common/db/tokens';
 import {
   AnnouncementRepository,
   type AnnouncementChange,
-  type AnnouncementScope,
   type AnnouncementTarget,
   type AnnouncementWrite,
 } from './announcement.repository';
+import type { OrgScope } from '../../common/scope';
 
 interface AnnouncementRow {
   id: string;
@@ -101,7 +101,7 @@ export class KyselyAnnouncementRepository extends AnnouncementRepository {
     super();
   }
 
-  private visible(db: Database, scope: AnnouncementScope) {
+  private visible(db: Database, scope: OrgScope) {
     return db
       .selectFrom('announcement')
       .where('announcement.organization_id', '=', scope.organizationId)
@@ -113,7 +113,7 @@ export class KyselyAnnouncementRepository extends AnnouncementRepository {
       );
   }
 
-  private withPeople(db: Database, scope: AnnouncementScope) {
+  private withPeople(db: Database, scope: OrgScope) {
     return this.visible(db, scope)
       .innerJoin('user as author', 'author.id', 'announcement.created_by')
       .leftJoin('user as editor', 'editor.id', 'announcement.updated_by')
@@ -137,7 +137,7 @@ export class KyselyAnnouncementRepository extends AnnouncementRepository {
       ]);
   }
 
-  private async counts(scope: AnnouncementScope): Promise<AnnouncementCounts> {
+  private async counts(scope: OrgScope): Promise<AnnouncementCounts> {
     const rows = await this.visible(this.db, scope)
       .select(['announcement.status', sql<number>`count(*)::int`.as('total')])
       .groupBy('announcement.status')
@@ -152,7 +152,7 @@ export class KyselyAnnouncementRepository extends AnnouncementRepository {
   }
 
   async list(
-    scope: AnnouncementScope,
+    scope: OrgScope,
     query: AnnouncementListQuery
   ): Promise<AnnouncementList> {
     const { status } = query;
@@ -185,7 +185,7 @@ export class KyselyAnnouncementRepository extends AnnouncementRepository {
   }
 
   async findById(
-    scope: AnnouncementScope,
+    scope: OrgScope,
     id: string
   ): Promise<Announcement | undefined> {
     const row = await this.withPeople(this.db, scope)
@@ -194,7 +194,7 @@ export class KyselyAnnouncementRepository extends AnnouncementRepository {
     return row && toAnnouncement(row);
   }
 
-  private publishedSummaries(scope: AnnouncementScope) {
+  private publishedSummaries(scope: OrgScope) {
     return this.visible(this.db, scope)
       .where('announcement.status', '=', 'published')
       .select([
@@ -211,16 +211,13 @@ export class KyselyAnnouncementRepository extends AnnouncementRepository {
       .orderBy('announcement.id');
   }
 
-  async feed(
-    scope: AnnouncementScope,
-    limit: number
-  ): Promise<AnnouncementSummary[]> {
+  async feed(scope: OrgScope, limit: number): Promise<AnnouncementSummary[]> {
     const rows = await this.publishedSummaries(scope).limit(limit).execute();
     return rows.flatMap((row) => toSummaries(row));
   }
 
   async publishedPage(
-    scope: AnnouncementScope,
+    scope: OrgScope,
     paging: { page: number; pageSize: number }
   ): Promise<{ items: AnnouncementSummary[]; total: number }> {
     const [rows, count] = await Promise.all([
@@ -239,10 +236,7 @@ export class KyselyAnnouncementRepository extends AnnouncementRepository {
     };
   }
 
-  async countPublishedSince(
-    scope: AnnouncementScope,
-    since: string
-  ): Promise<number> {
+  async countPublishedSince(scope: OrgScope, since: string): Promise<number> {
     const row = await this.visible(this.db, scope)
       .where('announcement.status', '=', 'published')
       .where('announcement.published_on', '>=', sql<Date>`${since}::date`)
