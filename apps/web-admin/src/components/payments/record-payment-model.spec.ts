@@ -10,6 +10,7 @@ import {
   toRequest,
   validate,
   withAmount,
+  withAccount,
   withMethod,
   withPayer,
   withShare,
@@ -22,6 +23,7 @@ const TOBI = '7c9a0b3d-1f2e-4a5b-8c6d-9e0f1a2b3c4d';
 const NGOZI = 'aaaaaaaa-1f2e-4a5b-8c6d-9e0f1a2b3c4d';
 const EMEKA = 'bbbbbbbb-1f2e-4a5b-8c6d-9e0f1a2b3c4d';
 const ACCOUNT = '9a1d4f60-6a4b-4f43-8d0c-1b2c3d4e5f60';
+const BANK_ACCOUNT = '9a1d4f60-6a4b-4f43-8d0c-1b2c3d4e5f61';
 
 const child = (studentId: string, name: string, owesMinor: number) => ({
   studentId,
@@ -37,7 +39,10 @@ const tobi = child(TOBI, 'Tobi', 6_000_000);
 const options: RecordingOptions = {
   currency: 'NGN',
   today: '2026-10-07',
-  accounts: [{ id: ACCOUNT, label: 'GTBank current · ending 4417' }],
+  accounts: [
+    { id: ACCOUNT, label: 'Lekki cash till', kind: 'cash' },
+    { id: BANK_ACCOUNT, label: 'GTBank current · ending 4417', kind: 'bank' },
+  ],
   methods: { cash: true, transfer: true, pos: true },
   payers: [
     { guardianId: NGOZI, name: 'Ngozi Okeke', children: [ada, chidi, tobi] },
@@ -137,6 +142,21 @@ describe('changing the payer, student and amount', () => {
     );
     expect(edited.shares[TOBI]).toBe('1500.50');
     expect(splitTotal(edited)).toBe(18_000_000 + 2_000_000 + 150_050);
+  });
+
+  it('moves the account off a cash till when a transfer needs a bank account', () => {
+    const state = initialState(options, {}, random);
+    expect(state.accountId).toBe(ACCOUNT);
+    const transfer = withAccount(
+      withMethod(state, 'transfer', 'TRF-1'),
+      options.accounts
+    );
+    expect(transfer.accountId).toBe(BANK_ACCOUNT);
+    const cash = withAccount(
+      withMethod(transfer, 'cash', 'CSH-1'),
+      options.accounts
+    );
+    expect(cash.accountId).toBe(BANK_ACCOUNT);
   });
 
   it('keeps the reference once typed, and follows the method until then', () => {

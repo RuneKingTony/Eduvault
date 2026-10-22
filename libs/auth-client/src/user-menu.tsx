@@ -150,18 +150,33 @@ function MenuActions({
   );
 }
 
-export function UserMenu({
+type UserMenuViewProps = UserMenuProps & { roleNames: readonly string[] };
+
+export function UserMenu(props: UserMenuProps) {
+  const access = useOptionalPermissions();
+  return access === null ? (
+    <UserMenuFromMember {...props} />
+  ) : (
+    <UserMenuView {...props} roleNames={access.roles} />
+  );
+}
+
+function UserMenuFromMember(props: UserMenuProps) {
+  const member = props.authClient.useActiveMember();
+  return <UserMenuView {...props} roleNames={splitRoles(member.data?.role)} />;
+}
+
+function UserMenuView({
   authClient,
+  roleNames,
   renderTrigger,
   side = 'bottom',
   onOpenCommandMenu,
   onOpenMyAccess,
   onSignedOut,
   onSchoolChanged,
-}: UserMenuProps) {
+}: UserMenuViewProps) {
   const session = authClient.useSession();
-  const member = authClient.useActiveMember();
-  const access = useOptionalPermissions();
   const sessionUser = session.data?.user;
   if (sessionUser === undefined) {
     return null;
@@ -170,7 +185,7 @@ export function UserMenu({
     name: sessionUser.name,
     image: sessionUser.image ?? null,
     login: loginOf(sessionUser),
-    roles: rolesLabel(access?.roles ?? splitRoles(member.data?.role)),
+    roles: rolesLabel(roleNames),
   };
 
   return (

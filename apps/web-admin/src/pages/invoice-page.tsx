@@ -1,21 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
 import { InfoIcon } from 'lucide-react';
-import { ApiError, type Invoice } from '@eduvault/api-contract';
-import {
-  Alert,
-  AlertDescription,
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-  Button,
-  ErrorMessage,
-  NotFoundState,
-  PageSkeleton,
-} from '@eduvault/ui';
+import type { Invoice } from '@eduvault/api-contract';
+import { Alert, AlertDescription } from '@eduvault/ui';
 import { useApi } from '../api';
+import {
+  BackButton,
+  DetailCrumbs,
+  DetailNotFound,
+  DetailPage,
+} from '../components/detail-page';
 import { InvoiceHeader } from '../components/invoices/invoice-header';
 import { InvoiceJournalCard } from '../components/invoices/invoice-journal-card';
 import { InvoiceLinesCard } from '../components/invoices/invoice-lines-card';
@@ -27,38 +20,25 @@ import { invoiceQueryOptions } from '../queries';
 
 function Crumbs({ last, onBack }: { last: string; onBack: () => void }) {
   return (
-    <Breadcrumb>
-      <BreadcrumbList>
-        <BreadcrumbItem>
-          <BreadcrumbLink asChild>
-            <button type="button" onClick={onBack}>
-              Charges
-            </button>
-          </BreadcrumbLink>
-        </BreadcrumbItem>
-        <BreadcrumbSeparator />
-        <BreadcrumbItem>
-          <BreadcrumbPage>{last}</BreadcrumbPage>
-        </BreadcrumbItem>
-      </BreadcrumbList>
-    </Breadcrumb>
+    <DetailCrumbs
+      parent={
+        <button type="button" onClick={onBack}>
+          Charges
+        </button>
+      }
+      last={last}
+    />
   );
 }
 
 function InvoiceNotFound({ onBack }: { onBack: () => void }) {
   return (
-    <section className="flex flex-col gap-4">
-      <Crumbs last="Not found" onBack={onBack} />
-      <h1>Not found</h1>
-      <NotFoundState
-        title="No charge here"
-        description="It may have been moved, or it may belong to a campus you don’t look after."
-      >
-        <Button type="button" variant="outline" onClick={onBack}>
-          Back to charges
-        </Button>
-      </NotFoundState>
-    </section>
+    <DetailNotFound
+      heading="Not found"
+      crumbs={<Crumbs last="Not found" onBack={onBack} />}
+      title="No charge here"
+      back={<BackButton label="Back to charges" onBack={onBack} />}
+    />
   );
 }
 
@@ -107,14 +87,12 @@ export function InvoicePage({
   onBack: () => void;
 }) {
   const invoice = useQuery(invoiceQueryOptions(useApi(), invoiceId));
-  if (invoice.error instanceof ApiError && invoice.error.status === 404) {
-    return <InvoiceNotFound onBack={onBack} />;
-  }
-  if (invoice.isError) {
-    return <ErrorMessage error={invoice.error} />;
-  }
-  if (invoice.data === undefined) {
-    return <PageSkeleton rows={2} />;
-  }
-  return <InvoiceBody invoice={invoice.data} onBack={onBack} />;
+  return (
+    <DetailPage
+      queries={[invoice]}
+      notFound={<InvoiceNotFound onBack={onBack} />}
+    >
+      {([data]) => <InvoiceBody invoice={data} onBack={onBack} />}
+    </DetailPage>
+  );
 }

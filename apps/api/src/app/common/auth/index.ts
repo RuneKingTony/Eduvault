@@ -13,4 +13,5 @@ export * from './slug-conflict';
 export * from './role-admin.service';
 export * from './role-permissions';
 export * from './portal-login';
+export * from './member-rows';
 export * from './require-permission';

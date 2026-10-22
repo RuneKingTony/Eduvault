@@ -5,6 +5,7 @@ import type {
 } from '@eduvault/api-contract';
 import type { ActivityInput } from '../../common/activity';
 import type { WaitingApproval } from '../../common/approvals';
+import type { UsableMoneyAccount } from '../../common/money-accounts';
 import {
   AdjustmentRepository,
   type AdjustmentPage,
@@ -14,7 +15,6 @@ import {
   type AdjustmentTx,
   type CreditAccountCheck,
   type NewAdjustment,
-  type RefundAccountCheck,
   type SentChargeCheck,
   type StudentFacts,
   type SystemAccounts,
@@ -33,7 +33,7 @@ export class FakeAdjustmentRepository extends AdjustmentRepository {
   knownCharges = new Set<string>();
   retiredAccounts = new Set<string>();
   creditAccounts = new Map<string, CreditAccountCheck>();
-  refundAccounts = new Map<string, RefundAccountCheck>();
+  refundAccounts = new Map<string, UsableMoneyAccount>();
   stored: StoredAdjustment[] = [];
   posted: AdjustmentPost[] = [];
   recorded: ActivityInput[] = [];

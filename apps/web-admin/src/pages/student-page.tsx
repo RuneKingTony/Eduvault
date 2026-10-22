@@ -8,11 +8,10 @@ import {
   UserIcon,
   UsersRoundIcon,
 } from 'lucide-react';
-import {
-  ApiError,
-  type LoginCredential,
-  type StudentDetail,
-  type StudentTab,
+import type {
+  LoginCredential,
+  StudentDetail,
+  StudentTab,
 } from '@eduvault/api-contract';
 import { Can, useCanAny } from '@eduvault/auth-client';
 import { FINANCE_READ_GATE, type Gate } from '@eduvault/policy';
@@ -39,9 +38,6 @@ import {
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
-  ErrorMessage,
-  NotFoundState,
-  PageSkeleton,
   Table,
   TableBody,
   TableCell,
@@ -54,6 +50,11 @@ import {
   TabsTrigger,
 } from '@eduvault/ui';
 import { useApi } from '../api';
+import {
+  BackButton,
+  DetailNotFound,
+  DetailPage,
+} from '../components/detail-page';
 import { AddGuardianButton, GuardianLines } from '../components/guardian-lines';
 import type { GuardianAction } from '../components/guardian-actions';
 import { GuardianDialogs } from '../components/guardian-dialogs';
@@ -575,17 +576,12 @@ function StudentBody(props: BodyProps) {
 
 function StudentNotFound({ onBack }: { onBack: () => void }) {
   return (
-    <section className="flex flex-col gap-4">
-      <h1>Student not found</h1>
-      <NotFoundState
-        title="We couldn’t find that student"
-        description="It may have been moved, or it may belong to a campus or class you don’t look after."
-      >
-        <Button type="button" variant="outline" onClick={onBack}>
-          Go back
-        </Button>
-      </NotFoundState>
-    </section>
+    <DetailNotFound
+      heading="Student not found"
+      title="We couldn’t find that student"
+      description="It may have been moved, or it may belong to a campus or class you don’t look after."
+      back={<BackButton label="Go back" onBack={onBack} />}
+    />
   );
 }
 
@@ -595,39 +591,36 @@ export function StudentPage(props: StudentPageProps) {
   const [issued, setIssued] = useState<Issued | null>(
     props.logins === undefined ? null : { logins: props.logins }
   );
-  if (student.error instanceof ApiError && student.error.status === 404) {
-    return <StudentNotFound onBack={props.onBack} />;
-  }
-  if (student.data === undefined) {
-    return student.isError ? (
-      <ErrorMessage error={student.error} />
-    ) : (
-      <PageSkeleton rows={2} />
-    );
-  }
   return (
-    <>
-      <StudentBody
-        student={student.data}
-        schoolName={props.schoolName}
-        initialDialog={props.initialDialog}
-        tab={props.tab}
-        onTabChange={props.onTabChange}
-        onDialogClosed={props.onDialogClosed}
-        onOpenTab={props.onOpenTab}
-        onBack={props.onBack}
-        onIssued={setIssued}
-      />
-      <LoginsDialog
-        open={issued !== null}
-        {...(issued?.title === undefined ? {} : { title: issued.title })}
-        studentFirstName={student.data.firstName}
-        logins={issued?.logins ?? []}
-        schoolName={props.schoolName}
-        onDone={() => {
-          setIssued(null);
-        }}
-      />
-    </>
+    <DetailPage
+      queries={[student]}
+      notFound={<StudentNotFound onBack={props.onBack} />}
+    >
+      {([loaded]) => (
+        <>
+          <StudentBody
+            student={loaded}
+            schoolName={props.schoolName}
+            initialDialog={props.initialDialog}
+            tab={props.tab}
+            onTabChange={props.onTabChange}
+            onDialogClosed={props.onDialogClosed}
+            onOpenTab={props.onOpenTab}
+            onBack={props.onBack}
+            onIssued={setIssued}
+          />
+          <LoginsDialog
+            open={issued !== null}
+            {...(issued?.title === undefined ? {} : { title: issued.title })}
+            studentFirstName={loaded.firstName}
+            logins={issued?.logins ?? []}
+            schoolName={props.schoolName}
+            onDone={() => {
+              setIssued(null);
+            }}
+          />
+        </>
+      )}
+    </DetailPage>
   );
 }

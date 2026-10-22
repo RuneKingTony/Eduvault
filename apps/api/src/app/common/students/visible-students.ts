@@ -1,8 +1,8 @@
 import { sql, type RawBuilder } from 'kysely';
 import type { CampusScope } from '../campus-scope';
 import type { ClassScope } from '../class-scope';
-import { INACTIVE_AFTER_DAYS } from '@eduvault/shared';
 import { effectiveCampusSql } from './effective-campus';
+import { inactiveSql } from './student-life-sql';
 
 interface VisibleStudentsOptions {
   organizationId: string;
@@ -81,9 +81,7 @@ export function visibleStudentsCte(
         ${VISIBLE_COLUMNS},
         CASE
           WHEN s.exit_kind IS NOT NULL THEN s.exit_kind
-          WHEN s.not_seen_since IS NOT NULL
-            AND (${options.today}::date - s.not_seen_since) >= ${INACTIVE_AFTER_DAYS}
-            THEN 'inactive'
+          WHEN ${inactiveSql(options.today, 's.not_seen_since')} THEN 'inactive'
           ELSE 'active'
         END AS life
       FROM student s
