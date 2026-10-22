@@ -125,8 +125,12 @@ export class StockCountService {
         throw notFound();
       }
       await decide(
-        { actorId: ctx.user.id, createdBy: found.createdBy },
-        async () => {
+        {
+          actorId: ctx.user.id,
+          createdBy: found.createdBy,
+          isOwner: ctx.isOwner,
+        },
+        async (ownRequest) => {
           if (found.status !== 'submitted') {
             return false;
           }
@@ -150,6 +154,7 @@ export class StockCountService {
               counted: found,
               netMinor,
               autoApproved: false,
+              ownRequest,
             });
           }
           return changed;
@@ -171,7 +176,11 @@ export class StockCountService {
         throw notFound();
       }
       await decide(
-        { actorId: ctx.user.id, createdBy: found.createdBy },
+        {
+          actorId: ctx.user.id,
+          createdBy: found.createdBy,
+          isOwner: ctx.isOwner,
+        },
         async () => {
           if (
             found.status !== 'submitted' ||
@@ -293,7 +302,12 @@ export class StockCountService {
   private async recordApproved(
     tx: StockCountTx,
     ctx: OrgContext,
-    outcome: { counted: Applied; netMinor: number; autoApproved: boolean }
+    outcome: {
+      counted: Applied;
+      netMinor: number;
+      autoApproved: boolean;
+      ownRequest?: boolean;
+    }
   ): Promise<void> {
     const { counted, ...write } = outcome;
     await tx.activity.recordMany(

@@ -32,7 +32,7 @@ const decideFor = (
   ctx: OrgContext,
   waiting: WaitingApproval
 ): ApprovalDecide => {
-  if (waiting.createdById === ctx.user.id) {
+  if (waiting.createdById === ctx.user.id && !ctx.isOwner) {
     return 'own';
   }
   return ctx.acting !== null ||

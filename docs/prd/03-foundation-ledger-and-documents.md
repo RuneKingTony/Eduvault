@@ -39,7 +39,7 @@ No screen of its own. Where the machinery shows up, with copy as written in the 
 ### Approval states
 
 - Status badges: `submitted` "Waiting", `approved`, `rejected`, `void_pending` "Cancellation waiting", `voided` "Cancelled", `matched` (stock count with no difference).
-- An approver who created the item sees it without approve controls and the reason "You created this. Someone else must approve it." (prototype wording: "You created this. The database refuses approved_by = created_by, so someone else must approve it.").
+- An approver who created the item, and is not the owner, sees it without approve controls and the reason "You can’t decide your own request. Ask someone else to decide it." (prototype wording: "You created this. The database refuses approved_by = created_by, so someone else must approve it.").
 
 ### Uploads
 
@@ -97,7 +97,7 @@ Later kinds already seen in the prototype's counters (`EXP`, `REQ`) follow the s
     - `CHECK (rejected_by IS NULL OR rejected_by <> created_by)` (nobody declines their own request either; finance doc, Invariants)
     - `CHECK (status <> 'rejected' OR (rejected_by IS NOT NULL AND length(trim(rejection_reason)) > 0))` (declining needs a reason)
     - `CHECK (status <> 'approved' OR approved_at IS NOT NULL)`
-14. The API pre-checks self-approval and answers 409 `SelfApproval` "You created this. Someone else must approve it." ([D-013](../technical-reference.md#decision-log)); `ErrorFilter` maps Postgres `23514` (check violation) to 409 as the backstop ([02](02-foundation-permissions-and-scopes.md) rule 24).
+14. The API pre-checks self-approval and answers 409 `SelfApproval` "You can’t decide your own request. Ask someone else to decide it." ([D-013](../technical-reference.md#decision-log)), except for the owner, who may decide their own request ([D-378](../technical-reference.md#decision-log)); there is no database check behind it.
 15. An approval or decline is a conditional update (`… WHERE id = $1 AND organization_id = $2 AND status = 'submitted'`); zero rows updated answers 409 "This has already been decided." so two approvers clicking at once post once.
 16. **Switched-off approval (D-007).** `school_setting` has one switch per kind (`refund`, `write_off`, `credit_note`, `discount`, `payment_void`; store write-offs follow `write_off`), all on by default. When the kind's switch is off at creation, the record is created `approved` with `approved_by` null and `approved_at` = creation time, and posts in the same transaction. It is never approved by its creator. The switch is read once, at creation: switching a kind off leaves requests already waiting as they are, and they still need an approver ([D-027](../technical-reference.md#decision-log)).
 17. Who may approve: a holder of `adjustment:approve` (or `leave:approve` for leave) whose campus scope includes the item's campus; an item with no campus is visible to every approver ([02](02-foundation-permissions-and-scopes.md) rule 19).
@@ -174,7 +174,7 @@ Contract types (`Replayed<T>`, `FileRef`, approval status unions) live in `@eduv
 5. Given a direct insert of a journal entry whose lines sum Dr 1,000 / Cr 900, when the transaction commits, then it fails and nothing is stored.
 6. Given a posted journal line, when an `UPDATE` or `DELETE` is attempted, then the database raises; given `TRUNCATE … CASCADE` in a test reset, then it succeeds.
 7. Given a line with both `debit_minor` and `credit_minor` positive, or both zero, then the insert fails.
-8. Given Chika created a payment cancellation, when Chika approves it, then 409 "You created this. Someone else must approve it."; when a raw `UPDATE` sets `approved_by` to her id, then the database refuses it.
+8. Given Chika created a payment cancellation, when Chika approves it, then 409 "You can’t decide your own request. Ask someone else to decide it."; given the owner created one, when the owner approves it, then 200 and the audit row reads "(their own request)".
 9. Given the school switched off `write_off` approval, when Chika creates a write-off, then it is `approved` with `approved_by` null and its entry posts in the same request.
 10. Given Grace and Funmi approve the same item at once, then one succeeds and the other gets 409 "This has already been decided."
 11. Given a school with one journal line, when the school or a referenced student is deleted, then 409 and nothing is removed.

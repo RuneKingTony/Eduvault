@@ -500,8 +500,12 @@ test.describe('leave in the queue', () => {
     api,
     addMember,
     createUser,
-    schools: { owner, orgA, lekki },
+    withPermissions,
+    schools: { orgA, lekki },
   }) => {
+    const grace = await withPermissions(orgA, ['leave:approve'], {
+      campuses: [lekki],
+    });
     const emeka = await addMember(
       orgA,
       await createUser({ name: 'Emeka Obi' }),
@@ -516,9 +520,9 @@ test.describe('leave in the queue', () => {
       endsOn: '2026-10-13',
       reason: 'Malaria',
     });
-    await askLeave(api, owner, { startsOn: '2026-10-22' });
+    await askLeave(api, grace, { startsOn: '2026-10-22' });
 
-    const list = await queue(api, owner);
+    const list = await queue(api, grace);
     const theirs = list.items.find(
       (item) => item.createdBy.name === 'Emeka Obi'
     );
@@ -534,7 +538,7 @@ test.describe('leave in the queue', () => {
     });
     expect(own?.kind).toBe('leave');
     expect(list).toMatchObject({ total: 2, othersCount: 0 });
-    expect(await summary(api, owner)).toMatchObject({
+    expect(await summary(api, grace)).toMatchObject({
       waitingForMe: 1,
       byNav: { approvals: 1, payments: 0 },
     });

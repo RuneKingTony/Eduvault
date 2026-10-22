@@ -193,6 +193,7 @@ describe('DiscountService.create', () => {
           discountKind: 'percent',
           value: 50,
           autoApproved: true,
+          ownRequest: false,
         },
       },
     ]);
@@ -223,6 +224,7 @@ describe('DiscountService.approve and decline', () => {
           discountKind: 'percent',
           value: 50,
           autoApproved: false,
+          ownRequest: false,
         },
       },
     ]);

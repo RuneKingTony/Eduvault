@@ -283,7 +283,7 @@ All figures respect the campus filter, or the viewer's campus scope when "All ca
     - Field "Reason": required textarea, placeholder "The person who asked will see this".
     - Button "Decline".
     - Toast (warning) "Declined. The request is kept with your reason."
-- On the counter's own request: badge "Your own", tooltip "You created this. Someone else must approve it." The API refuses both approve and decline (409, [D-013](../technical-reference.md#decision-log)).
+- On the counter's own request: badge "Your own", tooltip "You can’t decide your own request. Ask someone else to decide it." The API refuses both approve and decline (409, [D-013](../technical-reference.md#decision-log)). The owner is the exception ([D-378](../technical-reference.md#decision-log)): their own count shows Approve and Decline, and the approval is marked "(their own request)".
 - Without `adjustment:approve`: badge "Someone else", tooltip "Needs someone who can approve money changes".
 
 #### Dashboard surfaces (screen owned by M2.6; content from this module)

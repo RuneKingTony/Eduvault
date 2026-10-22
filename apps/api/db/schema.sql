@@ -602,7 +602,6 @@ CREATE TABLE public.adjustment (
     journal_entry_id uuid,
     CONSTRAINT adjustment_amount_minor_check CHECK ((amount_minor > 0)),
     CONSTRAINT adjustment_approved_columns CHECK (((status = 'approved'::text) = (approved_at IS NOT NULL))),
-    CONSTRAINT adjustment_approved_not_self CHECK (((approved_by IS NULL) OR (approved_by <> created_by))),
     CONSTRAINT adjustment_kind_check CHECK ((kind = ANY (ARRAY['credit_note'::text, 'write_off'::text, 'refund'::text]))),
     CONSTRAINT adjustment_kind_shape CHECK (
 CASE kind
@@ -613,7 +612,6 @@ END),
     CONSTRAINT adjustment_number_check CHECK ((char_length(btrim(number)) > 0)),
     CONSTRAINT adjustment_reason_check CHECK (((char_length(btrim(reason)) >= 1) AND (char_length(btrim(reason)) <= 200))),
     CONSTRAINT adjustment_rejected_columns CHECK (((status = 'rejected'::text) = ((rejected_at IS NOT NULL) AND (rejected_by IS NOT NULL) AND (rejection_reason IS NOT NULL)))),
-    CONSTRAINT adjustment_rejected_not_self CHECK (((rejected_by IS NULL) OR (rejected_by <> created_by))),
     CONSTRAINT adjustment_rejection_reason_check CHECK (((char_length(btrim(rejection_reason)) >= 1) AND (char_length(btrim(rejection_reason)) <= 500))),
     CONSTRAINT adjustment_status_check CHECK ((status = ANY (ARRAY['submitted'::text, 'approved'::text, 'rejected'::text])))
 );
@@ -1199,10 +1197,8 @@ CREATE TABLE public.payment_void (
     rejection_reason text,
     journal_entry_id uuid,
     CONSTRAINT payment_void_approved_columns CHECK (((status = 'approved'::text) = (approved_at IS NOT NULL))),
-    CONSTRAINT payment_void_approved_not_self CHECK (((approved_by IS NULL) OR (approved_by <> created_by))),
     CONSTRAINT payment_void_reason_check CHECK (((char_length(btrim(reason)) >= 1) AND (char_length(btrim(reason)) <= 500))),
     CONSTRAINT payment_void_rejected_columns CHECK (((status = 'rejected'::text) = ((rejected_at IS NOT NULL) AND (rejected_by IS NOT NULL) AND (rejection_reason IS NOT NULL)))),
-    CONSTRAINT payment_void_rejected_not_self CHECK (((rejected_by IS NULL) OR (rejected_by <> created_by))),
     CONSTRAINT payment_void_rejection_reason_check CHECK (((char_length(btrim(rejection_reason)) >= 1) AND (char_length(btrim(rejection_reason)) <= 500))),
     CONSTRAINT payment_void_status_check CHECK ((status = ANY (ARRAY['submitted'::text, 'approved'::text, 'rejected'::text])))
 );
@@ -1326,17 +1322,14 @@ CREATE TABLE public.staff_leave (
     cancelled_by text,
     cancellation_reason text,
     CONSTRAINT staff_leave_approved_columns CHECK ((((status = 'approved'::text) OR (cancelled_by IS NOT NULL)) = ((approved_by IS NOT NULL) AND (approved_at IS NOT NULL)))),
-    CONSTRAINT staff_leave_approved_not_self CHECK (((approved_by IS NULL) OR (approved_by <> created_by))),
     CONSTRAINT staff_leave_cancellation_reason_check CHECK (((char_length(btrim(cancellation_reason)) >= 1) AND (char_length(btrim(cancellation_reason)) <= 500))),
     CONSTRAINT staff_leave_cancelled_by_columns CHECK (((cancelled_by IS NOT NULL) = (cancellation_reason IS NOT NULL))),
     CONSTRAINT staff_leave_cancelled_by_status CHECK (((cancelled_by IS NULL) OR (status = 'cancelled'::text))),
     CONSTRAINT staff_leave_cancelled_columns CHECK (((status = 'cancelled'::text) = (cancelled_at IS NOT NULL))),
-    CONSTRAINT staff_leave_cancelled_not_self CHECK (((cancelled_by IS NULL) OR (cancelled_by <> created_by))),
     CONSTRAINT staff_leave_cover_check CHECK ((char_length(cover) <= 200)),
     CONSTRAINT staff_leave_dates CHECK ((ends_on >= starts_on)),
     CONSTRAINT staff_leave_reason_check CHECK (((char_length(btrim(reason)) >= 1) AND (char_length(btrim(reason)) <= 500))),
     CONSTRAINT staff_leave_rejected_columns CHECK (((status = 'rejected'::text) = ((rejected_by IS NOT NULL) AND (rejected_at IS NOT NULL) AND (rejection_reason IS NOT NULL)))),
-    CONSTRAINT staff_leave_rejected_not_self CHECK (((rejected_by IS NULL) OR (rejected_by <> created_by))),
     CONSTRAINT staff_leave_rejection_reason_check CHECK (((char_length(btrim(rejection_reason)) >= 1) AND (char_length(btrim(rejection_reason)) <= 500))),
     CONSTRAINT staff_leave_status_check CHECK ((status = ANY (ARRAY['submitted'::text, 'approved'::text, 'rejected'::text, 'cancelled'::text]))),
     CONSTRAINT staff_leave_type_check CHECK ((type = ANY (ARRAY['annual'::text, 'sick'::text, 'personal'::text, 'study'::text, 'parental'::text])))
@@ -1373,11 +1366,9 @@ CREATE TABLE public.stock_count (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT stock_count_approved_columns CHECK (((status = 'approved'::text) = (approved_at IS NOT NULL))),
-    CONSTRAINT stock_count_approved_not_self CHECK (((approved_by IS NULL) OR (approved_by <> created_by))),
     CONSTRAINT stock_count_note_check CHECK (((char_length(btrim(note)) >= 1) AND (char_length(btrim(note)) <= 500))),
     CONSTRAINT stock_count_number_check CHECK ((char_length(btrim(number)) > 0)),
     CONSTRAINT stock_count_rejected_columns CHECK (((status = 'rejected'::text) = ((rejected_at IS NOT NULL) AND (rejected_by IS NOT NULL) AND (rejection_reason IS NOT NULL)))),
-    CONSTRAINT stock_count_rejected_not_self CHECK (((rejected_by IS NULL) OR (rejected_by <> created_by))),
     CONSTRAINT stock_count_rejection_reason_check CHECK (((char_length(btrim(rejection_reason)) >= 1) AND (char_length(btrim(rejection_reason)) <= 500))),
     CONSTRAINT stock_count_status_check CHECK ((status = ANY (ARRAY['matched'::text, 'submitted'::text, 'approved'::text, 'rejected'::text])))
 );
@@ -1581,12 +1572,10 @@ CREATE TABLE public.student_discount (
     ended_at timestamp with time zone,
     ended_by text,
     CONSTRAINT student_discount_approved_columns CHECK (((status = 'approved'::text) = (approved_at IS NOT NULL))),
-    CONSTRAINT student_discount_approved_not_self CHECK (((approved_by IS NULL) OR (approved_by <> created_by))),
     CONSTRAINT student_discount_kind_check CHECK ((kind = ANY (ARRAY['percent'::text, 'fixed'::text]))),
     CONSTRAINT student_discount_percent_range CHECK (((kind <> 'percent'::text) OR (value <= 100))),
     CONSTRAINT student_discount_reason_check CHECK (((char_length(btrim(reason)) >= 1) AND (char_length(btrim(reason)) <= 200))),
     CONSTRAINT student_discount_rejected_columns CHECK (((status = 'rejected'::text) = ((rejected_at IS NOT NULL) AND (rejected_by IS NOT NULL) AND (rejection_reason IS NOT NULL)))),
-    CONSTRAINT student_discount_rejected_not_self CHECK (((rejected_by IS NULL) OR (rejected_by <> created_by))),
     CONSTRAINT student_discount_rejection_reason_check CHECK (((char_length(btrim(rejection_reason)) >= 1) AND (char_length(btrim(rejection_reason)) <= 500))),
     CONSTRAINT student_discount_status_check CHECK ((status = ANY (ARRAY['submitted'::text, 'approved'::text, 'rejected'::text]))),
     CONSTRAINT student_discount_value_positive CHECK ((value > 0))
@@ -4998,4 +4987,5 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20261017110000'),
     ('20261017110100'),
     ('20261018090000'),
-    ('20261018100000');
+    ('20261018100000'),
+    ('20261022120000');

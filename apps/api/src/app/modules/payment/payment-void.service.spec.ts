@@ -357,6 +357,7 @@ describe('PaymentVoidService.request', () => {
           receiptNumber: 'RCT-2026-00098',
           amountMinor: 2_000_000,
           autoApproved: true,
+          ownRequest: false,
         },
       },
     ]);

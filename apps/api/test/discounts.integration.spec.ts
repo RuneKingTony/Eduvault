@@ -196,10 +196,9 @@ test.describe('asking for a discount', () => {
     expect(blank.body.code).toBe('ValidationError');
   });
 
-  test('nobody approves or declines their own discount, in the service or the database', async ({
+  test('nobody approves or declines their own discount', async ({
     api,
     app,
-    pool,
     withPermissions,
     schools: { owner, orgA, lekki, studentLekki },
   }) => {
@@ -231,25 +230,43 @@ test.describe('asking for a discount', () => {
       message: SELF_APPROVAL_MESSAGE,
     });
     expect(decline.body.code).toBe('SelfApproval');
-    await expect(
-      pool.query(
-        `UPDATE student_discount SET status = 'approved', approved_by = created_by, approved_at = now() WHERE id = $1`,
-        [discount.id]
-      )
-    ).rejects.toMatchObject({
-      code: '23514',
-      constraint: 'student_discount_approved_not_self',
-    });
-    await expect(
-      pool.query(
-        `UPDATE student_discount SET status = 'rejected', rejected_by = created_by,
-           rejected_at = now(), rejection_reason = 'No' WHERE id = $1`,
-        [discount.id]
-      )
-    ).rejects.toMatchObject({
-      code: '23514',
-      constraint: 'student_discount_rejected_not_self',
-    });
+  });
+
+  test('the owner approves their own discount and the audit row says so', async ({
+    api,
+    app,
+    pool,
+    schools: { owner, studentLekki },
+  }) => {
+    const fixture = await chargeFixture(app, api, owner);
+    const ask = () =>
+      askDiscount(api, owner, {
+        studentId: studentLekki.id,
+        kind: 'percent',
+        value: 10,
+        ledgerAccountId: null,
+        fromTermId: fixture.secondTermId,
+        reason: 'Staff child',
+      });
+    const { discount } = await ask();
+
+    const approved = await approveDiscount(api, owner, discount.id);
+
+    expect(approved.status).toBe('approved');
+    expect(approved.approvedBy).not.toBeNull();
+    const { rows } = await pool.query<{ text: string; data: unknown }>(
+      `SELECT text, data FROM activity_event WHERE kind = 'discount.approved' AND subject_id = $1`,
+      [discount.id]
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.text).toMatch(/\(their own request\)\.$/);
+    expect(rows[0]?.data).toMatchObject({ ownRequest: true });
+
+    const other = await ask();
+    await api(owner)
+      .post(`/finance/discounts/${other.discount.id}/decline`)
+      .send({ reason: 'Changed my mind' })
+      .expect(200);
   });
 
   test('switched off, a discount is approved on creation with no approver', async ({

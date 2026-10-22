@@ -407,6 +407,7 @@ describe('store write-off activity', () => {
           differences: 2,
           netMinor: 450_000,
           autoApproved: false,
+          ownRequest: false,
         },
       },
     ]);
@@ -563,7 +564,9 @@ describe('paymentCancellationDeclinedActivity', () => {
 
 describe('adjustment activity', () => {
   it('records an approval with the kind label, number, student and amount', () => {
-    expect(adjustmentApprovedActivity(actor, adjustment, false)).toEqual([
+    expect(
+      adjustmentApprovedActivity(actor, adjustment, { autoApproved: false })
+    ).toEqual([
       {
         organizationId: 'org-1',
         campusId: LEKKI,
@@ -580,9 +583,21 @@ describe('adjustment activity', () => {
           studentId: 'student-1',
           amountMinor: 1_200_000,
           autoApproved: false,
+          ownRequest: false,
         },
       },
     ]);
+  });
+
+  it('says so on the row when the approver decided their own request', () => {
+    const [row] = adjustmentApprovedActivity(actor, adjustment, {
+      autoApproved: false,
+      ownRequest: true,
+    });
+    expect(row?.text).toMatch(
+      /approved by Tunde Bakare \(their own request\)\.$/
+    );
+    expect(row?.data).toMatchObject({ ownRequest: true });
   });
 
   it.each([
@@ -592,13 +607,15 @@ describe('adjustment activity', () => {
     const [row] = adjustmentApprovedActivity(
       actor,
       { ...adjustment, kind },
-      false
+      { autoApproved: false }
     );
     expect(row?.text).toMatch(new RegExp(`^${label} ADJ-2026-0003`));
   });
 
   it('says applied and sets autoApproved when approval is off', () => {
-    const [row] = adjustmentApprovedActivity(actor, adjustment, true);
+    const [row] = adjustmentApprovedActivity(actor, adjustment, {
+      autoApproved: true,
+    });
     expect(row).toMatchObject({
       kind: 'adjustment.approved',
       text: 'Reduce a fee ADJ-2026-0003 for Bola Ade, ₦12,000, applied by Tunde Bakare.',
@@ -633,7 +650,9 @@ describe('adjustment activity', () => {
 
 describe('discount activity', () => {
   it('records a percent approval', () => {
-    expect(discountApprovedActivity(actor, discount, false)).toEqual([
+    expect(
+      discountApprovedActivity(actor, discount, { autoApproved: false })
+    ).toEqual([
       {
         organizationId: 'org-1',
         campusId: IKEJA,
@@ -649,6 +668,7 @@ describe('discount activity', () => {
           discountKind: 'percent',
           value: 10,
           autoApproved: false,
+          ownRequest: false,
         },
       },
     ]);
@@ -658,7 +678,7 @@ describe('discount activity', () => {
     const [row] = discountApprovedActivity(
       actor,
       { ...discount, kind: 'fixed', value: 500_000 },
-      true
+      { autoApproved: true }
     );
     expect(row).toMatchObject({
       text: 'Discount for Chika Obi (₦5,000) applied by Tunde Bakare.',

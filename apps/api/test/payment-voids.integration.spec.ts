@@ -205,10 +205,9 @@ test.describe('cancelling a payment', () => {
     expect(second.body.message).toBe(PAYMENT_VOID_EXISTS_MESSAGE);
   });
 
-  test('nobody approves or declines their own request, in the service or the database', async ({
+  test('nobody approves or declines their own request', async ({
     api,
     app,
-    pool,
     withPermissions,
     schools: { owner, orgA, lekki, studentLekki },
   }) => {
@@ -237,28 +236,35 @@ test.describe('cancelling a payment', () => {
       message: SELF_APPROVAL_MESSAGE,
     });
     expect(decline.body.code).toBe('SelfApproval');
-    await expect(
-      pool.query(
-        `UPDATE payment_void SET status = 'approved', approved_by = created_by, approved_at = now() WHERE id = $1`,
-        [asked.id]
-      )
-    ).rejects.toMatchObject({
-      code: '23514',
-      constraint: 'payment_void_approved_not_self',
-    });
-    await expect(
-      pool.query(
-        `UPDATE payment_void SET status = 'rejected', rejected_by = created_by,
-           rejected_at = now(), rejection_reason = 'No' WHERE id = $1`,
-        [asked.id]
-      )
-    ).rejects.toMatchObject({
-      code: '23514',
-      constraint: 'payment_void_rejected_not_self',
-    });
     expect((await receiptOf(api, owner, receipt.id)).status).toBe(
       'void_pending'
     );
+  });
+
+  test('the owner approves their own cancellation and the audit row says so', async ({
+    api,
+    app,
+    pool,
+    schools: { owner, studentLekki },
+  }) => {
+    const account = await bankAccount(app, owner);
+    const receipt = await recordCash(api, owner, {
+      accountId: account.id,
+      allocations: [{ studentId: studentLekki.id, amountMinor: PAID }],
+    });
+    const { void: asked } = await askVoid(api, owner, receipt.id);
+
+    const approved = await approveVoid(api, owner, asked.id);
+
+    expect(approved.status).toBe('approved');
+    expect((await receiptOf(api, owner, receipt.id)).status).toBe('voided');
+    const { rows } = await pool.query<{ text: string; data: unknown }>(
+      `SELECT text, data FROM activity_event WHERE kind = 'payment.cancelled' AND subject_id = $1`,
+      [receipt.id]
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.text).toMatch(/\(their own request\)\.$/);
+    expect(rows[0]?.data).toMatchObject({ ownRequest: true });
   });
 
   test('racing approvers give one 200, one 409 and one journal entry', async ({

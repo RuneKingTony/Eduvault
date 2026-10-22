@@ -66,7 +66,7 @@ export const APPROVAL_PREVIEW_SIZE = 5;
 export const APPROVAL_REASON_MAX = 500;
 
 export const SELF_APPROVAL_MESSAGE =
-  'You created this. Someone else must approve it.';
+  'You can’t decide your own request. Ask someone else to decide it.';
 export const ALREADY_DECIDED_MESSAGE = 'This has already been decided.';
 export const DECLINE_REASON_MESSAGE =
   'Say why you are declining. The person who asked will see it.';

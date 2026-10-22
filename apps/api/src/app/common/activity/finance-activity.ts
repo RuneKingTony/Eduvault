@@ -171,6 +171,14 @@ function sumByCampus(rows: readonly CampusAmount[]): CampusTotal[] {
 const verdict = (autoApproved: boolean): string =>
   autoApproved ? 'applied' : 'approved';
 
+interface Approval {
+  autoApproved: boolean;
+  ownRequest?: boolean;
+}
+
+const ownNote = (ownRequest: boolean): string =>
+  ownRequest ? ' (their own request)' : '';
+
 interface RoundRef {
   id: string;
   number: string;
@@ -310,14 +318,19 @@ const writeOffValue = (actor: FinanceActor, netMinor: number): string => {
 export function storeWriteOffApprovedActivity(
   actor: FinanceActor,
   count: StoreWriteOffFacts,
-  write: { netMinor: number; differences: number; autoApproved: boolean }
+  write: {
+    netMinor: number;
+    differences: number;
+    autoApproved: boolean;
+    ownRequest?: boolean;
+  }
 ): ActivityInput[] {
   return [
     finance(actor, {
       campusId: count.campusId,
       kind: 'store_write_off.approved',
       subject: { type: 'stock_count', id: count.id },
-      text: `Store write-off ${count.number} at the ${count.campusName} store: ${countOf(write.differences, 'item differs', 'items differ')}, ${writeOffValue(actor, write.netMinor)}, ${verdict(write.autoApproved)} by ${actor.name}.`,
+      text: `Store write-off ${count.number} at the ${count.campusName} store: ${countOf(write.differences, 'item differs', 'items differ')}, ${writeOffValue(actor, write.netMinor)}, ${verdict(write.autoApproved)} by ${actor.name}${ownNote(write.ownRequest ?? false)}.`,
       data: {
         countId: count.id,
         number: count.number,
@@ -325,6 +338,7 @@ export function storeWriteOffApprovedActivity(
         differences: write.differences,
         netMinor: write.netMinor,
         autoApproved: write.autoApproved,
+        ownRequest: write.ownRequest ?? false,
       },
     }),
   ];
@@ -396,11 +410,12 @@ export function paymentCancelledActivity(
   cancellation: {
     allocations: readonly CampusAmount[];
     autoApproved: boolean;
+    ownRequest?: boolean;
   }
 ): ActivityInput[] {
   const closing = cancellation.autoApproved
     ? `cancelled by ${actor.name}`
-    : `cancelled, approved by ${actor.name}`;
+    : `cancelled, approved by ${actor.name}${ownNote(cancellation.ownRequest ?? false)}`;
   const shares = sumByCampus(cancellation.allocations);
   return shares.map(({ campusId, amountMinor }) =>
     finance(actor, {
@@ -416,6 +431,7 @@ export function paymentCancelledActivity(
         receiptNumber: payment.receiptNumber,
         amountMinor,
         autoApproved: cancellation.autoApproved,
+        ownRequest: cancellation.ownRequest ?? false,
       },
     })
   );
@@ -449,14 +465,14 @@ export function paymentCancellationDeclinedActivity(
 export function adjustmentApprovedActivity(
   actor: FinanceActor,
   adjustment: AdjustmentFacts,
-  autoApproved: boolean
+  { autoApproved, ownRequest = false }: Approval
 ): ActivityInput[] {
   return [
     finance(actor, {
       campusId: adjustment.campusId,
       kind: 'adjustment.approved',
       subject: { type: 'adjustment', id: adjustment.id },
-      text: `${ADJUSTMENT_KIND_LABELS[adjustment.kind]} ${adjustment.number} for ${adjustment.studentName}, ${money(adjustment.amountMinor, actor.currency)}, ${verdict(autoApproved)} by ${actor.name}.`,
+      text: `${ADJUSTMENT_KIND_LABELS[adjustment.kind]} ${adjustment.number} for ${adjustment.studentName}, ${money(adjustment.amountMinor, actor.currency)}, ${verdict(autoApproved)} by ${actor.name}${ownNote(ownRequest)}.`,
       data: {
         adjustmentId: adjustment.id,
         number: adjustment.number,
@@ -464,6 +480,7 @@ export function adjustmentApprovedActivity(
         studentId: adjustment.studentId,
         amountMinor: adjustment.amountMinor,
         autoApproved,
+        ownRequest,
       },
     }),
   ];
@@ -499,20 +516,21 @@ const discountValue = (actor: FinanceActor, discount: DiscountFacts): string =>
 export function discountApprovedActivity(
   actor: FinanceActor,
   discount: DiscountFacts,
-  autoApproved: boolean
+  { autoApproved, ownRequest = false }: Approval
 ): ActivityInput[] {
   return [
     finance(actor, {
       campusId: discount.campusId,
       kind: 'discount.approved',
       subject: { type: 'student_discount', id: discount.id },
-      text: `Discount for ${discount.studentName} (${discountValue(actor, discount)}) ${verdict(autoApproved)} by ${actor.name}.`,
+      text: `Discount for ${discount.studentName} (${discountValue(actor, discount)}) ${verdict(autoApproved)} by ${actor.name}${ownNote(ownRequest)}.`,
       data: {
         discountId: discount.id,
         studentId: discount.studentId,
         discountKind: discount.kind,
         value: discount.value,
         autoApproved,
+        ownRequest,
       },
     }),
   ];
