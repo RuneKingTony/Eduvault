@@ -36,8 +36,28 @@ export const ROW_STATUS_LABELS: Record<StatementRowStatus, string> = {
   refunded: 'Refunded',
 };
 
+export const VOIDED_LABEL = 'Voided';
+
+export const rowStatusLabel = (row: {
+  status: StatementRowStatus;
+  voided?: boolean;
+}): string =>
+  row.voided === true && row.status === 'paid'
+    ? VOIDED_LABEL
+    : ROW_STATUS_LABELS[row.status];
+
 export const isOwingStatus = (status: StatementRowStatus): boolean =>
   status === 'charged' || status === 'cancelled' || status === 'refunded';
+
+export const rowTone = (row: {
+  status: StatementRowStatus;
+  voided?: boolean;
+}): 'owe' | 'paid' | 'neutral' => {
+  if (row.voided === true) {
+    return 'neutral';
+  }
+  return isOwingStatus(row.status) ? 'owe' : 'paid';
+};
 
 const minorSchema = z.number().int();
 const countSchema = z.number().int().nonnegative();
@@ -116,6 +136,7 @@ export const statementRowSchema = z.object({
   reference: z.string(),
   description: z.string(),
   status: statementRowStatusSchema,
+  voided: z.boolean().optional(),
   amountMinor: minorSchema.positive(),
   link: statementLinkSchema,
 });

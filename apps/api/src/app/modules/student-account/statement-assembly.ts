@@ -26,6 +26,7 @@ export interface MovementRecord extends KindMovement {
     receiptNumber: string;
     payerName: string;
     method: PaymentMethod;
+    voided: boolean;
   } | null;
 }
 
@@ -139,6 +140,7 @@ export function statementRowsOf(
       reference: movement.reference,
       description: describe(movement, status),
       status,
+      voided: movement.kind === 'payment' && movement.payment?.voided === true,
       amountMinor,
       link: movementLink(movement),
     }))

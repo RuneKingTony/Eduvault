@@ -16,7 +16,7 @@ import {
 } from '../ui/table';
 import { NumberedPager } from './numbered-pager';
 
-export type StatementTone = 'owe' | 'paid';
+export type StatementTone = 'owe' | 'paid' | 'neutral';
 
 export interface StatementCardTile {
   label: string;
@@ -95,8 +95,19 @@ function Callout({
   );
 }
 
+const BADGE_VARIANT = {
+  owe: 'destructive',
+  paid: 'success',
+  neutral: 'secondary',
+} as const;
+
+const AMOUNT_COLOUR: Record<StatementTone, string> = {
+  owe: 'text-destructive',
+  paid: 'text-success',
+  neutral: 'text-muted-foreground',
+};
+
 function EntryRow({ row }: { row: StatementCardRow }) {
-  const owe = row.tone === 'owe';
   return (
     <TableRow>
       <TableCell>{row.date}</TableCell>
@@ -111,13 +122,10 @@ function EntryRow({ row }: { row: StatementCardRow }) {
         </span>
       </TableCell>
       <TableCell>
-        <Badge variant={owe ? 'destructive' : 'success'}>{row.status}</Badge>
+        <Badge variant={BADGE_VARIANT[row.tone]}>{row.status}</Badge>
       </TableCell>
       <TableCell
-        className={cn(
-          'text-right tabular-nums',
-          owe ? 'text-destructive' : 'text-success'
-        )}
+        className={cn('text-right tabular-nums', AMOUNT_COLOUR[row.tone])}
       >
         {row.amount}
       </TableCell>

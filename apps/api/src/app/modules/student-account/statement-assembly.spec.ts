@@ -49,6 +49,7 @@ const receipt: MovementRecord = {
     receiptNumber: 'RCT-2026-00088',
     payerName: 'Ngozi Okeke',
     method: 'transfer',
+    voided: false,
   },
 };
 
@@ -184,6 +185,17 @@ describe('statementRowsOf', () => {
       reference: 'TRF-20260920-K3Q7ZA',
       link: { type: 'payment', id: 'payment-1' },
     });
+  });
+
+  it('flags the row of a voided receipt so clients do not read it as plainly Paid', () => {
+    const voided: MovementRecord = {
+      ...receipt,
+      payment: { ...receipt.payment!, voided: true },
+    };
+
+    expect(statementRowsOf([voided, receipt]).map((row) => row.voided)).toEqual(
+      [true, false]
+    );
   });
 
   it('writes one row per correction kind from its memo, in the bucket the PRD names', () => {
