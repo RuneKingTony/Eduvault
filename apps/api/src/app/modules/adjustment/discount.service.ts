@@ -102,7 +102,7 @@ export class DiscountService {
                 value: input.value,
                 ...studentFacts(student),
               },
-              true
+              { autoApproved: true }
             )
           );
         }
@@ -123,15 +123,19 @@ export class DiscountService {
         throw notFound();
       }
       await decide(
-        { actorId: ctx.user.id, createdBy: found.createdById },
-        async () => {
+        {
+          actorId: ctx.user.id,
+          createdBy: found.createdById,
+          isOwner: ctx.isOwner,
+        },
+        async (ownRequest) => {
           const changed = await tx.approve(id);
           if (changed) {
             await tx.activity.recordMany(
               discountApprovedActivity(
                 await financeActorIn(ctx, tx),
                 { ...found, ...studentFacts(found.student) },
-                false
+                { autoApproved: false, ownRequest }
               )
             );
           }
@@ -155,7 +159,11 @@ export class DiscountService {
         throw notFound();
       }
       await decide(
-        { actorId: ctx.user.id, createdBy: found.createdById },
+        {
+          actorId: ctx.user.id,
+          createdBy: found.createdById,
+          isOwner: ctx.isOwner,
+        },
         async () => {
           const changed = await tx.reject(id, declineReason);
           if (changed) {

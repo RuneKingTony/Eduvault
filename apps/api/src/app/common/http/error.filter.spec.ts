@@ -76,33 +76,6 @@ describe('ErrorFilter', () => {
     });
   });
 
-  it('maps a self-approval check violation to SelfApproval', () => {
-    expect(
-      run({ code: '23514', constraint: 'payment_void_approved_by_not_self' })
-    ).toEqual({
-      status: 409,
-      body: {
-        code: 'SelfApproval',
-        message: 'You created this. Someone else must approve it.',
-      },
-    });
-  });
-
-  it('maps the new approval tables’ self-approval checks to SelfApproval', () => {
-    for (const constraint of [
-      'adjustment_approved_not_self',
-      'adjustment_rejected_not_self',
-      'payment_void_approved_not_self',
-      'payment_void_rejected_not_self',
-      'student_discount_approved_not_self',
-      'staff_leave_approved_not_self',
-      'staff_leave_rejected_not_self',
-      'staff_leave_cancelled_not_self',
-    ]) {
-      expect(run({ code: '23514', constraint }).body.code).toBe('SelfApproval');
-    }
-  });
-
   it('maps an update of a decided approval record to AlreadyDecided', () => {
     for (const constraint of [
       'adjustment_decided_frozen',

@@ -412,9 +412,25 @@ test.describe('deciding leave', () => {
     expect(approve.body).toMatchObject({ code: 'SelfApproval' });
   });
 
-  test('never lets a requester decide their own request, in the service or the database', async ({
+  test('lets the owner approve their own leave and the audit row says so', async ({
     api,
     pool,
+    schools: { owner },
+  }) => {
+    const mine = await askLeave(api, owner, { startsOn: '2026-10-22' });
+
+    await approveLeave(api, owner, mine.id);
+
+    const { rows } = await pool.query<{ text: string }>(
+      `SELECT text FROM activity_event WHERE kind = 'leave.approved' AND subject_id = $1`,
+      [mine.id]
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.text).toMatch(/\(their own request\)\.$/);
+  });
+
+  test('never lets a requester decide their own request', async ({
+    api,
     withPermissions,
     schools: { orgA, lekki },
   }) => {
@@ -439,25 +455,6 @@ test.describe('deciding leave', () => {
     expect((await queueOf(api, grace))[0]).toMatchObject({
       id: mine.id,
       isOwn: true,
-    });
-    await expect(
-      pool.query(
-        `UPDATE staff_leave SET status = 'approved', approved_by = created_by, approved_at = now() WHERE id = $1`,
-        [mine.id]
-      )
-    ).rejects.toMatchObject({
-      code: '23514',
-      constraint: 'staff_leave_approved_not_self',
-    });
-    await expect(
-      pool.query(
-        `UPDATE staff_leave SET status = 'rejected', rejected_by = created_by, rejected_at = now(),
-           rejection_reason = 'No' WHERE id = $1`,
-        [mine.id]
-      )
-    ).rejects.toMatchObject({
-      code: '23514',
-      constraint: 'staff_leave_rejected_not_self',
     });
   });
 
@@ -658,9 +655,8 @@ test.describe('cancelling approved leave', () => {
       .expect(200);
   });
 
-  test('never lets an approver cancel their own leave, in the service or the database', async ({
+  test('never lets an approver cancel their own leave', async ({
     api,
-    pool,
     withPermissions,
     schools: { owner, orgA, lekki },
   }) => {
@@ -682,16 +678,6 @@ test.describe('cancelling approved leave', () => {
     expect(res.body).toMatchObject({
       code: 'SelfApproval',
       message: SELF_APPROVAL_MESSAGE,
-    });
-    await expect(
-      pool.query(
-        `UPDATE staff_leave SET status = 'cancelled', cancelled_by = created_by, cancelled_at = now(),
-           cancellation_reason = 'No' WHERE id = $1`,
-        [mine.id]
-      )
-    ).rejects.toMatchObject({
-      code: '23514',
-      constraint: 'staff_leave_cancelled_not_self',
     });
     expect((await mineOf(api, grace)).items[0]?.status).toBe('approved');
   });

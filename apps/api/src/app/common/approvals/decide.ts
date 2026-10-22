@@ -8,10 +8,14 @@ import {
 interface Decision {
   actorId: string;
   createdBy: string | null;
+  isOwner: boolean;
 }
 
-export function assertNotOwn({ actorId, createdBy }: Decision): void {
-  if (createdBy !== null && createdBy === actorId) {
+export const isOwnRequest = ({ actorId, createdBy }: Decision): boolean =>
+  createdBy !== null && createdBy === actorId;
+
+export function assertNotOwn(decision: Decision): void {
+  if (isOwnRequest(decision) && !decision.isOwner) {
     throw new ConflictException({
       code: 'SelfApproval',
       message: SELF_APPROVAL_MESSAGE,
@@ -29,10 +33,10 @@ export function assertDeclineReason(reason: string): string {
 
 export async function decide(
   decision: Decision,
-  apply: () => Promise<boolean>
+  apply: (ownRequest: boolean) => Promise<boolean>
 ): Promise<void> {
   assertNotOwn(decision);
-  if (!(await apply())) {
+  if (!(await apply(isOwnRequest(decision)))) {
     throw new ConflictException({
       code: 'AlreadyDecided',
       message: ALREADY_DECIDED_MESSAGE,

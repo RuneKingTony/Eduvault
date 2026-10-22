@@ -37,7 +37,7 @@ const item = {
 describe('approval copy', () => {
   it('uses the PRD words for the two refusals', () => {
     expect(SELF_APPROVAL_MESSAGE).toBe(
-      'You created this. Someone else must approve it.'
+      'You can’t decide your own request. Ask someone else to decide it.'
     );
     expect(ALREADY_DECIDED_MESSAGE).toBe('This has already been decided.');
   });

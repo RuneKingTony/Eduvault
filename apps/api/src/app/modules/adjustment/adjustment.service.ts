@@ -227,7 +227,7 @@ export class AdjustmentService {
             adjustmentApprovedActivity(
               await financeActorIn(ctx, tx),
               { ...row, ...studentFacts(student) },
-              true
+              { autoApproved: true }
             )
           );
         }
@@ -248,8 +248,12 @@ export class AdjustmentService {
         throw notFound();
       }
       await decide(
-        { actorId: ctx.user.id, createdBy: found.createdBy },
-        async () => {
+        {
+          actorId: ctx.user.id,
+          createdBy: found.createdBy,
+          isOwner: ctx.isOwner,
+        },
+        async (ownRequest) => {
           if (found.status !== 'submitted') {
             return false;
           }
@@ -271,7 +275,7 @@ export class AdjustmentService {
               adjustmentApprovedActivity(
                 await financeActorIn(ctx, tx),
                 { ...found, ...studentFacts(student) },
-                false
+                { autoApproved: false, ownRequest }
               )
             );
           }
@@ -295,7 +299,11 @@ export class AdjustmentService {
         throw notFound();
       }
       await decide(
-        { actorId: ctx.user.id, createdBy: found.createdBy },
+        {
+          actorId: ctx.user.id,
+          createdBy: found.createdBy,
+          isOwner: ctx.isOwner,
+        },
         async () => {
           const changed =
             found.status === 'submitted' &&

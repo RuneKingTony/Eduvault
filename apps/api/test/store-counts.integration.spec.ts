@@ -708,7 +708,7 @@ test.describe('declining a count', () => {
 });
 
 test.describe('who may count and decide', () => {
-  test('the counter cannot approve or decline their own count, from the API or a direct UPDATE', async ({
+  test('the counter cannot approve or decline their own count', async ({
     api,
     app,
     pool,
@@ -740,21 +740,32 @@ test.describe('who may count and decide', () => {
       message: SELF_APPROVAL_MESSAGE,
     });
     expect(decline.body).toMatchObject({ code: 'SelfApproval' });
-    await expect(
-      pool.query(
-        `UPDATE stock_count SET status = 'approved', approved_by = created_by,
-           approved_at = now() WHERE id = $1`,
-        [count.id]
-      )
-    ).rejects.toThrow(/stock_count_approved_not_self/);
-    await expect(
-      pool.query(
-        `UPDATE stock_count SET status = 'rejected', rejected_by = created_by,
-           rejected_at = now(), rejection_reason = 'Mine' WHERE id = $1`,
-        [count.id]
-      )
-    ).rejects.toThrow(/stock_count_rejected_not_self/);
     expect(await countMovements(pool, count.number)).toEqual([]);
+  });
+
+  test('the owner approves their own count and the audit row says so', async ({
+    api,
+    app,
+    pool,
+    schools,
+  }) => {
+    const { owner, lekki } = schools;
+    const { tie } = await stocked(app, api, schools);
+    const count = await submitCount(api, owner, {
+      campusId: lekki.id,
+      lines: [{ itemId: tie.id, countedQuantity: 3 }],
+    });
+
+    const approved = await approveCount(api, owner, count.id);
+
+    expect(approved.status).toBe('approved');
+    const { rows } = await pool.query<{ text: string; data: unknown }>(
+      `SELECT text, data FROM activity_event WHERE kind = 'store_write_off.approved' AND subject_id = $1`,
+      [count.id]
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.text).toMatch(/\(their own request\)\.$/);
+    expect(rows[0]?.data).toMatchObject({ ownRequest: true });
   });
 
   test('store:count and adjustment:approve are each needed', async ({
@@ -1015,19 +1026,25 @@ test.describe('isolation', () => {
       .expect(401);
   });
 
-  test('the counter cannot decide their own count (case 11)', async ({
+  test('a counter who is not the owner cannot decide their own count (case 11)', async ({
     api,
     app,
+    withPermissions,
     schools,
   }) => {
-    const { owner, lekki } = schools;
+    const { orgA, lekki } = schools;
     const { tie } = await stocked(app, api, schools);
-    const count = await submitCount(api, owner, {
+    const both = await withPermissions(
+      orgA,
+      ['store:read', 'store:count', 'adjustment:approve'],
+      { campuses: [lekki] }
+    );
+    const count = await submitCount(api, both, {
       campusId: lekki.id,
       lines: [{ itemId: tie.id, countedQuantity: 3 }],
     });
 
-    const res = await api(owner)
+    const res = await api(both)
       .post(`/store/counts/${count.id}/approve`)
       .expect(409);
 

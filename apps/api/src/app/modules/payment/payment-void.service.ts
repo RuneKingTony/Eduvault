@@ -120,8 +120,12 @@ export class PaymentVoidService {
       }
       assertWholePayment(found.payment);
       await decide(
-        { actorId: ctx.user.id, createdBy: found.createdBy },
-        async () => {
+        {
+          actorId: ctx.user.id,
+          createdBy: found.createdBy,
+          isOwner: ctx.isOwner,
+        },
+        async (ownRequest) => {
           if (found.status !== 'submitted') {
             return false;
           }
@@ -136,6 +140,7 @@ export class PaymentVoidService {
             await this.recordCancelled(tx, ctx, {
               payment: found.payment,
               autoApproved: false,
+              ownRequest,
             });
           }
           return changed;
@@ -158,7 +163,11 @@ export class PaymentVoidService {
         throw voidNotFound();
       }
       await decide(
-        { actorId: ctx.user.id, createdBy: found.createdBy },
+        {
+          actorId: ctx.user.id,
+          createdBy: found.createdBy,
+          isOwner: ctx.isOwner,
+        },
         async () => {
           const changed =
             found.status === 'submitted' &&
@@ -189,7 +198,11 @@ export class PaymentVoidService {
   private async recordCancelled(
     tx: PaymentVoidTx,
     ctx: OrgContext,
-    cancelled: { payment: VoidablePayment; autoApproved: boolean }
+    cancelled: {
+      payment: VoidablePayment;
+      autoApproved: boolean;
+      ownRequest?: boolean;
+    }
   ): Promise<void> {
     await tx.activity.recordMany(
       paymentCancelledActivity(
@@ -198,6 +211,7 @@ export class PaymentVoidService {
         {
           allocations: await tx.allocationShares(cancelled.payment.id),
           autoApproved: cancelled.autoApproved,
+          ownRequest: cancelled.ownRequest,
         }
       )
     );

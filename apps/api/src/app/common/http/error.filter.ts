@@ -10,7 +10,6 @@ import {
   ALREADY_DECIDED_MESSAGE,
   JOURNAL_REFERENCE_CLASH_MESSAGE,
   LEAVE_OVERLAP_MESSAGE,
-  SELF_APPROVAL_MESSAGE,
   STORE_PAYMENT_VOID_MESSAGE,
   YEAR_OVERLAP_MESSAGE,
   apiErrorCodeSchema,
@@ -55,10 +54,6 @@ function describeCheckViolation(exception: unknown) {
   const constraint = pgConstraint(exception);
   if (constraint === 'payment_store_sale_stays_posted') {
     return conflict(STORE_PAYMENT_VOID_MESSAGE);
-  }
-  // Convention: a self-approval CHECK is named `<table>_<action>_not_self`.
-  if (constraint.includes('not_self')) {
-    return conflict(SELF_APPROVAL_MESSAGE, 'SelfApproval');
   }
   // The trigger on a decided approval record is named `<table>_decided_frozen`.
   if (constraint.endsWith('_decided_frozen')) {

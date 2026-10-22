@@ -198,13 +198,13 @@ export class LeaveService {
   }
 
   async approve(ctx: OrgContext, id: string): Promise<LeaveDto> {
-    await this.decideOn(ctx, id, async (tx, found) => {
+    await this.decideOn(ctx, id, async (tx, found, ownRequest) => {
       const applied = await tx.approve(id);
       if (applied) {
         await this.recordDecision(tx, ctx, {
           found,
           kind: 'leave.approved',
-          text: `${sentenceFor(found)} was approved.`,
+          text: `${sentenceFor(found)} was approved${ownRequest ? ' (their own request)' : ''}.`,
         });
       }
       return applied;
@@ -241,7 +241,11 @@ export class LeaveService {
         throw notFound();
       }
       await decide(
-        { actorId: ctx.user.id, createdBy: found.createdBy },
+        {
+          actorId: ctx.user.id,
+          createdBy: found.createdBy,
+          isOwner: ctx.isOwner,
+        },
         async () => {
           assertCancellable(found, today);
           const applied = await tx.cancel(id, cancelReason);
@@ -262,7 +266,11 @@ export class LeaveService {
   private decideOn(
     ctx: OrgContext,
     id: string,
-    apply: (tx: LeaveTx, found: LockedLeave) => Promise<boolean>
+    apply: (
+      tx: LeaveTx,
+      found: LockedLeave,
+      ownRequest: boolean
+    ) => Promise<boolean>
   ): Promise<void> {
     return this.leave.withTx(orgScopeOf(ctx), ctx.user.id, async (tx) => {
       const found = await tx.lockInScope(id);
@@ -270,8 +278,13 @@ export class LeaveService {
         throw notFound();
       }
       await decide(
-        { actorId: ctx.user.id, createdBy: found.createdBy },
-        async () => found.status === 'submitted' && (await apply(tx, found))
+        {
+          actorId: ctx.user.id,
+          createdBy: found.createdBy,
+          isOwner: ctx.isOwner,
+        },
+        async (ownRequest) =>
+          found.status === 'submitted' && (await apply(tx, found, ownRequest))
       );
     });
   }

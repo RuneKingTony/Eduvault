@@ -426,10 +426,9 @@ test.describe('asking for a correction', () => {
     expect(await entryCount(pool, orgA.id, adjustment.number)).toBe(1);
   });
 
-  test('nobody approves or declines their own request, in the service or the database', async ({
+  test('nobody approves or declines their own request', async ({
     api,
     app,
-    pool,
     withPermissions,
     schools: { owner, orgA, lekki, studentLekki },
   }) => {
@@ -459,25 +458,32 @@ test.describe('asking for a correction', () => {
       message: SELF_APPROVAL_MESSAGE,
     });
     expect(decline.body.code).toBe('SelfApproval');
-    await expect(
-      pool.query(
-        `UPDATE adjustment SET status = 'approved', approved_by = created_by, approved_at = now() WHERE id = $1`,
-        [adjustment.id]
-      )
-    ).rejects.toMatchObject({
-      code: '23514',
-      constraint: 'adjustment_approved_not_self',
+  });
+
+  test('the owner approves their own request and the audit row says so', async ({
+    api,
+    app,
+    pool,
+    schools: { owner, studentLekki },
+  }) => {
+    await owes(app, owner, { studentId: studentLekki.id, amountMinor: OWED });
+    const { adjustment } = await askAdjustment(api, owner, {
+      kind: 'credit_note',
+      studentId: studentLekki.id,
+      amountMinor: 100_000,
+      reason: 'Late enrolment',
     });
-    await expect(
-      pool.query(
-        `UPDATE adjustment SET status = 'rejected', rejected_by = created_by, rejected_at = now(),
-           rejection_reason = 'No' WHERE id = $1`,
-        [adjustment.id]
-      )
-    ).rejects.toMatchObject({
-      code: '23514',
-      constraint: 'adjustment_rejected_not_self',
-    });
+
+    const approved = await approveAdjustment(api, owner, adjustment.id);
+
+    expect(approved.status).toBe('approved');
+    const { rows } = await pool.query<{ text: string; data: unknown }>(
+      `SELECT text, data FROM activity_event WHERE kind = 'adjustment.approved' AND subject_id = $1`,
+      [adjustment.id]
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.text).toMatch(/\(their own request\)\.$/);
+    expect(rows[0]?.data).toMatchObject({ ownRequest: true });
   });
 
   test('a decline keeps its reason and posts nothing, and a blank one answers 400', async ({

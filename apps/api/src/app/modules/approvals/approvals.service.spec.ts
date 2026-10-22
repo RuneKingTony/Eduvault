@@ -33,6 +33,7 @@ const org = (
   options: {
     approve?: boolean;
     acting?: boolean;
+    owner?: boolean;
     permissions?: Permission[];
     campusScope?: OrgContext['campusScope'];
   } = {}
@@ -45,6 +46,7 @@ const org = (
       options.permissions ??
         (options.approve === false ? ['payment:read'] : ['adjustment:approve'])
     ),
+    isOwner: options.owner === true,
     acting: options.acting === true ? { writes: false } : null,
   }) as unknown as OrgContext;
 
@@ -127,6 +129,12 @@ describe('ApprovalsService.list', () => {
       amountMinor: null,
       amountText: '50% off',
     });
+  });
+
+  it('lets the owner decide their own request', async () => {
+    const service = serviceOver(provider(balanceItem, voidItem));
+    const list = await service.list(org('chika', { owner: true }), page1);
+    expect(list.items.map((item) => item.decide)).toEqual(['yes', 'yes']);
   });
 
   it('marks the viewer’s own request as own and still lists it', async () => {

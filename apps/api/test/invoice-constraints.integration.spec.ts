@@ -527,21 +527,6 @@ test.describe('student discount constraints', () => {
       );
     };
 
-    await expect(
-      insert({
-        status: 'approved',
-        approved_by: user,
-        approved_at: '2026-10-01',
-      })
-    ).rejects.toThrow(/student_discount_approved_not_self/);
-    await expect(
-      insert({
-        status: 'rejected',
-        rejected_by: user,
-        rejected_at: '2026-10-01',
-        rejection_reason: 'No',
-      })
-    ).rejects.toThrow(/student_discount_rejected_not_self/);
     await expect(insert({ value: 101 })).rejects.toThrow(
       /student_discount_percent_range/
     );

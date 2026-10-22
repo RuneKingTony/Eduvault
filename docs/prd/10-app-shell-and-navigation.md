@@ -235,7 +235,7 @@ There is no theme button in the topbar; the theme switch is in the user menu.
 #### 4. Self-approval refused
 
 - Someone with `adjustment:approve` opens Approvals and sees a request they created (for example a payment cancellation they drafted).
-- Their own row shows a "Your own" warning badge instead of Approve and Decline. Tooltip: "You created this. Someone else must approve it." (The prototype's tooltip names the database check; see Prototype gaps.)
+- Their own row shows a "Your own" warning badge instead of Approve and Decline. Tooltip: "You can’t decide your own request. Ask someone else to decide it." The owner sees Approve and Decline on their own row instead ([D-378](../technical-reference.md#decision-log)). (The prototype's tooltip names the database check; see Prototype gaps.)
 - Their own requests are left out of the bell and of the nav counts.
 - If an approve or decline call is made anyway, the API answers 409 with `code: "SelfApproval"`, and the screen shows a danger toast with the same sentence. The database checks `approved_by <> created_by` and `rejected_by <> created_by` back this up ([D-013](../technical-reference.md#decision-log), [D-025](../technical-reference.md#decision-log)).
 - The requester can still withdraw their own submitted leave.

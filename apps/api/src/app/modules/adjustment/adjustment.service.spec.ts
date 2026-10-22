@@ -292,6 +292,7 @@ describe('AdjustmentService.create', () => {
           studentId: ADA,
           amountMinor: 1_000_000,
           autoApproved: true,
+          ownRequest: false,
         },
       },
     ]);
@@ -483,6 +484,7 @@ describe('AdjustmentService.approve activity', () => {
         data: {
           adjustmentKind: kind,
           autoApproved: false,
+          ownRequest: false,
           amountMinor: amount,
         },
       });

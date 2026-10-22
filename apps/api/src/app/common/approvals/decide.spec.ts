@@ -15,7 +15,8 @@ const conflictBody = async (promise: Promise<unknown>) => {
   return (error as ConflictException).getResponse();
 };
 
-const own = () => assertNotOwn({ actorId: 'chika', createdBy: 'chika' });
+const own = () =>
+  assertNotOwn({ actorId: 'chika', createdBy: 'chika', isOwner: false });
 
 describe('assertNotOwn', () => {
   it('refuses the creator with the SelfApproval code and the PRD words', () => {
@@ -23,12 +24,18 @@ describe('assertNotOwn', () => {
     expect(() => own()).toThrow(SELF_APPROVAL_MESSAGE);
   });
 
+  it('lets the owner decide their own request', () => {
+    expect(() =>
+      assertNotOwn({ actorId: 'funmi', createdBy: 'funmi', isOwner: true })
+    ).not.toThrow();
+  });
+
   it('lets someone else decide, and anyone decide a request with no creator', () => {
     expect(() =>
-      assertNotOwn({ actorId: 'grace', createdBy: 'chika' })
+      assertNotOwn({ actorId: 'grace', createdBy: 'chika', isOwner: false })
     ).not.toThrow();
     expect(() =>
-      assertNotOwn({ actorId: 'grace', createdBy: null })
+      assertNotOwn({ actorId: 'grace', createdBy: null, isOwner: false })
     ).not.toThrow();
   });
 });
@@ -47,14 +54,32 @@ describe('assertDeclineReason', () => {
 describe('decide', () => {
   it('runs the update for someone else and resolves', async () => {
     const apply = vi.fn(() => Promise.resolve(true));
-    await decide({ actorId: 'grace', createdBy: 'chika' }, apply);
+    await decide(
+      { actorId: 'grace', createdBy: 'chika', isOwner: false },
+      apply
+    );
     expect(apply).toHaveBeenCalledTimes(1);
+  });
+
+  it('tells the update when it is deciding the owner’s own request', async () => {
+    const apply = vi.fn((ownRequest: boolean) => Promise.resolve(ownRequest));
+    await decide(
+      { actorId: 'funmi', createdBy: 'funmi', isOwner: true },
+      apply
+    );
+    expect(apply).toHaveBeenCalledWith(true);
+    const other = vi.fn((ownRequest: boolean) => Promise.resolve(!ownRequest));
+    await decide(
+      { actorId: 'funmi', createdBy: 'chika', isOwner: true },
+      other
+    );
+    expect(other).toHaveBeenCalledWith(false);
   });
 
   it('answers 409 SelfApproval before the update runs', async () => {
     const apply = vi.fn(() => Promise.resolve(true));
     const body = await conflictBody(
-      decide({ actorId: 'chika', createdBy: 'chika' }, apply)
+      decide({ actorId: 'chika', createdBy: 'chika', isOwner: false }, apply)
     );
     expect(body).toEqual({
       code: 'SelfApproval',
@@ -65,7 +90,7 @@ describe('decide', () => {
 
   it('answers 409 AlreadyDecided when the conditional update changed no row', async () => {
     const body = await conflictBody(
-      decide({ actorId: 'grace', createdBy: 'chika' }, () =>
+      decide({ actorId: 'grace', createdBy: 'chika', isOwner: false }, () =>
         Promise.resolve(false)
       )
     );
@@ -77,7 +102,7 @@ describe('decide', () => {
 
   it('lets a failure inside the update pass through untouched', async () => {
     await expect(
-      decide({ actorId: 'grace', createdBy: null }, () =>
+      decide({ actorId: 'grace', createdBy: null, isOwner: false }, () =>
         Promise.reject(new Error('boom'))
       )
     ).rejects.toThrow('boom');
