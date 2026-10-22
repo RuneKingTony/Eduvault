@@ -7,8 +7,9 @@
 
 Open 3 · fixed 1 · still failing 0
 
-## F-01 · high · small · Reject leaves the journey on "waiting for reviewer"
+## F-01 · high · small · After a reviewer rejects a write-off, the request still shows as waiting
 status: open
+impact: every approver; the request stays in the queue and the pending badge never drops
 section: 03-approvals
 persona: owner
 check: <check id>, after rejecting a write-off the row shows Rejected
@@ -25,6 +26,8 @@ cause: the approvals query is not invalidated after the decision (apps/web-admin
 
 | Field    | Content                                                                                                                                                                                                                             |
 | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| title    | what a person sees or can no longer do, in plain words; never the mechanism                                                                                                                                                         |
+| impact   | who is affected (role, campus) and what is at stake, one line                                                                                                                                                                       |
 | id       | `F-NN`, never reused or renumbered                                                                                                                                                                                                  |
 | severity | `critical` data loss, wrong money, a role seeing another school or campus; `high` the flow cannot be completed or a permission is wrong; `medium` works with a visible defect (missing success signal, wrong state); `low` cosmetic |
 | effort   | `small`, `medium`, `large`: your estimate of the fix, so findings can be batched                                                                                                                                                    |
