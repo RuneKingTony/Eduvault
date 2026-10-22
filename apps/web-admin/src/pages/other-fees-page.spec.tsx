@@ -145,6 +145,24 @@ describe('OtherFeesPage', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('shows the Who takes card only with a fee type chip selected', async () => {
+    const { api } = setup(ownerAccess(), { type: BUS.id });
+    expect(await screen.findByText('Who takes School bus')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(api.feeOptIns.list).toHaveBeenCalledWith({
+        params: { feeTypeId: BUS.id },
+        query: { termId: TERM_1, q: '' },
+      });
+    });
+  });
+
+  it('leaves the Who takes card out on All other fees', async () => {
+    const { api } = setup();
+    await screen.findByText('Other fees · First term, 2026/2027');
+    expect(screen.queryByText(/^Who takes /)).not.toBeInTheDocument();
+    expect(api.feeOptIns.list).not.toHaveBeenCalled();
+  });
+
   it('reports the chip picked', async () => {
     const { onSearchChange } = setup();
     await user.click(await screen.findByRole('tab', { name: 'PTA fee' }));

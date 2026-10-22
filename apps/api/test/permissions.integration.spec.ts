@@ -105,6 +105,8 @@ test.describe('guard order', () => {
       ['post', '/fee-types'],
       ['get', `/students/${id}/fee-options`],
       ['put', `/students/${id}/fee-options/${id}`],
+      ['get', `/fee-types/${id}/opt-ins`],
+      ['put', `/fee-types/${id}/opt-ins`],
       ['get', '/campuses/summary'],
       ['patch', '/school-account'],
       ['put', '/school-account/logo'],

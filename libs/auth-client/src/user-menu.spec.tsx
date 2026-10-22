@@ -27,6 +27,9 @@ function setup(
     .fn()
     .mockResolvedValue(options.signOutResult ?? { data: {}, error: null });
   const onSignedOut = vi.fn();
+  const useActiveMember = vi.fn(() => ({
+    data: { role: options.role ?? 'owner,member' },
+  }));
   const authClient = fakeClient({
     useSession: () => ({
       data: {
@@ -41,7 +44,7 @@ function setup(
     }),
     useListOrganizations: () => ({ data: options.schools ?? [] }),
     organization: { setActive },
-    useActiveMember: () => ({ data: { role: options.role ?? 'owner,member' } }),
+    useActiveMember,
     signOut,
   });
   const menu = (
@@ -69,7 +72,7 @@ function setup(
       <PermissionsProvider value={access}>{menu}</PermissionsProvider>
     )
   );
-  return { signOut, onSignedOut, setActive };
+  return { signOut, onSignedOut, setActive, useActiveMember };
 }
 
 describe('UserMenu', () => {
@@ -106,6 +109,19 @@ describe('UserMenu', () => {
     expect(
       screen.getByRole('button', { name: 'Funmi Adeyemi Student' })
     ).toBeInTheDocument();
+  });
+
+  it('does not ask for the active member while permissions are present', () => {
+    const { useActiveMember } = setup({ access: accessOfStarter('bursar') });
+    expect(
+      screen.getByRole('button', { name: 'Funmi Adeyemi Bursar' })
+    ).toBeInTheDocument();
+    expect(useActiveMember).not.toHaveBeenCalled();
+  });
+
+  it('asks for the active member only outside a permissions provider', () => {
+    const { useActiveMember } = setup({ access: null, role: 'student,member' });
+    expect(useActiveMember).toHaveBeenCalled();
   });
 
   it('shows the name and email, light or dark and sign out', async () => {

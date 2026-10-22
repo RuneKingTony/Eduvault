@@ -150,6 +150,34 @@ describe('SubjectsPage catalogue', () => {
     expect(screen.getByText('Not on any level')).toBeInTheDocument();
   });
 
+  it('dates the Archived tooltip by the Lagos day, not the UTC one', async () => {
+    renderWithApi(
+      page('catalogue'),
+      apiFor({
+        subjects: {
+          list: vi.fn().mockResolvedValue({
+            items: [
+              subject({
+                id: SUBJECT_IDS.agr,
+                code: 'AGR',
+                name: 'Agricultural Science',
+                retiredAt: '2025-07-19T23:30:00.000Z',
+                levelCodes: [],
+              }),
+            ],
+            total: 1,
+          }),
+          create: vi.fn(),
+          update: vi.fn(),
+        },
+      })
+    );
+    await user.hover(await screen.findByText('Archived'));
+    expect(
+      (await screen.findAllByText('Retired 20 Jul 2025'))[0]
+    ).toBeInTheDocument();
+  });
+
   it('shows four level badges and a +n badge for the rest', async () => {
     renderWithApi(page('catalogue'), apiFor());
     const cells = within(

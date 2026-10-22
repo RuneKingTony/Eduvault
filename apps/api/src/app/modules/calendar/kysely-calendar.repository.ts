@@ -1,8 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { sql } from 'kysely';
-import { INACTIVE_AFTER_DAYS } from '@eduvault/shared';
 import { KYSELY_TOKEN, type Database } from '../../common/db/tokens';
-import { rollForwardPlacements } from '../../common/students';
+import { inactiveSql, rollForwardPlacements } from '../../common/students';
 import {
   CalendarRepository,
   type HolidayRecord,
@@ -340,10 +339,7 @@ export class KyselyCalendarRepository extends CalendarRepository {
       FROM student s
       WHERE s.organization_id = ${organizationId}
         AND s.exit_kind IS NULL
-        AND (
-          s.not_seen_since IS NULL
-          OR (${query.today}::date - s.not_seen_since) < ${INACTIVE_AFTER_DAYS}
-        )
+        AND NOT ${inactiveSql(query.today, 's.not_seen_since')}
         AND EXISTS (
           SELECT 1 FROM student_enrollment en
           WHERE en.student_id = s.id

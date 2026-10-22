@@ -7,6 +7,7 @@ import type {
 import type { ActivityRecorder } from '../../common/activity';
 import type { WaitingApproval } from '../../common/approvals';
 import type { CampusScope } from '../../common/campus-scope';
+import type { UsableMoneyAccount } from '../../common/money-accounts';
 import type { PostInput } from '../../common/ledger';
 import type { StudentIdentity } from '../../common/students';
 
@@ -25,10 +26,6 @@ export type CreditAccountCheck =
   | { status: 'ok'; ledgerAccountId: string };
 
 export type SentChargeCheck = 'ok' | 'missing' | 'not_sent';
-
-export type RefundAccountCheck =
-  | { status: 'missing' | 'retired' | 'gateway' }
-  | { status: 'ok'; ledgerAccountId: string; campusId: string | null };
 
 export interface AdjustmentRecord {
   id: string;
@@ -85,7 +82,7 @@ export interface AdjustmentTx {
   approvalOn(kind: AdjustmentKind): Promise<boolean>;
   sentCharge(studentId: string, invoiceId: string): Promise<SentChargeCheck>;
   creditAccount(ledgerAccountId: string | null): Promise<CreditAccountCheck>;
-  refundAccount(moneyAccountId: string): Promise<RefundAccountCheck>;
+  refundAccount(moneyAccountId: string): Promise<UsableMoneyAccount>;
   moneyAccountPosting(
     moneyAccountId: string
   ): Promise<MoneyAccountPosting | undefined>;

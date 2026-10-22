@@ -21,6 +21,7 @@ import {
   createSchoolYear,
 } from './support/factories/calendar';
 import { approveLeave, askLeave } from './support/factories/leave';
+import { expectSeatsConsistent } from './support/seats';
 import { assignClassTeacher, createClass } from './support/factories/classes';
 import {
   MATHS,
@@ -588,6 +589,58 @@ test.describe('members', () => {
       expect(removeMember.body.message).toContain('Cashier');
     });
 
+    test('refuses changing the campuses or the title of a member who holds a role the caller lacks', async ({
+      api,
+      createRole,
+      hire,
+      withPermissions,
+      schools: { orgA, owner, lekki, ikeja },
+    }) => {
+      await createRole(orgA, {
+        slug: 'cashier',
+        label: 'Cashier',
+        permissions: ['schoolAccount:update'],
+      });
+      const editor = await withPermissions(
+        orgA,
+        ['member:read', 'member:update'],
+        { campuses: [lekki, ikeja] }
+      );
+      const holder = await hire(owner, {
+        name: 'Holder',
+        title: 'Bursar',
+        campusIds: [lekki.id, ikeja.id],
+      });
+      await putRoles(api, owner, {
+        id: holder.member.id,
+        roles: ['cashier'],
+        campusIds: [lekki.id, ikeja.id],
+      }).expect(200);
+
+      const campuses = await api(editor)
+        .put(`/members/${holder.member.id}/campuses`)
+        .send({ campusIds: [lekki.id] })
+        .expect(403);
+      expect(campuses.body.message).toBe(
+        `You can’t change the campuses of Holder: they hold Cashier, which ${ESCALATION.replace('it ', '')}`
+      );
+      const title = await putTitle(api, editor, {
+        id: holder.member.id,
+        title: 'Registrar',
+      }).expect(403);
+      expect(title.body.message).toBe(
+        `You can’t change the title of Holder: they hold Cashier, which ${ESCALATION.replace('it ', '')}`
+      );
+
+      const after = (
+        await api(owner).get(`/members/${holder.member.id}`).expect(200)
+      ).body as MemberDetail;
+      expect(after.campusIds.toSorted((a, b) => a.localeCompare(b))).toEqual(
+        [lekki.id, ikeja.id].toSorted((a, b) => a.localeCompare(b))
+      );
+      expect(after.title).toBe('Bursar');
+    });
+
     test('a refused change leaves roles and campuses unchanged', async ({
       api,
       createRole,
@@ -1139,7 +1192,7 @@ test.describe('members', () => {
       api,
       pool,
       hire,
-      schools: { owner, lekki },
+      schools: { owner, orgA, lekki },
     }) => {
       const target = await hire(owner, { campusIds: [lekki.id] });
       await api(target.user).get('/campuses').expect(200);
@@ -1166,6 +1219,7 @@ test.describe('members', () => {
       const refused = await api(target.user).get('/campuses').expect(403);
       expect(refused.body.code).toBe('NoSchool');
       await api(owner).get(`/members/${target.member.id}`).expect(404);
+      await expectSeatsConsistent(pool, orgA.id);
     });
   });
 
@@ -1964,6 +2018,94 @@ test.describe('members', () => {
       const full = (await api(owner).get(`/members/${id}`).expect(200))
         .body as MemberDetail;
       expect(full.classes).toHaveLength(2);
+    });
+
+    test('names the classes a subject-only teacher teaches, and none they no longer teach', async ({
+      api,
+      app,
+      createUser,
+      addMember,
+      schools: { orgA, owner, lekki },
+    }) => {
+      await createSchoolYear(app, owner);
+      const teacher = await addMember(orgA, await createUser(), {
+        roles: ['teacher'],
+        campuses: [lekki],
+      });
+      const gold = await createClass(app, owner, {
+        campusId: lekki.id,
+        name: 'Gold',
+      });
+      const old = await createClass(app, owner, {
+        campusId: lekki.id,
+        name: 'Old',
+      });
+      const maths = await createSubject(app, owner, MATHS);
+      for (const arm of [gold, old]) {
+        await assignSubjectTeacher(app, owner, {
+          arm,
+          subjectId: maths.id,
+          userId: teacher.id,
+        });
+      }
+      await api(owner)
+        .patch(`/classes/${old.id}`)
+        .send({ archived: true })
+        .expect(200);
+
+      const id = await idOf(api, owner, teacher.id);
+      const detail = (await api(owner).get(`/members/${id}`).expect(200))
+        .body as MemberDetail;
+
+      expect(detail.classes).toEqual([
+        { id: gold.id, displayName: gold.displayName },
+      ]);
+      expect(detail.classScope).toEqual([gold.id]);
+    });
+
+    test('lists an arm once when taught as class and subject, and keeps a Lekki-only viewer to Lekki', async ({
+      api,
+      app,
+      createUser,
+      addMember,
+      withPermissions,
+      schools: { orgA, owner, lekki, ikeja },
+    }) => {
+      await createSchoolYear(app, owner);
+      const viewer = await withPermissions(orgA, ['member:read'], {
+        campuses: [lekki],
+      });
+      const teacher = await addMember(orgA, await createUser(), {
+        roles: ['teacher'],
+        campuses: [lekki, ikeja],
+      });
+      const atLekki = await createClass(app, owner, { campusId: lekki.id });
+      const atIkeja = await createClass(app, owner, { campusId: ikeja.id });
+      await assignClassTeacher(app, owner, {
+        classId: atLekki.id,
+        userId: teacher.id,
+      });
+      const maths = await createSubject(app, owner, MATHS);
+      for (const arm of [atLekki, atIkeja]) {
+        await assignSubjectTeacher(app, owner, {
+          arm,
+          subjectId: maths.id,
+          userId: teacher.id,
+        });
+      }
+
+      const id = await idOf(api, owner, teacher.id);
+      const seen = (await api(viewer).get(`/members/${id}`).expect(200))
+        .body as MemberDetail;
+      expect(seen.classes.map((row) => row.id)).toEqual([atLekki.id]);
+      expect(seen.classScope).toEqual([atLekki.id]);
+      const full = (await api(owner).get(`/members/${id}`).expect(200))
+        .body as MemberDetail;
+      expect(
+        full.classes.map((row) => row.id).toSorted((a, b) => a.localeCompare(b))
+      ).toEqual(
+        [atLekki.id, atIkeja.id].toSorted((a, b) => a.localeCompare(b))
+      );
     });
 
     test('another school’s owner gets 404, never the classes', async ({

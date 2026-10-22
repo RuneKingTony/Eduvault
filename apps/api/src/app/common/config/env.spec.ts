@@ -17,6 +17,31 @@ describe('loadEnv', () => {
     expect(loadEnv(valid).PORT).toBe(3000);
   });
 
+  it('sizes the database pool and its connect wait, with defaults', () => {
+    expect(loadEnv(valid)).toMatchObject({
+      DATABASE_POOL_MAX: 20,
+      DATABASE_CONNECT_TIMEOUT_MS: 10_000,
+    });
+    expect(
+      loadEnv({
+        ...valid,
+        DATABASE_POOL_MAX: '5',
+        DATABASE_CONNECT_TIMEOUT_MS: '3000',
+      })
+    ).toMatchObject({
+      DATABASE_POOL_MAX: 5,
+      DATABASE_CONNECT_TIMEOUT_MS: 3000,
+    });
+    for (const bad of ['0', '-1', 'many', '1.5']) {
+      expect(() => loadEnv({ ...valid, DATABASE_POOL_MAX: bad })).toThrow(
+        /DATABASE_POOL_MAX/
+      );
+      expect(() =>
+        loadEnv({ ...valid, DATABASE_CONNECT_TIMEOUT_MS: bad })
+      ).toThrow(/DATABASE_CONNECT_TIMEOUT_MS/);
+    }
+  });
+
   it('names every invalid variable in one error', () => {
     expect(() =>
       loadEnv({ ...valid, DATABASE_URL: '', BETTER_AUTH_SECRET: 'short' })

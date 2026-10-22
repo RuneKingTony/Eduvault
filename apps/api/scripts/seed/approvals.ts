@@ -1,6 +1,5 @@
 import type { INestApplicationContext } from '@nestjs/common';
 import type { OrgContext } from '../../src/app/common/auth';
-import { Clock } from '../../src/app/common/clock';
 import { KYSELY_TOKEN, type Database } from '../../src/app/common/db/tokens';
 import { AdjustmentService } from '../../src/app/modules/adjustment/adjustment.service';
 import { PaymentVoidService } from '../../src/app/modules/payment/payment-void.service';
@@ -115,16 +114,10 @@ export async function seedApprovals(
   app: INestApplicationContext,
   seed: ApprovalsSeed
 ) {
-  const clock = app.get(Clock, { strict: false });
   const [bursar, principal] = await Promise.all([
     orgContextFor(app, emailOf('chika')),
     orgContextFor(app, emailOf('grace')),
   ]);
-  clock.set(seed.today);
-  try {
-    await seedWaitingCancellation(app, seed, bursar);
-    await seedCorrections(app, seed, { bursar, principal });
-  } finally {
-    clock.set(null);
-  }
+  await seedWaitingCancellation(app, seed, bursar);
+  await seedCorrections(app, seed, { bursar, principal });
 }

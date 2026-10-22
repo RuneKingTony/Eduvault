@@ -5,6 +5,7 @@ import { toast } from '@eduvault/ui';
 import {
   ACCOUNT,
   ADA,
+  BANK_ACCOUNT,
   CHIDI,
   NGOZI,
   PAYMENT_ID,
@@ -269,7 +270,7 @@ describe('RecordPaymentSheet', () => {
     expect(api.files.upload).toHaveBeenCalledTimes(1);
     expect(api.payments.record.mock.calls[0]?.[0].body).toMatchObject({
       payerGuardianId: NGOZI,
-      moneyAccountId: ACCOUNT,
+      moneyAccountId: BANK_ACCOUNT,
       method: 'transfer',
       proofFileId: '00000000-0000-4000-8000-0000000a0a01',
       amountMinor: 30_000_000,
@@ -339,6 +340,36 @@ describe('RecordPaymentSheet', () => {
       );
     });
     expect(router.state.location.search).not.toHaveProperty('recorded', 1);
+  });
+
+  it('clears the amount error once a valid amount is typed', async () => {
+    setup();
+    await screen.findByLabelText('Amount received (₦)');
+    await user.clear(amount());
+    await user.type(amount(), '0');
+    await user.click(screen.getByRole('button', { name: 'Record payment' }));
+    expect(
+      await screen.findByText('Enter the amount received.')
+    ).toBeInTheDocument();
+    await user.clear(amount());
+    await user.type(amount(), '5000');
+    expect(
+      screen.queryByText('Enter the amount received.')
+    ).not.toBeInTheDocument();
+  });
+
+  it('sends one request when Record payment is pressed twice before it settles', async () => {
+    const { api } = setup({
+      record: vi.fn().mockReturnValue(new Promise(() => undefined)),
+    });
+    const button = await screen.findByRole('button', {
+      name: 'Record payment',
+    });
+    await user.click(button);
+    await user.click(button);
+    await waitFor(() => {
+      expect(api.payments.record).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('shows the server’s refusal and keeps the sheet open', async () => {

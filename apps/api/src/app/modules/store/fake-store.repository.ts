@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { itemDisplayName, type DeliveryDetail } from '@eduvault/api-contract';
+import type { UsableMoneyAccount } from '../../common/money-accounts';
 import type { ActivityInput } from '../../common/activity';
 import { receiveValue } from './stock-value';
 import {
@@ -14,7 +15,6 @@ import {
   type ItemInsertOutcome,
   type ItemRecord,
   type ItemUpdateOutcome,
-  type MoneyAccountCheck,
   type NewDelivery,
   type NewItem,
   type StockTotals,
@@ -100,7 +100,7 @@ export class FakeStoreRepository extends StoreRepository {
   items: ItemRecord[] = [];
   stores: StoreRef[] = [];
   totals: StockTotals[] = [];
-  accounts = new Map<string, MoneyAccountCheck>();
+  accounts = new Map<string, UsableMoneyAccount>();
   deliveries: DeliveryDetail[] = [];
   existing: ExistingDelivery | undefined;
   opening = false;
@@ -267,7 +267,7 @@ export class FakeStoreRepository extends StoreRepository {
   moneyAccount(
     _scope: StoreScope,
     moneyAccountId: string
-  ): Promise<MoneyAccountCheck> {
+  ): Promise<UsableMoneyAccount> {
     return Promise.resolve(
       this.accounts.get(moneyAccountId) ?? ({ status: 'missing' } as const)
     );

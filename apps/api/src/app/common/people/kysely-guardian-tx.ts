@@ -3,11 +3,10 @@ import { splitRoles } from '@eduvault/policy';
 import type { ActivityInput, ActivityWriter } from '../activity';
 import type { DB } from '../../../db/db-types';
 import { escapeLike } from '../db/escape-like';
+import { addMemberRole, stripMemberRole } from '../auth/member-rows';
 import {
-  addMemberRole,
   createPortalLogin,
   resetPortalPassword,
-  stripMemberRole,
   type NewPortalLogin,
 } from '../auth/portal-login';
 import type {

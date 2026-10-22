@@ -84,6 +84,7 @@ function setup() {
   repository.items = [shirt, tie];
   repository.accounts.set(ACCOUNT, {
     status: 'ok',
+    kind: 'bank',
     ledgerAccountId: 'bank-ledger',
     campusId: LEKKI,
   });
@@ -149,6 +150,7 @@ describe('DeliveryService.record', () => {
     const { repository, service } = setup();
     repository.accounts.set(ACCOUNT, {
       status: 'ok',
+      kind: 'bank',
       ledgerAccountId: 'bank-ledger',
       campusId: null,
     });
@@ -441,7 +443,7 @@ describe('DeliveryService.record refusals', () => {
     ['a retired account', { status: 'retired' }],
     [
       'an account on another campus',
-      { status: 'ok', ledgerAccountId: 'x', campusId: IKEJA },
+      { status: 'ok', ledgerAccountId: 'x', campusId: IKEJA, kind: 'bank' },
     ],
   ] as const)('answers 400 for %s', async (_name, account) => {
     const { repository, service } = setup();

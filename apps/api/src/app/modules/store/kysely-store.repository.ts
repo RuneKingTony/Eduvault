@@ -4,6 +4,10 @@ import type { DeliveryDetail } from '@eduvault/api-contract';
 import { ActivityWriter } from '../../common/activity';
 import { inCampusScope } from '../../common/db/in-campus-scope';
 import { KYSELY_TOKEN, type Database } from '../../common/db/tokens';
+import {
+  usableMoneyAccount,
+  type UsableMoneyAccount,
+} from '../../common/money-accounts';
 import { LedgerPoster, schoolCurrency } from '../../common/ledger';
 import {
   findDelivery,
@@ -33,7 +37,6 @@ import {
   type ItemInsertOutcome,
   type ItemRecord,
   type ItemUpdateOutcome,
-  type MoneyAccountCheck,
   type NewDelivery,
   type NewItem,
   type StockTotals,
@@ -162,36 +165,11 @@ export class KyselyStoreRepository extends StoreRepository {
     return findDeliveryByReference(this.db, organizationId, reference);
   }
 
-  async moneyAccount(
+  moneyAccount(
     scope: StoreScope,
     moneyAccountId: string
-  ): Promise<MoneyAccountCheck> {
-    const row = await this.db
-      .selectFrom('money_account')
-      .select(['ledger_account_id', 'campus_id', 'kind', 'retired_at'])
-      .where('organization_id', '=', scope.organizationId)
-      .where('id', '=', moneyAccountId)
-      .where((eb) =>
-        inCampusScope(eb, 'money_account.campus_id', {
-          scope: scope.campusScope,
-          nullMeans: 'all',
-        })
-      )
-      .executeTakeFirst();
-    if (row === undefined) {
-      return { status: 'missing' };
-    }
-    if (row.kind === 'gateway') {
-      return { status: 'gateway' };
-    }
-    if (row.retired_at !== null) {
-      return { status: 'retired' };
-    }
-    return {
-      status: 'ok',
-      ledgerAccountId: row.ledger_account_id,
-      campusId: row.campus_id,
-    };
+  ): Promise<UsableMoneyAccount> {
+    return usableMoneyAccount(this.db, scope, moneyAccountId);
   }
 
   hasOpeningStock(organizationId: string, storeId: string): Promise<boolean> {

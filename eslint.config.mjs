@@ -454,7 +454,10 @@ export default [
   },
   {
     // A contract runner registers each scenario under the contract's own title, so the title is not a literal; runScenario carries the assertions.
-    files: ['**/store-repository.integration.spec.ts'],
+    files: [
+      '**/store-repository.integration.spec.ts',
+      '**/fee-option-repository.integration.spec.ts',
+    ],
     rules: {
       'vitest/expect-expect': [
         'error',

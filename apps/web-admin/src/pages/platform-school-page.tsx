@@ -10,7 +10,7 @@ import {
   ShieldIcon,
   UserCogIcon,
 } from 'lucide-react';
-import { ApiError, type PlatformSchool } from '@eduvault/api-contract';
+import type { PlatformSchool } from '@eduvault/api-contract';
 import { UserAvatar } from '@eduvault/auth-client';
 import { fmtTimestamp } from '@eduvault/shared';
 import {
@@ -30,8 +30,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   ErrorMessage,
-  NotFoundState,
-  PageSkeleton,
   Tooltip,
   TooltipContent,
   TooltipProvider,
@@ -39,6 +37,11 @@ import {
 } from '@eduvault/ui';
 import type { SchoolRef } from '../acting-store';
 import { useApi } from '../api';
+import {
+  BackButton,
+  DetailNotFound,
+  DetailPage,
+} from '../components/detail-page';
 import { AuditTable } from '../components/audit-table';
 import { TemporaryPasswordDialog } from '../components/created-school-dialog';
 import {
@@ -244,14 +247,11 @@ function Header({
 
 function SchoolNotFound({ onBack }: { onBack: () => void }) {
   return (
-    <NotFoundState
+    <DetailNotFound
       title="School not found"
       description="We couldn’t find that school. It may have been moved, or it may belong to a campus or class you don’t look after."
-    >
-      <Button type="button" variant="outline" size="sm" onClick={onBack}>
-        Go back
-      </Button>
-    </NotFoundState>
+      back={<BackButton label="Go back" size="sm" onBack={onBack} />}
+    />
   );
 }
 
@@ -359,20 +359,20 @@ export function PlatformSchoolPage({
   onBack: () => void;
 }) {
   const api = useApi();
-  const { data: school, error } = useQuery(
-    platformSchoolQueryOptions(api, schoolId)
-  );
-  if (error instanceof ApiError && error.status === 404) {
-    return <SchoolNotFound onBack={onBack} />;
-  }
-  if (school === undefined) {
-    return error === null ? (
-      <PageSkeleton rows={3} />
-    ) : (
-      <ErrorMessage error={error} />
-    );
-  }
+  const school = useQuery(platformSchoolQueryOptions(api, schoolId));
   return (
-    <SchoolBody school={school} onActInSchool={onActInSchool} onBack={onBack} />
+    <DetailPage
+      queries={[school]}
+      rows={3}
+      notFound={<SchoolNotFound onBack={onBack} />}
+    >
+      {([loaded]) => (
+        <SchoolBody
+          school={loaded}
+          onActInSchool={onActInSchool}
+          onBack={onBack}
+        />
+      )}
+    </DetailPage>
   );
 }

@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { expect } from './support/base-test';
 import { assignClassTeacher } from './support/factories/classes';
 import { createStudent, ensureClass } from './support/factories/students';
+import { expectSeatsConsistent } from './support/seats';
 import { schoolsTest } from './support/two-schools';
 
 const test = schoolsTest;
@@ -316,6 +317,7 @@ test.describe('payers and unlinking', () => {
       .delete(`/students/${studentIkeja.id}/guardians/${guardianId}`)
       .expect(200);
     expect(await roles()).toEqual([]);
+    await expectSeatsConsistent(pool, orgA.id);
     const unlinked = await pool.query<{ text: string; data: string }>(
       `SELECT text, data::text AS data FROM activity_event
        WHERE kind = 'guardian.unlinked' AND organization_id = $1 ORDER BY occurred_at`,

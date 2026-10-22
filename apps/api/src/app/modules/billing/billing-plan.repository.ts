@@ -1,21 +1,11 @@
 import type {
-  BillingRun,
-  BillingRunListQuery,
-  BillingRunSummary,
-} from '@eduvault/api-contract';
-import type { CampusScope } from '../../common/campus-scope';
-import type {
   ChargeableFeeLine,
   DiscountFacts,
   TermPosition,
 } from '../../common/fees';
 import type { RoundFilter } from './billing-round';
-import type { PlannedCharge, RoundCandidate } from './round-plan';
-
-export interface BillingScope {
-  organizationId: string;
-  campusScope: CampusScope;
-}
+import type { BillingScope } from './billing-scope';
+import type { RoundCandidate } from './round-plan';
 
 export interface TermInfo {
   id: string;
@@ -53,49 +43,7 @@ export interface RoundCandidateOptions {
   today: string;
 }
 
-export type RunHeader = Omit<BillingRun, 'charges' | 'currency'>;
-
-export interface RunPage {
-  items: BillingRunSummary[];
-  total: number;
-}
-
-export interface NewRound {
-  organizationId: string;
-  userId: string;
-  termId: string;
-  filter: RoundFilter;
-  year: number;
-  charges: readonly PlannedCharge[];
-}
-
-export interface CreatedRound {
-  runId: string | null;
-  number: string | null;
-  created: number;
-}
-
-export interface RunAction {
-  scope: BillingScope;
-  runId: string;
-  userId: string;
-  userName: string;
-}
-
-export interface IssueRound extends RunAction {
-  today: string;
-  year: number;
-}
-
-export type RunOutcome =
-  | { status: 'done' }
-  | { status: 'not_found' }
-  | { status: 'out_of_scope' }
-  | { status: 'refused'; current: BillingRun['status'] };
-
-export abstract class BillingRepository {
-  abstract currency(organizationId: string): Promise<string>;
-
+export abstract class BillingPlanRepository {
   abstract termsToCharge(organizationId: string): Promise<TermInfo[]>;
 
   abstract findTerm(
@@ -136,20 +84,4 @@ export abstract class BillingRepository {
   ): Promise<Map<string, DiscountFacts[]>>;
 
   abstract discountsAccountId(organizationId: string): Promise<string>;
-
-  abstract createRound(input: NewRound): Promise<CreatedRound>;
-
-  abstract listRuns(
-    scope: BillingScope,
-    query: BillingRunListQuery
-  ): Promise<RunPage>;
-
-  abstract findRun(
-    scope: BillingScope,
-    id: string
-  ): Promise<RunHeader | undefined>;
-
-  abstract issue(input: IssueRound): Promise<RunOutcome>;
-
-  abstract cancel(input: RunAction): Promise<RunOutcome>;
 }
