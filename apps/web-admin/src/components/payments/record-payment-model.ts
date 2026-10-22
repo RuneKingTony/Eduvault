@@ -7,6 +7,7 @@ import {
   PAYMENT_REFERENCE_REQUIRED_MESSAGE,
   paymentSplitMismatchMessage,
   accountTakesMethod,
+  METHOD_ACCOUNT_KINDS,
   type PaymentMethod,
   type PaymentMethods,
   type RecordingMoneyAccount,
@@ -140,7 +141,7 @@ export function initialState(
     payerName: '',
     ...prefilled(childrenFor(options, who)),
     paidOn: options.today,
-    accountId: accountsFor(options.accounts, method)[0]?.id ?? '',
+    accountId: preferredAccountId(options.accounts, method),
     method,
     providerReference: '',
     reference: generatePaymentReference(method, options.today, random),
@@ -200,6 +201,21 @@ export function accountsFor(
   return accounts.filter((account) => accountTakesMethod(account.kind, method));
 }
 
+/** METHOD_ACCOUNT_KINDS lists kinds in preference order, so cash opens on a cash account when there is one. */
+export function preferredAccountId(
+  accounts: readonly RecordingMoneyAccount[],
+  method: PaymentMethod
+): string {
+  const usable = accountsFor(accounts, method);
+  for (const kind of METHOD_ACCOUNT_KINDS[method]) {
+    const match = usable.find((account) => account.kind === kind);
+    if (match !== undefined) {
+      return match.id;
+    }
+  }
+  return '';
+}
+
 export function withMethod(
   state: SheetState,
   method: PaymentMethod,
@@ -220,7 +236,10 @@ export function withAccount(
   if (usable.some((account) => account.id === state.accountId)) {
     return state;
   }
-  return { ...state, accountId: usable[0]?.id ?? '' };
+  return {
+    ...state,
+    accountId: preferredAccountId(accounts, state.method),
+  };
 }
 
 export const splitTotal = (state: SheetState): number =>
