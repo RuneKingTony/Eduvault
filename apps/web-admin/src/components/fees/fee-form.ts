@@ -1,13 +1,13 @@
 import {
-  createFeeLineSchema,
+  FEE_LINE_AMOUNT_MESSAGE,
   TUITION_FEE_CODE,
+  createFeeLineSchema,
   type CreateFeeLineInput,
   type FeeGroup,
   type FeeType,
 } from '@eduvault/api-contract';
 import { fieldValue } from '@eduvault/ui';
 import { parseFeeAmount } from '../../fee-amount';
-import { ENTER_AMOUNT } from './fee-text';
 
 export const EVERY_CAMPUS = 'every-campus';
 
@@ -39,7 +39,7 @@ export function feeFormBody(
 ): FeeFormResult {
   const amountMinor = parseFeeAmount(fieldValue(data, 'amount'));
   if (amountMinor === undefined) {
-    return { ok: false, message: ENTER_AMOUNT };
+    return { ok: false, message: FEE_LINE_AMOUNT_MESSAGE };
   }
   const campus = fieldValue(data, 'campusId');
   const input: CreateFeeLineInput = {

@@ -1,4 +1,8 @@
-import { errorSchema, type ApiErrorBody } from './schemas';
+import {
+  MISSING_PERMISSION_PREFIX,
+  errorSchema,
+  type ApiErrorBody,
+} from './schemas';
 import type { Contract, RouteDef, RouteInput, RouteOutput } from './route';
 
 export class ApiError extends Error {
@@ -14,7 +18,7 @@ export class ApiError extends Error {
 export function denialMessage(error: Error, denied: string): string {
   return error instanceof ApiError &&
     error.status === 403 &&
-    error.message.startsWith('Missing')
+    error.message.startsWith(MISSING_PERMISSION_PREFIX)
     ? denied
     : error.message;
 }

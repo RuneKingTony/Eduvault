@@ -4,11 +4,12 @@ import { CheckIcon, PackageCheckIcon } from 'lucide-react';
 import {
   PAYMENT_METHOD_LABELS,
   PAYMENT_PROOF_TYPE_MESSAGE,
-  type PaymentMethod,
+  STORE_SALE_NOT_ACTIVE_MESSAGE,
+  storeSaleNoAccountMessage,
   storeSaleReference,
   storeSaleReplayedMessage,
-  storeSaleNoAccountMessage,
   type Item,
+  type PaymentMethod,
   type RecordedSale,
   type SaleOptions,
 } from '@eduvault/api-contract';
@@ -197,7 +198,7 @@ function StudentFields({
       <SelectField
         label="Student"
         name="studentId"
-        hint="Only active students can receive items."
+        hint={STORE_SALE_NOT_ACTIVE_MESSAGE}
         value={state.studentId}
         onChange={(event) => {
           onStudent(event.target.value);
