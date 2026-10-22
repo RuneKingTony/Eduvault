@@ -40,7 +40,12 @@ import {
   TooltipTrigger,
   toast,
 } from '@eduvault/ui';
-import { useApi, type Api } from '../../api';
+import { useApi } from '../../api';
+import {
+  announceReplay,
+  uploadProofOnce,
+  type UploadedProof,
+} from '../record-once';
 import { useToday } from '../calendar/use-today';
 import {
   invalidateSale,
@@ -92,52 +97,25 @@ interface Attempt {
   file: File | undefined;
 }
 
-interface Uploaded {
-  file: File;
-  id: string;
-}
-
 const Hint = ({ children }: { children: string }) => (
   <p className="text-xs text-muted-foreground">{children}</p>
 );
 
-async function proofIdOf(
-  api: Api,
-  attempt: Attempt,
-  remembered: {
-    uploaded: Uploaded | undefined;
-    remember: (u: Uploaded) => void;
-  }
-): Promise<string | undefined> {
-  const { file, state } = attempt;
-  if (!needsProof(state.method) || file === undefined) {
-    return undefined;
-  }
-  if (remembered.uploaded?.file === file) {
-    return remembered.uploaded.id;
-  }
-  const form = new FormData();
-  form.set('kind', 'payment_proof');
-  form.set('file', file);
-  const stored = await api.files.upload({ body: form });
-  remembered.remember({ file, id: stored.id });
-  return stored.id;
-}
-
 function useRecord(done: {
   onRecorded: () => void;
   onStatement: (studentId: string) => void;
-  uploaded: Uploaded | undefined;
-  onUploaded: (stored: Uploaded) => void;
+  uploaded: UploadedProof | undefined;
+  onUploaded: (stored: UploadedProof) => void;
 }) {
   const api = useApi();
   const queryClient = useQueryClient();
   const canSeeStatement = useCanAny(FINANCE_READ_GATE);
   const announce = (sale: RecordedSale) => {
-    if (sale.replayed) {
-      toast.warning(
-        storeSaleReplayedMessage(sale.reference, sale.receiptNumber)
-      );
+    if (
+      announceReplay(sale, (again) =>
+        storeSaleReplayedMessage(again.reference, again.receiptNumber)
+      )
+    ) {
       return;
     }
     toast.success(saleRecordedMessage(sale), {
@@ -155,7 +133,9 @@ function useRecord(done: {
   };
   return useMutation({
     mutationFn: async (attempt: Attempt) => {
-      const proofFileId = await proofIdOf(api, attempt, {
+      const proofFileId = await uploadProofOnce(api, {
+        file: attempt.file,
+        needed: needsProof(attempt.state.method),
         uploaded: done.uploaded,
         remember: done.onUploaded,
       });
@@ -472,7 +452,7 @@ function useSaleForm(loaded: LoadedProps) {
     )
   );
   const [file, setFile] = useState<File>();
-  const [uploaded, setUploaded] = useState<Uploaded>();
+  const [uploaded, setUploaded] = useState<UploadedProof>();
   const student = loaded.options.students.find(
     (row) => row.id === state.studentId
   );
