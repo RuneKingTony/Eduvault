@@ -1,6 +1,6 @@
 import {
-  ROW_STATUS_LABELS,
-  isOwingStatus,
+  rowStatusLabel,
+  rowTone,
   type PortalStatement,
 } from '@eduvault/api-contract';
 import { UserAvatar } from '@eduvault/auth-client';
@@ -19,8 +19,8 @@ function rowsOf({ rows, currency }: PortalStatement): StatementCardRow[] {
     key: `${row.effectiveOn}-${row.status}-${index}`,
     date: fmtDate(row.effectiveOn),
     what: <span>{row.description}</span>,
-    status: ROW_STATUS_LABELS[row.status],
-    tone: isOwingStatus(row.status) ? 'owe' : 'paid',
+    status: rowStatusLabel(row),
+    tone: rowTone(row),
     amount: money(row.amountMinor, currency),
   }));
 }
