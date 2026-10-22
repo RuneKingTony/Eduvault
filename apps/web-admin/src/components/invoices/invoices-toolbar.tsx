@@ -7,6 +7,7 @@ import { oneOf } from '@eduvault/shared';
 import { NativeSelect, NativeSelectOption, SearchInput } from '@eduvault/ui';
 import { KIND_LABELS, STATUS_LABELS } from '../billing/billing-text';
 import type { InvoicesSearch } from '../../invoices-search';
+import { useSearchText } from '../use-search-text';
 
 const ANY = '';
 
@@ -83,19 +84,18 @@ export function InvoicesToolbar({
   shown: number;
   onSearchChange: Change;
 }) {
+  const { text, onTextChange } = useSearchText(search.q, (q) => {
+    onSearchChange({ ...search, q, page: undefined });
+  });
   return (
     <div className="flex flex-wrap items-center gap-2 px-4 pb-3">
       <SearchInput
         className="min-w-48 flex-1"
         aria-label="Search charges"
         placeholder="Search student or number"
-        value={search.q ?? ''}
+        value={text}
         onChange={(event) => {
-          onSearchChange({
-            ...search,
-            q: event.target.value === '' ? undefined : event.target.value,
-            page: undefined,
-          });
+          onTextChange(event.target.value);
         }}
       />
       <KindSelect

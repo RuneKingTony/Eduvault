@@ -50,6 +50,7 @@ import {
   membersQueryOptions,
   schoolRolesQueryOptions,
 } from '../queries';
+import { useSearchText } from '../components/use-search-text';
 
 const ANY_ROLE = 'any';
 const INFO =
@@ -108,17 +109,19 @@ function Toolbar({
   roles: readonly SchoolRole[];
   onChange: (next: MembersSearch) => void;
 }) {
+  const { text, onTextChange } = useSearchText(search.q, (q) => {
+    onChange({ ...search, q, page: undefined });
+  });
   return (
     <div className="flex flex-wrap items-center gap-3">
       <Input
         type="search"
         aria-label="Search"
         placeholder="Search name, title or role"
-        defaultValue={search.q ?? ''}
+        value={text}
         className="max-w-xs"
         onChange={(event) => {
-          const q = event.target.value.trim();
-          onChange({ ...search, q: q === '' ? undefined : q, page: undefined });
+          onTextChange(event.target.value);
         }}
       />
       <Select

@@ -35,6 +35,7 @@ import type { Prefill } from '../components/payments/record-payment-model';
 import { FILTER_LABELS } from '../components/payments/statement-text';
 import type { AccountsSearch } from '../accounts-search';
 import { balancesQueryOptions } from '../queries';
+import { useSearchText } from '../components/use-search-text';
 
 function Header() {
   return (
@@ -93,19 +94,18 @@ function Toolbar({
   shown: number;
   onSearchChange: (next: AccountsSearch) => void;
 }) {
+  const { text, onTextChange } = useSearchText(search.q, (q) => {
+    onSearchChange({ ...search, q, page: undefined });
+  });
   return (
     <div className="flex flex-wrap items-center gap-2 px-4 pb-3">
       <SearchInput
         className="min-w-48 flex-1"
         aria-label="Search students"
         placeholder="Search name or GF number"
-        value={search.q ?? ''}
+        value={text}
         onChange={(event) => {
-          onSearchChange({
-            ...search,
-            q: event.target.value === '' ? undefined : event.target.value,
-            page: undefined,
-          });
+          onTextChange(event.target.value);
         }}
       />
       <NativeSelect

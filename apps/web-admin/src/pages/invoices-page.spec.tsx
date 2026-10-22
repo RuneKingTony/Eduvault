@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ApiError } from '@eduvault/api-contract';
 import {
@@ -130,9 +130,11 @@ describe('InvoicesPage', () => {
     });
     await user.click(screen.getByLabelText('Search charges'));
     await user.paste('CHG-2026');
-    expect(onSearchChange).toHaveBeenLastCalledWith({
-      page: undefined,
-      q: 'CHG-2026',
+    await waitFor(() => {
+      expect(onSearchChange).toHaveBeenLastCalledWith({
+        page: undefined,
+        q: 'CHG-2026',
+      });
     });
   });
 
