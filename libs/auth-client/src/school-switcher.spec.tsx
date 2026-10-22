@@ -1,6 +1,7 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { SchoolSwitcher } from './school-switcher';
-import { fakeClient, openMenu, renderInSidebar } from './menu-test-utils';
+import { fakeClient, renderInSidebar } from './menu-test-utils';
 
 const schools = [
   { id: 'o1', name: 'Greenfield College' },
@@ -29,6 +30,15 @@ function setup(
   return { setActive, onSwitched };
 }
 
+let user: ReturnType<typeof userEvent.setup>;
+
+beforeEach(() => {
+  user = userEvent.setup();
+});
+
+const openMenu = () =>
+  user.click(screen.getByRole('button', { name: /Greenfield College/ }));
+
 describe('SchoolSwitcher', () => {
   it('shows the active school in the head', () => {
     setup();
@@ -52,24 +62,24 @@ describe('SchoolSwitcher', () => {
     );
   });
 
-  it('adds extra items under the school list', () => {
+  it('adds extra items under the school list', async () => {
     setup('o1', { menuExtra: <button type="button">Extra thing</button> });
-    openMenu(/Greenfield College/);
+    await openMenu();
     expect(
       screen.getByRole('button', { name: 'Extra thing' })
     ).toBeInTheDocument();
     expect(screen.getByRole('separator')).toBeInTheDocument();
   });
 
-  it('adds no separator without extra items', () => {
+  it('adds no separator without extra items', async () => {
     setup();
-    openMenu(/Greenfield College/);
+    await openMenu();
     expect(screen.queryByRole('separator')).not.toBeInTheDocument();
   });
 
-  it('lists the schools the person belongs to', () => {
+  it('lists the schools the person belongs to', async () => {
     setup();
-    openMenu(/Greenfield College/);
+    await openMenu();
     expect(
       screen.getByRole('menuitem', { name: /Lekki Prep/ })
     ).toBeInTheDocument();
@@ -80,8 +90,8 @@ describe('SchoolSwitcher', () => {
 
   it('switches school, then lets the app refetch and go home', async () => {
     const { setActive, onSwitched } = setup();
-    openMenu(/Greenfield College/);
-    fireEvent.click(screen.getByRole('menuitem', { name: /Lekki Prep/ }));
+    await openMenu();
+    await user.click(screen.getByRole('menuitem', { name: /Lekki Prep/ }));
     await waitFor(() => {
       expect(onSwitched).toHaveBeenCalledOnce();
     });
@@ -91,25 +101,25 @@ describe('SchoolSwitcher', () => {
   it('stays put when the switch fails', async () => {
     const { setActive, onSwitched } = setup();
     setActive.mockResolvedValue({ data: null, error: { message: 'No' } });
-    openMenu(/Greenfield College/);
-    fireEvent.click(screen.getByRole('menuitem', { name: /Lekki Prep/ }));
+    await openMenu();
+    await user.click(screen.getByRole('menuitem', { name: /Lekki Prep/ }));
     await waitFor(() => {
       expect(setActive).toHaveBeenCalledOnce();
     });
     expect(onSwitched).not.toHaveBeenCalled();
   });
 
-  it('does nothing when the active school is chosen again', () => {
+  it('does nothing when the active school is chosen again', async () => {
     const { setActive, onSwitched } = setup();
-    openMenu(/Greenfield College/);
-    fireEvent.click(
+    await openMenu();
+    await user.click(
       screen.getByRole('menuitem', { name: /Greenfield College/ })
     );
     expect(setActive).not.toHaveBeenCalled();
     expect(onSwitched).not.toHaveBeenCalled();
   });
 
-  it('renders a plain button outside the sidebar', () => {
+  it('renders a plain button outside the sidebar', async () => {
     const authClient = fakeClient({
       useSession: () => ({ data: { session: { activeOrganizationId: 'o1' } } }),
       useListOrganizations: () => ({ data: schools }),
@@ -122,7 +132,7 @@ describe('SchoolSwitcher', () => {
         onSwitched={vi.fn()}
       />
     );
-    openMenu(/Greenfield College/);
+    await openMenu();
     expect(
       screen.getByRole('menuitem', { name: /Lekki Prep/ })
     ).toBeInTheDocument();

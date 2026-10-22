@@ -42,6 +42,7 @@ import {
 import { StoreRepository, type StoreRef } from './store.repository';
 import { storeInView } from './store-view';
 import { orgScopeOf } from '../../common/scope';
+import { replayOf } from '../../common/references/apply-once';
 
 interface Checked {
   student: SaleStudent;
@@ -149,21 +150,22 @@ export class SaleService {
     existing: ExistingSale,
     input: RecordSale
   ): Promise<RecordedSale> {
-    const visible = await this.sales.find(orgScopeOf(ctx), existing.id);
-    if (visible === undefined) {
-      throw new ConflictException(STORE_SALE_REFERENCE_TAKEN_MESSAGE);
-    }
-    const requestHash = saleRequestHash({
-      studentId: input.studentId,
-      method: input.method,
-      moneyAccountId: input.moneyAccountId ?? existing.moneyAccountId,
-      lines: input.lines,
+    const visible = replayOf({
+      visible: await this.sales.find(orgScopeOf(ctx), existing.id),
+      sameRequest: () =>
+        existing.requestHash ===
+        saleRequestHash({
+          studentId: input.studentId,
+          method: input.method,
+          moneyAccountId: input.moneyAccountId ?? existing.moneyAccountId,
+          lines: input.lines,
+        }),
+      taken: () => new ConflictException(STORE_SALE_REFERENCE_TAKEN_MESSAGE),
+      used: () =>
+        new ConflictException(
+          storeSaleReferenceUsedMessage(input.reference, existing.number)
+        ),
     });
-    if (existing.requestHash !== requestHash) {
-      throw new ConflictException(
-        storeSaleReferenceUsedMessage(input.reference, existing.number)
-      );
-    }
     return { ...visible, replayed: true };
   }
 

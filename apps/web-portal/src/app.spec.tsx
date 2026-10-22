@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { EduvaultAuthClient } from '@eduvault/auth-client';
 import type { Me } from '@eduvault/api-contract';
 import { ApiProvider, type Api } from './api';
@@ -83,6 +84,7 @@ describe('App', () => {
   });
 
   it('tells a user without a school to ask the school', async () => {
+    const user = userEvent.setup();
     const signOut = vi.fn().mockResolvedValue({ data: {}, error: null });
     const { api } = apiWith(me({ schoolCount: 0, activeOrganizationId: null }));
     renderApp(
@@ -98,7 +100,7 @@ describe('App', () => {
     expect(
       screen.getByText('Ask the school to add you as a student or guardian.')
     ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+    await user.click(screen.getByRole('button', { name: 'Sign out' }));
     await waitFor(() => {
       expect(signOut).toHaveBeenCalledOnce();
     });
@@ -139,6 +141,7 @@ describe('App', () => {
   });
 
   it('shows the paused screen for a suspended school, with sign out', async () => {
+    const user = userEvent.setup();
     const signOut = vi.fn().mockResolvedValue({ data: {}, error: null });
     const { api } = apiWith(
       me({ suspendedSchool: { id: 'o1', name: 'Greenfield College' } })
@@ -152,13 +155,14 @@ describe('App', () => {
     expect(
       screen.queryByRole('button', { name: 'Greenfield College' })
     ).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+    await user.click(screen.getByRole('button', { name: 'Sign out' }));
     await waitFor(() => {
       expect(signOut).toHaveBeenCalledOnce();
     });
   });
 
   it('offers the school switcher when the person belongs to other schools', async () => {
+    const user = userEvent.setup();
     const { api } = apiWith(
       me({
         schoolCount: 2,
@@ -173,9 +177,8 @@ describe('App', () => {
     expect(
       screen.getByRole('button', { name: 'Sign out' })
     ).toBeInTheDocument();
-    fireEvent.keyDown(
-      screen.getByRole('button', { name: 'Greenfield College' }),
-      { key: 'Enter' }
+    await user.click(
+      screen.getByRole('button', { name: 'Greenfield College' })
     );
     expect(
       await screen.findByRole('menuitem', { name: 'Hillcrest Academy' })

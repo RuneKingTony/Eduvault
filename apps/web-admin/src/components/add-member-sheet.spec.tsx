@@ -1,4 +1,5 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
+import userEvent, { type UserEvent } from '@testing-library/user-event';
 import { ApiError, type CreateMemberInput } from '@eduvault/api-contract';
 import { renderWithApi } from '../test-utils';
 import { IKEJA, LEKKI, detail, signedIn } from '../test-members';
@@ -36,12 +37,15 @@ function setup({
   return { create, onAdded, onOpenCampuses };
 }
 
-const fill = (label: string, value: string) => {
-  fireEvent.change(screen.getByLabelText(label), { target: { value } });
+const fill = async (user: UserEvent, label: string, value: string) => {
+  const field = screen.getByLabelText(label);
+  await user.clear(field);
+  await user.type(field, value);
 };
 
 describe('AddMemberSheet', () => {
   it('ticks the active campus and sends the form', async () => {
+    const user = userEvent.setup();
     const { create, onAdded } = setup();
     const lekki = await screen.findByRole('checkbox', { name: /Lekki/ });
     await waitFor(() => {
@@ -49,9 +53,9 @@ describe('AddMemberSheet', () => {
     });
     expect(screen.getByRole('checkbox', { name: /Ikeja/ })).not.toBeChecked();
 
-    fill('Full name', ' New Hire ');
-    fill('Email', 'New.Hire@Example.test');
-    fireEvent.click(screen.getByRole('button', { name: 'Create account' }));
+    await fill(user, 'Full name', ' New Hire ');
+    await fill(user, 'Email', 'New.Hire@Example.test');
+    await user.click(screen.getByRole('button', { name: 'Create account' }));
 
     await waitFor(() => {
       expect(create).toHaveBeenCalledWith({
@@ -73,13 +77,14 @@ describe('AddMemberSheet', () => {
   });
 
   it('shows the inline validation messages and sends nothing', async () => {
+    const user = userEvent.setup();
     const { create } = setup();
     await screen.findByRole('checkbox', { name: /Lekki/ });
     await waitFor(() => {
       expect(screen.getByRole('checkbox', { name: /Lekki/ })).toBeChecked();
     });
-    fireEvent.click(screen.getByRole('checkbox', { name: /Lekki/ }));
-    fireEvent.click(screen.getByRole('button', { name: 'Create account' }));
+    await user.click(screen.getByRole('checkbox', { name: /Lekki/ }));
+    await user.click(screen.getByRole('button', { name: 'Create account' }));
 
     expect(
       await screen.findByText('Enter their full name.')
@@ -90,6 +95,7 @@ describe('AddMemberSheet', () => {
   });
 
   it('shows the already-on-the-list message under Email', async () => {
+    const user = userEvent.setup();
     const create = vi.fn().mockRejectedValue(
       new ApiError(409, {
         code: 'Conflict',
@@ -98,21 +104,22 @@ describe('AddMemberSheet', () => {
     );
     setup({ create });
     await screen.findByRole('checkbox', { name: /Lekki/ });
-    fill('Full name', 'Ada Obi');
-    fill('Email', 'ada@example.test');
-    fireEvent.click(screen.getByRole('button', { name: 'Create account' }));
+    await fill(user, 'Full name', 'Ada Obi');
+    await fill(user, 'Email', 'ada@example.test');
+    await user.click(screen.getByRole('button', { name: 'Create account' }));
     expect(
       await screen.findByText('ada@example.test is already on the staff list.')
     ).toBeInTheDocument();
   });
 
   it('asks for a campus first when the school has none', async () => {
+    const user = userEvent.setup();
     const { onOpenCampuses } = setup({ campuses: [] });
     expect(await screen.findByText('Add a campus first')).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Create account' })
     ).toBeDisabled();
-    fireEvent.click(screen.getByRole('button', { name: 'Go to Campuses' }));
+    await user.click(screen.getByRole('button', { name: 'Go to Campuses' }));
     expect(onOpenCampuses).toHaveBeenCalled();
   });
 });

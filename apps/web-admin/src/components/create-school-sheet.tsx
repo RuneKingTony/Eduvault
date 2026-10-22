@@ -21,7 +21,7 @@ import {
   FieldError,
 } from '@eduvault/ui';
 import { useApi } from '../api';
-import { PLATFORM_SCHOOLS_KEY } from '../queries';
+import { invalidatePlatformSchools } from '../queries';
 import { suggestPrefix, suggestSlug } from '../platform-suggestions';
 
 const FIELD_MESSAGES: Record<string, string> = {
@@ -85,7 +85,7 @@ function useCreateSchool(onCreated: (result: CreateSchoolResult) => void) {
       body: Parameters<typeof api.platform.schools.create>[0]['body']
     ) => api.platform.schools.create({ body }),
     onSuccess: async (result) => {
-      await queryClient.invalidateQueries({ queryKey: PLATFORM_SCHOOLS_KEY });
+      await invalidatePlatformSchools(queryClient);
       onCreated(result);
     },
   });

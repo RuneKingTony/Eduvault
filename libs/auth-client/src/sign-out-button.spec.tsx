@@ -1,8 +1,10 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { fakeClient } from './menu-test-utils';
 import { SignOutButton } from './sign-out-button';
 
-function setup(result: { data: unknown; error: unknown }) {
+async function setup(result: { data: unknown; error: unknown }) {
+  const user = userEvent.setup();
   const signOut = vi.fn().mockResolvedValue(result);
   const onSignedOut = vi.fn();
   render(
@@ -11,13 +13,13 @@ function setup(result: { data: unknown; error: unknown }) {
       onSignedOut={onSignedOut}
     />
   );
-  fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+  await user.click(screen.getByRole('button', { name: 'Sign out' }));
   return { signOut, onSignedOut };
 }
 
 describe('SignOutButton', () => {
   it('signs out and reports it', async () => {
-    const { signOut, onSignedOut } = setup({ data: {}, error: null });
+    const { signOut, onSignedOut } = await setup({ data: {}, error: null });
     await waitFor(() => {
       expect(onSignedOut).toHaveBeenCalledOnce();
     });
@@ -25,7 +27,7 @@ describe('SignOutButton', () => {
   });
 
   it('does not report a sign-out that failed', async () => {
-    const { signOut, onSignedOut } = setup({
+    const { signOut, onSignedOut } = await setup({
       data: null,
       error: { message: 'No' },
     });

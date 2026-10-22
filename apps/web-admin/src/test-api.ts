@@ -10,6 +10,22 @@ import type { Api } from './api';
 export const checked = (api: Partial<Record<keyof Api, unknown>>): Api =>
   contractChecked(contract, api as ApiFake<AppContract>);
 
+/** For a refusal test: the `raw` routes answer a request the contract itself rejects, so only the server's refusal can answer them. Every other route is still checked. */
+export const checkedExcept = (
+  api: Partial<Record<keyof Api, unknown>>,
+  raw: Partial<Record<keyof Api, Record<string, unknown>>>
+): Api => {
+  const guarded = checked(api) as unknown as Record<
+    string,
+    Record<string, unknown>
+  >;
+  const merged = { ...guarded };
+  for (const [group, routes] of Object.entries(raw)) {
+    merged[group] = { ...guarded[group], ...routes };
+  }
+  return merged as unknown as Api;
+};
+
 /** A valid v4 UUID for fixtures; give each fixture file its own range of `n` so ids never collide inside a spec. */
 export const testId = (n: number): string =>
   `00000000-0000-4000-8000-${n.toString(16).padStart(12, '0')}`;

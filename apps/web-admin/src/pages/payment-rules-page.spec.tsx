@@ -1,4 +1,5 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
+import userEvent, { type UserEvent } from '@testing-library/user-event';
 import { ApiError } from '@eduvault/api-contract';
 import { toast } from '@eduvault/ui';
 import { settings } from '../test-school';
@@ -39,6 +40,11 @@ function setup(
   return api;
 }
 
+const typeInto = async (user: UserEvent, field: HTMLElement, value: string) => {
+  await user.clear(field);
+  await user.type(field, value);
+};
+
 describe('PaymentRulesPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -60,8 +66,9 @@ describe('PaymentRulesPage', () => {
   });
 
   it('switches a method off and says so', async () => {
+    const user = userEvent.setup();
     const api = setup();
-    fireEvent.click(await screen.findByRole('switch', { name: 'POS' }));
+    await user.click(await screen.findByRole('switch', { name: 'POS' }));
 
     await waitFor(() => {
       expect(api.schoolSettings.updatePaymentRules).toHaveBeenCalledWith({
@@ -76,12 +83,13 @@ describe('PaymentRulesPage', () => {
   });
 
   it('switches a method on and says so', async () => {
+    const user = userEvent.setup();
     const api = setup({
       current: settings({
         paymentMethods: { cash: true, transfer: false, pos: true },
       }),
     });
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('switch', { name: 'Bank transfer' })
     );
 
@@ -98,6 +106,7 @@ describe('PaymentRulesPage', () => {
   });
 
   it('springs the switch back and shows the refusal when the last way is switched off', async () => {
+    const user = userEvent.setup();
     setup({
       current: settings({
         paymentMethods: { cash: true, transfer: false, pos: false },
@@ -108,7 +117,7 @@ describe('PaymentRulesPage', () => {
       }),
     });
     const cash = await screen.findByRole('switch', { name: 'Cash' });
-    fireEvent.click(cash);
+    await user.click(cash);
 
     await waitFor(() => {
       expect(toast.error).toHaveBeenCalledWith(
@@ -119,12 +128,11 @@ describe('PaymentRulesPage', () => {
   });
 
   it('saves the footer and says so', async () => {
+    const user = userEvent.setup();
     const api = setup();
     const footer = await screen.findByLabelText('Receipt footer');
-    fireEvent.change(footer, {
-      target: { value: 'Thank God for your payment.' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    await typeInto(user, footer, 'Thank God for your payment.');
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
 
     await waitFor(() => {
       expect(api.schoolSettings.update).toHaveBeenCalledWith({
@@ -137,11 +145,14 @@ describe('PaymentRulesPage', () => {
   });
 
   it('refuses a footer over 120 characters before asking the server', async () => {
+    const user = userEvent.setup();
     const api = setup();
-    fireEvent.change(await screen.findByLabelText('Receipt footer'), {
-      target: { value: 'a'.repeat(121) },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    await typeInto(
+      user,
+      await screen.findByLabelText('Receipt footer'),
+      'a'.repeat(121)
+    );
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
 
     expect(
       await screen.findByText('Use 120 characters or fewer.')

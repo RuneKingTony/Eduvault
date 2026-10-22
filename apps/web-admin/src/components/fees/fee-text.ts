@@ -74,5 +74,3 @@ export const optInsToast = (
     ? `${students} now ${verb} ${feeType} from the next round of charges.`
     : `${students} no longer ${verb} ${feeType}.`;
 };
-
-export const ENTER_AMOUNT = 'Enter an amount.';

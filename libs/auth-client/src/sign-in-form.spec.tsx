@@ -1,4 +1,5 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { fakeClient } from './menu-test-utils';
 import { SignInForm, signInErrorMessage } from './sign-in-form';
 
@@ -16,14 +17,11 @@ function setup(result: { error: unknown } = OK, variant?: 'staff' | 'portal') {
   return { email, username };
 }
 
-const fill = (email: string, password: string, label = 'Email') => {
-  fireEvent.change(screen.getByLabelText(label), {
-    target: { value: email },
-  });
-  fireEvent.change(screen.getByLabelText('Password'), {
-    target: { value: password },
-  });
-  fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+const fill = async (email: string, password: string, label = 'Email') => {
+  const user = userEvent.setup();
+  await user.type(screen.getByLabelText(label), email);
+  await user.type(screen.getByLabelText('Password'), password);
+  await user.click(screen.getByRole('button', { name: 'Sign in' }));
 };
 
 describe('SignInForm', () => {
@@ -54,9 +52,11 @@ describe('SignInForm', () => {
     ).toBeInTheDocument();
   });
 
-  it('asks for each empty field and does not call the server', () => {
+  it('asks for each empty field and does not call the server', async () => {
     const { email } = setup();
-    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+    await userEvent
+      .setup()
+      .click(screen.getByRole('button', { name: 'Sign in' }));
     expect(screen.getByText('Enter your email.')).toBeInTheDocument();
     expect(screen.getByText('Enter your password.')).toBeInTheDocument();
     expect(email).not.toHaveBeenCalled();
@@ -64,7 +64,7 @@ describe('SignInForm', () => {
 
   it('signs in with the trimmed email', async () => {
     const { email } = setup();
-    fill(' ada@school.test ', 'long-enough-password');
+    await fill(' ada@school.test ', 'long-enough-password');
     await waitFor(() => {
       expect(email).toHaveBeenCalledWith({
         email: 'ada@school.test',
@@ -83,13 +83,13 @@ describe('SignInForm', () => {
     ],
   ])('answers %j with one message', async (error, message) => {
     setup({ error });
-    fill('ada@school.test', 'long-enough-password');
+    await fill('ada@school.test', 'long-enough-password');
     expect(await screen.findByText(message)).toBeInTheDocument();
   });
 
   it('keeps the staff form email-only', async () => {
     const { email, username } = setup();
-    fill('ada', 'long-enough-password');
+    await fill('ada', 'long-enough-password');
     await waitFor(() => {
       expect(email).toHaveBeenCalledWith({
         email: 'ada',
@@ -111,7 +111,7 @@ describe('SignInForm in the portal', () => {
 
   it('signs in by username when the input has no @', async () => {
     const { email, username } = setup(OK, 'portal');
-    fill(' greenfield-0123 ', 'long-enough-password', LABEL);
+    await fill(' greenfield-0123 ', 'long-enough-password', LABEL);
     await waitFor(() => {
       expect(username).toHaveBeenCalledWith({
         username: 'greenfield-0123',
@@ -123,7 +123,7 @@ describe('SignInForm in the portal', () => {
 
   it('signs in by email when the input has an @', async () => {
     const { email, username } = setup(OK, 'portal');
-    fill('ngozi@example.com', 'long-enough-password', LABEL);
+    await fill('ngozi@example.com', 'long-enough-password', LABEL);
     await waitFor(() => {
       expect(email).toHaveBeenCalledWith({
         email: 'ngozi@example.com',
@@ -133,9 +133,11 @@ describe('SignInForm in the portal', () => {
     expect(username).not.toHaveBeenCalled();
   });
 
-  it('asks for the missing identifier in its own words', () => {
+  it('asks for the missing identifier in its own words', async () => {
     const { email, username } = setup(OK, 'portal');
-    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+    await userEvent
+      .setup()
+      .click(screen.getByRole('button', { name: 'Sign in' }));
     expect(screen.getByText('Enter your username or email.')).toBeVisible();
     expect(email).not.toHaveBeenCalled();
     expect(username).not.toHaveBeenCalled();
@@ -143,7 +145,7 @@ describe('SignInForm in the portal', () => {
 
   it('says a failed username sign-in does not match', async () => {
     setup({ error: { status: 401 } }, 'portal');
-    fill('greenfield-0123', 'wrong-password-123', LABEL);
+    await fill('greenfield-0123', 'wrong-password-123', LABEL);
     expect(
       await screen.findByText(
         'That username or email and password don’t match.'

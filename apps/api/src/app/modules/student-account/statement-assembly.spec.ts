@@ -49,6 +49,7 @@ const receipt: MovementRecord = {
     receiptNumber: 'RCT-2026-00088',
     payerName: 'Ngozi Okeke',
     method: 'transfer',
+    voided: false,
   },
 };
 
@@ -186,6 +187,17 @@ describe('statementRowsOf', () => {
     });
   });
 
+  it('flags the row of a voided receipt so clients do not read it as plainly Paid', () => {
+    const voided: MovementRecord = {
+      ...receipt,
+      payment: { ...receipt.payment!, voided: true },
+    };
+
+    expect(statementRowsOf([voided, receipt]).map((row) => row.voided)).toEqual(
+      [true, false]
+    );
+  });
+
   it('writes one row per correction kind from its memo, in the bucket the PRD names', () => {
     const adjustment = (
       reference: string,
@@ -252,6 +264,23 @@ describe('unpaidOf', () => {
     };
     expect(unpaidOf([opening])).toEqual([
       { reference: 'Opening balance', outstandingMinor: 4_000_000, link: null },
+    ]);
+  });
+
+  it('names a cancelled receipt rather than showing its internal void reference', () => {
+    const reversal: MovementRecord = {
+      ...base,
+      kind: 'payment_void',
+      reference: 'VOID-CASH-1',
+      memo: 'Void of RCT-2026-00098: Wrong child',
+      debitMinor: 2_000_000,
+    };
+    expect(unpaidOf([reversal])).toEqual([
+      {
+        reference: 'Payment RCT-2026-00098 cancelled',
+        outstandingMinor: 2_000_000,
+        link: null,
+      },
     ]);
   });
 

@@ -1,4 +1,5 @@
-import { fireEvent, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { ApiError } from '@eduvault/api-contract';
 import { toast } from '@eduvault/ui';
 import {
@@ -65,16 +66,16 @@ describe('AddHolidayDialog', () => {
     ]);
   });
 
-  it('defaults the date to a week after today, or after a later term start', () => {
+  it('defaults the date to a week after today, or after a later term start', async () => {
+    const user = userEvent.setup();
     setup(vi.fn(), [currentYear(), nextYear()], TERM_1);
     expect(screen.getByLabelText('Date')).toHaveValue('2026-10-14');
-    fireEvent.change(screen.getByLabelText('Term'), {
-      target: { value: TERM_4 },
-    });
+    await user.selectOptions(screen.getByLabelText('Term'), TERM_4);
     expect(screen.getByLabelText('Date')).toHaveValue('2027-09-13');
   });
 
   it('adds the holiday, toasts the new count and closes', async () => {
+    const user = userEvent.setup();
     const success = vi.spyOn(toast, 'success').mockReturnValue(1);
     const create = vi.fn(
       ({ body }: { body: { date: string; name: string } }) => ({
@@ -83,10 +84,8 @@ describe('AddHolidayDialog', () => {
       })
     );
     const onOpenChange = setup(create);
-    fireEvent.change(screen.getByLabelText('Name'), {
-      target: { value: 'Sports day' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Add holiday' }));
+    await user.type(screen.getByLabelText('Name'), 'Sports day');
+    await user.click(screen.getByRole('button', { name: 'Add holiday' }));
     await vi.waitFor(() => {
       expect(create).toHaveBeenCalledWith({
         params: { id: TERM_1 },
@@ -100,9 +99,10 @@ describe('AddHolidayDialog', () => {
   });
 
   it('asks for a name, and for a term when none is left', async () => {
+    const user = userEvent.setup();
     const create = vi.fn();
     setup(create);
-    fireEvent.click(screen.getByRole('button', { name: 'Add holiday' }));
+    await user.click(screen.getByRole('button', { name: 'Add holiday' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Fill in the date and the name.'
     );
@@ -110,17 +110,17 @@ describe('AddHolidayDialog', () => {
   });
 
   it('shows the no-term message when every term has ended', async () => {
+    const user = userEvent.setup();
     const past = currentYear();
     past.terms = past.terms.map((t) => term({ ...t, ended: true }));
     setup(vi.fn(), [past], null);
-    fireEvent.change(screen.getByLabelText('Name'), {
-      target: { value: 'x' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Add holiday' }));
+    await user.type(screen.getByLabelText('Name'), 'x');
+    await user.click(screen.getByRole('button', { name: 'Add holiday' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(NO_TERM_ERROR);
   });
 
   it('shows the API refusal inline', async () => {
+    const user = userEvent.setup();
     const create = vi.fn().mockRejectedValue(
       new ApiError(409, {
         code: 'Conflict',
@@ -128,8 +128,8 @@ describe('AddHolidayDialog', () => {
       })
     );
     setup(create);
-    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'x' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Add holiday' }));
+    await user.type(screen.getByLabelText('Name'), 'x');
+    await user.click(screen.getByRole('button', { name: 'Add holiday' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(
       '1 Oct 2026 is already a holiday: Independence Day.'
     );

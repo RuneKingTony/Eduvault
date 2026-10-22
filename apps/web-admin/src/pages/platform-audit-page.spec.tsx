@@ -1,4 +1,5 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { auditRow, renderWithApi } from '../test-utils';
 import { PlatformAuditPage } from './platform-audit-page';
 
@@ -91,6 +92,7 @@ describe('PlatformAuditPage', () => {
   });
 
   it('filters by school and by writes only through the query', async () => {
+    const user = userEvent.setup();
     const { list } = setup();
     const select = await screen.findByLabelText('School');
     expect(
@@ -98,21 +100,21 @@ describe('PlatformAuditPage', () => {
     ).toBeInTheDocument();
     await screen.findByRole('option', { name: 'Hilltop Academy' });
 
-    fireEvent.change(select, { target: { value: 's2' } });
+    await user.selectOptions(select, 's2');
     await waitFor(() => {
       expect(list).toHaveBeenLastCalledWith({
         query: expect.objectContaining({ schoolId: 's2' }),
       });
     });
 
-    fireEvent.click(screen.getByRole('switch', { name: 'Writes only' }));
+    await user.click(screen.getByRole('switch', { name: 'Writes only' }));
     await waitFor(() => {
       expect(list).toHaveBeenLastCalledWith({
         query: expect.objectContaining({ schoolId: 's2', writesOnly: true }),
       });
     });
 
-    fireEvent.change(select, { target: { value: '' } });
+    await user.selectOptions(select, '');
     await waitFor(() => {
       expect(list).toHaveBeenLastCalledWith({
         query: expect.not.objectContaining({ schoolId: expect.anything() }),
@@ -121,12 +123,13 @@ describe('PlatformAuditPage', () => {
   });
 
   it('pages with the cursor', async () => {
+    const user = userEvent.setup();
     const { list } = setup([auditRow()], 'c2');
     const next = await screen.findByRole('button', { name: 'Next' });
     await waitFor(() => {
       expect(next).toBeEnabled();
     });
-    fireEvent.click(next);
+    await user.click(next);
     await waitFor(() => {
       expect(list).toHaveBeenLastCalledWith({
         query: expect.objectContaining({ cursor: 'c2' }),

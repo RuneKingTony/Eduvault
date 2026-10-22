@@ -1,4 +1,5 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { ApiError } from '@eduvault/api-contract';
 import { toast } from '@eduvault/ui';
 import { IDS, classDetail, teacher } from '../test-classes';
@@ -41,8 +42,10 @@ function setup({
   return { api, onOpenChange };
 }
 
+let user: ReturnType<typeof userEvent.setup>;
+
 const submit = () =>
-  fireEvent.click(screen.getByRole('button', { name: 'Add class teacher' }));
+  user.click(screen.getByRole('button', { name: 'Add class teacher' }));
 
 const roleOptions = () =>
   within(screen.getByLabelText('Role'))
@@ -52,6 +55,7 @@ const roleOptions = () =>
 describe('AddClassTeacherDialog', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    user = userEvent.setup();
   });
 
   it('explains itself and lists the candidates with the campus hint', async () => {
@@ -109,7 +113,7 @@ describe('AddClassTeacherDialog', () => {
   it('asks for a teacher before calling the API', async () => {
     const { api } = setup();
     await screen.findByLabelText('Teacher');
-    submit();
+    await submit();
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Choose a teacher.'
     );
@@ -118,10 +122,11 @@ describe('AddClassTeacherDialog', () => {
 
   it('adds the teacher, toasts the role in lower case and closes', async () => {
     const { api, onOpenChange } = setup();
-    fireEvent.change(await screen.findByLabelText('Teacher'), {
-      target: { value: IDS.claire },
-    });
-    submit();
+    await user.selectOptions(
+      await screen.findByLabelText('Teacher'),
+      IDS.claire
+    );
+    await submit();
     await waitFor(() => {
       expect(api.classes.assignTeacher).toHaveBeenCalledWith({
         params: { id: IDS.gold },
@@ -136,13 +141,9 @@ describe('AddClassTeacherDialog', () => {
 
   it('sends the chosen role', async () => {
     const { api } = setup();
-    fireEvent.change(await screen.findByLabelText('Teacher'), {
-      target: { value: IDS.ayo },
-    });
-    fireEvent.change(screen.getByLabelText('Role'), {
-      target: { value: 'lead' },
-    });
-    submit();
+    await user.selectOptions(await screen.findByLabelText('Teacher'), IDS.ayo);
+    await user.selectOptions(screen.getByLabelText('Role'), 'lead');
+    await submit();
     await waitFor(() => {
       expect(api.classes.assignTeacher).toHaveBeenCalledWith({
         params: { id: IDS.gold },
@@ -175,10 +176,11 @@ describe('AddClassTeacherDialog', () => {
       api.classes.assignTeacher.mockRejectedValue(
         new ApiError(status, { code, message })
       );
-      fireEvent.change(await screen.findByLabelText('Teacher'), {
-        target: { value: IDS.ayo },
-      });
-      submit();
+      await user.selectOptions(
+        await screen.findByLabelText('Teacher'),
+        IDS.ayo
+      );
+      await submit();
       expect(await screen.findByRole('alert')).toHaveTextContent(message);
       expect(onOpenChange).not.toHaveBeenCalled();
       expect(toast.success).not.toHaveBeenCalled();

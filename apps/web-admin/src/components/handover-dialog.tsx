@@ -14,7 +14,7 @@ import {
   toast,
 } from '@eduvault/ui';
 import { useApi } from '../api';
-import { ME_PERMISSIONS_KEY, invalidateSchool } from '../queries';
+import { invalidatePermissions, invalidateSchool } from '../queries';
 
 const DENIED = 'You need permission to hand over the school.';
 
@@ -39,7 +39,7 @@ function useHandover(
       );
       await Promise.all([
         invalidateSchool(queryClient),
-        queryClient.invalidateQueries({ queryKey: ME_PERMISSIONS_KEY }),
+        invalidatePermissions(queryClient),
       ]);
       handedOver();
     },

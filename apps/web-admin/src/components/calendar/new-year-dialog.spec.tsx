@@ -1,4 +1,5 @@
-import { fireEvent, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { ApiError, type CreateSchoolYearInput } from '@eduvault/api-contract';
 import { fakeAccess, renderWithApi, seedFeeSetup } from '../../test-utils';
 import { currentYear, nextYear } from '../../test-calendar';
@@ -40,9 +41,14 @@ describe('NewYearDialog', () => {
   });
 
   it('creates the year with the chosen dates and closes', async () => {
+    const user = userEvent.setup();
     const { create, onOpenChange } = setup();
-    fireEvent.change(await field('Year'), { target: { value: '2028/2029' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create school year' }));
+    const year = await field('Year');
+    await user.clear(year);
+    await user.type(year, '2028/2029');
+    await user.click(
+      screen.getByRole('button', { name: 'Create school year' })
+    );
     await vi.waitFor(() => {
       expect(create).toHaveBeenCalledWith({
         body: {
@@ -61,13 +67,14 @@ describe('NewYearDialog', () => {
   ])(
     'drops the cached fee setup only when the new year made a term current (madeCurrent: $madeCurrent)',
     async ({ madeCurrent, dropped }) => {
+      const user = userEvent.setup();
       const { onOpenChange, queryClient } = setup(
         [currentYear()],
         created(madeCurrent)
       );
       const { key, setup: seeded } = seedFeeSetup(queryClient);
       await field('Year');
-      fireEvent.click(
+      await user.click(
         screen.getByRole('button', { name: 'Create school year' })
       );
       await vi.waitFor(() => {
@@ -80,6 +87,7 @@ describe('NewYearDialog', () => {
   );
 
   it('shows the API refusal inline and stays open', async () => {
+    const user = userEvent.setup();
     const create = vi.fn().mockRejectedValue(
       new ApiError(400, {
         code: 'BadRequest',
@@ -87,8 +95,12 @@ describe('NewYearDialog', () => {
       })
     );
     const { onOpenChange } = setup([currentYear()], create);
-    fireEvent.change(await field('Year'), { target: { value: '27/28' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create school year' }));
+    const year = await field('Year');
+    await user.clear(year);
+    await user.type(year, '27/28');
+    await user.click(
+      screen.getByRole('button', { name: 'Create school year' })
+    );
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Write the year as two years in a row, for example 2028/2029.'
     );
@@ -96,9 +108,12 @@ describe('NewYearDialog', () => {
   });
 
   it('asks for every field before calling the API', async () => {
+    const user = userEvent.setup();
     const { create } = setup();
-    fireEvent.change(await field('Starts'), { target: { value: '' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create school year' }));
+    await user.clear(await field('Starts'));
+    await user.click(
+      screen.getByRole('button', { name: 'Create school year' })
+    );
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Fill in the year and both dates.'
     );

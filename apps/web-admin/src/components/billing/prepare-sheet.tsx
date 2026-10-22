@@ -2,13 +2,15 @@ import { useState, type SubmitEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { ReceiptTextIcon } from 'lucide-react';
-import type {
-  BillingScope,
-  BillingTerm,
-  Campus,
-  FeeSetupLevel,
-  PrepareBody,
-  PrepareResult,
+import {
+  BILLING_CAMPUS_REQUIRED_MESSAGE,
+  BILLING_LEVEL_REQUIRED_MESSAGE,
+  type BillingScope,
+  type BillingTerm,
+  type Campus,
+  type FeeSetupLevel,
+  type PrepareBody,
+  type PrepareResult,
 } from '@eduvault/api-contract';
 import {
   Button,
@@ -29,7 +31,7 @@ import {
   billingTermsQueryOptions,
   campusesQueryOptions,
   feeSetupQueryOptions,
-  invalidateBilling,
+  invalidateCharges,
 } from '../../queries';
 import {
   SCOPE_OPTIONS,
@@ -54,7 +56,7 @@ function usePrepare(
   return useMutation({
     mutationFn: (body: PrepareBody) => api.billingRuns.prepare({ body }),
     onSuccess: async (result) => {
-      await invalidateBilling(queryClient);
+      await invalidateCharges(queryClient);
       const term = terms.find(
         (candidate) => candidate.termId === result.termId
       );
@@ -168,7 +170,11 @@ function usePrepareForm(
       const data = new FormData(event.currentTarget);
       const scopeId = scopeIdOf(data, scope);
       if (scope !== 'school' && (scopeId === undefined || scopeId === '')) {
-        setError(scope === 'campus' ? 'Choose a campus.' : 'Choose a level.');
+        setError(
+          scope === 'campus'
+            ? BILLING_CAMPUS_REQUIRED_MESSAGE
+            : BILLING_LEVEL_REQUIRED_MESSAGE
+        );
         return;
       }
       setError(null);

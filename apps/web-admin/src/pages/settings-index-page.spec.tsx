@@ -1,8 +1,10 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { SettingsIndexPage } from './settings-index-page';
 
 describe('SettingsIndexPage', () => {
-  it('lists each item the person can open and opens the one clicked', () => {
+  it('lists each item the person can open and opens the one clicked', async () => {
+    const user = userEvent.setup();
     const onOpen = vi.fn();
     render(
       <SettingsIndexPage
@@ -26,7 +28,7 @@ describe('SettingsIndexPage', () => {
       screen.getByText('The parts of the school set-up you can open.')
     ).toBeInTheDocument();
     expect(screen.getByText('Your settings')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Campuses' }));
+    await user.click(screen.getByRole('button', { name: 'Campuses' }));
     expect(onOpen).toHaveBeenCalledWith('/campuses');
   });
 });

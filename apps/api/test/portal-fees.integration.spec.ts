@@ -121,6 +121,7 @@ test.describe('GET /portal/students/:studentId/statement', () => {
         'description',
         'effectiveOn',
         'status',
+        'voided',
       ]);
     }
     expect(statement).toMatchObject({ total: 2, page: 1, pageSize: 10 });
@@ -450,6 +451,7 @@ test.describe('GET /portal/students/:studentId/statement with a term', () => {
         'description',
         'effectiveOn',
         'status',
+        'voided',
       ]);
     }
     expect(first!.rows).not.toHaveLength(0);

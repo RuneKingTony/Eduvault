@@ -8,6 +8,8 @@ import {
   familyTermFields,
   guardianStatementParamsSchema,
   isOwingStatus,
+  rowStatusLabel,
+  rowTone,
   statementQuerySchema,
   statementTermFields,
 } from './student-accounts';
@@ -172,6 +174,20 @@ describe('the statement row statuses', () => {
     expect(Object.keys(ROW_STATUS_LABELS)).toEqual([...STATEMENT_ROW_STATUSES]);
     expect(ROW_STATUS_LABELS.cancelled).toBe('Payment cancelled');
     expect(ROW_STATUS_LABELS.refunded).toBe('Refunded');
+  });
+
+  it('read a voided receipt as voided, and leave other rows alone', () => {
+    expect(rowStatusLabel({ status: 'paid', voided: true })).toBe('Voided');
+    expect(rowStatusLabel({ status: 'paid', voided: false })).toBe('Paid');
+    expect(rowStatusLabel({ status: 'cancelled', voided: false })).toBe(
+      'Payment cancelled'
+    );
+  });
+
+  it('give a voided receipt a neutral tone, whatever its status', () => {
+    expect(rowTone({ status: 'paid', voided: true })).toBe('neutral');
+    expect(rowTone({ status: 'paid', voided: false })).toBe('paid');
+    expect(rowTone({ status: 'charged' })).toBe('owe');
   });
 
   it('count charged, cancelled and refunded rows as owing and paid and reduced as not', () => {

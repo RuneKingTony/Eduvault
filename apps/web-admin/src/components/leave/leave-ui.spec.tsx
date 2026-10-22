@@ -1,4 +1,5 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import {
   ApiError,
   type CreateLeaveInput,
@@ -41,7 +42,10 @@ const [
   OWN,
 ] = LEAVE_IDS as [string, string, string, string, string, string, string];
 
+let user: ReturnType<typeof userEvent.setup>;
+
 beforeEach(() => {
+  user = userEvent.setup();
   vi.clearAllMocks();
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(new Date(`${TODAY}T09:00:00Z`));
@@ -131,7 +135,7 @@ describe('MyLeaveCard', () => {
 
     const buttons = await screen.findAllByRole('button', { name: 'Withdraw' });
     expect(buttons).toHaveLength(1);
-    fireEvent.click(buttons[0]!);
+    await user.click(buttons[0]!);
 
     await waitFor(() => {
       expect(api.leave.withdraw).toHaveBeenCalledWith({
@@ -295,7 +299,7 @@ describe('LeaveDecisionsNotice', () => {
       )
     ).toBeVisible();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Got it' }));
+    await user.click(screen.getByRole('button', { name: 'Got it' }));
 
     await waitFor(() => {
       expect(api.leave.seen).toHaveBeenCalledExactlyOnceWith({
@@ -317,7 +321,7 @@ describe('LeaveDecisionsNotice', () => {
     );
     renderWithApi(<MyLeaveCard canWrite />, api);
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Got it' }));
+    await user.click(await screen.findByRole('button', { name: 'Got it' }));
 
     expect(await screen.findByText('Try again in a moment.')).toBeVisible();
     expect(toast.error).not.toHaveBeenCalled();
@@ -418,7 +422,7 @@ describe('MemberLeaveCard Cancel leave', () => {
 
   it('opens the dialog for that row', async () => {
     renderWithApi(<MemberLeaveCard userId="user-emeka" />, memberApi());
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('button', { name: 'Cancel leave' })
     );
     expect(await screen.findByText('Cancel this leave?')).toBeVisible();
@@ -428,8 +432,8 @@ describe('MemberLeaveCard Cancel leave', () => {
   });
 });
 
-const submit = () => {
-  fireEvent.click(screen.getByRole('button', { name: 'Cancel leave' }));
+const submit = async () => {
+  await user.click(screen.getByRole('button', { name: 'Cancel leave' }));
 };
 
 describe('CancelLeaveDialog', () => {
@@ -449,7 +453,7 @@ describe('CancelLeaveDialog', () => {
     return { api, onClose, queryClient };
   }
 
-  it('names the leave and offers Keep leave and Cancel leave', () => {
+  it('names the leave and offers Keep leave and Cancel leave', async () => {
     const { onClose } = openCancel();
     expect(screen.getByText('Cancel this leave?')).toBeVisible();
     expect(
@@ -458,18 +462,17 @@ describe('CancelLeaveDialog', () => {
     expect(
       screen.getByPlaceholderText('The staff member will see this')
     ).toBeVisible();
-    fireEvent.click(screen.getByRole('button', { name: 'Keep leave' }));
+    await user.click(screen.getByRole('button', { name: 'Keep leave' }));
     expect(onClose).toHaveBeenCalled();
   });
 
-  it('asks for a reason before cancelling', () => {
+  it('asks for a reason before cancelling', async () => {
     const { api } = openCancel();
-    submit();
+    await submit();
     expect(screen.getByText('Give a reason.')).toBeVisible();
-    fireEvent.change(screen.getByLabelText('Reason'), {
-      target: { value: '   ' },
-    });
-    submit();
+    await user.clear(screen.getByLabelText('Reason'));
+    await user.type(screen.getByLabelText('Reason'), '   ');
+    await submit();
     expect(screen.getByText('Give a reason.')).toBeVisible();
     expect(api.leave.cancel).not.toHaveBeenCalled();
   });
@@ -477,10 +480,9 @@ describe('CancelLeaveDialog', () => {
   it('cancels with the trimmed reason, closes and toasts', async () => {
     const { api, onClose, queryClient } = openCancel();
     const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
-    fireEvent.change(screen.getByLabelText('Reason'), {
-      target: { value: '  Cover is short  ' },
-    });
-    submit();
+    await user.clear(screen.getByLabelText('Reason'));
+    await user.type(screen.getByLabelText('Reason'), '  Cover is short  ');
+    await submit();
 
     await waitFor(() => {
       expect(api.leave.cancel).toHaveBeenCalledWith({
@@ -508,10 +510,9 @@ describe('CancelLeaveDialog', () => {
       })
     );
     const { onClose } = openCancel(api);
-    fireEvent.change(screen.getByLabelText('Reason'), {
-      target: { value: 'Too late' },
-    });
-    submit();
+    await user.clear(screen.getByLabelText('Reason'));
+    await user.type(screen.getByLabelText('Reason'), 'Too late');
+    await submit();
 
     expect(
       await screen.findByText('Leave that has started can’t be cancelled.')
@@ -526,12 +527,20 @@ function openDialog(api = cardApi()) {
   return api;
 }
 
-const type = (label: string, value: string) => {
-  fireEvent.change(screen.getByLabelText(label), { target: { value } });
+const type = async (label: string, value: string) => {
+  const field = screen.getByLabelText(label);
+  if (field instanceof HTMLSelectElement) {
+    await user.selectOptions(field, value);
+    return;
+  }
+  await user.clear(field);
+  if (value) {
+    await user.type(field, value);
+  }
 };
 
-const send = () => {
-  fireEvent.click(screen.getByRole('button', { name: 'Send request' }));
+const send = async () => {
+  await user.click(screen.getByRole('button', { name: 'Send request' }));
 };
 
 describe('RequestLeaveDialog', () => {
@@ -567,44 +576,44 @@ describe('RequestLeaveDialog', () => {
     ).toBeVisible();
   });
 
-  it('asks for a first day and a reason before sending', () => {
+  it('asks for a first day and a reason before sending', async () => {
     const api = openDialog();
-    send();
+    await send();
 
     expect(screen.getByText('Choose the first day of leave.')).toBeVisible();
     expect(screen.getByText('Give a reason.')).toBeVisible();
     expect(api.leave.create).not.toHaveBeenCalled();
   });
 
-  it('sets the last day’s minimum to the first day', () => {
+  it('sets the last day’s minimum to the first day', async () => {
     openDialog();
-    type('First day', '2026-10-22');
+    await type('First day', '2026-10-22');
     expect(screen.getByLabelText('Last day')).toHaveAttribute(
       'min',
       '2026-10-22'
     );
   });
 
-  it('refuses a last day before the first, a past first day and a weekend', () => {
+  it('refuses a last day before the first, a past first day and a weekend', async () => {
     const api = openDialog();
-    type('Reason', 'Trip');
+    await type('Reason', 'Trip');
 
-    type('First day', '2026-10-22');
-    type('Last day', '2026-10-21');
-    send();
+    await type('First day', '2026-10-22');
+    await type('Last day', '2026-10-21');
+    await send();
     expect(
       screen.getByText('The last day can’t be before the first day.')
     ).toBeVisible();
 
-    type('First day', '2026-10-09');
-    type('Last day', '');
-    send();
+    await type('First day', '2026-10-09');
+    await type('Last day', '');
+    await send();
     expect(
       screen.getByText('The first day can’t be before today.')
     ).toBeVisible();
 
-    type('First day', '2026-10-17');
-    send();
+    await type('First day', '2026-10-17');
+    await send();
     expect(
       screen.getByText(
         'Those dates are school holidays or a weekend. Choose at least one school day.'
@@ -626,11 +635,11 @@ describe('RequestLeaveDialog', () => {
           days: 1,
         })
     );
-    type('Type of leave', 'study');
-    type('First day', '2026-10-22');
-    type('Reason', '  Exam  ');
-    type('Cover for your classes (optional)', 'Ayo takes JSS 2');
-    send();
+    await type('Type of leave', 'study');
+    await type('First day', '2026-10-22');
+    await type('Reason', '  Exam  ');
+    await type('Cover for your classes (optional)', 'Ayo takes JSS 2');
+    await send();
 
     await waitFor(() => {
       expect(api.leave.create).toHaveBeenCalledWith({
@@ -657,9 +666,9 @@ describe('RequestLeaveDialog', () => {
         message: 'You already asked for leave on some of these days.',
       })
     );
-    type('First day', '2026-10-22');
-    type('Reason', 'Trip');
-    send();
+    await type('First day', '2026-10-22');
+    await type('Reason', 'Trip');
+    await send();
 
     expect(
       await screen.findByText(
@@ -677,9 +686,9 @@ describe('RequestLeaveDialog', () => {
           'Those dates are school holidays or a weekend. Choose at least one school day.',
       })
     );
-    type('First day', '2026-10-22');
-    type('Reason', 'Trip');
-    send();
+    await type('First day', '2026-10-22');
+    await type('Reason', 'Trip');
+    await send();
 
     expect(
       await screen.findByText(

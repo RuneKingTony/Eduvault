@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import {
   AuthClientProvider,
   type EduvaultAuthClient,
@@ -18,6 +19,12 @@ function setup() {
   );
   return { signOut };
 }
+
+let user: ReturnType<typeof userEvent.setup>;
+
+beforeEach(() => {
+  user = userEvent.setup();
+});
 
 describe('StaffScreen', () => {
   it('tells staff the portal is for students and guardians, with no nav', () => {
@@ -39,7 +46,7 @@ describe('StaffScreen', () => {
 
   it('signs out', async () => {
     const { signOut } = setup();
-    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+    await user.click(screen.getByRole('button', { name: 'Sign out' }));
     await waitFor(() => {
       expect(signOut).toHaveBeenCalledOnce();
     });

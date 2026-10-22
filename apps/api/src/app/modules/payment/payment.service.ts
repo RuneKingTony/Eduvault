@@ -42,6 +42,7 @@ import {
 } from './payment.repository';
 import type { UsableMoneyAccount } from '../../common/money-accounts';
 import { orgScopeOf, type OrgScope } from '../../common/scope';
+import { replayOf } from '../../common/references/apply-once';
 
 const sumOf = (rows: readonly { amountMinor: number }[]): number =>
   rows.reduce((total, row) => total + row.amountMinor, 0);
@@ -203,15 +204,15 @@ export class PaymentService {
     existing: ExistingPayment,
     request: { reference: string; requestHash: string }
   ): Promise<RecordedPayment> {
-    const visible = await this.payments.find(orgScopeOf(ctx), existing.id);
-    if (visible === undefined) {
-      throw new ConflictException(PAYMENT_REFERENCE_TAKEN_MESSAGE);
-    }
-    if (existing.requestHash !== request.requestHash) {
-      throw new ConflictException(
-        paymentReferenceUsedMessage(request.reference, existing.receiptNumber)
-      );
-    }
+    const visible = replayOf({
+      visible: await this.payments.find(orgScopeOf(ctx), existing.id),
+      sameRequest: () => existing.requestHash === request.requestHash,
+      taken: () => new ConflictException(PAYMENT_REFERENCE_TAKEN_MESSAGE),
+      used: () =>
+        new ConflictException(
+          paymentReferenceUsedMessage(request.reference, existing.receiptNumber)
+        ),
+    });
     const currency = await this.payments.currency(ctx.organizationId);
     return { currency, ...visible, replayed: true };
   }

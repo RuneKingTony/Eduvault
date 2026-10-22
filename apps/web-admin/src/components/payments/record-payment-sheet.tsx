@@ -21,7 +21,12 @@ import {
   Skeleton,
   toast,
 } from '@eduvault/ui';
-import { useApi, type Api } from '../../api';
+import { useApi } from '../../api';
+import {
+  announceReplay,
+  uploadProofOnce,
+  type UploadedProof,
+} from '../record-once';
 import {
   invalidatePayments,
   recordingOptionsQueryOptions,
@@ -77,43 +82,18 @@ function recordedMessage(payment: RecordedPayment): string {
     : base;
 }
 
-interface Uploaded {
-  file: File;
-  id: string;
-}
-
-async function proofIdOf(
-  api: Api,
-  attempt: Attempt,
-  remembered: {
-    uploaded: Uploaded | undefined;
-    remember: (u: Uploaded) => void;
-  }
-): Promise<string | undefined> {
-  const { file, state } = attempt;
-  if (state.method !== 'transfer' || file === undefined) {
-    return undefined;
-  }
-  if (remembered.uploaded?.file === file) {
-    return remembered.uploaded.id;
-  }
-  const form = new FormData();
-  form.set('kind', 'payment_proof');
-  form.set('file', file);
-  const stored = await api.files.upload({ body: form });
-  remembered.remember({ file, id: stored.id });
-  return stored.id;
-}
-
 function announce(
   payment: RecordedPayment,
   stay: boolean,
   openReceipt: (paymentId: string, recorded: boolean) => void
 ): void {
-  if (payment.replayed) {
-    toast.warning(
-      `Reference ${payment.reference} was already recorded as ${payment.receiptNumber}. Nothing was posted twice.`
-    );
+  if (
+    announceReplay(
+      payment,
+      (again) =>
+        `Reference ${again.reference} was already recorded as ${again.receiptNumber}. Nothing was posted twice.`
+    )
+  ) {
     openReceipt(payment.id, false);
     return;
   }
@@ -137,7 +117,7 @@ function useRecord(
   done: {
     onClose: () => void;
     onUploaded: (file: File, id: string) => void;
-    uploaded: Uploaded | undefined;
+    uploaded: UploadedProof | undefined;
     options: RecordingOptions;
   }
 ) {
@@ -153,7 +133,9 @@ function useRecord(
   };
   return useMutation({
     mutationFn: async (attempt: Attempt) => {
-      const proofId = await proofIdOf(api, attempt, {
+      const proofId = await uploadProofOnce(api, {
+        file: attempt.file,
+        needed: attempt.state.method === 'transfer',
         uploaded: done.uploaded,
         remember: (stored) => {
           done.onUploaded(stored.file, stored.id);
@@ -277,7 +259,7 @@ function SheetForm({
   const { state, act } = useSheetState(options, prefill);
   const [submitted, setSubmitted] = useState(false);
   const [file, setFile] = useState<File | undefined>();
-  const [uploaded, setUploaded] = useState<{ file: File; id: string }>();
+  const [uploaded, setUploaded] = useState<UploadedProof>();
   const sending = useRef(false);
   const record = useRecord(stay, {
     onClose,

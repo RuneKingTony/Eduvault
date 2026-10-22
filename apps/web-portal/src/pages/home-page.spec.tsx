@@ -1,4 +1,5 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { ApiError, type AnnouncementSummary } from '@eduvault/api-contract';
 import type { Permission } from '@eduvault/policy';
 import { addDays, lagosDateOf } from '@eduvault/shared';
@@ -87,6 +88,12 @@ const renderHome = (
     api,
     props.held
   );
+
+let user: ReturnType<typeof userEvent.setup>;
+
+beforeEach(() => {
+  user = userEvent.setup();
+});
 
 describe('Home hero', () => {
   it('names the child, their class and campus, and says the guardian is viewing', async () => {
@@ -205,9 +212,9 @@ describe('Home announcements', () => {
       })
     );
     const toggle = await screen.findByRole('button', { name: /PTA meeting/ });
-    fireEvent.click(toggle);
+    await user.click(toggle);
     expect(screen.getByText('Saturday at ten.')).toBeVisible();
-    fireEvent.click(toggle);
+    await user.click(toggle);
     expect(screen.queryByText('Saturday at ten.')).not.toBeInTheDocument();
   });
 
@@ -267,7 +274,7 @@ describe('Home announcements', () => {
       childId: ADA_ID,
       onSeeAll,
     });
-    fireEvent.click(await screen.findByRole('button', { name: 'See all' }));
+    await user.click(await screen.findByRole('button', { name: 'See all' }));
     expect(onSeeAll).toHaveBeenCalledWith(ADA_ID);
   });
 
@@ -326,7 +333,7 @@ describe('Home holidays and profile', () => {
     renderHome(apiWith(), { me: studentMe });
     const trigger = await screen.findByRole('button', { name: /Profile/ });
     expect(screen.queryByText('GF-0123')).not.toBeInTheDocument();
-    fireEvent.click(trigger);
+    await user.click(trigger);
     expect(screen.getByText('GF-0123')).toBeInTheDocument();
     expect(screen.getByText('2 May 2014')).toBeInTheDocument();
     expect(screen.getByText('Username')).toBeInTheDocument();
@@ -336,7 +343,7 @@ describe('Home holidays and profile', () => {
 
   it('shows a guardian what they signed in with', async () => {
     renderHome(apiWith());
-    fireEvent.click(await screen.findByRole('button', { name: /Profile/ }));
+    await user.click(await screen.findByRole('button', { name: /Profile/ }));
     expect(screen.getByText('Signed in with')).toBeInTheDocument();
     expect(screen.getByText('okeke-family')).toBeInTheDocument();
     expect(screen.queryByText('Username')).not.toBeInTheDocument();
@@ -349,7 +356,7 @@ describe('Home holidays and profile', () => {
         login: { username: null, email: 'ngozi@example.com' },
       }),
     });
-    fireEvent.click(await screen.findByRole('button', { name: /Profile/ }));
+    await user.click(await screen.findByRole('button', { name: /Profile/ }));
     expect(screen.getByText('ngozi@example.com')).toBeInTheDocument();
   });
 });
@@ -487,7 +494,7 @@ describe('Home fees tile', () => {
   it('opens Fees for the selected child', async () => {
     const onSeeFees = vi.fn();
     renderHome(feesApi(6_000_000), { held: WITH_FEES, onSeeFees });
-    fireEvent.click(await screen.findByRole('button', { name: /Fees/ }));
+    await user.click(await screen.findByRole('button', { name: /Fees/ }));
     expect(onSeeFees).toHaveBeenCalledWith(ADA_ID);
   });
 

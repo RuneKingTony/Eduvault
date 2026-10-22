@@ -1,6 +1,6 @@
 # Front end (apps/web-admin, apps/web-portal, libs/ui, libs/auth-client)
 
-Tests run on Vitest with Testing Library (`render`, `screen`, `within`, `fireEvent`). Each app has a `test-utils.tsx` and `test-*.ts` fixture files. `renderWithApi(ui, api, access)` wraps the page in `ApiProvider` with a fake `api` object of `vi.fn()` methods.
+Tests run on Vitest with Testing Library (`render`, `screen`, `within`, `userEvent`). Each app has a `test-utils.tsx` and `test-*.ts` fixture files. `renderWithApi(ui, api, access)` wraps the page in `ApiProvider` with a fake `api` object of `vi.fn()` methods.
 
 ## What the front end gets right
 
@@ -37,7 +37,7 @@ Partial mocks of `@eduvault/ui` that only replace `notify`/`toast` are fine: the
 2. **Type the fake.** Replace the `unknown` fake with a deep-partial of `Api` so a wrong method name or response shape fails `tsc` (`typecheck` is a gate).
 3. **Test at the network boundary for flows that matter.** Mock Service Worker intercepts real requests, so the contract client, serialization and error handling stay under test; `vi.mock` of an API module skips them. Reuse the `libs/api-contract` handlers. Adopt it for money and permission flows first, not everywhere.
 4. **Lint it.** `@vitest/eslint-plugin` recommended and `eslint-plugin-testing-library` (`flat/react`, plus `no-test-id-queries` and `prefer-query-matchers`) are on for every spec (`eslint.config.mjs`, D-356); `vitest/no-restricted-matchers` bans `toBeDefined`, `toBeTruthy` and `toBeFalsy`. The testing-library rules catch the DOM-structure patterns above (`.closest('tr')` becomes `getByRole('row', { name })`). Not enabled: `prefer-user-event` and `prefer-explicit-assert`. Every rule is `error` here (`conventions.md`), so fix hits rather than disabling.
-5. **Prefer `userEvent` over `fireEvent`.** 927 `fireEvent` calls and no `userEvent`: `fireEvent.change` skips focus, typing and disabled-state behaviour, so a test can pass against a control a user could not operate.
+5. **Interact like a user.** Specs use `userEvent` (`prefer-user-event` and `prefer-user-event-setup` are errors, D-377): `fireEvent.change` skipped focus, typing and disabled-state behaviour, so a test could pass against a control a user could not operate. Where a test needs the contract skipped for one request, use `renderWithRefusal`.
 6. **Assert the outcome after the request.** For each spy-only test, add the visible result, or state in the title that the request is the contract.
 7. **Hold fakes to the contract.** `checked(...)` (`test-api.ts` in each app, `contractChecked` in `libs/api-contract`) validates every fake call's request and answer against the route schemas, so fixtures need real UUIDs and real shapes. Every spec in both apps is held to it; a spec that mounts `ApiProvider` with a bare fake bypasses it, so grep for `ApiProvider api=` without `checked(`. Use real UUID constants for shared ids, and make fake write methods echo the request.
 8. **Let e2e own flows.** Anything permission- or tenancy-sensitive that is only covered by fake-client component tests needs an `eduvault-e2e` step (`docs/verification.md`: sign-in and school switching are only component-tested in the default loop).

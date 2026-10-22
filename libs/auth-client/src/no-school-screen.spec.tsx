@@ -1,12 +1,14 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { NoSchoolScreen } from './no-school-screen';
 
 describe('NoSchoolScreen', () => {
-  it('tells staff to ask the school owner', () => {
+  it('tells staff to ask the school owner', async () => {
+    const user = userEvent.setup();
     const onSignOut = vi.fn();
     render(<NoSchoolScreen variant="staff" onSignOut={onSignOut} />);
     expect(screen.getByText('You’re not in a school yet')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+    await user.click(screen.getByRole('button', { name: 'Sign out' }));
     expect(onSignOut).toHaveBeenCalledOnce();
   });
 

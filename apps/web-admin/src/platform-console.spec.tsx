@@ -4,7 +4,8 @@ import {
   createMemoryHistory,
   createRouter,
 } from '@tanstack/react-router';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import {
   AuthClientProvider,
   type EduvaultAuthClient,
@@ -130,6 +131,12 @@ const sidebarLink = (name: string) =>
   screen
     .getAllByRole('link', { name })
     .find((link) => !link.hasAttribute('aria-disabled'));
+
+let user: ReturnType<typeof userEvent.setup>;
+
+beforeEach(() => {
+  user = userEvent.setup();
+});
 
 describe('platform console', () => {
   beforeEach(() => {
@@ -260,7 +267,7 @@ describe('platform console', () => {
 
     it('starts acting from the school page: stores the school, warns and opens Dashboard', async () => {
       const { router } = await renderAt('/platform/schools/s1', me());
-      fireEvent.click(
+      await user.click(
         await screen.findByRole('button', { name: 'Act in this school' })
       );
       await waitFor(() => {
@@ -283,10 +290,8 @@ describe('platform console', () => {
 
       const allow = screen.getByRole('button', { name: 'Allow writes' });
       expect(allow).toBeDisabled();
-      fireEvent.change(screen.getByLabelText('Reason for writes'), {
-        target: { value: 'SUP-2214' },
-      });
-      fireEvent.click(allow);
+      await user.type(screen.getByLabelText('Reason for writes'), 'SUP-2214');
+      await user.click(allow);
 
       expect(await screen.findByText('Acting · writes on')).toBeInTheDocument();
       expect(screen.getByRole('status')).toHaveTextContent(
@@ -300,7 +305,7 @@ describe('platform console', () => {
         await screen.findByRole('button', { name: 'Admit student' })
       ).toBeInTheDocument();
 
-      fireEvent.click(
+      await user.click(
         screen.getByRole('button', { name: 'Back to read-only' })
       );
       expect(await screen.findByText('Acting · read-only')).toBeInTheDocument();
@@ -310,7 +315,7 @@ describe('platform console', () => {
         ).not.toBeInTheDocument();
       });
 
-      fireEvent.click(screen.getByRole('button', { name: 'Leave school' }));
+      await user.click(screen.getByRole('button', { name: 'Leave school' }));
       await waitFor(() => {
         expect(router.state.location.pathname).toBe('/platform/schools/s1');
       });
@@ -323,9 +328,7 @@ describe('platform console', () => {
     it('does not show My access in the user menu while acting', async () => {
       startActing('s1', 'Greenfield College');
       await renderAt('/', me());
-      fireEvent.keyDown(screen.getByRole('button', { name: /Jude/ }), {
-        key: 'Enter',
-      });
+      await user.click(screen.getByRole('button', { name: /Jude/ }));
       expect(
         await screen.findByRole('menuitem', { name: /Command menu/ })
       ).toBeInTheDocument();
