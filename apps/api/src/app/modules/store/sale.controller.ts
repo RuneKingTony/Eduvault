@@ -1,6 +1,10 @@
 import { Body, Controller, Get, Param, Post, Query, Res } from '@nestjs/common';
 import type { Response } from 'express';
-import { contract, type RouteOutput } from '@eduvault/api-contract';
+import {
+  contract,
+  type RouteOutput,
+  type SaleOptionsQuery,
+} from '@eduvault/api-contract';
 import { Org, OrganizationAuth, type OrgContext } from '../../common/auth';
 import { zod } from '../../common/http/zod.pipe';
 import { SaleService } from './sale.service';
@@ -28,9 +32,10 @@ export class SaleController {
   @Get('sales/options')
   @OrganizationAuth('store', 'issue')
   saleOptions(
-    @Org() org: OrgContext
+    @Org() org: OrgContext,
+    @Query(zod(routes.saleOptions.query)) query: SaleOptionsQuery
   ): Promise<RouteOutput<typeof routes.saleOptions>> {
-    return this.reads.saleOptions(org);
+    return this.reads.saleOptions(org, query);
   }
 
   @Get('sales/:id')

@@ -1277,6 +1277,67 @@ test.describe('the sale reads', () => {
     expect(options.students.map((row) => row.id)).toEqual([studentLekki.id]);
     expect(options.students[0]).not.toHaveProperty('balanceMinor');
   });
+
+  test('narrows the sheet’s students by search text and always includes the chosen one', async ({
+    api,
+    app,
+    schools,
+  }) => {
+    const { owner, studentLekki, studentIkeja } = schools;
+    await counter(app, api, schools);
+    const all = (await api(owner).get('/store/sales/options').expect(200))
+      .body as SaleOptions;
+    const ikeja = all.students.find((row) => row.id === studentIkeja.id);
+
+    const found = (
+      await api(owner)
+        .get('/store/sales/options')
+        .query({ q: ikeja?.admissionNumber })
+        .expect(200)
+    ).body as SaleOptions;
+    const kept = (
+      await api(owner)
+        .get('/store/sales/options')
+        .query({ q: ikeja?.admissionNumber, studentId: studentLekki.id })
+        .expect(200)
+    ).body as SaleOptions;
+    const none = (
+      await api(owner)
+        .get('/store/sales/options')
+        .query({ q: 'no such student' })
+        .expect(200)
+    ).body as SaleOptions;
+
+    expect(found.students.map((row) => row.id)).toEqual([studentIkeja.id]);
+    expect(kept.students.map((row) => row.id)).toEqual([
+      studentLekki.id,
+      studentIkeja.id,
+    ]);
+    expect(none.students).toEqual([]);
+  });
+
+  test('never returns a student outside the caller’s campus, even when asked for by id', async ({
+    api,
+    app,
+    schools,
+    withPermissions,
+  }) => {
+    const { orgA, lekki, studentIkeja, studentB } = schools;
+    await counter(app, api, schools);
+    const issuer = await withPermissions(orgA, ['store:issue'], {
+      campuses: [lekki],
+    });
+
+    for (const studentId of [studentIkeja.id, studentB.id]) {
+      const options = (
+        await api(issuer)
+          .get('/store/sales/options')
+          .query({ studentId })
+          .expect(200)
+      ).body as SaleOptions;
+      expect(options.students.map((row) => row.id)).not.toContain(studentId);
+    }
+  });
 });
 
 async function made(app: INestApplication, api: Api, schools: Schools) {

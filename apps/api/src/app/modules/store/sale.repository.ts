@@ -93,6 +93,13 @@ export interface StudentPlacement {
 
 export type OptionStudents = SaleOptions['students'];
 
+export interface OptionStudentsRequest {
+  today: string;
+  withBalance: boolean;
+  q: string | undefined;
+  studentId: string | undefined;
+}
+
 export abstract class SaleRepository {
   abstract findByReference(
     organizationId: string,
@@ -110,7 +117,7 @@ export abstract class SaleRepository {
 
   abstract optionStudents(
     scope: OrgScope,
-    request: { today: string; withBalance: boolean }
+    request: OptionStudentsRequest
   ): Promise<OptionStudents>;
 
   abstract currentTerm(

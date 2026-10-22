@@ -48,6 +48,7 @@ import {
   uploadProofOnce,
   type UploadedProof,
 } from '../record-once';
+import { useDebounced } from '../../use-debounced';
 import { useToday } from '../calendar/use-today';
 import {
   invalidateSale,
@@ -85,6 +86,12 @@ interface SaleSheetProps {
   onOpenChange: (open: boolean) => void;
   onRecorded: () => void;
   onStatement: (studentId: string) => void;
+}
+
+interface StudentSearch {
+  text: string;
+  onText: (text: string) => void;
+  onChosen: (studentId: string) => void;
 }
 
 interface LoadedProps {
@@ -159,24 +166,50 @@ function useRecord(done: {
   });
 }
 
+function StudentSearchBox({ search }: { search: StudentSearch }) {
+  return (
+    <TextField
+      label="Find a student"
+      name="student-search"
+      type="search"
+      placeholder="Name or admission number"
+      value={search.text}
+      onChange={(event) => {
+        search.onText(event.target.value);
+      }}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+        }
+      }}
+    />
+  );
+}
+
 function StudentFields({
   loaded,
   state,
   student,
   campusId,
+  search,
   onStudent,
 }: {
   loaded: LoadedProps;
   state: SaleState;
   student: SaleStudent | undefined;
   campusId: string | undefined;
+  search: StudentSearch;
   onStudent: (id: string) => void;
 }) {
   const students = loaded.options.students.filter(
-    (row) => campusId === undefined || row.campusId === campusId
+    (row) =>
+      campusId === undefined ||
+      row.campusId === campusId ||
+      row.id === state.studentId
   );
   return (
     <>
+      <StudentSearchBox search={search} />
       <SelectField
         label="Student"
         name="studentId"
@@ -580,15 +613,36 @@ function useSaleSubmit(
   };
 }
 
+function SaleFooter({
+  chosen,
+  disabled,
+  onClose,
+}: {
+  chosen: boolean;
+  disabled: boolean;
+  onClose: () => void;
+}) {
+  return (
+    <SheetFooter>
+      <Button type="button" variant="ghost" onClick={onClose}>
+        Cancel
+      </Button>
+      <RecordButton chosen={chosen} disabled={disabled} />
+    </SheetFooter>
+  );
+}
+
 function SaleForm({
   loaded,
   campusId,
+  search,
   onClose,
   onRecorded,
   onStatement,
 }: {
   loaded: LoadedProps;
   campusId: string | undefined;
+  search: StudentSearch;
   onClose: () => void;
   onRecorded: () => void;
   onStatement: (studentId: string) => void;
@@ -613,23 +667,21 @@ function SaleForm({
           state={state}
           student={student}
           campusId={campusId}
+          search={search}
           onStudent={(id) => {
             form.change(withStudent(state, id));
+            search.onChosen(id);
           }}
         />
         {student === undefined ? null : (
           <ChosenStudent loaded={loaded} form={form} student={student} />
         )}
       </form>
-      <SheetFooter>
-        <Button type="button" variant="ghost" onClick={onClose}>
-          Cancel
-        </Button>
-        <RecordButton
-          chosen={student !== undefined}
-          disabled={pending || into?.status === 'none'}
-        />
-      </SheetFooter>
+      <SaleFooter
+        chosen={student !== undefined}
+        disabled={pending || into?.status === 'none'}
+        onClose={onClose}
+      />
       <ConfirmSale
         state={step.target?.state}
         student={student}
@@ -652,7 +704,12 @@ function SheetBody({
 }) {
   const api = useApi();
   const today = useToday();
-  const options = useQuery(storeSaleOptionsQueryOptions(api));
+  const [text, setText] = useState('');
+  const [chosen, setChosen] = useState('');
+  const q = useDebounced(text.trim());
+  const options = useQuery(
+    storeSaleOptionsQueryOptions(api, { q, studentId: chosen })
+  );
   const items = useQuery(storeAllItemsQueryOptions(api));
   const error = options.error ?? items.error;
   if (error !== null) {
@@ -669,6 +726,7 @@ function SheetBody({
     <SaleForm
       loaded={{ options: options.data, items: items.data.items, today }}
       campusId={campusId}
+      search={{ text, onText: setText, onChosen: setChosen }}
       onClose={onClose}
       onRecorded={onRecorded}
       onStatement={onStatement}

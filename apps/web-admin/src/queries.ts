@@ -1139,10 +1139,20 @@ export const storeDeliveryQueryOptions = (api: Api, id: string) =>
     queryFn: () => api.store.delivery({ params: { id } }),
   });
 
-export const storeSaleOptionsQueryOptions = (api: Api) =>
+export const storeSaleOptionsQueryOptions = (
+  api: Api,
+  search: { q: string; studentId: string }
+) =>
   queryOptions({
-    queryKey: [...STORE_KEY, 'sale-options'],
-    queryFn: () => api.store.saleOptions({}),
+    queryKey: [...STORE_KEY, 'sale-options', search.q, search.studentId],
+    queryFn: () =>
+      api.store.saleOptions({
+        query: {
+          q: search.q === '' ? undefined : search.q,
+          studentId: search.studentId === '' ? undefined : search.studentId,
+        },
+      }),
+    placeholderData: keepPreviousData,
     gcTime: 0,
   });
 

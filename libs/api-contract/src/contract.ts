@@ -208,6 +208,7 @@ import {
   recordedSaleSchema,
   saleListQuerySchema,
   saleListSchema,
+  saleOptionsQuerySchema,
   saleOptionsSchema,
   saleSchema,
   stockCountListQuerySchema,
@@ -1281,6 +1282,7 @@ export const contract = defineContract({
     saleOptions: defineRoute({
       method: 'GET',
       path: '/store/sales/options',
+      query: saleOptionsQuerySchema,
       response: saleOptionsSchema,
     }),
     sale: defineRoute({

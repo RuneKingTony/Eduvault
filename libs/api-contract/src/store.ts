@@ -574,6 +574,15 @@ export const saleListSchema = z.object({
 });
 export type SaleList = z.infer<typeof saleListSchema>;
 
+export const SALE_STUDENT_CHOICES = 20;
+
+export const saleOptionsQuerySchema = z.object({
+  q: z.string().trim().max(120).optional(),
+  studentId: idSchema.optional(),
+});
+export type SaleOptionsQueryInput = z.input<typeof saleOptionsQuerySchema>;
+export type SaleOptionsQuery = z.output<typeof saleOptionsQuerySchema>;
+
 export const saleOptionsSchema = z.object({
   students: z.array(
     z.object({
