@@ -30,6 +30,8 @@ import {
   toast,
 } from '@eduvault/ui';
 import { useApi } from '../../api';
+import { useConfirmStep } from '../use-confirm-step';
+import { ConfirmCount } from './confirm-count';
 import {
   campusesQueryOptions,
   invalidateApprovals,
@@ -234,12 +236,15 @@ function CountForm({
 }) {
   const form = useCountForm(loaded, campusId);
   const submit = useSubmit(done);
+  const step = useConfirmStep<CountState>((state, settled) => {
+    submit.mutate(countRequest(state, loaded.items), { onSettled: settled });
+  });
   const fields = { loaded, state: form.state, onChange: form.change };
 
   function onSubmit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     if (form.check()) {
-      submit.mutate(countRequest(form.state, loaded.items));
+      step.ask(form.state);
     }
   }
 
@@ -265,6 +270,12 @@ function CountForm({
           Submit count
         </Button>
       </SheetFooter>
+      <ConfirmCount
+        step={step}
+        campuses={loaded.campuses}
+        items={loaded.items}
+        pending={submit.isPending}
+      />
     </>
   );
 }

@@ -77,3 +77,14 @@ export function countRequest(
     })),
   };
 }
+
+export function differingItems(
+  state: CountState,
+  items: readonly Counted[]
+): number {
+  return items.filter(
+    (item) =>
+      Number((state.counted[item.id] ?? '').trim()) !==
+      expectedAt(item, state.campusId)
+  ).length;
+}

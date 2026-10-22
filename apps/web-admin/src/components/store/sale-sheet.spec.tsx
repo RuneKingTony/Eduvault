@@ -96,8 +96,19 @@ const quantity = async (name: string, text: string) => {
   await user.type(input, text);
 };
 
-const record = async () => {
+const ask = async () => {
   await user.click(screen.getByRole('button', { name: 'Record purchase' }));
+};
+
+const confirmDialog = () =>
+  screen.findByRole('dialog', { name: 'Record this purchase?' });
+
+const record = async () => {
+  await ask();
+  const dialog = await confirmDialog();
+  await user.click(
+    within(dialog).getByRole('button', { name: 'Record purchase' })
+  );
 };
 
 describe('SaleSheet', () => {
@@ -181,7 +192,7 @@ describe('SaleSheet', () => {
     const { api } = setup();
     await choose(ADA_ID);
     await screen.findByText('Books for JSS 1');
-    await record();
+    await ask();
 
     expect(toast.error).toHaveBeenCalledWith(STORE_SALE_REQUIRED_MESSAGE);
     expect(api.store.recordSale).not.toHaveBeenCalled();
@@ -194,11 +205,11 @@ describe('SaleSheet', () => {
     await quantity('School tie', '1');
 
     await user.selectOptions(screen.getByLabelText('Payment'), 'pos');
-    await record();
+    await ask();
     expect(toast.error).toHaveBeenLastCalledWith(STORE_SALE_POS_PROOF_MESSAGE);
 
     await user.selectOptions(screen.getByLabelText('Payment'), 'transfer');
-    await record();
+    await ask();
     expect(toast.error).toHaveBeenLastCalledWith(
       STORE_SALE_TRANSFER_PROOF_MESSAGE
     );
@@ -216,7 +227,7 @@ describe('SaleSheet', () => {
       screen.getByLabelText(/Payment receipt/),
       new File(['x'], 'slip.docx', { type: 'application/msword' })
     );
-    await record();
+    await ask();
 
     expect(toast.error).toHaveBeenLastCalledWith(
       'The proof must be a photo, a screenshot or a PDF.'
@@ -387,6 +398,27 @@ describe('SaleSheet', () => {
       expect(second).toBe(first);
     });
 
+    it('shows the student, the items and the total, and sends nothing until confirmed', async () => {
+      const { api } = setup();
+      await choose(ADA_ID);
+      await screen.findByText('Books for JSS 1');
+      await quantity('School tie', '2');
+      await ask();
+
+      const dialog = await confirmDialog();
+      expect(within(dialog).getByText(/Ada/)).toBeVisible();
+      expect(within(dialog).getByText('Total')).toBeVisible();
+      expect(api.store.recordSale).not.toHaveBeenCalled();
+
+      await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+      await waitFor(() => {
+        expect(
+          screen.queryByRole('dialog', { name: 'Record this purchase?' })
+        ).not.toBeInTheDocument();
+      });
+      expect(api.store.recordSale).not.toHaveBeenCalled();
+    });
+
     it('disables Record purchase while it is being recorded', async () => {
       setup({ record: vi.fn(() => new Promise(() => undefined)) });
       await choose(ADA_ID);
@@ -394,9 +426,10 @@ describe('SaleSheet', () => {
       await quantity('School tie', '1');
       await record();
 
+      const dialog = await confirmDialog();
       await waitFor(() => {
         expect(
-          screen.getByRole('button', { name: 'Record purchase' })
+          within(dialog).getByRole('button', { name: 'Record purchase' })
         ).toBeDisabled();
       });
     });

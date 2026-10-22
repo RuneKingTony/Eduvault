@@ -35,6 +35,7 @@ import {
 } from '@eduvault/ui';
 import { useApi } from '../../api';
 import { announceReplay } from '../record-once';
+import { useConfirmStep } from '../use-confirm-step';
 import { useToday } from '../calendar/use-today';
 import {
   campusesQueryOptions,
@@ -63,6 +64,7 @@ import {
   deliveryReplayedMessage,
   newDeliveryReference,
 } from './store-text';
+import { ConfirmDelivery } from './confirm-delivery';
 import { MaskedMoney } from './masked-money';
 import { SheetPending } from './sheet-pending';
 import { SwitchField } from './switch-field';
@@ -353,6 +355,32 @@ function TotalAtCost({ minor }: { minor: number }) {
   );
 }
 
+function DeliveryFooter({
+  onClose,
+  pending,
+}: {
+  onClose: () => void;
+  pending: boolean;
+}) {
+  return (
+    <SheetFooter>
+      <Button type="button" variant="ghost" onClick={onClose}>
+        Cancel
+      </Button>
+      <Button type="submit" form="record-delivery" disabled={pending}>
+        <CheckIcon />
+        Record delivery
+      </Button>
+    </SheetFooter>
+  );
+}
+
+function useDeliveryStep(record: ReturnType<typeof useRecord>) {
+  return useConfirmStep<DeliveryState>((state, settled) => {
+    record.mutate(state, { onSettled: settled });
+  });
+}
+
 function DeliveryForm({
   loaded,
   campusId,
@@ -366,20 +394,19 @@ function DeliveryForm({
 }) {
   const form = useDeliveryForm(loaded, campusId);
   const record = useRecord(loaded.campuses, onRecorded);
-
-  function submit(event: SubmitEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (form.check()) {
-      record.mutate(form.state);
-    }
-  }
+  const step = useDeliveryStep(record);
 
   return (
     <>
       <form
         id="record-delivery"
         noValidate
-        onSubmit={submit}
+        onSubmit={(event: SubmitEvent<HTMLFormElement>) => {
+          event.preventDefault();
+          if (form.check()) {
+            step.ask(form.state);
+          }
+        }}
         className="flex flex-col gap-4 overflow-y-auto px-4"
       >
         <HeaderFields
@@ -396,19 +423,12 @@ function DeliveryForm({
         <FieldError message={form.error} />
         <ErrorMessage error={record.error} />
       </form>
-      <SheetFooter>
-        <Button type="button" variant="ghost" onClick={onClose}>
-          Cancel
-        </Button>
-        <Button
-          type="submit"
-          form="record-delivery"
-          disabled={record.isPending}
-        >
-          <CheckIcon />
-          Record delivery
-        </Button>
-      </SheetFooter>
+      <DeliveryFooter onClose={onClose} pending={record.isPending} />
+      <ConfirmDelivery
+        step={step}
+        campuses={loaded.campuses}
+        pending={record.isPending}
+      />
     </>
   );
 }

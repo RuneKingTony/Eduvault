@@ -193,6 +193,10 @@ function setup(
 }
 
 let user: ReturnType<typeof userEvent.setup>;
+async function confirmStep(dialogName: string, button: string) {
+  const dialog = await screen.findByRole('dialog', { name: dialogName });
+  await user.click(within(dialog).getByRole('button', { name: button }));
+}
 
 beforeEach(() => {
   user = userEvent.setup();
@@ -520,6 +524,7 @@ describe('the New request sheet', () => {
     await user.click(
       within(sheet).getByRole('button', { name: 'Submit for approval' })
     );
+    await confirmStep('Submit this request?', 'Submit');
 
     await waitFor(() => {
       expect(api.adjustments.create).toHaveBeenCalledWith({
@@ -541,6 +546,34 @@ describe('the New request sheet', () => {
     });
   });
 
+  it('shows the request, the student and the amount, and sends nothing until confirmed', async () => {
+    const { api, sheet } = await openSheet();
+    await waitFor(() => {
+      expect(within(sheet).getByLabelText('Student')).toBeEnabled();
+    });
+    await within(sheet).findByRole('option', { name: 'Ada Okeke · GF-0123' });
+    await user.selectOptions(within(sheet).getByLabelText('Student'), ADA);
+    await user.type(within(sheet).getByLabelText('Amount (₦)'), '10,000');
+    await user.type(within(sheet).getByLabelText('Reason'), 'Late enrolment');
+    await user.click(
+      within(sheet).getByRole('button', { name: 'Submit for approval' })
+    );
+
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Submit this request?',
+    });
+    expect(within(dialog).getByText('₦10,000')).toBeVisible();
+    expect(await within(dialog).findByText('Ada Okeke')).toBeVisible();
+    expect(api.adjustments.create).not.toHaveBeenCalled();
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    await waitFor(() => {
+      expect(
+        screen.queryByRole('dialog', { name: 'Submit this request?' })
+      ).not.toBeInTheDocument();
+    });
+    expect(api.adjustments.create).not.toHaveBeenCalled();
+  });
+
   it('says it was applied straight away when the kind needs no approval', async () => {
     const ctx = setup({
       search: { new: 1 },
@@ -555,6 +588,7 @@ describe('the New request sheet', () => {
     await user.click(
       within(sheet).getByRole('button', { name: 'Submit for approval' })
     );
+    await confirmStep('Submit this request?', 'Submit');
 
     await waitFor(() => {
       expect(toast.success).toHaveBeenCalledWith(
@@ -581,6 +615,7 @@ describe('the New request sheet', () => {
     await user.click(
       within(sheet).getByRole('button', { name: 'Submit for approval' })
     );
+    await confirmStep('Submit this request?', 'Submit');
 
     expect(await within(sheet).findByText(message)).toBeVisible();
   });
@@ -598,6 +633,7 @@ describe('the New request sheet', () => {
     await user.click(
       within(sheet).getByRole('button', { name: 'Submit for approval' })
     );
+    await confirmStep('Submit this request?', 'Submit');
 
     await waitFor(() => {
       expect(api.adjustments.create).toHaveBeenCalledWith({
@@ -702,6 +738,7 @@ describe('the New discount sheet', () => {
     await user.click(
       within(sheet).getByRole('button', { name: 'Submit for approval' })
     );
+    await confirmStep('Submit this discount?', 'Submit');
 
     await waitFor(() => {
       expect(api.studentDiscounts.create).toHaveBeenCalledWith({
@@ -738,6 +775,7 @@ describe('the New discount sheet', () => {
     await user.click(
       within(sheet).getByRole('button', { name: 'Submit for approval' })
     );
+    await confirmStep('Submit this discount?', 'Submit');
 
     await waitFor(() => {
       expect(toast.success).toHaveBeenCalledWith(

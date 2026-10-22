@@ -363,6 +363,14 @@ describe('StorePage', () => {
       '10'
     );
     await user.click(screen.getByRole('button', { name: 'Record delivery' }));
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Record this delivery?',
+    });
+    expect(within(dialog).getByText('Adebayo Uniforms Ltd')).toBeVisible();
+    expect(api.store.recordDelivery).not.toHaveBeenCalled();
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Record delivery' })
+    );
 
     await waitFor(() => {
       expect(api.store.recordDelivery).toHaveBeenCalledWith({

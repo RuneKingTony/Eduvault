@@ -41,6 +41,8 @@ import {
   toast,
 } from '@eduvault/ui';
 import { useApi } from '../../api';
+import { useConfirmStep } from '../use-confirm-step';
+import { ConfirmSale } from './confirm-sale';
 import {
   announceReplay,
   uploadProofOnce,
@@ -559,12 +561,16 @@ function useSaleSubmit(
     uploaded: form.uploaded,
     onUploaded: form.setUploaded,
   });
+  const step = useConfirmStep<Attempt>((attempt, settled) => {
+    record.mutate(attempt, { onSettled: settled });
+  });
   return {
     pending: record.isPending,
+    step,
     submit: (event: SubmitEvent<HTMLFormElement>) => {
       event.preventDefault();
       if (form.check()) {
-        record.mutate({
+        step.ask({
           state: form.state,
           accountId: effectiveAccount(form.state, form.into)?.id,
           file: form.file ?? form.uploaded?.file,
@@ -589,7 +595,10 @@ function SaleForm({
 }) {
   const form = useSaleForm(loaded);
   const { state, student, into } = form;
-  const { pending, submit } = useSaleSubmit(form, { onRecorded, onStatement });
+  const { pending, step, submit } = useSaleSubmit(form, {
+    onRecorded,
+    onStatement,
+  });
 
   return (
     <>
@@ -621,6 +630,14 @@ function SaleForm({
           disabled={pending || into?.status === 'none'}
         />
       </SheetFooter>
+      <ConfirmSale
+        state={step.target?.state}
+        student={student}
+        items={loaded.items}
+        pending={pending}
+        onConfirm={step.confirm}
+        onCancel={step.cancel}
+      />
     </>
   );
 }

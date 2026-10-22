@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import {
   ApiError,
@@ -72,8 +72,19 @@ const change = async (input: HTMLInputElement, text: string) => {
   }
 };
 
-const submit = async () => {
+const ask = async () => {
   await user.click(screen.getByRole('button', { name: 'Submit count' }));
+};
+
+const confirmDialog = () =>
+  screen.findByRole('dialog', { name: 'Submit this stock count?' });
+
+const submit = async () => {
+  await ask();
+  const dialog = await confirmDialog();
+  await user.click(
+    within(dialog).getByRole('button', { name: 'Submit count' })
+  );
 };
 
 describe('StockCountSheet', () => {
@@ -212,13 +223,43 @@ describe('StockCountSheet', () => {
     const { api } = setup();
     await change(await counted('School tie'), '-1');
 
-    await submit();
+    await ask();
 
     expect(await screen.findByText(STOCK_COUNT_NEGATIVE_MESSAGE)).toBeVisible();
     expect(api.stockCounts.submit).not.toHaveBeenCalled();
     await change(await counted('School tie'), '');
-    await submit();
+    await ask();
     expect(api.stockCounts.submit).not.toHaveBeenCalled();
+  });
+
+  it('says which store and how many items differ, and sends nothing until confirmed', async () => {
+    const { api } = setup();
+    await change(await counted('School tie'), '4');
+
+    await ask();
+
+    const dialog = await confirmDialog();
+    expect(within(dialog).getByText('Lekki')).toBeVisible();
+    expect(within(dialog).getByText('Items that differ')).toBeVisible();
+    expect(within(dialog).getByText('1')).toBeVisible();
+    expect(api.stockCounts.submit).not.toHaveBeenCalled();
+  });
+
+  it('goes back to the count on Cancel in the confirmation without submitting', async () => {
+    const { api, onOpenChange } = setup();
+    await change(await counted('School tie'), '4');
+    await ask();
+    const dialog = await confirmDialog();
+
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+
+    await waitFor(() => {
+      expect(
+        screen.queryByRole('dialog', { name: 'Submit this stock count?' })
+      ).not.toBeInTheDocument();
+    });
+    expect(api.stockCounts.submit).not.toHaveBeenCalled();
+    expect(onOpenChange).not.toHaveBeenCalled();
   });
 
   it('closes from Cancel', async () => {

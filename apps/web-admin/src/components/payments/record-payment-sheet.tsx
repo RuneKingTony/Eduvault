@@ -1,4 +1,4 @@
-import { useRef, useState, type SubmitEvent } from 'react';
+import { useState, type SubmitEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { CheckIcon } from 'lucide-react';
@@ -10,6 +10,7 @@ import type {
 import { generatePaymentReference, money } from '@eduvault/shared';
 import {
   Button,
+  ConfirmDialog,
   ErrorMessage,
   FieldError,
   Sheet,
@@ -22,6 +23,7 @@ import {
   toast,
 } from '@eduvault/ui';
 import { useApi } from '../../api';
+import { useConfirmStep, type ConfirmStep } from '../use-confirm-step';
 import {
   announceReplay,
   uploadProofOnce,
@@ -45,6 +47,7 @@ import {
   toRequest,
   validate,
   accountsFor,
+  confirmDetails,
   withAccount,
   withAmount,
   withMethod,
@@ -245,6 +248,37 @@ function SheetActionsFooter({
   );
 }
 
+function ConfirmPayment({
+  options,
+  step,
+  pending,
+}: {
+  options: RecordingOptions;
+  step: ConfirmStep<Attempt>;
+  pending: boolean;
+}) {
+  return (
+    <ConfirmDialog
+      open={step.target !== null}
+      title="Record this payment?"
+      description="It posts at once and issues a receipt."
+      details={
+        step.target === null ? [] : confirmDetails(options, step.target.state)
+      }
+      confirmLabel="Record payment"
+      pending={pending}
+      onConfirm={step.confirm}
+      onCancel={step.cancel}
+    />
+  );
+}
+
+function useRecordStep(record: ReturnType<typeof useRecord>) {
+  return useConfirmStep<Attempt>((attempt, settled) => {
+    record.mutate(attempt, { onSettled: settled });
+  });
+}
+
 function SheetForm({
   options,
   prefill,
@@ -260,27 +294,22 @@ function SheetForm({
   const [submitted, setSubmitted] = useState(false);
   const [file, setFile] = useState<File | undefined>();
   const [uploaded, setUploaded] = useState<UploadedProof>();
-  const sending = useRef(false);
   const record = useRecord(stay, {
     onClose,
     onUploaded: (stored, id) => setUploaded({ file: stored, id }),
     uploaded,
     options,
   });
+  const step = useRecordStep(record);
   const proof = { file, uploaded: uploaded !== undefined };
   const errors: SheetErrors = submitted ? validate(state, proof) : {};
 
   function submit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     setSubmitted(true);
-    if (sending.current || Object.keys(validate(state, proof)).length > 0) {
-      return;
+    if (Object.keys(validate(state, proof)).length === 0) {
+      step.ask({ state, file: file ?? uploaded?.file });
     }
-    sending.current = true;
-    record.mutate(
-      { state, file: file ?? uploaded?.file },
-      { onSettled: () => (sending.current = false) }
-    );
   }
 
   return (
@@ -303,6 +332,11 @@ function SheetForm({
           record.isPending ||
           accountsFor(options.accounts, state.method).length === 0
         }
+      />
+      <ConfirmPayment
+        options={options}
+        step={step}
+        pending={record.isPending}
       />
     </>
   );
