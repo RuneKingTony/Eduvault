@@ -1,6 +1,8 @@
+import { ConflictException } from '@nestjs/common';
 import type { NewGuardian, GuardianRelationship } from '@eduvault/api-contract';
 import type { CampusScope } from '../../common/campus-scope';
 import type { SchoolRules } from '../../common/people';
+import type { AdmissionTx } from './admission-tx';
 import type { CampusClassScope } from '../../common/scope';
 
 export interface CurrentTerm {
@@ -77,6 +79,13 @@ export interface AdmissionOutcome {
   guardians: AdmittedGuardian[];
 }
 
+/** Answers with the body `ErrorFilter` gives any unique violation. */
+export class UsernameTakenError extends ConflictException {
+  constructor() {
+    super('Resource already exists');
+  }
+}
+
 export abstract class AdmissionRepository {
   abstract today(organizationId: string): string;
 
@@ -120,5 +129,6 @@ export abstract class AdmissionRepository {
     }
   ): Promise<DuplicateMatch[]>;
 
-  abstract admit(write: AdmissionWrite): Promise<AdmissionOutcome>;
+  /** Throws `UsernameTakenError` when a login insert hits the username index. */
+  abstract transaction<T>(fn: (tx: AdmissionTx) => Promise<T>): Promise<T>;
 }
