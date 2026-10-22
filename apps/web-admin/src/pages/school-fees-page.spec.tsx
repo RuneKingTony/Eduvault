@@ -588,7 +588,7 @@ describe('the preview card', () => {
     expect(await screen.findByText('Already charged')).toBeInTheDocument();
     expect(
       screen.getByText(
-        /Pending discount not applied yet: Academic scholarship, Staff child\. It applies once a boss approves it\./
+        /Pending discount not applied yet: Academic scholarship, Staff child\. It applies once an approver agrees\./
       )
     ).toBeInTheDocument();
   });
