@@ -525,9 +525,10 @@ describe('StatementPage family term filter', () => {
       family: guardianStatement(familyChildren(), { termOptions: OPTIONS }),
     });
 
-    fireEvent.change(await screen.findByRole('combobox', { name: 'Term' }), {
-      target: { value: TERM_ID },
-    });
+    await user.selectOptions(
+      await screen.findByRole('combobox', { name: 'Term' }),
+      TERM_ID
+    );
 
     expect(onSearchChange).toHaveBeenCalledWith({
       view: 'family',
@@ -542,9 +543,10 @@ describe('StatementPage family term filter', () => {
       family: inTerm(),
     });
 
-    fireEvent.change(await screen.findByRole('combobox', { name: 'Term' }), {
-      target: { value: '' },
-    });
+    await user.selectOptions(
+      await screen.findByRole('combobox', { name: 'Term' }),
+      ''
+    );
 
     expect(onSearchChange).toHaveBeenCalledWith({
       view: 'family',

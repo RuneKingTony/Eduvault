@@ -200,9 +200,12 @@ describe('the portal routes', () => {
     );
     const router = openAt(`/children?child=${TOBI_ID}`, api);
 
-    fireEvent.change(await screen.findByRole('combobox', { name: 'Term' }), {
-      target: { value: TERM_ID },
-    });
+    await userEvent
+      .setup()
+      .selectOptions(
+        await screen.findByRole('combobox', { name: 'Term' }),
+        TERM_ID
+      );
 
     await waitFor(() => {
       expect(router.state.location.search).toEqual({
