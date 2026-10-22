@@ -11,7 +11,7 @@ Verifies the product, not one diff: "does this area work the way a person would 
 
 The person using this still looks at the app, to judge whether it feels right and what is missing (a filter that should exist, copy that does not explain). This skill covers whether it works.
 
-Checklists (`references/`): [known-problems](references/known-problems.md) · [access](references/checks-access.md) · [setup](references/checks-setup.md) · [people](references/checks-people.md) · [fees](references/checks-fees.md) · [money](references/checks-money.md) · [store-portal](references/checks-store-portal.md). What a check should cover: [coverage](references/coverage.md). Ledger format: [findings](references/findings.md).
+Checklists (`references/`): [known-problems](references/known-problems.md) · [access](references/checks-access.md) · [setup](references/checks-setup.md) · [people](references/checks-people.md) · [fees](references/checks-fees.md) · [money](references/checks-money.md) · [store-portal](references/checks-store-portal.md). What a check should cover: [coverage](references/coverage.md). Ledger format: [findings](references/findings.md). How to write the report: [report-style](references/report-style.md).
 
 ## Check format
 
@@ -38,10 +38,10 @@ Every check is a block with a header `### ID · kind · persona`, then `Do:` and
 2. Preflight and provision exactly as eduvault-e2e sections 2 and 3 (`preflight.sh browser`, then `RUN_DIR=$(bash .claude/skills/eduvault-e2e/scripts/provision.sh)`). On a branch use `stack-worktree.sh up` so the run never touches the shared database. Read the `e2e:` line. A flow's setup (a fee, an item, a class) is created through the real UI or API as a persona and appended to the ledger straight away (for example the 30 students for KP-09).
 3. Run the selected checks. Inside an area: happy path first and get it right, then permissions (the same view as each role that should differ), then edge and non-happy paths. Do not start edges on a section whose happy path failed; record the finding and move on. Evidence per section is below.
 4. Record each check as one line in `$RUN_DIR/checks.tsv`: `ID<TAB>PASS|FAIL|BLOCKED<TAB>note<TAB>screenshot`. A note is required for FAIL (expected vs actual) and BLOCKED (`cause: environment|persona|product`). Every FAIL also gets a finding.
-5. `bash .claude/skills/eduvault-verify/scripts/summarize.sh "$RUN_DIR/checks.tsv"` prints the per-check table, the counts and the verdict. Write it into `$RUN_DIR/report.md` in the [eduvault-e2e report format](../eduvault-e2e/references/report.md), add the severity counts, a section table (section, passed, failed, blocked, screenshot folder) and **Not verified**, and validate it with `report-check.sh`. Add `$RUN_DIR/INDEX.md`: each section folder with one line per screenshot, so it reads in order without the app.
+5. `bash .claude/skills/eduvault-verify/scripts/summarize.sh "$RUN_DIR/checks.tsv"` prints the per-check table, the counts and the verdict. Write `$RUN_DIR/report.md` in the order of [report-style](references/report-style.md): the worst findings first, in plain words, then the rest. It must still satisfy the [eduvault-e2e report format](../eduvault-e2e/references/report.md); validate it with `report-check.sh`. Add a section table (section, passed, failed, blocked, screenshot folder), **Not verified**, and `$RUN_DIR/INDEX.md`: each section folder with one line per screenshot, so it reads in order without the app.
 6. Clean up as eduvault-e2e does: `cleanup.sh` the ledger, then close sessions on a pass; on a fail leave them open and say so.
 
-Report the verdict, the findings by severity and the path to the run folder. Do not paste the whole ledger into chat.
+Tell the person the worst findings first, in a few plain sentences (what breaks, for whom, why it matters), then the run folder path. Do not open with counts and do not paste the ledger into chat.
 
 ## Area without a checklist
 
@@ -63,7 +63,7 @@ Then run steps 2 to 6. When the area is worth keeping, turn the plan into a chec
 
 ## Findings
 
-Every FAIL is written at once to `$RUN_DIR/findings.md` in the [findings](references/findings.md) format: id, severity, effort, section, persona, the check id, expected and actual, endpoint with status and excerpt, console and log excerpts, screenshot path, and the code location when the cause is verified. Enough that someone can fix it without reproducing it.
+Every FAIL is written at once to `$RUN_DIR/findings.md` in the [findings](references/findings.md) format: id, severity, effort, section, persona, the check id, expected and actual, endpoint with status and excerpt, console and log excerpts, screenshot path, and the code location when the cause is verified. Enough that someone can fix it without reproducing it. Write each for a reader, not a log: a plain title of what a person sees, who is affected and what is at stake, per [report-style](references/report-style.md). Findings are ordered by severity, then by how many people they hit.
 
 A finding is something broken or surprising. A missing filter, a better label or a new feature is an idea for the `## Ideas` list at the bottom and does not affect the verdict.
 
