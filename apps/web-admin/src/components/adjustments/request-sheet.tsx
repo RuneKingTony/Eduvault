@@ -19,6 +19,8 @@ import {
   toast,
 } from '@eduvault/ui';
 import { useApi } from '../../api';
+import { useConfirmStep } from '../use-confirm-step';
+import { ConfirmRequest } from './confirm-request';
 import {
   invalidateApprovals,
   ledgerAccountsQueryOptions,
@@ -91,6 +93,9 @@ function useRequestForm(prefill: RequestPrefill, onClose: () => void) {
   const [errors, setErrors] = useState<RequestErrors>({});
   const choices = useChoices(chosen);
   const create = useCreate(onClose);
+  const step = useConfirmStep<RequestState>((request, settled) => {
+    create.mutate(request, { onSettled: settled });
+  });
   const moneyAccounts = choices.accounts.data ?? [];
   const state = withAccount(chosen, moneyAccounts);
   const patch = (change: Partial<RequestState>) => {
@@ -102,11 +107,11 @@ function useRequestForm(prefill: RequestPrefill, onClose: () => void) {
     const found = validateRequest(state);
     setErrors(found);
     if (Object.keys(found).length === 0) {
-      create.mutate(state);
+      step.ask(state);
     }
   }
 
-  return { state, errors, patch, submit, choices, create, moneyAccounts };
+  return { state, errors, patch, submit, choices, create, step, moneyAccounts };
 }
 
 type RequestFormModel = ReturnType<typeof useRequestForm>;
@@ -185,6 +190,11 @@ function RequestForm({
           Submit for approval
         </Button>
       </SheetFooter>
+      <ConfirmRequest
+        step={form.step}
+        appliesAtOnce={rule === false}
+        pending={form.create.isPending}
+      />
     </>
   );
 }

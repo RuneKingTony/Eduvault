@@ -27,6 +27,8 @@ import {
   toast,
 } from '@eduvault/ui';
 import { useApi } from '../../api';
+import { useConfirmStep } from '../use-confirm-step';
+import { ConfirmPrepare } from './confirm-prepare';
 import {
   billingTermsQueryOptions,
   campusesQueryOptions,
@@ -158,7 +160,11 @@ function usePrepareForm(
     done.onPrepared(prepared);
     done.onClose();
   });
+  const step = useConfirmStep<PrepareBody>((body, settled) => {
+    prepare.mutate(body, { onSettled: settled });
+  });
   return {
+    step,
     scope,
     setScope,
     termId,
@@ -178,7 +184,7 @@ function usePrepareForm(
         return;
       }
       setError(null);
-      prepare.mutate({ termId, scope, scopeId });
+      step.ask({ termId, scope, scopeId });
     },
   };
 }
@@ -267,6 +273,11 @@ function PrepareForm({
           Prepare charges
         </Button>
       </SheetFooter>
+      <ConfirmPrepare
+        step={form.step}
+        choices={choices}
+        pending={form.pending}
+      />
     </>
   );
 }

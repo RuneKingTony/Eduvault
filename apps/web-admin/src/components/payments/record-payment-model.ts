@@ -19,6 +19,7 @@ import {
   PAYMENT_METHODS,
   generatePaymentReference,
   isProofFile,
+  money,
   nairaInputText,
   parseNaira,
   spreadAmount,
@@ -321,4 +322,23 @@ export function toRequest(
     paidOn: state.paidOn,
     allocations,
   };
+}
+
+export function confirmDetails(
+  options: RecordingOptions,
+  state: SheetState
+): { label: string; value: string }[] {
+  const payer =
+    state.payer === SOMEONE_ELSE
+      ? state.payerName.trim()
+      : (options.payers.find((found) => found.guardianId === state.payer)
+          ?.name ?? '');
+  const students = childrenFor(options, state)
+    .filter((child) => minorOf(state.shares[child.studentId] ?? '') > 0)
+    .map((child) => child.name);
+  return [
+    { label: 'Paid by', value: payer },
+    { label: 'Student', value: students.join(', ') },
+    { label: 'Amount', value: money(amountOf(state), options.currency) },
+  ];
 }

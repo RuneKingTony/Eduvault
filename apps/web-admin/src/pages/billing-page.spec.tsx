@@ -37,6 +37,11 @@ function setup(
 
 let user: ReturnType<typeof userEvent.setup>;
 
+async function confirmStep(dialogName: string, button: string) {
+  const dialog = await screen.findByRole('dialog', { name: dialogName });
+  await user.click(within(dialog).getByRole('button', { name: button }));
+}
+
 beforeEach(() => {
   user = userEvent.setup();
 });
@@ -204,6 +209,29 @@ describe('the prepare sheet', () => {
     expect(levelNames()).toEqual(['JSS 1']);
   });
 
+  it('asks before preparing and sends nothing when cancelled', async () => {
+    const { api } = setup(billingApi(), ownerAccess(), { prepare: 1 });
+    const sheet = await screen.findByRole('dialog', {
+      name: 'Charge students',
+    });
+    await within(sheet).findByLabelText('Term');
+    await user.click(
+      within(sheet).getByRole('button', { name: 'Prepare charges' })
+    );
+
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Prepare these charges?',
+    });
+    expect(within(dialog).getByText('Everyone I can see')).toBeVisible();
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    await waitFor(() => {
+      expect(
+        screen.queryByRole('dialog', { name: 'Prepare these charges?' })
+      ).not.toBeInTheDocument();
+    });
+    expect(api.billingRuns.prepare).not.toHaveBeenCalled();
+  });
+
   it('prepares the whole school and shows the ready callout with a toast', async () => {
     const { api } = setup(billingApi(), ownerAccess(), { prepare: 1 });
     const sheet = await screen.findByRole('dialog', {
@@ -213,6 +241,7 @@ describe('the prepare sheet', () => {
     await user.click(
       within(sheet).getByRole('button', { name: 'Prepare charges' })
     );
+    await confirmStep('Prepare these charges?', 'Prepare charges');
     await waitFor(() => {
       expect(api.billingRuns.prepare).toHaveBeenCalledWith({
         body: { termId: TERM_TWO, scope: 'school', scopeId: undefined },
@@ -248,6 +277,7 @@ describe('the prepare sheet', () => {
     await user.click(
       within(sheet).getByRole('button', { name: 'Prepare charges' })
     );
+    await confirmStep('Prepare these charges?', 'Prepare charges');
     expect(await screen.findByText(/2 had no fees that apply/)).toBeVisible();
     expect(screen.getByText('1 charge ready to check')).toBeVisible();
   });
@@ -265,6 +295,7 @@ describe('the prepare sheet', () => {
     await user.click(
       within(sheet).getByRole('button', { name: 'Prepare charges' })
     );
+    await confirmStep('Prepare these charges?', 'Prepare charges');
     expect(
       await screen.findByText('Nothing new: 4 already charged.')
     ).toBeVisible();
@@ -290,6 +321,7 @@ describe('the prepare sheet', () => {
     await user.click(
       within(sheet).getByRole('button', { name: 'Prepare charges' })
     );
+    await confirmStep('Prepare these charges?', 'Prepare charges');
     await waitFor(() => {
       expect(api.billingRuns.prepare).toHaveBeenCalledWith({
         body: {
@@ -317,6 +349,7 @@ describe('the prepare sheet', () => {
     await user.click(
       within(sheet).getByRole('button', { name: 'Prepare charges' })
     );
+    await confirmStep('Prepare these charges?', 'Prepare charges');
     await waitFor(() => {
       expect(toast.error).toHaveBeenCalledWith(
         'Choose the current term or the next term.'

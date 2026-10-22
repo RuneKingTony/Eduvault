@@ -1,26 +1,12 @@
-import { useState, type SubmitEvent } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
-import { CheckIcon, XIcon } from 'lucide-react';
+import { XIcon } from 'lucide-react';
 import {
   ApiError,
   DECLINE_REASON_MESSAGE,
   type ApprovalItem,
 } from '@eduvault/api-contract';
-import {
-  Button,
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  ErrorMessage,
-  Label,
-  Textarea,
-  fieldValue,
-  toast,
-} from '@eduvault/ui';
+import { ConfirmDialog, toast } from '@eduvault/ui';
 import { useApi, type Api } from '../../api';
 import { invalidateApprovals } from '../../queries';
 import {
@@ -98,26 +84,10 @@ function useApprove(onClose: () => void) {
   });
 }
 
-function RequestDetails({
-  item,
-  currency,
-}: {
-  item: ApprovalItem;
-  currency: string;
-}) {
-  return (
-    <dl className="flex flex-col gap-2 text-sm">
-      <div className="flex justify-between gap-3">
-        <dt className="text-muted-foreground">Details</dt>
-        <dd className="text-right font-semibold">{item.details}</dd>
-      </div>
-      <div className="flex justify-between gap-3">
-        <dt className="text-muted-foreground">Amount</dt>
-        <dd className="text-right font-semibold">{amountOf(item, currency)}</dd>
-      </div>
-    </dl>
-  );
-}
+const detailsOf = (item: ApprovalItem, currency: string) => [
+  { label: 'Details', value: item.details },
+  { label: 'Amount', value: amountOf(item, currency) },
+];
 
 interface DialogProps {
   item: ApprovalItem | null;
@@ -128,50 +98,27 @@ interface DialogProps {
 export function ApproveDialog({ item, currency, onClose }: DialogProps) {
   const approve = useApprove(onClose);
   return (
-    <Dialog
+    <ConfirmDialog
       open={item !== null}
-      onOpenChange={(open) => {
-        if (!open) {
-          approve.reset();
-          onClose();
+      title="Approve this request?"
+      description={`${item?.label ?? ''} · asked by ${item?.createdBy.name ?? ''}`}
+      details={item === null ? [] : detailsOf(item, currency)}
+      note={
+        item === null ? undefined : APPROVAL_KIND_UI[item.kind].approveEffect
+      }
+      confirmLabel="Approve"
+      pending={approve.isPending}
+      error={approve.error}
+      onConfirm={() => {
+        if (item !== null) {
+          approve.mutate(item);
         }
       }}
-    >
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Approve this request?</DialogTitle>
-          <DialogDescription>
-            {item?.label} · asked by {item?.createdBy.name}
-          </DialogDescription>
-        </DialogHeader>
-        {item === null ? null : (
-          <>
-            <RequestDetails item={item} currency={currency} />
-            <p className="rounded-md bg-muted p-3 text-sm">
-              {APPROVAL_KIND_UI[item.kind].approveEffect}
-            </p>
-          </>
-        )}
-        <ErrorMessage error={approve.error} />
-        <DialogFooter>
-          <Button type="button" variant="ghost" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            disabled={approve.isPending || item === null}
-            onClick={() => {
-              if (item !== null) {
-                approve.mutate(item);
-              }
-            }}
-          >
-            <CheckIcon />
-            Approve
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      onCancel={() => {
+        approve.reset();
+        onClose();
+      }}
+    />
   );
 }
 
@@ -191,101 +138,39 @@ function useDecline(onClose: () => void) {
   });
 }
 
-function DeclineForm({
-  item,
-  onClose,
-  onSubmit,
-  missing,
-  error,
-  pending,
-}: {
-  item: ApprovalItem | null;
-  onClose: () => void;
-  onSubmit: (event: SubmitEvent<HTMLFormElement>) => void;
-  missing: boolean;
-  error: unknown;
-  pending: boolean;
-}) {
-  return (
-    <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
-      <DialogHeader>
-        <DialogTitle>Decline this request?</DialogTitle>
-        <DialogDescription>
-          {item === null
-            ? 'The request stays on record with your reason.'
-            : `The request stays on record with your reason. ${APPROVAL_KIND_UI[item.kind].declineEffect}`}
-        </DialogDescription>
-      </DialogHeader>
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="decline-reason">Reason</Label>
-        <Textarea
-          id="decline-reason"
-          name="reason"
-          placeholder="The person who asked will see this"
-          aria-invalid={missing ? true : undefined}
-        />
-        {missing ? (
-          <p role="alert" className="text-sm text-destructive">
-            {DECLINE_REASON_MESSAGE}
-          </p>
-        ) : null}
-      </div>
-      <ErrorMessage error={error} />
-      <DialogFooter>
-        <Button type="button" variant="ghost" onClick={onClose}>
-          Cancel
-        </Button>
-        <Button type="submit" variant="destructive" disabled={pending}>
-          <XIcon />
-          Decline
-        </Button>
-      </DialogFooter>
-    </form>
-  );
-}
-
 export function DeclineDialog({
   item,
   onClose,
 }: Omit<DialogProps, 'currency'>) {
   const decline = useDecline(onClose);
-  const [missing, setMissing] = useState(false);
-
-  function submit(event: SubmitEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const reason = fieldValue(
-      new FormData(event.currentTarget),
-      'reason'
-    ).trim();
-    if (reason === '' || item === null) {
-      setMissing(true);
-      return;
-    }
-    setMissing(false);
-    decline.mutate({ item, reason });
-  }
-
   return (
-    <Dialog
+    <ConfirmDialog
       open={item !== null}
-      onOpenChange={(open) => {
-        if (!open) {
-          decline.reset();
-          setMissing(false);
-          onClose();
+      title="Decline this request?"
+      description={
+        item === null
+          ? 'The request stays on record with your reason.'
+          : `The request stays on record with your reason. ${APPROVAL_KIND_UI[item.kind].declineEffect}`
+      }
+      reason={{
+        label: 'Reason',
+        placeholder: 'The person who asked will see this',
+        missing: DECLINE_REASON_MESSAGE,
+      }}
+      tone="destructive"
+      icon={<XIcon />}
+      confirmLabel="Decline"
+      pending={decline.isPending}
+      error={decline.error}
+      onConfirm={(reason) => {
+        if (item !== null) {
+          decline.mutate({ item, reason });
         }
       }}
-    >
-      <DialogContent>
-        <DeclineForm
-          item={item}
-          onClose={onClose}
-          onSubmit={submit}
-          missing={missing}
-          error={decline.error}
-          pending={decline.isPending}
-        />
-      </DialogContent>
-    </Dialog>
+      onCancel={() => {
+        decline.reset();
+        onClose();
+      }}
+    />
   );
 }

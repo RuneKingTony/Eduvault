@@ -89,10 +89,20 @@ function setup(
   return { api, onOpenChange, ...view };
 }
 
+let user: ReturnType<typeof userEvent.setup>;
+
+const confirmDialog = () =>
+  screen.findByRole('dialog', { name: 'Record this payment?' });
+
+async function confirmPayment() {
+  const dialog = await confirmDialog();
+  await user.click(
+    within(dialog).getByRole('button', { name: 'Record payment' })
+  );
+}
+
 const amount = () => screen.getByLabelText('Amount received (₦)');
 const share = (name: string) => screen.getByLabelText(`Amount for ${name}`);
-
-let user: ReturnType<typeof userEvent.setup>;
 
 describe('RecordPaymentSheet', () => {
   beforeEach(() => {
@@ -263,6 +273,7 @@ describe('RecordPaymentSheet', () => {
       new File(['x'], 'alert.pdf', { type: 'application/pdf' })
     );
     await user.click(screen.getByRole('button', { name: 'Record payment' }));
+    await confirmPayment();
 
     await waitFor(() => {
       expect(api.payments.record).toHaveBeenCalledTimes(1);
@@ -299,6 +310,7 @@ describe('RecordPaymentSheet', () => {
     await user.clear(await screen.findByLabelText('Amount received (₦)'));
     await user.type(amount(), '320000');
     await user.click(screen.getByRole('button', { name: 'Record payment' }));
+    await confirmPayment();
 
     await waitFor(() => {
       expect(toast.success).toHaveBeenCalledWith(
@@ -312,6 +324,7 @@ describe('RecordPaymentSheet', () => {
     await user.click(
       await screen.findByRole('button', { name: 'Record payment' })
     );
+    await confirmPayment();
 
     await waitFor(() => {
       expect(toast.success).toHaveBeenCalledTimes(1);
@@ -328,6 +341,7 @@ describe('RecordPaymentSheet', () => {
     await user.click(
       await screen.findByRole('button', { name: 'Record payment' })
     );
+    await confirmPayment();
 
     await waitFor(() => {
       expect(toast.warning).toHaveBeenCalledWith(
@@ -362,7 +376,11 @@ describe('RecordPaymentSheet', () => {
     const { api } = setup({
       record: vi.fn().mockReturnValue(new Promise(() => undefined)),
     });
-    const button = await screen.findByRole('button', {
+    await user.click(
+      await screen.findByRole('button', { name: 'Record payment' })
+    );
+    const dialog = await confirmDialog();
+    const button = within(dialog).getByRole('button', {
       name: 'Record payment',
     });
     await user.click(button);
@@ -384,6 +402,7 @@ describe('RecordPaymentSheet', () => {
     await user.click(
       await screen.findByRole('button', { name: 'Record payment' })
     );
+    await confirmPayment();
 
     expect(
       await screen.findByText(
@@ -393,16 +412,53 @@ describe('RecordPaymentSheet', () => {
     expect(onOpenChange).not.toHaveBeenCalled();
   });
 
-  it('disables Record payment while it is being recorded', async () => {
+  it('disables the confirm buttons while it is being recorded', async () => {
     setup({ record: vi.fn().mockReturnValue(new Promise(() => undefined)) });
-    const button = await screen.findByRole('button', {
-      name: 'Record payment',
+    await user.click(
+      await screen.findByRole('button', { name: 'Record payment' })
+    );
+    await confirmPayment();
+
+    const dialog = await confirmDialog();
+    await waitFor(() => {
+      expect(
+        within(dialog).getByRole('button', { name: 'Record payment' })
+      ).toBeDisabled();
     });
-    await user.click(button);
+    expect(
+      within(dialog).getByRole('button', { name: 'Cancel' })
+    ).toBeDisabled();
+  });
+
+  it('shows who paid, for which child and how much, and sends nothing until confirmed', async () => {
+    const { api } = setup();
+    await user.click(
+      await screen.findByRole('button', { name: 'Record payment' })
+    );
+
+    const dialog = await confirmDialog();
+    expect(within(dialog).getByText('Ngozi Okeke')).toBeVisible();
+    expect(within(dialog).getByText('₦300,000')).toBeVisible();
+    expect(within(dialog).getByText(/Ada/)).toBeVisible();
+    expect(api.payments.record).not.toHaveBeenCalled();
+  });
+
+  it('goes back to the sheet on Cancel without recording', async () => {
+    const { api, onOpenChange } = setup();
+    await user.click(
+      await screen.findByRole('button', { name: 'Record payment' })
+    );
+    const dialog = await confirmDialog();
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
 
     await waitFor(() => {
-      expect(button).toBeDisabled();
+      expect(
+        screen.queryByRole('dialog', { name: 'Record this payment?' })
+      ).not.toBeInTheDocument();
     });
+    expect(api.payments.record).not.toHaveBeenCalled();
+    expect(onOpenChange).not.toHaveBeenCalled();
+    expect(amount()).toBeVisible();
   });
 
   it('says so when there is no account to record into', async () => {

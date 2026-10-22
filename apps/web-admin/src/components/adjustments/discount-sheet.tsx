@@ -25,6 +25,8 @@ import {
   toast,
 } from '@eduvault/ui';
 import { useApi } from '../../api';
+import { useConfirmStep } from '../use-confirm-step';
+import { ConfirmDiscount } from './confirm-discount';
 import { StudentPicker } from './student-picker';
 import {
   discountTermsQueryOptions,
@@ -217,6 +219,9 @@ function useDiscountForm(
   }));
   const [submitted, setSubmitted] = useState(false);
   const create = useCreateDiscount(onClose);
+  const step = useConfirmStep<DiscountState>((discount, settled) => {
+    create.mutate(discount, { onSettled: settled });
+  });
   const patch = (change: Partial<DiscountState>) => {
     setState((current) => ({ ...current, ...change }));
   };
@@ -232,11 +237,11 @@ function useDiscountForm(
     event.preventDefault();
     setSubmitted(true);
     if (Object.keys(problems(state)).length === 0) {
-      create.mutate(state);
+      step.ask(state);
     }
   }
 
-  return { state, errors, patch, submit, create };
+  return { state, errors, patch, submit, create, step };
 }
 
 function DiscountForm({
@@ -248,7 +253,7 @@ function DiscountForm({
   terms: readonly TermOption[];
   onClose: () => void;
 }) {
-  const { state, errors, patch, submit, create } = useDiscountForm(
+  const { state, errors, patch, submit, create, step } = useDiscountForm(
     { feeTypes, terms },
     onClose
   );
@@ -282,6 +287,7 @@ function DiscountForm({
           Submit for approval
         </Button>
       </SheetFooter>
+      <ConfirmDiscount step={step} terms={terms} pending={create.isPending} />
     </>
   );
 }
