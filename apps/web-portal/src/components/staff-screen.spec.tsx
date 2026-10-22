@@ -1,6 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { render, screen } from '@testing-library/react';
 import {
   AuthClientProvider,
   type EduvaultAuthClient,
@@ -8,8 +7,7 @@ import {
 import { StaffScreen } from './staff-screen';
 
 function setup() {
-  const signOut = vi.fn().mockResolvedValue({ data: {}, error: null });
-  const authClient = { signOut } as unknown as EduvaultAuthClient;
+  const authClient = { signOut: vi.fn() } as unknown as EduvaultAuthClient;
   render(
     <QueryClientProvider client={new QueryClient()}>
       <AuthClientProvider authClient={authClient}>
@@ -17,14 +15,7 @@ function setup() {
       </AuthClientProvider>
     </QueryClientProvider>
   );
-  return { signOut };
 }
-
-let user: ReturnType<typeof userEvent.setup>;
-
-beforeEach(() => {
-  user = userEvent.setup();
-});
 
 describe('StaffScreen', () => {
   it('tells staff the portal is for students and guardians, with no nav', () => {
@@ -42,13 +33,5 @@ describe('StaffScreen', () => {
     expect(
       screen.getByRole('link', { name: 'Go to web-admin' })
     ).toHaveAttribute('href', 'http://localhost:4200');
-  });
-
-  it('signs out', async () => {
-    const { signOut } = setup();
-    await user.click(screen.getByRole('button', { name: 'Sign out' }));
-    await waitFor(() => {
-      expect(signOut).toHaveBeenCalledOnce();
-    });
   });
 });

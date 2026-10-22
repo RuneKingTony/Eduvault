@@ -2,7 +2,6 @@ import { QueryClient, QueryObserver } from '@tanstack/react-query';
 import type { Api } from './api';
 import { detail } from './test-members';
 import {
-  ME_PERMISSIONS_KEY,
   campusSummaryQueryOptions,
   classLevelsQueryOptions,
   classQueryOptions,
@@ -48,6 +47,7 @@ import {
   studentQueryOptions,
   studentsQueryOptions,
 } from './queries';
+import { ME_PERMISSIONS_KEY } from '@eduvault/auth-client';
 
 describe('member removal', () => {
   it('refreshes the list and roles but not the removed member’s own query', async () => {
