@@ -196,7 +196,7 @@ describe('LeaveOnlyApprovalsPage', () => {
         startsOn: '2026-10-22',
         endsOn: '2026-10-22',
         days: 1,
-        type: 'annual',
+        type: 'sick',
       }),
       holidays: [
         {
@@ -222,7 +222,7 @@ describe('LeaveOnlyApprovalsPage', () => {
     ).toBeVisible();
     expect(screen.getByText('Oldest sent 8 Oct 2026')).toBeVisible();
     expect(screen.getByText('22 Oct 2026')).toBeVisible();
-    expect(screen.getByText('Annual leave · 1 day')).toBeVisible();
+    expect(screen.getByText('Sick leave · 1 day')).toBeVisible();
     expect(screen.getByText('My requests')).toBeVisible();
     expect(
       screen.getByText('No need to request leave on these days.')
@@ -553,18 +553,12 @@ describe('RequestLeaveDialog', () => {
         'Someone with leave approval decides. You’ll see the decision here.'
       )
     ).toBeVisible();
-    expect(screen.getByLabelText('Type of leave')).toHaveValue('annual');
+    expect(screen.getByLabelText('Type of leave')).toHaveValue('sick');
     expect(
       within(screen.getByLabelText('Type of leave'))
         .getAllByRole('option')
         .map((option) => option.textContent)
-    ).toEqual([
-      'Annual leave',
-      'Sick leave',
-      'Personal leave',
-      'Study leave',
-      'Maternity or paternity leave',
-    ]);
+    ).toEqual(['Sick leave', 'Maternity leave', 'Bereavement leave']);
     expect(screen.getByLabelText('First day')).toHaveValue('');
     expect(screen.getByLabelText('First day')).toHaveAttribute('min', TODAY);
     expect(screen.getByText('Leave empty for one day.')).toBeVisible();
@@ -635,7 +629,7 @@ describe('RequestLeaveDialog', () => {
           days: 1,
         })
     );
-    await type('Type of leave', 'study');
+    await type('Type of leave', 'bereavement');
     await type('First day', '2026-10-22');
     await type('Reason', '  Exam  ');
     await type('Cover for your classes (optional)', 'Ayo takes JSS 2');
@@ -644,7 +638,7 @@ describe('RequestLeaveDialog', () => {
     await waitFor(() => {
       expect(api.leave.create).toHaveBeenCalledWith({
         body: {
-          type: 'study',
+          type: 'bereavement',
           startsOn: '2026-10-22',
           reason: 'Exam',
           cover: 'Ayo takes JSS 2',

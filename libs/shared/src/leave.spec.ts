@@ -55,11 +55,9 @@ describe('leave day count', () => {
 describe('leave copy', () => {
   it('labels every type and status', () => {
     expect(LEAVE_TYPES.map((type) => LEAVE_TYPE_LABELS[type])).toEqual([
-      'Annual leave',
       'Sick leave',
-      'Personal leave',
-      'Study leave',
-      'Maternity or paternity leave',
+      'Maternity leave',
+      'Bereavement leave',
     ]);
     expect(LEAVE_STATUSES.map((status) => LEAVE_STATUS_LABELS[status])).toEqual(
       ['Waiting', 'Approved', 'Declined', 'Withdrawn']
@@ -67,7 +65,7 @@ describe('leave copy', () => {
   });
 
   it('lower-cases a type for a sentence', () => {
-    expect(leaveTypeLower('parental')).toBe('maternity or paternity leave');
+    expect(leaveTypeLower('maternity')).toBe('maternity leave');
   });
 
   it('pluralises days', () => {

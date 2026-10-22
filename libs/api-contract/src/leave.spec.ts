@@ -22,7 +22,7 @@ import {
 const id = '0b0c8a8e-8a3e-4c6c-a8c4-0e2f0f6b1f11';
 
 const valid = {
-  type: 'annual',
+  type: 'sick',
   startsOn: '2026-10-22',
   reason: 'Family wedding',
 };
@@ -102,7 +102,7 @@ describe('createLeaveSchema', () => {
     expect(messagesOf({ ...valid, reason: '   ' })).toEqual([
       LEAVE_REASON_MESSAGE,
     ]);
-    expect(messagesOf({ type: 'annual', startsOn: valid.startsOn })).toEqual([
+    expect(messagesOf({ type: 'sick', startsOn: valid.startsOn })).toEqual([
       LEAVE_REASON_MESSAGE,
     ]);
   });
@@ -142,6 +142,9 @@ describe('createLeaveSchema', () => {
       LEAVE_FIRST_DAY_MESSAGE,
     ]);
     expect(leaveTypeSchema.safeParse('holiday').success).toBe(false);
+    for (const retired of ['annual', 'personal', 'study', 'parental']) {
+      expect(leaveTypeSchema.safeParse(retired).success).toBe(false);
+    }
     expect(createLeaveSchema.safeParse({ ...valid, type: 'x' }).success).toBe(
       false
     );

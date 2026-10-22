@@ -58,7 +58,7 @@ Scopes applied:
   | "Refund"           | waiting `adjustment` `refund`         | "{student}: {reason}"                                                     | the amount                    | `adjustment:approve` | Discounts and refunds |
   | "Discount"         | waiting `student_discount`            | "{student}: {reason} ({5%} \| {₦15,000})"                                 | "{5}% off" or "₦{15,000} off" | `adjustment:approve` | Discounts and refunds |
   | "Store write-off"  | waiting stock count with a difference | "{Lekki} stock count: {summary}" (summary per [61-store.md](61-store.md)) | the loss at cost              | `adjustment:approve` | Store                 |
-  | "Leave"            | waiting `staff_leave`                 | "{member} · {Annual leave} · {range}. {reason}"                           | "{n} day(s)"                  | `leave:approve`      | Approvals             |
+  | "Leave"            | waiting `staff_leave`                 | "{member} · {Sick leave} · {range}. {reason}"                             | "{n} day(s)"                  | `leave:approve`      | Approvals             |
 
 - **Actions cell** per row:
   - The viewer lacks the item's permission (only seen with the switch on): badge "Someone else" (outline), tip "The owner or principal decides leave" for leave, "Needs someone who can approve money changes" otherwise.

@@ -48,7 +48,7 @@ export async function seedLeave(
     reason: 'Doctor’s appointment and a few days of rest',
   });
   await askAs(app, 'emeka', {
-    type: 'personal',
+    type: 'maternity',
     startsOn: day(13),
     reason: 'Family matter',
   });
@@ -60,7 +60,7 @@ export async function seedLeave(
   });
   await leave.approve(owner, away.id);
   const study = await askAs(app, 'claire', {
-    type: 'study',
+    type: 'bereavement',
     startsOn: day(14),
     reason: 'Sitting a teaching exam',
     cover: 'Ayo Bassey will take French',

@@ -1328,7 +1328,7 @@ test.describe('leave on the dashboard', () => {
 
     expect(task).toMatchObject({ count: 1 });
     expect(task?.items[0]?.label).toBe('Leave');
-    expect(task?.items[0]?.details).toContain('Annual leave · 22 Oct 2026');
+    expect(task?.items[0]?.details).toContain('Sick leave · 22 Oct 2026');
     expect(
       taskOf(await tasksOf(api, lekkiOnly), 'approvalsWaiting')
     ).toBeUndefined();
@@ -1418,13 +1418,13 @@ test.describe('leave on the dashboard', () => {
       count: 2,
       items: [
         {
-          type: 'annual',
+          type: 'sick',
           startsOn: '2026-10-29',
           endsOn: '2026-10-29',
           status: 'rejected',
         },
         {
-          type: 'annual',
+          type: 'sick',
           startsOn: '2026-10-22',
           endsOn: '2026-10-22',
           status: 'approved',

@@ -7,7 +7,7 @@ const leave = (over: Partial<LeaveDto>): LeaveDto => ({
   id: '0b0c8a8e-8a3e-4c6c-a8c4-0e2f0f6b1f11',
   createdBy: 'ayo',
   requesterName: 'Ayo Bassey',
-  type: 'annual',
+  type: 'sick',
   startsOn: '2026-10-22',
   endsOn: '2026-10-23',
   days: 2,
@@ -48,7 +48,7 @@ describe('DashboardLeaveService.tasks', () => {
       [
         leave({ status: 'cancelled', cancelledBy: 'funmi' }),
         leave({ status: 'rejected', type: 'sick', startsOn: '2026-10-26' }),
-        leave({ type: 'study' }),
+        leave({ type: 'bereavement' }),
       ],
       7
     );
@@ -58,7 +58,7 @@ describe('DashboardLeaveService.tasks', () => {
         count: 7,
         items: [
           {
-            type: 'annual',
+            type: 'sick',
             startsOn: '2026-10-22',
             endsOn: '2026-10-23',
             status: 'cancelled',

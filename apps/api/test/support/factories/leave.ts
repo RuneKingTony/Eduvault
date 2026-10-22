@@ -11,7 +11,7 @@ export async function askLeave(
   const res = await api(actor)
     .post('/leave')
     .send({
-      type: 'annual',
+      type: 'sick',
       startsOn: '2026-10-22',
       reason: 'Family wedding',
       ...body,

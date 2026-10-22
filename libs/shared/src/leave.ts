@@ -1,12 +1,6 @@
 import { countOf } from './count-of';
 
-export const LEAVE_TYPES = [
-  'annual',
-  'sick',
-  'personal',
-  'study',
-  'parental',
-] as const;
+export const LEAVE_TYPES = ['sick', 'maternity', 'bereavement'] as const;
 export type LeaveType = (typeof LEAVE_TYPES)[number];
 
 export const LEAVE_STATUSES = [
@@ -18,11 +12,9 @@ export const LEAVE_STATUSES = [
 export type LeaveStatus = (typeof LEAVE_STATUSES)[number];
 
 export const LEAVE_TYPE_LABELS = {
-  annual: 'Annual leave',
   sick: 'Sick leave',
-  personal: 'Personal leave',
-  study: 'Study leave',
-  parental: 'Maternity or paternity leave',
+  maternity: 'Maternity leave',
+  bereavement: 'Bereavement leave',
 } as const satisfies Record<LeaveType, string>;
 
 export const LEAVE_STATUS_LABELS = {

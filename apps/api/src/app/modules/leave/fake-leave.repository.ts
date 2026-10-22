@@ -122,7 +122,7 @@ export class FakeLeaveRepository extends LeaveRepository {
     this.sequence += 1;
     const stored: StoredLeave = {
       id: `leave-${this.sequence}`,
-      type: 'annual',
+      type: 'sick',
       endsOn: row.startsOn,
       reason: 'Family',
       cover: null,

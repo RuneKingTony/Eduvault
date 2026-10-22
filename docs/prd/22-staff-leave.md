@@ -82,13 +82,13 @@ Scopes: a leave request is visible to an approver when the requester shares at l
 - Title "Request leave" (icon calendar-days). Description "Someone with leave approval decides. You’ll see the decision here." (LV-7).
 - Fields:
 
-  | Label                             | Control                                                                                     | Required | Default                                | Validation (message)                                                                  |
-  | --------------------------------- | ------------------------------------------------------------------------------------------- | -------- | -------------------------------------- | ------------------------------------------------------------------------------------- |
-  | Type of leave                     | select: Annual leave, Sick leave, Personal leave, Study leave, Maternity or paternity leave | yes      | Annual leave                           | one of the five                                                                       |
-  | First day                         | date, min today                                                                             | yes      | empty                                  | "Choose the first day of leave."; before today is refused (data model)                |
-  | Last day                          | date, min today                                                                             | no       | empty; hint "Leave empty for one day." | "The last day can’t be before the first day." The build sets its min to the first day |
-  | Reason                            | textarea, placeholder "e.g. Doctor’s appointment"                                           | yes      | empty                                  | non-empty after trim, at most 500 characters ("Give a reason.", new)                  |
-  | Cover for your classes (optional) | text, placeholder "e.g. Ayo Bassey will take JSS 2 Mathematics"                             | no       | empty                                  | at most 200 characters                                                                |
+  | Label                             | Control                                                         | Required | Default                                | Validation (message)                                                                  |
+  | --------------------------------- | --------------------------------------------------------------- | -------- | -------------------------------------- | ------------------------------------------------------------------------------------- |
+  | Type of leave                     | select: Sick leave, Maternity leave, Bereavement leave          | yes      | Sick leave                             | one of the three                                                                      |
+  | First day                         | date, min today                                                 | yes      | empty                                  | "Choose the first day of leave."; before today is refused (data model)                |
+  | Last day                          | date, min today                                                 | no       | empty; hint "Leave empty for one day." | "The last day can’t be before the first day." The build sets its min to the first day |
+  | Reason                            | textarea, placeholder "e.g. Doctor’s appointment"               | yes      | empty                                  | non-empty after trim, at most 500 characters ("Give a reason.", new)                  |
+  | Cover for your classes (optional) | text, placeholder "e.g. Ayo Bassey will take JSS 2 Mathematics" | no       | empty                                  | at most 200 characters                                                                |
 
 - Whole-form check: at least one counted day (weekdays minus school holidays, [D-039](../technical-reference.md#decision-log)), else "Those dates are school holidays or a weekend. Choose at least one school day."
 - Buttons: **Cancel** (ghost), **Send request** (primary, icon send).
@@ -128,7 +128,7 @@ Scopes: a leave request is visible to an approver when the requester shares at l
 ## Business rules
 
 1. Any staff member of the active school may request leave for themselves (LV-1). Portal-only members (roles only `member`, `student`, `guardian`) are refused (403).
-2. Type is one of `annual`, `sick`, `personal`, `study`, `parental`, shown as "Annual leave", "Sick leave", "Personal leave", "Study leave", "Maternity or paternity leave".
+2. Type is one of `sick`, `maternity`, `bereavement`, shown as "Sick leave", "Maternity leave", "Bereavement leave".
 3. The first day is today or later; the last day defaults to the first day and is not before it; reason is required; cover is optional.
 4. **Days** = the weekdays from first to last day inclusive (`leaveDays`), minus `school_holiday` days ([D-039](../technical-reference.md#decision-log)). Term breaks still count. A request must count at least one day.
 5. A request starts `submitted`. Only its requester may withdraw it, and only while `submitted` (status `cancelled`, shown "Withdrawn"). Withdrawing someone else's request answers 404.
@@ -150,7 +150,7 @@ Scopes: a leave request is visible to an approver when the requester shares at l
 - `staff_leave`: `id`, `organization_id`, `type`, `starts_on`, `ends_on`, `reason`, `cover`, `status` (`submitted`, `approved`, `rejected`, `cancelled`), and the shared approval columns `created_by` (the requester), `created_at`, `approved_by`, `approved_at`, `rejected_by`, `rejected_at`, `rejection_reason` ([D-025](../technical-reference.md#decision-log)), plus `cancelled_at` (set when the requester withdraws or an approver cancels), `cancelled_by` and `cancellation_reason` (set only when an approver cancels; `cancelled_by` null on a cancelled row means the requester withdrew it) and `updated_at` (set on a withdrawal or cancel; a decision is stamped by `approved_at` or `rejected_at`). This replaces the overview's [Foundation model](../brainstorming/data-model-overview.md#foundation-model) columns `user_id`, `decided_by` and `decided_at`; the overview should be amended.
 - Constraints this module adds:
   - `CHECK (ends_on >= starts_on)`.
-  - `CHECK (type IN ('annual','sick','personal','study','parental'))`; the doc names the types but not the stored keys.
+  - `CHECK (type IN ('sick','maternity','bereavement'))`; the doc names the types but not the stored keys.
   - `CHECK (approved_by IS NULL OR approved_by <> created_by)` and `CHECK (rejected_by IS NULL OR rejected_by <> created_by)`, the approval rule every approvable table carries.
   - `CHECK ((status = 'approved' OR cancelled_by IS NOT NULL) = (approved_by IS NOT NULL AND approved_at IS NOT NULL))`: cancelled approved leave keeps its approver.
   - `CHECK ((cancelled_by IS NOT NULL) = (cancellation_reason IS NOT NULL))`, `CHECK (cancelled_by IS NULL OR status = 'cancelled')` and `CHECK (cancelled_by IS NULL OR cancelled_by <> created_by)` (`staff_leave_cancelled_not_self`, mapped to 409 `SelfApproval`).
@@ -188,7 +188,7 @@ Scopes: a leave request is visible to an approver when the requester shares at l
 
 ## Acceptance criteria
 
-1. **Request.** Given Emeka (teacher), when he asks for Annual leave on Thursday 22 October 2026 with a reason (no other leave on that day), then the toast reads "Leave request sent: 1 school day. Someone with leave approval will decide." and the request shows "Waiting".
+1. **Request.** Given Emeka (teacher), when he asks for Sick leave on Thursday 22 October 2026 with a reason (no other leave on that day), then the toast reads "Leave request sent: 1 school day. Someone with leave approval will decide." and the request shows "Waiting".
 2. **Weekend or holiday only.** Given a request for Saturday and Sunday, or for weekdays that are all school holidays, then it is refused with "Those dates are school holidays or a weekend. Choose at least one school day."; given a week that includes one school holiday, then it counts 4 days.
 3. **End before start.** Given a last day before the first, then "The last day can’t be before the first day." and 400 from the API.
 4. **Past start.** Given a first day before today, then the API answers 400.
