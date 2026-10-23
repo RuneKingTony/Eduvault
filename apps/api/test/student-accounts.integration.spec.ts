@@ -558,8 +558,11 @@ test.describe('term filter', () => {
     });
     const [inFirst, inSecond] = views;
 
-    for (const table of Object.values(before)) {
-      expect(table).not.toMatch(/^0:/);
+    const withoutWallets = Object.entries(before)
+      .filter(([table]) => !table.startsWith('wallet_'))
+      .map(([, fingerprint]) => fingerprint);
+    for (const fingerprint of withoutWallets) {
+      expect(fingerprint).not.toMatch(/^0:/);
     }
     expect(await moneyFingerprint(pool, orgA.id)).toEqual(before);
 

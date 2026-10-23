@@ -1,11 +1,13 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import {
   MONEY_ACCOUNT_BANK_NAME_MESSAGE,
+  MONEY_ACCOUNT_GATEWAY_RETIRE_MESSAGE,
   MONEY_ACCOUNT_NOT_FOUND_MESSAGE,
   MONEY_ACCOUNT_RETIRE_MESSAGE,
   MONEY_ACCOUNT_SCHOOL_WIDE_MESSAGE,
@@ -98,6 +100,9 @@ export class MoneyAccountService {
     const current = await this.require(ctx, id);
     if (input.retired === false) {
       throw new BadRequestException(MONEY_ACCOUNT_RETIRE_MESSAGE);
+    }
+    if (input.retired === true && current.kind === 'gateway') {
+      throw new ConflictException(MONEY_ACCOUNT_GATEWAY_RETIRE_MESSAGE);
     }
     if (input.bankName !== undefined && current.kind !== 'bank') {
       throw new BadRequestException(MONEY_ACCOUNT_BANK_NAME_MESSAGE);

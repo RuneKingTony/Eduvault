@@ -92,6 +92,35 @@ describe('visibleChart', () => {
   });
 });
 
+describe('the wallet and gateway accounts', () => {
+  it('shows Student wallets and rolls Monnify collections into Money accounts', () => {
+    const rolled = rollUpChart([
+      account(1200, { type: 'asset', systemKey: 'money_accounts' }),
+      account(1230, {
+        type: 'asset',
+        parentId: 'id-1200',
+        systemKey: 'monnify_collections',
+        debitMinor: 900,
+        creditMinor: 100,
+      }),
+      account(1240, { type: 'asset', parentId: 'id-1200', debitMinor: 500 }),
+      account(2200, {
+        type: 'liability',
+        systemKey: 'student_wallets',
+        creditMinor: 1200,
+      }),
+    ]);
+    expect(
+      visibleChart(rolled).map((row) => [row.code, row.debitMinor])
+    ).toEqual([
+      [1200, 1400],
+      [1230, 900],
+      [1240, 500],
+      [2200, 0],
+    ]);
+  });
+});
+
 describe('nextChildCode', () => {
   it('starts ten above the parent when there are no children', () => {
     expect(nextChildCode(4000, [], [4000, 4500])).toBe(4010);
@@ -111,6 +140,12 @@ describe('nextChildCode', () => {
     expect(nextChildCode(1200, [], taken)).toBe(1210);
     expect(nextChildCode(1200, [1210], taken)).toBe(1220);
     expect(nextChildCode(1200, [1210, 1220], taken)).toBe(1230);
+  });
+
+  it('goes ten above Monnify collections, which holds 1230 from the start', () => {
+    const taken = [1100, 1200, 1230, 1300];
+    expect(nextChildCode(1200, [1230], taken)).toBe(1240);
+    expect(nextChildCode(1200, [1230, 1240], taken)).toBe(1250);
   });
 
   it('steps past Store stock at 1300', () => {

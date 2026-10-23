@@ -43,6 +43,9 @@ const MONEY_TABLES = [
   'adjustment',
   'journal_entry',
   'journal_line',
+  'wallet_topup',
+  'wallet_spend',
+  'wallet_earmark',
 ] as const;
 
 export async function moneyFingerprint(

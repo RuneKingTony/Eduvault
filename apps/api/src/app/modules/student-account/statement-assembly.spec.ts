@@ -100,6 +100,18 @@ describe('describeMovement', () => {
     ).toBe('Cancelled: REF-1');
   });
 
+  it('says a wallet spend paid the charge and a top-up filled the wallet', () => {
+    expect(describeMovement({ ...base, kind: 'wallet_spend' }, 'paid')).toBe(
+      'Paid from wallet'
+    );
+    expect(describeMovement({ ...base, kind: 'wallet_topup' }, 'paid')).toBe(
+      'Wallet top-up'
+    );
+    expect(describeForFamily({ ...base, kind: 'wallet_spend' }, 'paid')).toBe(
+      'Paid from wallet'
+    );
+  });
+
   it('writes opening balances and adjustments from their memo', () => {
     expect(
       describeMovement(

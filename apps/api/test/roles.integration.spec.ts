@@ -772,6 +772,9 @@ test.describe('roles', () => {
           'store:receive',
           'store:issue',
           'store:count',
+          'wallet:read',
+          'wallet:topUp',
+          'wallet:requestRefund',
         ],
         { campuses: [lekki] }
       );
@@ -814,6 +817,9 @@ test.describe('roles', () => {
         'store:receive',
         'store:issue',
         'store:count',
+        'wallet:read',
+        'wallet:topUp',
+        'wallet:requestRefund',
       ]);
       const res = await api(deleter).delete('/roles/bursar').expect(409);
       expect(res.body.message).toBe(

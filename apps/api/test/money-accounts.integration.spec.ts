@@ -85,7 +85,7 @@ test.describe('adding an account', () => {
       .expect(201);
   });
 
-  test('gives ledger codes 1210, 1220 and 1230 under 1200 and answers 409 for a duplicate name', async ({
+  test('gives ledger codes 1240, 1250 and 1260 under 1200, after Monnify collections at 1230, and answers 409 for a duplicate name', async ({
     api,
     pool,
     schools,
@@ -105,7 +105,7 @@ test.describe('adding an account', () => {
       .expect(201);
     expect(
       [first, second, third].map((res) => (res.body as MoneyAccount).ledgerCode)
-    ).toEqual([1210, 1220, 1230]);
+    ).toEqual([1240, 1250, 1260]);
     expect(first.body).toMatchObject({
       name: 'GTBank current',
       kind: 'bank',
@@ -125,9 +125,10 @@ test.describe('adding an account', () => {
       [orgA.id]
     );
     expect(rows).toEqual([
-      { code: 1210, parent_id: parent },
-      { code: 1220, parent_id: parent },
       { code: 1230, parent_id: parent },
+      { code: 1240, parent_id: parent },
+      { code: 1250, parent_id: parent },
+      { code: 1260, parent_id: parent },
     ]);
 
     const duplicate = await api(owner)
@@ -192,8 +193,9 @@ test.describe('the list and the cash book', () => {
     expect(
       list.items.map((item) => [item.name, item.ledgerCode, item.balanceMinor])
     ).toEqual([
-      ['GTBank current', 1210, 9_500_000],
-      ['Moniepoint POS', 1220, 1_200_000],
+      ['Monnify collections', 1230, 0],
+      ['GTBank current', 1240, 9_500_000],
+      ['Moniepoint POS', 1250, 1_200_000],
     ]);
   });
 
@@ -340,7 +342,7 @@ test.describe('the list and the cash book', () => {
       await api(lekkiOnly).get('/finance/money-accounts').expect(200)
     ).body as MoneyAccountList;
     expect(list.items.map((item) => item.id)).toEqual([lekkiPos.id]);
-    expect(list.hiddenSchoolWideCount).toBe(2);
+    expect(list.hiddenSchoolWideCount).toBe(3);
 
     await api(lekkiOnly)
       .get(`/finance/money-accounts/${lekkiPos.id}/cash-book`)
@@ -371,7 +373,7 @@ test.describe('editing and retiring', () => {
       name: 'GTBank main',
       bankName: 'Guaranty Trust',
       last4: '0099',
-      ledgerCode: 1210,
+      ledgerCode: 1240,
     });
     const { rows } = await pool.query<{ name: string }>(
       'SELECT name FROM ledger_account WHERE id = $1',
@@ -433,7 +435,11 @@ test.describe('editing and retiring', () => {
 
     const list = (await api(owner).get('/finance/money-accounts').expect(200))
       .body as MoneyAccountList;
-    expect(list.items.map((item) => item.id)).toEqual([current.id, old.id]);
+    expect(
+      list.items
+        .filter((item) => item.kind !== 'gateway')
+        .map((item) => item.id)
+    ).toEqual([current.id, old.id]);
     const book = (
       await api(owner)
         .get(`/finance/money-accounts/${old.id}/cash-book`)
@@ -450,6 +456,32 @@ test.describe('editing and retiring', () => {
       .patch(`/finance/money-accounts/${old.id}`)
       .send({ retired: true })
       .expect(200);
+  });
+
+  test('answers 409 when the Monnify collections account is retired, and keeps it open', async ({
+    api,
+    schools,
+  }) => {
+    const { owner } = schools;
+    const list = (await api(owner).get('/finance/money-accounts').expect(200))
+      .body as MoneyAccountList;
+    const gateway = list.items.find((item) => item.kind === 'gateway');
+    expect(gateway).toMatchObject({
+      name: 'Monnify collections',
+      ledgerCode: 1230,
+      campusId: null,
+      retiredAt: null,
+    });
+    const refused = await api(owner)
+      .patch(`/finance/money-accounts/${gateway?.id}`)
+      .send({ retired: true })
+      .expect(409);
+    expect(refused.body.code).toBe('Conflict');
+    const after = (await api(owner).get('/finance/money-accounts').expect(200))
+      .body as MoneyAccountList;
+    expect(
+      after.items.find((item) => item.kind === 'gateway')?.retiredAt
+    ).toBeNull();
   });
 
   test('answers 400 for a kind or campus edit and for a bank name on a POS account', async ({
@@ -578,6 +610,7 @@ test.describe('the dashboard card', () => {
     expect(everyone.totalMinor).toBe(10_700_000);
     expect(everyone.hiddenSchoolWide).toBe(0);
     expect(everyone.accounts.map((item) => item.name)).toEqual([
+      'Monnify collections',
       'GTBank current',
       'Moniepoint POS',
     ]);
@@ -585,7 +618,7 @@ test.describe('the dashboard card', () => {
     const campus = (await api(lekkiOnly).get('/dashboard/money').expect(200))
       .body as DashboardMoney;
     expect(campus.totalMinor).toBe(1_200_000);
-    expect(campus.hiddenSchoolWide).toBe(1);
+    expect(campus.hiddenSchoolWide).toBe(2);
     expect(campus.accounts).toEqual([
       {
         id: pos.id,
@@ -639,15 +672,22 @@ test.describe('the dashboard card across schools', () => {
     const a = (await api(owner).get('/dashboard/money').expect(200))
       .body as DashboardMoney;
     expect(a.totalMinor).toBe(700_000);
-    expect(a.accounts.map((item) => item.id)).toEqual([mine.id]);
+    expect(
+      a.accounts
+        .filter((item) => item.kind !== 'gateway')
+        .map((item) => item.id)
+    ).toEqual([mine.id]);
     expect(a.hiddenSchoolWide).toBe(0);
 
     const b = (await api(ownerB).get('/dashboard/money').expect(200))
       .body as DashboardMoney;
     expect(b.totalMinor).toBe(3_000_000);
-    expect(b.accounts.map((item) => item.id).toSorted(byName)).toEqual(
-      [theirs.id, theirsSchoolWide.id].toSorted(byName)
-    );
+    expect(
+      b.accounts
+        .filter((item) => item.kind !== 'gateway')
+        .map((item) => item.id)
+        .toSorted(byName)
+    ).toEqual([theirs.id, theirsSchoolWide.id].toSorted(byName));
   });
 });
 
@@ -749,13 +789,21 @@ test.describe('isolation', () => {
       .send({ retired: true })
       .expect(404);
 
-    const ids = async (user: typeof owner) =>
+    const items = async (user: typeof owner) =>
       (
         (await api(user).get('/finance/money-accounts').expect(200))
           .body as MoneyAccountList
-      ).items.map((item) => item.id);
-    expect(await ids(owner)).toEqual([mine.id]);
-    expect(await ids(ownerB)).toEqual([theirs.id]);
+      ).items;
+    const own = (list: Awaited<ReturnType<typeof items>>) =>
+      list.filter((item) => item.kind !== 'gateway').map((item) => item.id);
+    const gateways = (list: Awaited<ReturnType<typeof items>>) =>
+      list.filter((item) => item.kind === 'gateway').map((item) => item.id);
+    const [listA, listB] = [await items(owner), await items(ownerB)];
+    expect(own(listA)).toEqual([mine.id]);
+    expect(own(listB)).toEqual([theirs.id]);
+    expect(gateways(listA)).toHaveLength(1);
+    expect(gateways(listB)).toHaveLength(1);
+    expect(gateways(listA)).not.toEqual(gateways(listB));
   });
 
   test('2: a campusId naming another school’s campus answers 404 Campus not found', async ({

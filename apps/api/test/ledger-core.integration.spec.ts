@@ -1,9 +1,10 @@
 import type { Pool, PoolClient } from 'pg';
 import { KYSELY_TOKEN, type Database } from '../src/app/common/db/tokens';
 import { allocateDocumentNumber } from '../src/app/common/documents';
-import { LedgerPoster } from '../src/app/common/ledger';
+import { LedgerPoster, withoutGatewayAccounts } from '../src/app/common/ledger';
 import { expect } from './support/base-test';
 import { ledgerAccountId, postEntry } from './support/factories/finance';
+import { guardianOf } from './support/portal';
 import { schoolsTest as test } from './support/two-schools';
 
 const byName = (a: string, b: string) => a.localeCompare(b);
@@ -20,6 +21,8 @@ const SYSTEM_KEYS = [
   'bad_debt',
   'store_cost',
   'store_losses',
+  'student_wallets',
+  'monnify_collections',
 ];
 
 interface RawLine {
@@ -27,6 +30,7 @@ interface RawLine {
   debit?: number;
   credit?: number;
   studentId?: string | null;
+  familyId?: string | null;
   campusId?: string | null;
 }
 
@@ -46,13 +50,14 @@ async function rawEntry(
     for (const line of input.lines) {
       await client.query(
         `INSERT INTO journal_line
-           (organization_id, entry_id, ledger_account_id, student_id, campus_id, debit_minor, credit_minor)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+           (organization_id, entry_id, ledger_account_id, student_id, family_id, campus_id, debit_minor, credit_minor)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
         [
           input.organizationId,
           entryId,
           line.accountId,
           line.studentId ?? null,
+          line.familyId ?? null,
           line.campusId ?? null,
           line.debit ?? 0,
           line.credit ?? 0,
@@ -75,7 +80,7 @@ const countOf = async (pool: Pool, sql: string, values: unknown[]) => {
 };
 
 test.describe('the chart', () => {
-  test('gives a new school the eleven system accounts and eight fee types, and seeding twice changes nothing', async ({
+  test('gives a new school the thirteen system accounts and eight fee types, and seeding twice changes nothing', async ({
     pool,
     schools,
   }) => {
@@ -111,10 +116,10 @@ test.describe('the chart', () => {
         'SELECT count(*) FROM ledger_account WHERE organization_id = $1',
         [orgA.id]
       );
-    expect(await total()).toBe(19);
+    expect(await total()).toBe(21);
     await pool.query('SELECT seed_ledger_accounts($1)', [orgA.id]);
     await pool.query('SELECT seed_ledger_accounts($1)', [orgA.id]);
-    expect(await total()).toBe(19);
+    expect(await total()).toBe(21);
   });
 
   test('backfills a school created before the migration', async ({
@@ -122,6 +127,9 @@ test.describe('the chart', () => {
     schools,
   }) => {
     const { orgA, orgB } = schools;
+    await pool.query('DELETE FROM money_account WHERE organization_id = $1', [
+      orgA.id,
+    ]);
     await pool.query('DELETE FROM ledger_account WHERE organization_id = $1', [
       orgA.id,
     ]);
@@ -141,8 +149,120 @@ test.describe('the chart', () => {
           'SELECT count(*) FROM ledger_account WHERE organization_id = $1',
           [org.id]
         )
-      ).toBe(19);
+      ).toBe(21);
     }
+  });
+
+  test('gives each school a Monnify collections account at 1230 with a school-wide gateway money account on it', async ({
+    pool,
+    schools,
+  }) => {
+    for (const org of [schools.orgA, schools.orgB]) {
+      const { rows } = await pool.query<{
+        code: number;
+        parent_code: number;
+        kind: string;
+        campus_id: string | null;
+        name: string;
+      }>(
+        `SELECT l.code, p.code AS parent_code, m.kind, m.campus_id, m.name
+         FROM ledger_account l
+         JOIN ledger_account p ON p.id = l.parent_id AND p.organization_id = l.organization_id
+         JOIN money_account m ON m.ledger_account_id = l.id
+         WHERE l.organization_id = $1 AND l.system_key = 'monnify_collections'`,
+        [org.id]
+      );
+      expect(rows).toEqual([
+        {
+          code: 1230,
+          parent_code: 1200,
+          kind: 'gateway',
+          campus_id: null,
+          name: 'Monnify collections',
+        },
+      ]);
+    }
+  });
+
+  test('puts the Monnify collections account on the next free code when 1230 is already a money account', async ({
+    pool,
+    schools,
+  }) => {
+    const { orgA } = schools;
+    await pool.query('DELETE FROM money_account WHERE organization_id = $1', [
+      orgA.id,
+    ]);
+    await pool.query(
+      `DELETE FROM ledger_account
+       WHERE organization_id = $1 AND system_key = 'monnify_collections'`,
+      [orgA.id]
+    );
+    await pool.query(
+      `INSERT INTO ledger_account (organization_id, code, name, type, parent_id)
+       VALUES ($1, 1230, 'Front desk till', 'asset', $2)`,
+      [orgA.id, await ledgerAccountId(pool, orgA.id, 1200)]
+    );
+    await pool.query('SELECT seed_ledger_accounts($1)', [orgA.id]);
+    await pool.query('SELECT seed_ledger_accounts($1)', [orgA.id]);
+    const { rows } = await pool.query<{ code: number }>(
+      `SELECT code FROM ledger_account
+       WHERE organization_id = $1 AND system_key = 'monnify_collections'`,
+      [orgA.id]
+    );
+    expect(rows).toEqual([{ code: 1240 }]);
+    expect(
+      await countOf(
+        pool,
+        `SELECT count(*) FROM money_account WHERE organization_id = $1 AND kind = 'gateway'`,
+        [orgA.id]
+      )
+    ).toBe(1);
+  });
+
+  test('puts the gateway money account back when the delete it made room for fails', async ({
+    pool,
+    schools,
+  }) => {
+    const { orgA } = schools;
+    const gateways = () =>
+      countOf(
+        pool,
+        `SELECT count(*) FROM money_account WHERE organization_id = $1 AND kind = 'gateway'`,
+        [orgA.id]
+      );
+    await withoutGatewayAccounts(pool, orgA.id, async () => {
+      expect(await gateways()).toBe(0);
+    });
+    await expect(
+      withoutGatewayAccounts(pool, orgA.id, () =>
+        Promise.reject(new Error('delete refused'))
+      )
+    ).rejects.toThrow('delete refused');
+    expect(await gateways()).toBe(1);
+  });
+
+  test('shows 2200 Student wallets as a liability that needs a family', async ({
+    pool,
+    schools,
+  }) => {
+    const { rows } = await pool.query<{
+      name: string;
+      type: string;
+      requires_family: boolean;
+      requires_student: boolean;
+    }>(
+      `SELECT name, type, requires_family, requires_student FROM ledger_account
+       WHERE organization_id = $1 AND code = 2200`,
+      [schools.orgA.id]
+    );
+    expect(rows).toEqual([
+      {
+        name: 'Student wallets',
+        type: 'liability',
+        requires_family: true,
+        requires_student: false,
+      },
+    ]);
   });
 
   test('refuses to retire, re-parent or retype a system account, but allows the rest', async ({
@@ -276,7 +396,7 @@ test.describe('the journal', () => {
     await refused('DELETE FROM journal_line WHERE entry_id = $1');
 
     await pool.query(
-      'TRUNCATE TABLE journal_line, journal_entry, invoice_line, invoice, store_sale_line, store_sale, payment_allocation, payment_void, payment, adjustment, stock_delivery_line, stock_delivery, stock_count_line, stock_count'
+      'TRUNCATE TABLE journal_line, journal_entry, invoice_line, invoice, store_sale_line, store_sale, payment_allocation, payment_void, payment, adjustment, stock_delivery_line, stock_delivery, stock_count_line, stock_count, wallet_earmark, wallet_spend, wallet_topup'
     );
     expect(await countOf(pool, 'SELECT count(*) FROM journal_entry', [])).toBe(
       0
@@ -348,6 +468,90 @@ test.describe('the journal', () => {
         { accountId: equity, credit: 500, campusId: lekki.id },
       ],
     });
+  });
+
+  test('refuses a wallet line without a family and a family on any other account', async ({
+    pool,
+    schools,
+  }) => {
+    const { orgA, studentLekki, lekki } = schools;
+    const guardianId = guardianOf(studentLekki.logins)?.guardianId ?? '';
+    const money = await ledgerAccountId(pool, orgA.id, 1200);
+    const wallets = await ledgerAccountId(pool, orgA.id, 2200);
+    const receivable = await ledgerAccountId(pool, orgA.id, 1100);
+    await expect(
+      rawEntry(pool, {
+        organizationId: orgA.id,
+        reference: 'NO-FAMILY',
+        lines: [
+          { accountId: money, debit: 500 },
+          { accountId: wallets, credit: 500 },
+        ],
+      })
+    ).rejects.toMatchObject({
+      code: '23514',
+      constraint: 'journal_line_requires_family',
+    });
+    await expect(
+      rawEntry(pool, {
+        organizationId: orgA.id,
+        reference: 'FAMILY-ON-CASH',
+        lines: [
+          { accountId: money, debit: 500, familyId: guardianId },
+          { accountId: wallets, credit: 500, familyId: guardianId },
+        ],
+      })
+    ).rejects.toMatchObject({
+      code: '23514',
+      constraint: 'journal_line_refuses_family',
+    });
+    await rawEntry(pool, {
+      organizationId: orgA.id,
+      reference: 'TOPPED-UP',
+      lines: [
+        { accountId: money, debit: 500 },
+        { accountId: wallets, credit: 500, familyId: guardianId },
+      ],
+    });
+    await rawEntry(pool, {
+      organizationId: orgA.id,
+      reference: 'SPENT',
+      lines: [
+        { accountId: wallets, debit: 200, familyId: guardianId },
+        {
+          accountId: receivable,
+          credit: 200,
+          studentId: studentLekki.id,
+          campusId: lekki.id,
+        },
+      ],
+    });
+  });
+
+  test('refuses a family from another school on a line', async ({
+    pool,
+    schools,
+  }) => {
+    const { orgA, orgB, studentB } = schools;
+    const foreign = guardianOf(studentB.logins)?.guardianId ?? '';
+    await expect(
+      rawEntry(pool, {
+        organizationId: orgA.id,
+        reference: 'FOREIGN-FAMILY',
+        lines: [
+          { accountId: await ledgerAccountId(pool, orgA.id, 1200), debit: 5 },
+          {
+            accountId: await ledgerAccountId(pool, orgA.id, 2200),
+            credit: 5,
+            familyId: foreign,
+          },
+        ],
+      })
+    ).rejects.toMatchObject({
+      code: '23503',
+      constraint: 'journal_line_family_fkey',
+    });
+    expect(orgB.id).not.toBe(orgA.id);
   });
 
   test('refuses a raw delete of a school, campus or student that has journal lines', async ({
@@ -498,6 +702,41 @@ test.describe('the poster', () => {
         [orgA.id]
       )
     ).toBe(2);
+  });
+
+  test('carries the family on a line the poster writes', async ({
+    app,
+    pool,
+    schools,
+  }) => {
+    const { orgA, studentLekki } = schools;
+    const guardianId = guardianOf(studentLekki.logins)?.guardianId ?? '';
+    await postEntry(app, {
+      organizationId: orgA.id,
+      reference: 'WITH-FAMILY',
+      kind: 'wallet_topup',
+      effectiveOn: '2026-09-01',
+      postedBy: null,
+      lines: [
+        {
+          ledgerAccountId: await ledgerAccountId(pool, orgA.id, 1200),
+          debitMinor: 900,
+          creditMinor: 0,
+        },
+        {
+          ledgerAccountId: await ledgerAccountId(pool, orgA.id, 2200),
+          familyId: guardianId,
+          debitMinor: 0,
+          creditMinor: 900,
+        },
+      ],
+    });
+    const { rows } = await pool.query<{ family_id: string | null }>(
+      `SELECT family_id FROM journal_line
+       WHERE organization_id = $1 AND credit_minor = 900`,
+      [orgA.id]
+    );
+    expect(rows).toEqual([{ family_id: guardianId }]);
   });
 
   test('refuses an unbalanced entry before any SQL runs, and the same reference in another school posts on its own', async ({
