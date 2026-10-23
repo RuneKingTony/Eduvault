@@ -42,7 +42,7 @@ Scopes: a leave request is visible to an approver when the requester shares at l
 
 #### B. Viewer with `leave:approve` or `adjustment:approve`
 
-- **Header (shared):** title "Approvals", description "Requests waiting for you to approve: money corrections and staff leave.", info tip "Staff ask, a boss approves. You can’t approve your own request." No header action.
+- **Header (shared):** title "Approvals", description "Requests waiting for you to approve: money corrections and staff leave.", info tip "Staff ask, a boss approves. Only the owner can approve their own request." No header action.
 - **Tabs (shared):** "All {n}", then "Money {n}" and "Leave {n}" for kinds present; tabs show only when more than one kind is present.
 - **Switch (shared):** "Include {n} others approve", shown when there are requests the viewer can't decide; it adds them to the table.
 - **Table (shared columns), leave row content:**

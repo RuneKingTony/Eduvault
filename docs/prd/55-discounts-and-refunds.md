@@ -15,7 +15,7 @@ Where staff ask for money corrections that need a second person: reducing a fee,
 | ---------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
 | Bursar (Chika, Lekki)        | `adjustment:read`, `adjustment:create`, `payment:void`    | See and ask for corrections and discounts for Lekki students; see cancellation requests     |
 | Principal (custom)           | `adjustment:read`, `adjustment:approve`, `campus:readAll` | See everything here; approve or decline in Approvals. Can't create (no `adjustment:create`) |
-| Owner                        | all                                                       | Everything; approves in Approvals, never their own requests                                 |
+| Owner                        | all                                                       | Everything; approves in Approvals, including their own requests (D-378)                     |
 | Administrator, teacher       | none                                                      | No access                                                                                   |
 | Super admin acting read-only | read permissions                                          | Lists only                                                                                  |
 

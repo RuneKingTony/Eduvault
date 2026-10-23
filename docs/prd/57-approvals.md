@@ -34,7 +34,7 @@ Scopes applied:
 - The page has two bodies:
   - **Viewer holds neither `adjustment:approve` nor `leave:approve`**: title "Approvals", description "Ask for leave and see what the school decides.", action **Request leave**, and the leave page. Specified in [22-staff-leave.md](22-staff-leave.md).
   - **Viewer holds either**: the queue below.
-- Header (queue): title "Approvals"; description "Requests waiting for you to approve: money corrections and staff leave."; info tip "Staff ask, a boss approves. You can’t approve your own request." No actions.
+- Header (queue): title "Approvals"; description "Requests waiting for you to approve: money corrections and staff leave."; info tip "Staff ask, a boss approves. Only the owner can approve their own request." No actions.
 - **Toolbar row**:
   - Left: tabs, shown only when the list holds more than one pillar: "All" ({count}), "Money" ({count}), "Leave" ({count}).
   - Right: a "Campus" select (`aria-label` "Campus": "All campuses", then each campus in the viewer's scope), shown only when the viewer can see more than one campus, and a switch "Include {n} others approve" (build copy: "Include {n} that others approve"), shown only when items exist in scope that the viewer can't decide. Off by default; on, those items join the list. The toolbar shows whenever the select does. Picking a campus narrows the queue, the tab counts and the switch count to that campus, goes back to page 1, keeps the tab and is kept in the URL as `campus`; the bell and nav counts stay school-wide. When the picked campus is refused (a stale or foreign `campus` in the URL), the select stays above the error so "All campuses" is one pick away (a viewer with one campus gets a "Show all campuses" button instead).
@@ -125,7 +125,7 @@ The settings frame, route and layout are owned by [33-school-settings.md](33-sch
 
   Toast (success): "These requests now wait for a boss to approve." when switched on; "These requests now go through straight away." when switched off.
 
-- Section **Who can approve**, description "Nobody can approve their own request." One row: badges "Owner" and each role holding `adjustment:approve` (e.g. "Principal"); "Anyone with one of these roles can approve."; button **Change roles** (outline, arrow) to Roles, shown with `ac:read`.
+- Section **Who can approve**, description "Only the owner can approve their own request." One row: badges "Owner" and each role holding `adjustment:approve` (e.g. "Principal"); "Anyone with one of these roles can approve."; button **Change roles** (outline, arrow) to Roles, shown with `ac:read`.
 - States: acting read-only renders with switches disabled.
 
 ## Business rules
