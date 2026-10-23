@@ -348,6 +348,7 @@ export interface JournalLine {
   credit_minor: Generated<Int8>;
   debit_minor: Generated<Int8>;
   entry_id: string;
+  family_id: string | null;
   id: Generated<string>;
   ledger_account_id: string;
   organization_id: string;
@@ -361,6 +362,7 @@ export interface LedgerAccount {
   name: string;
   organization_id: string;
   parent_id: string | null;
+  requires_family: Generated<boolean>;
   requires_student: Generated<boolean>;
   retired_at: Timestamp | null;
   system_key: string | null;
@@ -818,6 +820,54 @@ export interface Verification {
   value: string;
 }
 
+export interface Wallet {
+  created_at: Generated<Timestamp>;
+  guardian_id: string;
+  id: Generated<string>;
+  organization_id: string;
+}
+
+export interface WalletEarmark {
+  created_at: Generated<Timestamp>;
+  created_by: string;
+  delta_minor: Int8;
+  id: Generated<string>;
+  journal_entry_id: string | null;
+  kind: string;
+  organization_id: string;
+  reference: string;
+  student_id: string;
+  wallet_id: string;
+}
+
+export interface WalletSpend {
+  created_at: Generated<Timestamp>;
+  created_by: string;
+  id: Generated<string>;
+  journal_entry_id: string;
+  organization_id: string;
+  reference: string;
+  request_hash: string;
+  wallet_id: string;
+}
+
+export interface WalletTopup {
+  amount_minor: Int8;
+  created_at: Generated<Timestamp>;
+  created_by: string;
+  depositor_name: string | null;
+  id: Generated<string>;
+  journal_entry_id: string;
+  method: string;
+  money_account_id: string;
+  organization_id: string;
+  proof_file_id: string;
+  received_on: Timestamp;
+  reference: string;
+  request_hash: string;
+  wallet_id: string;
+}
+
 export interface DB {
   academic_session: AcademicSession;
   account: Account;
@@ -879,5 +929,9 @@ export interface DB {
   term: Term;
   user: User;
   verification: Verification;
+  wallet: Wallet;
+  wallet_earmark: WalletEarmark;
+  wallet_spend: WalletSpend;
+  wallet_topup: WalletTopup;
 }
 
