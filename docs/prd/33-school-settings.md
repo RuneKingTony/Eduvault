@@ -103,7 +103,7 @@ Scopes: settings are school-wide (one row per school). Another school's settings
 
   Toasts: "These requests now wait for a boss to approve." / "These requests now go through straight away."
 
-- Section **Who can approve**, description "Nobody can approve their own request." One row: badges "Owner" plus the label of every role holding `adjustment:approve` ("Principal" in the seed), description "Anyone with one of these roles can approve.", and a "Change roles" button (outline, arrow) to Roles, shown only with `ac:read`.
+- Section **Who can approve**, description "Only the owner can approve their own request." One row: badges "Owner" plus the label of every role holding `adjustment:approve` ("Principal" in the seed), description "Anyone with one of these roles can approve.", and a "Change roles" button (outline, arrow) to Roles, shown only with `ac:read`.
 
 ### Payment rules (M3.4)
 

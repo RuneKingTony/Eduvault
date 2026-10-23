@@ -112,7 +112,7 @@ function WhoCanApprove({ approvers }: { approvers: readonly string[] }) {
   return (
     <SettingsSection
       title="Who can approve"
-      description="Nobody can approve their own request."
+      description="Only the owner can approve their own request."
     >
       <SettingsRow
         label="Approvers"

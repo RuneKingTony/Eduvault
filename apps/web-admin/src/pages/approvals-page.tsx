@@ -58,7 +58,8 @@ function Header() {
             </button>
           </TooltipTrigger>
           <TooltipContent>
-            Staff ask, a boss approves. You can’t approve your own request.
+            Staff ask, a boss approves. Only the owner can approve their own
+            request.
           </TooltipContent>
         </Tooltip>
       </h1>
