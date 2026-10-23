@@ -224,6 +224,7 @@ export const RESOURCE_PILLARS: Record<Resource, Pillar> = {
   ledger: 'Finance',
   moneyAccount: 'Finance',
   store: 'Finance',
+  wallet: 'Finance',
   subject: 'Foundation',
 };
 
@@ -250,6 +251,11 @@ export const ACTION_WORDS: Record<Action, string> = {
   count: 'count stock',
   void: 'cancel',
   approve: 'approve',
+  topUp: 'record top-ups',
+  spend: 'spend',
+  requestRefund: 'ask for refunds',
+  approveRefund: 'approve refunds',
+  manageGateway: 'manage the payment gateway',
 };
 
 export function capabilityLabel(permission: Permission): string {

@@ -7,6 +7,8 @@ const PORTAL_OWN_PERMISSIONS: ReadonlySet<Permission> = new Set([
   'invoice:readOwn',
   'feeLine:readOwn',
   'payment:readOwn',
+  'wallet:readOwn',
+  'wallet:spend',
 ]);
 
 export interface GrantRequest {

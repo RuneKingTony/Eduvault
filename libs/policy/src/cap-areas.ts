@@ -258,6 +258,37 @@ export const CAP_AREAS: readonly CapArea[] = [
     extras: [],
   },
   {
+    id: 'wallets',
+    group: 'Money',
+    label: 'Wallets',
+    important: false,
+    see: ['wallet:read'],
+    change: ['wallet:topUp'],
+    changeDesc: 'Record money families pay into their wallets',
+    extras: [
+      {
+        label: 'Asks for wallet refunds',
+        description: 'Asks for wallet money to be paid back to a family.',
+        permissions: ['wallet:requestRefund'],
+        important: false,
+      },
+      {
+        label: 'Approves wallet refunds',
+        description:
+          'Approves or declines refund requests from other people, never their own.',
+        permissions: ['wallet:approveRefund'],
+        important: true,
+      },
+      {
+        label: 'Manages the payment gateway',
+        description:
+          'Connects and changes the online payment gateway. Only an owner can do it.',
+        permissions: ['wallet:manageGateway'],
+        important: true,
+      },
+    ],
+  },
+  {
     id: 'money-categories',
     group: 'Money',
     label: 'Money categories',
@@ -280,6 +311,13 @@ export const CAP_AREAS: readonly CapArea[] = [
         label: 'Sees fees',
         description: 'Charges, payments and the family statement.',
         permissions: ['invoice:readOwn', 'payment:readOwn', 'feeLine:readOwn'],
+        important: false,
+      },
+      {
+        label: 'Uses the family wallet',
+        description:
+          'Sees the family wallet, pays charges from it and sets money aside for a child.',
+        permissions: ['wallet:readOwn', 'wallet:spend'],
         important: false,
       },
     ],

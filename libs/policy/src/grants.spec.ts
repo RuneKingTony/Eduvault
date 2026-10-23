@@ -48,12 +48,32 @@ describe('canGrantRole', () => {
             'invoice:readOwn',
             'feeLine:readOwn',
             'payment:readOwn',
+            'wallet:readOwn',
+            'wallet:spend',
           ]),
           assignerPermissions: teacher,
           assignerIsOwner: false,
         })
       ).toEqual({ allowed: true, missing: [] });
     }
+  });
+
+  it('still requires the assigner to hold wallet:topUp on a custom staff role', () => {
+    expect(
+      canGrantRole({
+        slug: 'wallet-clerk',
+        rolePermissions: toPermissionMap([
+          'wallet:readOwn',
+          'wallet:spend',
+          'wallet:topUp',
+        ]),
+        assignerPermissions: teacher,
+        assignerIsOwner: false,
+      })
+    ).toEqual({
+      allowed: false,
+      missing: ['wallet:readOwn', 'wallet:spend', 'wallet:topUp'],
+    });
   });
 
   it('still requires the assigner to hold the own-record fee permissions on a custom staff role', () => {
