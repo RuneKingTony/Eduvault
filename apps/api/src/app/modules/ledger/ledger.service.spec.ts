@@ -67,6 +67,44 @@ describe('LedgerService.createAccount', () => {
     });
   });
 
+  it('records one fee_type.created row for a saved account', async () => {
+    const { service, repository } = setup();
+    repository.accounts = [feeIncome];
+    await service.createAccount(everyone, {
+      parentId: 'acc-4000',
+      name: 'Sports',
+    });
+    expect(repository.recorded).toHaveLength(1);
+    expect(repository.recorded[0]).toMatchObject({
+      organizationId: 'school-a',
+      campusId: null,
+      kind: 'fee_type.created',
+      actorUserId: 'caller',
+      subjectType: 'fee_type',
+      subjectId: 'new-account',
+    });
+  });
+
+  it('records nothing for a refused account', async () => {
+    const { service, repository } = setup();
+    repository.accounts = [
+      feeIncome,
+      { ...feeIncome, id: 'acc-4010', code: 4010, systemKey: null },
+    ];
+    const create = (parentId: string) =>
+      service.createAccount(everyone, { parentId, name: 'Sports' });
+    repository.outcome = { status: 'name_taken' };
+    await expect(create('acc-4000')).rejects.toBeInstanceOf(ConflictException);
+    repository.outcome = { status: 'code_taken' };
+    await expect(create('acc-4000')).rejects.toBeInstanceOf(ConflictException);
+    repository.outcome = undefined;
+    await expect(create('elsewhere')).rejects.toBeInstanceOf(NotFoundException);
+    await expect(create('acc-4010')).rejects.toBeInstanceOf(
+      BadRequestException
+    );
+    expect(repository.recorded).toEqual([]);
+  });
+
   it('answers 400 for any other parent, built-in or not', async () => {
     const { service, repository } = setup();
     repository.accounts = [

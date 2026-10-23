@@ -10,6 +10,7 @@ import {
   type JournalLine,
   type JournalQuery,
 } from '@eduvault/api-contract';
+import { ActivityWriter } from '../../common/activity';
 import { inCampusScope } from '../../common/db/in-campus-scope';
 import { day } from '../../common/db/rows';
 import { KYSELY_TOKEN, type Database } from '../../common/db/tokens';
@@ -23,6 +24,7 @@ import {
 import { visibleStudentsCte } from '../../common/students';
 import {
   LedgerRepository,
+  type AccountActivity,
   type LedgerAccountRef,
   type LedgerOutcome,
   type MoneyAccountRef,
@@ -88,7 +90,8 @@ const toEntry = (
 export class KyselyLedgerRepository extends LedgerRepository {
   constructor(
     @Inject(KYSELY_TOKEN) private readonly db: Database,
-    private readonly poster: LedgerPoster
+    private readonly poster: LedgerPoster,
+    private readonly activity: ActivityWriter
   ) {
     super();
   }
@@ -177,29 +180,31 @@ export class KyselyLedgerRepository extends LedgerRepository {
         };
   }
 
-  async createAccount(input: {
-    organizationId: string;
-    parentId: string;
-    name: string;
-  }): Promise<LedgerOutcome> {
+  async createAccount(
+    input: {
+      organizationId: string;
+      parentId: string;
+      name: string;
+    },
+    activity: AccountActivity
+  ): Promise<LedgerOutcome> {
     return transactAccounts(this.db, async (trx): Promise<LedgerOutcome> => {
       const inserted = await insertChildAccount(trx, input);
       if (inserted.status === 'name_taken') {
         return inserted;
       }
       const { row } = inserted;
-      return {
-        status: 'saved',
-        account: {
-          id: row.id,
-          code: row.code,
-          name: row.name,
-          type: ledgerAccountTypeSchema.parse(row.type),
-          parentId: row.parent_id,
-          systemKey: row.system_key,
-          balanceMinor: 0,
-        },
+      const account = {
+        id: row.id,
+        code: row.code,
+        name: row.name,
+        type: ledgerAccountTypeSchema.parse(row.type),
+        parentId: row.parent_id,
+        systemKey: row.system_key,
+        balanceMinor: 0,
       };
+      await this.activity.within(trx).recordMany(activity(account));
+      return { status: 'saved', account };
     });
   }
 

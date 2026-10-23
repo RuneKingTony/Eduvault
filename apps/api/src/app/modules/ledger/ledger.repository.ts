@@ -4,6 +4,7 @@ import type {
   LedgerAccount,
   LedgerAccountType,
 } from '@eduvault/api-contract';
+import type { ActivityInput } from '../../common/activity';
 import type { ChartAccount } from '../../common/ledger';
 import type { PlannedEntry } from './opening-balances';
 import type { OrgScope } from '../../common/scope';
@@ -20,6 +21,8 @@ export type LedgerOutcome =
   | { status: 'saved'; account: LedgerAccount }
   | { status: 'name_taken' }
   | { status: 'code_taken' };
+
+export type AccountActivity = (account: LedgerAccount) => ActivityInput[];
 
 export interface SystemAccounts {
   receivableId: string;
@@ -48,11 +51,14 @@ export abstract class LedgerRepository {
     id: string
   ): Promise<LedgerAccountRef | undefined>;
 
-  abstract createAccount(input: {
-    organizationId: string;
-    parentId: string;
-    name: string;
-  }): Promise<LedgerOutcome>;
+  abstract createAccount(
+    input: {
+      organizationId: string;
+      parentId: string;
+      name: string;
+    },
+    activity: AccountActivity
+  ): Promise<LedgerOutcome>;
 
   abstract journal(scope: OrgScope, query: JournalQuery): Promise<JournalList>;
 

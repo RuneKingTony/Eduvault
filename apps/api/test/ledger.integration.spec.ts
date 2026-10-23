@@ -17,6 +17,8 @@ import {
 } from './support/base-test';
 import {
   createMoneyAccount,
+  financeActivityRows,
+  financeTexts,
   importOpening,
   ledgerAccountId,
   postEntry,
@@ -228,6 +230,63 @@ test.describe('adding a fee category', () => {
     expect(codes.slice(codes.indexOf(4000), codes.indexOf(4000) + 12)).toEqual([
       4000, 4010, 4020, 4030, 4040, 4050, 4070, 4080, 4090, 4100, 4500, 5000,
     ]);
+  });
+
+  test('writes one school-wide fee_type.created row, shown with the fee types, and none for a duplicate', async ({
+    api,
+    pool,
+    schools,
+  }) => {
+    const { owner, ownerB, orgA, orgB } = schools;
+    const parentId = await under(api, owner);
+    const created = await api(owner)
+      .post('/finance/ledger-accounts')
+      .send({ parentId, name: 'Sports' })
+      .expect(201);
+    await api(owner)
+      .post('/finance/ledger-accounts')
+      .send({ parentId, name: ' SPORTS ' })
+      .expect(409);
+
+    const rows = (await financeActivityRows(pool, orgA.id)).filter(
+      (row) => row.kind === 'fee_type.created'
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      campus_id: null,
+      subject_type: 'fee_type',
+      subject_id: created.body.id,
+      data: { feeTypeId: created.body.id, code: 4090, name: 'Sports' },
+    });
+    expect(await financeTexts(api, owner)).toContainEqual(
+      expect.stringMatching(/^.+ added the fee type Sports \(4090\)\.$/)
+    );
+    expect(await financeActivityRows(pool, orgB.id)).toEqual([]);
+    expect(await financeTexts(api, ownerB)).toEqual([]);
+    const feeTypes = (await api(owner).get('/fee-types').expect(200)).body as {
+      id: string;
+    }[];
+    expect(feeTypes.map((feeType) => feeType.id)).toContain(created.body.id);
+  });
+
+  test('writes no row for a parent in another school or a refused parent', async ({
+    api,
+    pool,
+    schools,
+  }) => {
+    const { owner, ownerB, orgA, orgB } = schools;
+    const parentA = await under(api, owner);
+    await api(ownerB)
+      .post('/finance/ledger-accounts')
+      .send({ parentId: parentA, name: 'Sports' })
+      .expect(404);
+    const refusedParent = await under(api, owner, 4010);
+    await api(owner)
+      .post('/finance/ledger-accounts')
+      .send({ parentId: refusedParent, name: 'Sports' })
+      .expect(400);
+    expect(await financeActivityRows(pool, orgA.id)).toEqual([]);
+    expect(await financeActivityRows(pool, orgB.id)).toEqual([]);
   });
 
   test('answers 409 for a duplicate name, ignoring case and spaces', async ({
