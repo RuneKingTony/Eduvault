@@ -738,7 +738,17 @@ describe('the New discount sheet', () => {
     await user.click(
       within(sheet).getByRole('button', { name: 'Submit for approval' })
     );
-    await confirmStep('Submit this discount?', 'Submit');
+    const confirm = await screen.findByRole('dialog', {
+      name: 'Submit this discount?',
+    });
+    expect(within(confirm).getByText('Applies to')).toBeVisible();
+    expect(within(confirm).getByText('Tuition')).toBeVisible();
+    expect(
+      within(confirm).getByText(
+        'It waits in Approvals until someone with approval decides.'
+      )
+    ).toBeVisible();
+    await user.click(within(confirm).getByRole('button', { name: 'Submit' }));
 
     await waitFor(() => {
       expect(api.studentDiscounts.create).toHaveBeenCalledWith({
@@ -790,12 +800,38 @@ describe('the End discount dialog', () => {
     vi.clearAllMocks();
   });
 
+  it('never offers a term before the one the discount starts in', async () => {
+    setup({
+      search: { tab: 'discounts' },
+      discounts: discountList([
+        discountRow({
+          status: 'approved',
+          fromTerm: { id: TERM_2, name: 'Second term, 2026/2027' },
+        }),
+      ]),
+    });
+    await user.click(
+      await screen.findByRole('button', { name: /End discount/ })
+    );
+    const dialog = await screen.findByRole('dialog');
+    const last = await within(dialog).findByLabelText<HTMLSelectElement>(
+      'Last term it applies to'
+    );
+    await waitFor(() => {
+      expect([...last.options].map((option) => option.value)).toEqual([
+        TERM_2,
+        TERM_3,
+      ]);
+    });
+  });
+
   it('offers the current term onward up to the existing Until and ends with the term chosen', async () => {
     const { api } = setup({
       search: { tab: 'discounts' },
       discounts: discountList([
         discountRow({
           status: 'approved',
+          fromTerm: { id: TERM_1, name: 'First term, 2026/2027' },
           toTerm: { id: TERM_3, name: 'Third term, 2026/2027' },
         }),
       ]),

@@ -195,11 +195,13 @@ export class DiscountService {
     if (found.status !== 'approved') {
       throw new ConflictException(DISCOUNT_NOT_APPROVED_MESSAGE);
     }
-    const [last, current] = await Promise.all([
+    const [last, from, current] = await Promise.all([
       this.requireTerm(ctx.organizationId, input.lastTermId),
+      this.requireTerm(ctx.organizationId, found.discount.fromTerm.id),
       this.discounts.currentTerm(ctx.organizationId),
     ]);
     const problem = endProblem({
+      from: from.position,
       last: last.position,
       until: found.until,
       current: current?.position,

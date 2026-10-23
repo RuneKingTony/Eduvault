@@ -36,9 +36,13 @@ export function canStillEnd(
 
 export function endOptions(
   options: readonly TermOption[],
-  untilId: string | null
+  untilId: string | null,
+  startId: string
 ): TermOption[] {
-  const from = fromOptions(options);
+  const starts = options.findIndex((option) => option.id === startId);
+  const from = fromOptions(options).filter(
+    (option) => starts === -1 || options.indexOf(option) >= starts
+  );
   if (untilId === null) {
     return from;
   }

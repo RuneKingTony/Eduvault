@@ -44,6 +44,8 @@ export const DISCOUNT_ALREADY_ENDED_MESSAGE =
   'This discount has already ended.';
 export const DISCOUNT_END_PAST_MESSAGE =
   'The last term can’t be before the current term.';
+export const DISCOUNT_END_BEFORE_FROM_MESSAGE =
+  'The last term can’t be before the term the discount starts in.';
 export const DISCOUNT_END_AFTER_UNTIL_MESSAGE =
   'The last term can’t be after the term the discount already ends in.';
 export const DISCOUNT_SUBMITTED_MESSAGE = 'Discount submitted for approval.';

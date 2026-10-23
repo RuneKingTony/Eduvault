@@ -121,7 +121,7 @@ Scopes applied:
   - On submit, approval on: saved as Waiting; toast (success) "Discount submitted for approval."
   - On submit, approval off: approved at once; toast (success) "Discount applied. It shows on the next round of charges."
 
-- **End discount** (row action, ghost, `adjustment:create`) on an approved discount that still applies to the current or a later term. Dialog: title "End this discount?"; description "{student} · {discount}"; field **Last term it applies to** (select of the current term and later terms up to its Until, default the current term); body "Charges already sent don’t change. Later charges no longer get this discount."; buttons **Cancel** (ghost), **End discount** (primary). No approval is needed (rule 20). Toast (success) "Discount ended. It last applies in {term}."
+- **End discount** (row action, ghost, `adjustment:create`) on an approved discount that still applies to the current or a later term. Dialog: title "End this discount?"; description "{student} · {discount}"; field **Last term it applies to** (select of the current term, or the term it starts in if later, up to its Until; default the first of those); body "Charges already sent don’t change. Later charges no longer get this discount."; buttons **Cancel** (ghost), **End discount** (primary). No approval is needed (rule 20). Toast (success) "Discount ended. It last applies in {term}."
 
 - States for the whole page: loading skeletons; error through `ErrorMessage`; denied: the sub-tab and route are hidden; acting read-only: lists render, no New request or New discount.
 
@@ -149,7 +149,7 @@ Scopes applied:
 17. **Payment cancellations** follow [53](53-payments.md) rules 11 to 16; this page lists them.
 18. **Never deleted.** No delete for adjustments, discounts or cancellations. Waiting requests can't be edited; a wrong one is declined and asked again.
 19. **Acting read-only** writes answer 403.
-20. **Ending a discount** sets its last term (`to_term_id`) to the chosen term, with `ended_at` and `ended_by`, without approval: it only ever raises future charges. The last term can't be before the current term or after the existing Until. Charges already prepared or sent don't change.
+20. **Ending a discount** sets its last term (`to_term_id`) to the chosen term, with `ended_at` and `ended_by`, without approval: it only ever raises future charges. The last term can't be before the current term, before the term the discount starts in, or after the existing Until (400 "The last term can’t be before the term the discount starts in."). Charges already prepared or sent don't change.
 
 ## Data
 

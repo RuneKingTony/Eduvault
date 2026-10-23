@@ -23,7 +23,7 @@ export function ConfirmRequest({
       description={
         appliesAtOnce
           ? 'Approval is switched off, so it applies at once.'
-          : 'It waits in Approvals until a second person decides.'
+          : 'It waits in Approvals until someone with approval decides.'
       }
       details={
         state === null
