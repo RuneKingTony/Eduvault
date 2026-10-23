@@ -43,7 +43,8 @@ gh_api_numbers() {
 }
 
 gh_parent() {
-  gh api "repos/{owner}/{repo}/issues/$1/parent" --jq '.number' 2>/dev/null || echo null
+  local out
+  out=$(gh api "repos/{owner}/{repo}/issues/$1/parent" --jq '.number' 2>/dev/null) && printf '%s' "$out" || echo null
 }
 
 links_json() {
