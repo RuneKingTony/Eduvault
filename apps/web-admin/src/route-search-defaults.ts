@@ -4,11 +4,14 @@ import type { BillingSearch } from './billing-search';
 import type { FeesSearch } from './fees-search';
 import type { InvoicesSearch } from './invoices-search';
 import type { PaymentsSearch } from './payments-search';
+import type { WalletSearch, WalletsSearch } from './wallets-search';
 
 interface RouteSearch {
   '/finance/billing': BillingSearch;
   '/finance/invoices': InvoicesSearch;
   '/finance/payments': PaymentsSearch;
+  '/finance/wallets': WalletsSearch;
+  '/finance/wallets/$walletId': WalletSearch;
   '/finance/accounts': AccountsSearch;
   '/finance/accounts/$studentId': StatementSearch;
   '/finance/adjustments': AdjustmentsSearch;
@@ -35,6 +38,8 @@ export const SEARCH_DEFAULTS = {
     page: undefined,
     record: undefined,
   },
+  '/finance/wallets': { q: undefined, page: undefined },
+  '/finance/wallets/$walletId': { page: undefined, topup: undefined },
   '/finance/accounts': { filter: undefined, q: undefined, page: undefined },
   '/finance/accounts/$studentId': {
     view: undefined,

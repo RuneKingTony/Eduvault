@@ -193,7 +193,7 @@ export function accountsFor(
 }
 
 /** METHOD_ACCOUNT_KINDS lists kinds in preference order, so cash opens on a cash account when there is one. */
-function preferredAccountId(
+export function preferredAccountId(
   accounts: readonly RecordingMoneyAccount[],
   method: PaymentMethod
 ): string {

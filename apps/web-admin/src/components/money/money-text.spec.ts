@@ -1,4 +1,6 @@
+import { JOURNAL_KINDS } from '@eduvault/api-contract';
 import {
+  JOURNAL_KIND_LABELS,
   campusLabel,
   endingText,
   entryCaption,
@@ -7,6 +9,19 @@ import {
   scopeText,
   tileSubline,
 } from './money-text';
+
+describe('journal kind labels', () => {
+  it('name the wallet movements for the journal and cash book', () => {
+    expect(JOURNAL_KIND_LABELS.wallet_topup).toBe('Wallet top-up');
+    expect(JOURNAL_KIND_LABELS.wallet_spend).toBe('Paid from wallet');
+  });
+
+  it('cover every kind the books can hold', () => {
+    expect(
+      Object.keys(JOURNAL_KIND_LABELS).toSorted((a, b) => a.localeCompare(b))
+    ).toEqual([...JOURNAL_KINDS].toSorted((a, b) => a.localeCompare(b)));
+  });
+});
 
 describe('money text', () => {
   it('names a campus or says school-wide', () => {

@@ -18,6 +18,7 @@ vi.mock('@eduvault/ui', async (importOriginal) => ({
 
 const POS_ID = testId(0x2_60_01);
 const CASH_BOX_ID = testId(0x2_60_02);
+const MONNIFY_ID = testId(0x2_60_03);
 const ADJUSTMENT_ENTRY_ID = testId(0x2_60_11);
 const OPENING_ENTRY_ID = testId(0x2_60_12);
 
@@ -30,7 +31,7 @@ const pos = moneyAccount({
   campusName: 'Lekki',
   bankName: null,
   last4: null,
-  ledgerCode: 1220,
+  ledgerCode: 1250,
   balanceMinor: 1_200_000,
 });
 const old = moneyAccount({
@@ -41,9 +42,18 @@ const old = moneyAccount({
   campusName: 'Ikeja',
   bankName: null,
   last4: null,
-  ledgerCode: 1230,
+  ledgerCode: 1260,
   balanceMinor: 0,
   retiredAt: '2026-10-01T09:00:00.000Z',
+});
+const monnify = moneyAccount({
+  id: MONNIFY_ID,
+  name: 'Monnify collections',
+  kind: 'gateway',
+  bankName: null,
+  last4: null,
+  ledgerCode: 1230,
+  balanceMinor: 0,
 });
 
 function setup(
@@ -71,7 +81,7 @@ function setup(
             last4: body.last4 ?? null,
             campusId: body.campusId,
             campusName: null,
-            ledgerCode: 1240,
+            ledgerCode: 1270,
             balanceMinor: 0,
           })
         )
@@ -139,6 +149,16 @@ describe('MoneyAccountsPage tiles', () => {
         query: { page: 1 },
       });
     });
+  });
+
+  it('shows the built-in Monnify collections account as an online payments tile', async () => {
+    setup({ list: moneyAccountList([monnify, gtbank]) });
+    const tile = await screen.findByRole('button', {
+      name: /Monnify collections/,
+    });
+    expect(within(tile).getByText('Online payments')).toBeInTheDocument();
+    expect(within(tile).getByText('₦0')).toBeInTheDocument();
+    expect(within(tile).getByText('School-wide')).toBeInTheDocument();
   });
 
   it('selects another tile and loads its cash book', async () => {
@@ -263,6 +283,18 @@ describe('MoneyAccountsPage permissions', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('offers Edit but never Retire on the built-in Monnify collections account', async () => {
+    setup({ list: moneyAccountList([monnify, gtbank]) });
+    await screen.findByText('Monnify collections cash book');
+    expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Retire' })
+    ).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /GTBank current/ }));
+    await screen.findByText('GTBank current cash book');
+    expect(screen.getByRole('button', { name: 'Retire' })).toBeInTheDocument();
+  });
+
   it('shows Add, Edit and Retire to the owner, but no Retire on a retired account', async () => {
     setup();
     expect(
@@ -350,7 +382,7 @@ describe('MoneyAccountsPage add form', () => {
     });
     await waitFor(() => {
       expect(toast.success).toHaveBeenCalledWith(
-        'Zenith savings added with ledger account 1240.'
+        'Zenith savings added with ledger account 1270.'
       );
     });
   });

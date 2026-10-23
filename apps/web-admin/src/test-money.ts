@@ -23,7 +23,7 @@ export const moneyAccount = (
   bankName: 'GTBank',
   last4: '4417',
   ledgerAccountId: GTBANK_LEDGER_ID,
-  ledgerCode: 1210,
+  ledgerCode: 1240,
   balanceMinor: 9_500_000,
   retiredAt: null,
   ...overrides,

@@ -147,6 +147,14 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         gate: ['payment:read'],
       },
       {
+        id: 'wallets',
+        label: 'Wallets',
+        pageTitle: 'Wallets',
+        route: '/finance/wallets',
+        icon: 'wallet',
+        gate: ['wallet:read'],
+      },
+      {
         id: 'store',
         label: 'Store',
         pageTitle: 'Store',

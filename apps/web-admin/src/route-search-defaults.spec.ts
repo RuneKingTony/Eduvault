@@ -4,6 +4,7 @@ import { parseBillingSearch } from './billing-search';
 import { parseFeesSearch } from './fees-search';
 import { parseInvoicesSearch } from './invoices-search';
 import { parsePaymentsSearch } from './payments-search';
+import { parseWalletSearch, parseWalletsSearch } from './wallets-search';
 import {
   prepareChargesTarget,
   hasSearchDefaults,
@@ -19,6 +20,8 @@ describe('hasSearchDefaults', () => {
     expect(hasSearchDefaults('/finance/accounts/$studentId')).toBe(true);
     expect(hasSearchDefaults('/finance/school-fees')).toBe(true);
     expect(hasSearchDefaults('/finance/other-fees')).toBe(true);
+    expect(hasSearchDefaults('/finance/wallets')).toBe(true);
+    expect(hasSearchDefaults('/finance/wallets/$walletId')).toBe(true);
     expect(hasSearchDefaults('/students')).toBe(false);
     expect(hasSearchDefaults('toString')).toBe(false);
   });
@@ -49,6 +52,12 @@ describe('SEARCH_DEFAULTS', () => {
     );
     expect(SEARCH_DEFAULTS['/finance/other-fees']).toStrictEqual(
       parseFeesSearch({})
+    );
+    expect(SEARCH_DEFAULTS['/finance/wallets']).toStrictEqual(
+      parseWalletsSearch({})
+    );
+    expect(SEARCH_DEFAULTS['/finance/wallets/$walletId']).toStrictEqual(
+      parseWalletSearch({})
     );
   });
 });

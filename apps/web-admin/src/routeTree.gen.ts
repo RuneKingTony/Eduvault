@@ -33,6 +33,7 @@ import { Route as FinanceOtherFeesRouteImport } from './routes/finance/other-fee
 import { Route as FinancePaymentsRouteImport } from './routes/finance/payments'
 import { Route as FinanceSchoolFeesRouteImport } from './routes/finance/school-fees'
 import { Route as FinanceStoreRouteImport } from './routes/finance/store'
+import { Route as FinanceWalletsRouteImport } from './routes/finance/wallets'
 import { Route as MembersMemberIdRouteImport } from './routes/members_.$memberId'
 import { Route as PlatformIndexRouteImport } from './routes/platform.index'
 import { Route as PlatformAuditRouteImport } from './routes/platform.audit'
@@ -50,6 +51,7 @@ import { Route as FinanceAccountsStudentIdRouteImport } from './routes/finance/a
 import { Route as FinanceBillingRunIdRouteImport } from './routes/finance/billing_.$runId'
 import { Route as FinanceInvoicesInvoiceIdRouteImport } from './routes/finance/invoices_.$invoiceId'
 import { Route as FinancePaymentsPaymentIdRouteImport } from './routes/finance/payments_.$paymentId'
+import { Route as FinanceWalletsWalletIdRouteImport } from './routes/finance/wallets_.$walletId'
 import { Route as PlatformSchoolsIndexRouteImport } from './routes/platform.schools.index'
 import { Route as PlatformSchoolsSchoolIdRouteImport } from './routes/platform.schools.$schoolId'
 import { Route as FinancePaymentsPaymentIdPrintRouteImport } from './routes/finance/payments_.$paymentId_.print'
@@ -174,6 +176,11 @@ const FinanceStoreRoute = FinanceStoreRouteImport.update({
   path: '/finance/store',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FinanceWalletsRoute = FinanceWalletsRouteImport.update({
+  id: '/finance/wallets',
+  path: '/finance/wallets',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const MembersMemberIdRoute = MembersMemberIdRouteImport.update({
   id: '/members_/$memberId',
   path: '/members/$memberId',
@@ -262,6 +269,11 @@ const FinancePaymentsPaymentIdRoute =
     path: '/finance/payments/$paymentId',
     getParentRoute: () => rootRouteImport,
   } as any)
+const FinanceWalletsWalletIdRoute = FinanceWalletsWalletIdRouteImport.update({
+  id: '/finance/wallets_/$walletId',
+  path: '/finance/wallets/$walletId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PlatformSchoolsIndexRoute = PlatformSchoolsIndexRouteImport.update({
   id: '/schools/',
   path: '/schools/',
@@ -304,6 +316,7 @@ export interface FileRoutesByFullPath {
   '/finance/payments': typeof FinancePaymentsRoute
   '/finance/school-fees': typeof FinanceSchoolFeesRoute
   '/finance/store': typeof FinanceStoreRoute
+  '/finance/wallets': typeof FinanceWalletsRoute
   '/members/$memberId': typeof MembersMemberIdRoute
   '/platform/audit': typeof PlatformAuditRoute
   '/roles/$roleSlug': typeof RolesRoleSlugRoute
@@ -321,6 +334,7 @@ export interface FileRoutesByFullPath {
   '/finance/billing/$runId': typeof FinanceBillingRunIdRoute
   '/finance/invoices/$invoiceId': typeof FinanceInvoicesInvoiceIdRoute
   '/finance/payments/$paymentId': typeof FinancePaymentsPaymentIdRoute
+  '/finance/wallets/$walletId': typeof FinanceWalletsWalletIdRoute
   '/platform/schools/$schoolId': typeof PlatformSchoolsSchoolIdRoute
   '/platform/schools/': typeof PlatformSchoolsIndexRoute
   '/finance/payments/$paymentId/print': typeof FinancePaymentsPaymentIdPrintRoute
@@ -348,6 +362,7 @@ export interface FileRoutesByTo {
   '/finance/payments': typeof FinancePaymentsRoute
   '/finance/school-fees': typeof FinanceSchoolFeesRoute
   '/finance/store': typeof FinanceStoreRoute
+  '/finance/wallets': typeof FinanceWalletsRoute
   '/members/$memberId': typeof MembersMemberIdRoute
   '/platform/audit': typeof PlatformAuditRoute
   '/roles/$roleSlug': typeof RolesRoleSlugRoute
@@ -365,6 +380,7 @@ export interface FileRoutesByTo {
   '/finance/billing/$runId': typeof FinanceBillingRunIdRoute
   '/finance/invoices/$invoiceId': typeof FinanceInvoicesInvoiceIdRoute
   '/finance/payments/$paymentId': typeof FinancePaymentsPaymentIdRoute
+  '/finance/wallets/$walletId': typeof FinanceWalletsWalletIdRoute
   '/platform/schools/$schoolId': typeof PlatformSchoolsSchoolIdRoute
   '/platform/schools': typeof PlatformSchoolsIndexRoute
   '/finance/payments/$paymentId/print': typeof FinancePaymentsPaymentIdPrintRoute
@@ -395,6 +411,7 @@ export interface FileRoutesById {
   '/finance/payments': typeof FinancePaymentsRoute
   '/finance/school-fees': typeof FinanceSchoolFeesRoute
   '/finance/store': typeof FinanceStoreRoute
+  '/finance/wallets': typeof FinanceWalletsRoute
   '/members_/$memberId': typeof MembersMemberIdRoute
   '/platform/audit': typeof PlatformAuditRoute
   '/roles_/$roleSlug': typeof RolesRoleSlugRoute
@@ -412,6 +429,7 @@ export interface FileRoutesById {
   '/finance/billing_/$runId': typeof FinanceBillingRunIdRoute
   '/finance/invoices_/$invoiceId': typeof FinanceInvoicesInvoiceIdRoute
   '/finance/payments_/$paymentId': typeof FinancePaymentsPaymentIdRoute
+  '/finance/wallets_/$walletId': typeof FinanceWalletsWalletIdRoute
   '/platform/schools/$schoolId': typeof PlatformSchoolsSchoolIdRoute
   '/platform/schools/': typeof PlatformSchoolsIndexRoute
   '/finance/payments_/$paymentId_/print': typeof FinancePaymentsPaymentIdPrintRoute
@@ -443,6 +461,7 @@ export interface FileRouteTypes {
     | '/finance/payments'
     | '/finance/school-fees'
     | '/finance/store'
+    | '/finance/wallets'
     | '/members/$memberId'
     | '/platform/audit'
     | '/roles/$roleSlug'
@@ -460,6 +479,7 @@ export interface FileRouteTypes {
     | '/finance/billing/$runId'
     | '/finance/invoices/$invoiceId'
     | '/finance/payments/$paymentId'
+    | '/finance/wallets/$walletId'
     | '/platform/schools/$schoolId'
     | '/platform/schools/'
     | '/finance/payments/$paymentId/print'
@@ -487,6 +507,7 @@ export interface FileRouteTypes {
     | '/finance/payments'
     | '/finance/school-fees'
     | '/finance/store'
+    | '/finance/wallets'
     | '/members/$memberId'
     | '/platform/audit'
     | '/roles/$roleSlug'
@@ -504,6 +525,7 @@ export interface FileRouteTypes {
     | '/finance/billing/$runId'
     | '/finance/invoices/$invoiceId'
     | '/finance/payments/$paymentId'
+    | '/finance/wallets/$walletId'
     | '/platform/schools/$schoolId'
     | '/platform/schools'
     | '/finance/payments/$paymentId/print'
@@ -533,6 +555,7 @@ export interface FileRouteTypes {
     | '/finance/payments'
     | '/finance/school-fees'
     | '/finance/store'
+    | '/finance/wallets'
     | '/members_/$memberId'
     | '/platform/audit'
     | '/roles_/$roleSlug'
@@ -550,6 +573,7 @@ export interface FileRouteTypes {
     | '/finance/billing_/$runId'
     | '/finance/invoices_/$invoiceId'
     | '/finance/payments_/$paymentId'
+    | '/finance/wallets_/$walletId'
     | '/platform/schools/$schoolId'
     | '/platform/schools/'
     | '/finance/payments_/$paymentId_/print'
@@ -580,6 +604,7 @@ export interface RootRouteChildren {
   FinancePaymentsRoute: typeof FinancePaymentsRoute
   FinanceSchoolFeesRoute: typeof FinanceSchoolFeesRoute
   FinanceStoreRoute: typeof FinanceStoreRoute
+  FinanceWalletsRoute: typeof FinanceWalletsRoute
   MembersMemberIdRoute: typeof MembersMemberIdRoute
   RolesRoleSlugRoute: typeof RolesRoleSlugRoute
   RolesNewRoute: typeof RolesNewRoute
@@ -588,6 +613,7 @@ export interface RootRouteChildren {
   FinanceBillingRunIdRoute: typeof FinanceBillingRunIdRoute
   FinanceInvoicesInvoiceIdRoute: typeof FinanceInvoicesInvoiceIdRoute
   FinancePaymentsPaymentIdRoute: typeof FinancePaymentsPaymentIdRoute
+  FinanceWalletsWalletIdRoute: typeof FinanceWalletsWalletIdRoute
   FinancePaymentsPaymentIdPrintRoute: typeof FinancePaymentsPaymentIdPrintRoute
 }
 
@@ -761,6 +787,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FinanceStoreRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/finance/wallets': {
+      id: '/finance/wallets'
+      path: '/finance/wallets'
+      fullPath: '/finance/wallets'
+      preLoaderRoute: typeof FinanceWalletsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/members_/$memberId': {
       id: '/members_/$memberId'
       path: '/members/$memberId'
@@ -880,6 +913,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FinancePaymentsPaymentIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/finance/wallets_/$walletId': {
+      id: '/finance/wallets_/$walletId'
+      path: '/finance/wallets/$walletId'
+      fullPath: '/finance/wallets/$walletId'
+      preLoaderRoute: typeof FinanceWalletsWalletIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/platform/schools/': {
       id: '/platform/schools/'
       path: '/schools'
@@ -971,6 +1011,7 @@ const rootRouteChildren: RootRouteChildren = {
   FinancePaymentsRoute: FinancePaymentsRoute,
   FinanceSchoolFeesRoute: FinanceSchoolFeesRoute,
   FinanceStoreRoute: FinanceStoreRoute,
+  FinanceWalletsRoute: FinanceWalletsRoute,
   MembersMemberIdRoute: MembersMemberIdRoute,
   RolesRoleSlugRoute: RolesRoleSlugRoute,
   RolesNewRoute: RolesNewRoute,
@@ -979,6 +1020,7 @@ const rootRouteChildren: RootRouteChildren = {
   FinanceBillingRunIdRoute: FinanceBillingRunIdRoute,
   FinanceInvoicesInvoiceIdRoute: FinanceInvoicesInvoiceIdRoute,
   FinancePaymentsPaymentIdRoute: FinancePaymentsPaymentIdRoute,
+  FinanceWalletsWalletIdRoute: FinanceWalletsWalletIdRoute,
   FinancePaymentsPaymentIdPrintRoute: FinancePaymentsPaymentIdPrintRoute,
 }
 export const routeTree = rootRouteImport

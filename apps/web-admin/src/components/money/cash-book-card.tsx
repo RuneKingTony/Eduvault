@@ -146,7 +146,7 @@ export function CashBookCard({
               <PencilIcon />
               Edit
             </Button>
-            {account.retiredAt === null ? (
+            {account.retiredAt === null && account.kind !== 'gateway' ? (
               <Button
                 type="button"
                 variant="outline"

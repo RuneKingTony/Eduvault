@@ -759,6 +759,7 @@ export const dashboardFinanceQueryOptions = (api: Api) =>
   });
 
 const PAYMENTS_KEY = ['payments'] as const;
+const WALLETS_KEY = ['wallets'] as const;
 const BALANCES_KEY = ['balances'] as const;
 const STATEMENTS_KEY = ['statements'] as const;
 
@@ -814,6 +815,47 @@ export const recordingOptionsQueryOptions = (api: Api) =>
   queryOptions({
     queryKey: [...PAYMENTS_KEY, 'recording-options'],
     queryFn: () => api.payments.recordingOptions({}),
+    gcTime: 0,
+  });
+
+interface WalletFilters {
+  q?: string;
+  page?: number;
+}
+
+export const walletsQueryOptions = (
+  api: Api,
+  { q, page = 1 }: WalletFilters = {}
+) =>
+  queryOptions({
+    queryKey: [...WALLETS_KEY, 'list', { q: q ?? '', page }],
+    queryFn: () =>
+      api.wallets.list({ query: { q: q === '' ? undefined : q, page } }),
+    placeholderData: keepPreviousData,
+  });
+
+export const walletQueryOptions = (api: Api, walletId: string) =>
+  queryOptions({
+    queryKey: [...WALLETS_KEY, 'one', walletId],
+    queryFn: () => api.wallets.get({ params: { walletId } }),
+  });
+
+export const walletMovementsQueryOptions = (
+  api: Api,
+  walletId: string,
+  page = 1
+) =>
+  queryOptions({
+    queryKey: [...WALLETS_KEY, 'movements', walletId, page],
+    queryFn: () =>
+      api.wallets.movements({ params: { walletId }, query: { page } }),
+    placeholderData: keepPreviousData,
+  });
+
+export const topUpOptionsQueryOptions = (api: Api) =>
+  queryOptions({
+    queryKey: [...WALLETS_KEY, 'top-up-options'],
+    queryFn: () => api.wallets.topUpOptions({}),
     gcTime: 0,
   });
 
@@ -1187,6 +1229,9 @@ export const invalidateLeave = (queryClient: QueryClient): Promise<void> =>
 
 export const invalidatePayments = (queryClient: QueryClient): Promise<void> =>
   invalidateAll(queryClient, MONEY_VIEW_KEYS);
+
+export const invalidateTopUp = (queryClient: QueryClient): Promise<void> =>
+  invalidateAll(queryClient, [WALLETS_KEY, ...MONEY_VIEW_KEYS]);
 
 export async function invalidateSale(queryClient: QueryClient): Promise<void> {
   await Promise.all([

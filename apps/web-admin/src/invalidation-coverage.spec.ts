@@ -17,6 +17,7 @@ import {
   invalidateLeave,
   invalidatePayments,
   invalidateSale,
+  invalidateTopUp,
   invoicesQueryOptions,
   ledgerAccountsQueryOptions,
   memberLeaveQueryOptions,
@@ -25,6 +26,7 @@ import {
   classLevelsQueryOptions,
   statementQueryOptions,
   storeItemsQueryOptions,
+  walletsQueryOptions,
 } from './queries';
 
 const api = {} as Api;
@@ -49,6 +51,7 @@ const VIEWS = {
   storeItems: storeItemsQueryOptions(api).queryKey,
   leave: memberLeaveQueryOptions(api, 'u1').queryKey,
   levels: classLevelsQueryOptions(api).queryKey,
+  wallets: walletsQueryOptions(api).queryKey,
 } as const;
 
 type View = keyof typeof VIEWS;
@@ -120,6 +123,11 @@ describe('what each mutation helper refreshes', () => {
       helper: 'invalidateSale',
       run: invalidateSale,
       covers: [...MONEY_VIEWS, ...STORE_VIEWS],
+    },
+    {
+      helper: 'invalidateTopUp',
+      run: invalidateTopUp,
+      covers: [...MONEY_VIEWS, 'wallets'],
     },
     {
       helper: 'invalidateLeave',
