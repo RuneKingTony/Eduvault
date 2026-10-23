@@ -42,6 +42,8 @@ The UI uses plain words; the model keeps the accounting names.
 | Lump sum for siblings      | One payment and one receipt, split across children; one journal entry with a credit line per child                                                                                                                     | A payment per child (three receipts for one transfer); guardian credit pool (a second balance holder)             |
 | Store sales                | Charged and paid in one action at the store, so the balance doesn't move; stock at cost on the books, with cost of sales on each sale. The sale's payment can't be cancelled on its own (D-020)                        | Charge now, pay later (the prototype takes payment at the store); quantities only (no stock value or profit)      |
 
+Family wallets ([D-385](../technical-reference.md#decision-log), [PRD 59](../prd/59-wallets.md)) supersede the "running wallet" and "guardian credit pool" rejections above: a wallet is not a second balance holder but a view over journal lines on `2200 Student wallets` tagged with the family (`journal_line.family_id`), so the books stay the one source of truth.
+
 ## Model
 
 Every table also has `id`, `organization_id`, `created_at` and `updated_at` unless noted. FKs from these tables use `ON DELETE RESTRICT`. Approvable tables carry the one approval shape from the [overview](data-model-overview.md#rules-every-table-follows): `status`, `created_by`, `approved_by`, `approved_at`, `rejected_by`, `rejected_at`, `rejection_reason` (D-025), written below as "the approval columns".
