@@ -7,18 +7,18 @@
 
 ## Summary
 
-Staff ask for days off from the Approvals page: a type, the dates, a reason and who covers their classes. Someone holding `leave:approve` (the owner and the ready-made Principal role by default, per [D-006](../technical-reference.md#decision-log) and [D-010](../technical-reference.md#decision-log)) approves or declines it from the same queue that holds money corrections, and nobody decides their own request. The requester sees each decision, the days they have taken this school year and the school's holidays.
+Staff ask for days off from the Approvals page: a type, the dates, a reason and who covers their classes. Someone holding `leave:approve` (the owner and the ready-made Principal role by default, per [D-006](../technical-reference.md#decision-log) and [D-010](../technical-reference.md#decision-log)) approves or declines it from the same queue that holds money corrections, and nobody but the owner decides their own request ([D-378](../technical-reference.md#decision-log)). The requester sees each decision, the days they have taken this school year and the school's holidays.
 
 ## Who uses it
 
-| Persona (seed)                                                          | Permission(s)            | What they can do here                                             |
-| ----------------------------------------------------------------------- | ------------------------ | ----------------------------------------------------------------- |
-| Any staff member (teacher, bursar, administrator, member with no roles) | none needed (LV-1)       | Request leave, see and withdraw their own requests                |
-| Owner (Funmi Adeyemi)                                                   | `leave:approve` (all)    | Approve or decline others' leave; cannot decide their own         |
-| Principal (Grace Nwosu)                                                 | `leave:approve`          | Approve or decline others' leave in campus scope; request her own |
-| Bursar (Chika Eze)                                                      | `adjustment:create` only | Sees the leave-only Approvals page                                |
-| Student, guardian                                                       | portal only              | No access (web-portal users)                                      |
-| Super admin acting read-only                                            | every `read`             | Sees the queue; Approve, Decline and Request hidden               |
+| Persona (seed)                                                          | Permission(s)            | What they can do here                                                                               |
+| ----------------------------------------------------------------------- | ------------------------ | --------------------------------------------------------------------------------------------------- |
+| Any staff member (teacher, bursar, administrator, member with no roles) | none needed (LV-1)       | Request leave, see and withdraw their own requests                                                  |
+| Owner (Funmi Adeyemi)                                                   | `leave:approve` (all)    | Approve or decline any leave, including their own ([D-378](../technical-reference.md#decision-log)) |
+| Principal (Grace Nwosu)                                                 | `leave:approve`          | Approve or decline others' leave in campus scope; request her own                                   |
+| Bursar (Chika Eze)                                                      | `adjustment:create` only | Sees the leave-only Approvals page                                                                  |
+| Student, guardian                                                       | portal only              | No access (web-portal users)                                                                        |
+| Super admin acting read-only                                            | every `read`             | Sees the queue; Approve, Decline and Request hidden                                                 |
 
 Scopes: a leave request is visible to an approver when the requester shares at least one campus with the approver's campus scope (LV-3). The requester always sees their own. Another school's request, or one outside campus scope, answers 404. A staff member without `leave:approve` calling an approver endpoint gets 403 [tenancy-001].
 
@@ -57,7 +57,7 @@ Scopes: a leave request is visible to an approver when the requester shares at l
 
   Action cell:
   - Viewer lacks `leave:approve`: outline badge "Someone else", tooltip "Someone with leave approval decides." (LV-7).
-  - Viewer's own request: warning badge "Your own", tooltip "You asked for this. Someone else must decide." (LV-7).
+  - Viewer's own request, when the viewer is not the owner: warning badge "Your own", tooltip "You asked for this. Someone else must decide." (LV-7). The owner's own request shows Approve and Decline like any other ([D-378](../technical-reference.md#decision-log)).
   - Otherwise: **Approve** (primary, small, icon check) and **Decline** (ghost, small, icon x).
 
 - **Empty (shared):** icon check-check, "Nothing waiting for you", "When staff ask for leave, or to refund, discount, write off or void a payment, the request appears here."
@@ -153,7 +153,7 @@ Scopes: a leave request is visible to an approver when the requester shares at l
   - `CHECK (type IN ('sick','maternity','bereavement'))`; the doc names the types but not the stored keys.
   - `CHECK (approved_by IS NULL OR approved_by <> created_by)` and `CHECK (rejected_by IS NULL OR rejected_by <> created_by)`, the approval rule every approvable table carries.
   - `CHECK ((status = 'approved' OR cancelled_by IS NOT NULL) = (approved_by IS NOT NULL AND approved_at IS NOT NULL))`: cancelled approved leave keeps its approver.
-  - `CHECK ((cancelled_by IS NOT NULL) = (cancellation_reason IS NOT NULL))`, `CHECK (cancelled_by IS NULL OR status = 'cancelled')` and `CHECK (cancelled_by IS NULL OR cancelled_by <> created_by)` (`staff_leave_cancelled_not_self`, mapped to 409 `SelfApproval`).
+  - `CHECK ((cancelled_by IS NOT NULL) = (cancellation_reason IS NOT NULL))` and `CHECK (cancelled_by IS NULL OR status = 'cancelled')`. No CHECK compares `cancelled_by` or `approved_by` with `created_by`; the service alone refuses a self-decision ([D-378](../technical-reference.md#decision-log)).
   - `CHECK ((status = 'rejected') = (rejected_by IS NOT NULL AND rejected_at IS NOT NULL AND rejection_reason IS NOT NULL))`.
   - FKs: `created_by`, `approved_by` and `rejected_by` to `user.id` with `ON DELETE RESTRICT`, so a removed member's history keeps their name; `organization_id` to `organization`.
   - `CHECK ((status = 'cancelled') = (cancelled_at IS NOT NULL))`, `UNIQUE (id, organization_id)`.
@@ -195,7 +195,7 @@ Scopes: a leave request is visible to an approver when the requester shares at l
 5. **Withdraw.** Given Emeka's waiting request, when he withdraws it, then it shows "Withdrawn" and leaves the approvers' queue; withdrawing it again answers 409; Chika withdrawing it answers 404.
 6. **Approve.** Given Ayo's sick-leave request (12–13 Oct), when Funmi approves it, then the toast reads "Leave approved for Ayo Bassey.", Ayo's list shows "Approved by Funmi Adeyemi on {today}", and "Days taken" includes 2.
 7. **Decline.** Given Emeka's waiting personal-leave request for 20 October, when Funmi declines it with a reason, then Emeka sees "Declined by Funmi Adeyemi: {reason}" and an empty reason answers 400.
-8. **No self-decision.** Given Grace (principal) requested leave, then her row shows "Your own" with no buttons, and `POST /leave/{id}/approve` as Grace answers 409 `SelfApproval`; a row updated directly with `approved_by = created_by` is refused by the database and the filter maps it to 409.
+8. **No self-decision.** Given Grace (principal) requested leave, then her row shows "Your own" with no buttons, and `POST /leave/{id}/approve` as Grace answers 409 `SelfApproval`. Given Funmi (owner) requested leave, then her row shows Approve and Decline, `POST /leave/{id}/approve` answers 200 and the audit row reads "(their own request)" ([D-378](../technical-reference.md#decision-log)).
 9. **Permission.** Given Chika (no `leave:approve`), then she sees the leave-only Approvals page and `GET /leave` answers 403.
 10. **Scope.** Given a principal role without `campus:readAll` on Lekki only, then Ikeja-only staff's requests are absent from her queue and approving one answers 404.
 11. **Race.** Given two approvers open the same request, when both approve, then the second gets 409 and the toast "Someone has already decided this request."
@@ -205,7 +205,7 @@ Scopes: a leave request is visible to an approver when the requester shares at l
 15. **Overlap.** Given Emeka's waiting request for 22 October, when he asks again for 21–23 October, then 409 "You already asked for leave on some of these days."
 16. **No other approver.** Given the owner is the only `leave:approve` holder, when she requests leave, then it is accepted and her My leave card shows "Nobody else can approve leave yet. Ask the owner to give someone leave approval."
 17. **Cancel.** Given Ayo's approved leave starting after today, when Funmi cancels it with a reason, then it reads "Cancelled", Ayo's list shows "Cancelled by Funmi Adeyemi: {reason}", days taken and next time off drop it, and he can ask for those days again.
-18. **Cancel refused.** Given leave whose first day is today or earlier, or a waiting, declined or withdrawn request, then cancelling answers 409; an empty reason answers 400; Funmi cancelling her own approved leave answers 409 `SelfApproval`, and a row updated directly with `cancelled_by = created_by` is refused by the database and mapped to 409; a member without `leave:approve` gets 403 and an out-of-scope or other-school request answers 404; two concurrent cancels give one 200 and one 409; any other change to a decided row is still refused by the trigger.
+18. **Cancel refused.** Given leave whose first day is today or earlier, or a waiting, declined or withdrawn request, then cancelling answers 409; an empty reason answers 400; Grace (principal) cancelling her own approved leave answers 409 `SelfApproval`, while Funmi (owner) cancelling her own succeeds ([D-378](../technical-reference.md#decision-log)); a member without `leave:approve` gets 403 and an out-of-scope or other-school request answers 404; two concurrent cancels give one 200 and one 409; any other change to a decided row is still refused by the trigger.
 19. **Decisions notice.** Given Funmi approved, declined or cancelled Emeka's leave, then on his next visit the dashboard shows "Your leave request was decided" and My leave shows the notice; after **Got it** both are gone until the next decision, and his own withdrawal never shows.
 
 ## Tests
@@ -215,11 +215,11 @@ Scopes: a leave request is visible to an approver when the requester shares at l
 - **Integration (`nx run api:test-integration`)**
   - Isolation: each route against another school's request answers 404; `staff_leave` rows never leak across schools [tenancy-002].
   - Campus scope for approvers (LV-3).
-  - Self-decision refused by the service (409 `SelfApproval`) and by the `CHECK` (direct update, mapped to 409).
+  - Self-decision refused by the service (409 `SelfApproval`) for every role except the owner, who may decide their own ([D-378](../technical-reference.md#decision-log)); no `CHECK` backs it.
   - Status transitions: withdraw, approve, decline only from `submitted`; concurrent approve gives one 200 and one 409.
   - Portal-only member gets 403 on `POST /leave`.
   - Overlap refused (LV-8).
-  - Cancel (LV-5): approved future leave answers 200 and frees the days; started, waiting, declined and withdrawn leave answer 409; own leave 409 `SelfApproval`; direct update with `cancelled_by = created_by` refused; 403, 404 (other campus, other school) and the concurrent-cancel race; the trigger still refuses every other change to a decided row.
+  - Cancel (LV-5): approved future leave answers 200 and frees the days; started, waiting, declined and withdrawn leave answer 409; own leave 409 `SelfApproval` (the owner excepted); 403, 404 (other campus, other school) and the concurrent-cancel race; the trigger still refuses every other change to a decided row.
   - Unseen decisions: approved, declined and cancelled leave listed, a withdrawal not, `POST /me/leave/seen` clears them, a later decision reappears, never another school's rows; the dashboard `leaveDecided` task follows.
 - **E2E (required, `eduvault-e2e`)**: teacher persona requests leave; owner approves it from Approvals; teacher sees "Approved by …"; owner cannot act on a request they made; owner cancels approved future leave from the teacher's member page and the teacher sees the notice and "Cancelled by …".
 
