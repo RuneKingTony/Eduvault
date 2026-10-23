@@ -66,7 +66,7 @@ describe('endOptions', () => {
   const options = years;
 
   it('offers the current term onward when the discount has no end', () => {
-    expect(endOptions(options, null).map((option) => option.id)).toEqual([
+    expect(endOptions(options, null, 't1').map((option) => option.id)).toEqual([
       't2',
       't3',
       't4',
@@ -74,14 +74,24 @@ describe('endOptions', () => {
   });
 
   it('stops at the discount’s existing Until', () => {
-    expect(endOptions(options, 't3').map((option) => option.id)).toEqual([
+    expect(endOptions(options, 't3', 't1').map((option) => option.id)).toEqual([
       't2',
       't3',
     ]);
   });
 
+  it('never offers a term before the one the discount starts in', () => {
+    expect(endOptions(options, null, 't3').map((option) => option.id)).toEqual([
+      't3',
+      't4',
+    ]);
+    expect(
+      endOptions(options, null, 'gone').map((option) => option.id)
+    ).toEqual(['t2', 't3', 't4']);
+  });
+
   it('ignores an Until that is already behind the current term', () => {
-    expect(endOptions(options, 't1').map((option) => option.id)).toEqual([
+    expect(endOptions(options, 't1', 't1').map((option) => option.id)).toEqual([
       't2',
       't3',
       't4',

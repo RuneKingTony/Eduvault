@@ -1,5 +1,6 @@
 import {
   DISCOUNT_END_AFTER_UNTIL_MESSAGE,
+  DISCOUNT_END_BEFORE_FROM_MESSAGE,
   DISCOUNT_END_PAST_MESSAGE,
   DISCOUNT_PAST_TERM_MESSAGE,
   DISCOUNT_UNTIL_MESSAGE,
@@ -55,26 +56,43 @@ describe('termsProblem', () => {
 describe('endProblem', () => {
   it('accepts the current term up to the existing Until', () => {
     expect(
-      endProblem({ last: second, until: third, current: second })
+      endProblem({ from: first, last: second, until: third, current: second })
     ).toBeUndefined();
     expect(
-      endProblem({ last: third, until: third, current: second })
+      endProblem({ from: first, last: third, until: third, current: second })
     ).toBeUndefined();
     expect(
-      endProblem({ last: third, until: null, current: second })
+      endProblem({ from: first, last: third, until: null, current: second })
     ).toBeUndefined();
   });
 
   it('refuses a last term before the current term', () => {
-    expect(endProblem({ last: first, until: null, current: second })).toBe(
-      DISCOUNT_END_PAST_MESSAGE
-    );
+    expect(
+      endProblem({ from: first, last: first, until: null, current: second })
+    ).toBe(DISCOUNT_END_PAST_MESSAGE);
   });
 
   it('refuses a last term after the existing Until', () => {
     expect(
-      endProblem({ last: nextYearFirst, until: third, current: second })
+      endProblem({
+        from: second,
+        last: nextYearFirst,
+        until: third,
+        current: second,
+      })
     ).toBe(DISCOUNT_END_AFTER_UNTIL_MESSAGE);
+  });
+
+  it('refuses a last term before the term the discount starts in', () => {
+    expect(
+      endProblem({ from: third, last: second, until: null, current: first })
+    ).toBe(DISCOUNT_END_BEFORE_FROM_MESSAGE);
+  });
+
+  it('accepts ending in the term the discount starts in', () => {
+    expect(
+      endProblem({ from: third, last: third, until: null, current: first })
+    ).toBeUndefined();
   });
 });
 

@@ -287,7 +287,12 @@ function DiscountForm({
           Submit for approval
         </Button>
       </SheetFooter>
-      <ConfirmDiscount step={step} terms={terms} pending={create.isPending} />
+      <ConfirmDiscount
+        step={step}
+        terms={terms}
+        feeTypes={feeTypes}
+        pending={create.isPending}
+      />
     </>
   );
 }

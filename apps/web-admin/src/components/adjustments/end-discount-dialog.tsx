@@ -75,7 +75,11 @@ function EndForm({
   onClose: () => void;
 }) {
   const choices = useQuery(discountTermsQueryOptions(useApi()));
-  const options = endOptions(choices.data ?? [], discount.toTerm?.id ?? null);
+  const options = endOptions(
+    choices.data ?? [],
+    discount.toTerm?.id ?? null,
+    discount.fromTerm.id
+  );
   const [chosen, setChosen] = useState('');
   const lastTermId = chosen === '' ? (options[0]?.id ?? '') : chosen;
   const end = useEnd(onClose);
