@@ -1,5 +1,5 @@
-import { createHash } from 'node:crypto';
 import type { RecordPayment } from '@eduvault/api-contract';
+import { hashCanonical, sortedByFirst } from '../references/request-hash';
 
 type HashedFields = Omit<RecordPayment, 'reference'>;
 
@@ -12,9 +12,9 @@ export function paymentRequestHash(input: HashedFields): string {
     method: input.method,
     amountMinor: input.amountMinor,
     paidOn: input.paidOn,
-    allocations: input.allocations
-      .map((row) => [row.studentId, row.amountMinor] as const)
-      .toSorted(([a], [b]) => a.localeCompare(b)),
+    allocations: sortedByFirst(
+      input.allocations.map((row) => [row.studentId, row.amountMinor] as const)
+    ),
   };
-  return createHash('sha256').update(JSON.stringify(canonical)).digest('hex');
+  return hashCanonical(canonical);
 }

@@ -25,7 +25,6 @@ import { WalletRepository, type EarmarkOutcome } from './wallet.repository';
 const sumOf = (rows: readonly { amountMinor: number }[]): number =>
   rows.reduce((total, row) => total + row.amountMinor, 0);
 
-/** The signed-in guardian's own wallet. The guardian comes from the session, never from the request. */
 @Injectable()
 export class WalletPortalService {
   constructor(

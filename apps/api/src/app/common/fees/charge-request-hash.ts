@@ -1,5 +1,5 @@
-import { createHash } from 'node:crypto';
 import type { CreateOneOffCharge } from '@eduvault/api-contract';
+import { hashCanonical } from '../references/request-hash';
 
 /** Line order is kept because the order is shown on the charge. */
 export function chargeRequestHash(
@@ -13,5 +13,5 @@ export function chargeRequestHash(
       amountMinor: line.amountMinor,
     })),
   };
-  return createHash('sha256').update(JSON.stringify(canonical)).digest('hex');
+  return hashCanonical(canonical);
 }

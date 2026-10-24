@@ -33,7 +33,6 @@ interface SpendPosting {
   campusOf: ReadonlyMap<string, string>;
 }
 
-/** One Dr 2200 and one Cr 1100 per child, so each child's statement and the family's wallet both show the line. */
 export function spendPostingLines(input: SpendPosting): LedgerLine[] {
   return input.lines.flatMap((line) => [
     {

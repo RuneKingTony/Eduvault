@@ -1,15 +1,15 @@
-import { createHash } from 'node:crypto';
 import type { SpendWallet, TopUpWallet } from '@eduvault/api-contract';
+import {
+  hashCanonical,
+  sortedByFirst,
+} from '../../common/references/request-hash';
 
-const sha256 = (canonical: unknown): string =>
-  createHash('sha256').update(JSON.stringify(canonical)).digest('hex');
-
-/** Order- and whitespace-insensitive. The receipt file is left out so a retry that re-uploads it still replays. */
+/** The receipt file is left out so a retry that re-uploads it still replays. */
 export function topUpRequestHash(
   walletId: string,
   input: Omit<TopUpWallet, 'reference' | 'proofFileId'>
 ): string {
-  return sha256({
+  return hashCanonical({
     walletId,
     moneyAccountId: input.moneyAccountId,
     method: input.method,
@@ -23,10 +23,10 @@ export function spendRequestHash(
   walletId: string,
   input: Omit<SpendWallet, 'reference'>
 ): string {
-  return sha256({
+  return hashCanonical({
     walletId,
-    lines: input.lines
-      .map((line) => [line.studentId, line.amountMinor] as const)
-      .toSorted(([a], [b]) => a.localeCompare(b)),
+    lines: sortedByFirst(
+      input.lines.map((line) => [line.studentId, line.amountMinor] as const)
+    ),
   });
 }

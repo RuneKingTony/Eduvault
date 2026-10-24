@@ -12,7 +12,7 @@ import {
 import { childSpendable, walletFigures } from '@eduvault/shared';
 import type { DB } from '../../../db/db-types';
 import { iso } from '../../common/db/rows';
-import type { ProofState } from '../../common/payments';
+import { fileProofState, type ProofState } from '../../common/payments';
 import { receivableBalanceSql } from '../../common/ledger';
 import type { OrgScope } from '../../common/scope';
 import {
@@ -361,27 +361,8 @@ export async function walletMovements(
   };
 }
 
-export async function walletProofState(
+export const walletProofState = (
   db: Kysely<DB>,
   proof: { organizationId: string; userId: string; fileId: string }
-): Promise<ProofState> {
-  const { organizationId, userId, fileId } = proof;
-  const file = await db
-    .selectFrom('file_object')
-    .select('id')
-    .where('organization_id', '=', organizationId)
-    .where('uploaded_by', '=', userId)
-    .where('id', '=', fileId)
-    .where('kind', '=', 'wallet_proof')
-    .executeTakeFirst();
-  if (file === undefined) {
-    return 'missing';
-  }
-  const attached = await db
-    .selectFrom('wallet_topup')
-    .select('id')
-    .where('organization_id', '=', organizationId)
-    .where('proof_file_id', '=', fileId)
-    .executeTakeFirst();
-  return attached === undefined ? 'free' : 'taken';
-}
+): Promise<ProofState> =>
+  fileProofState(db, proof, { kind: 'wallet_proof', table: 'wallet_topup' });

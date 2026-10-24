@@ -90,7 +90,6 @@ export abstract class WalletRepository {
 
   abstract list(scope: OrgScope, query: WalletListQuery): Promise<WalletPage>;
 
-  /** A wallet the caller can see: the school matches and, below school-wide scope, a linked child is on their campuses. */
   abstract findWallet(
     scope: OrgScope,
     walletId: string

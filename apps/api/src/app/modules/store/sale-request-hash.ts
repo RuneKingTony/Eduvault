@@ -1,5 +1,8 @@
-import { createHash } from 'node:crypto';
 import type { PaymentMethod } from '@eduvault/api-contract';
+import {
+  hashCanonical,
+  sortedByFirst,
+} from '../../common/references/request-hash';
 
 interface HashedSale {
   studentId: string;
@@ -14,9 +17,9 @@ export function saleRequestHash(input: HashedSale): string {
     studentId: input.studentId,
     method: input.method,
     moneyAccountId: input.moneyAccountId,
-    lines: input.lines
-      .map((line) => [line.itemId, line.quantity] as const)
-      .toSorted(([a], [b]) => a.localeCompare(b)),
+    lines: sortedByFirst(
+      input.lines.map((line) => [line.itemId, line.quantity] as const)
+    ),
   };
-  return createHash('sha256').update(JSON.stringify(canonical)).digest('hex');
+  return hashCanonical(canonical);
 }
