@@ -139,16 +139,17 @@ There is no theme button in the topbar; the theme switch is in the user menu.
 - Every settings section renders inside a two-column frame: a settings nav on the left, the section on the right.
 - Settings nav groups and sections, each shown only if its gate passes:
 
-  | Group            | Section                | Route                     | Gate                  |
-  | ---------------- | ---------------------- | ------------------------- | --------------------- |
-  | General          | School profile         | `/settings/profile`       | `schoolAccount:read`  |
-  | General          | Admissions rules       | `/settings/admissions`    | `schoolAccount:read`  |
-  | General          | Approval rules         | `/settings/approvals`     | `schoolAccount:read`  |
-  | School structure | School years and terms | `/calendar`               | `session:read`        |
-  | School structure | Campuses               | `/campuses`               | `team:read`           |
-  | Finance          | Payment rules          | `/settings/payment-rules` | `schoolAccount:read`  |
-  | Access           | Roles and permissions  | `/roles`                  | `ac:read`             |
-  | Access           | Danger zone            | `/settings/danger`        | `organization:delete` |
+  | Group            | Section                | Route                       | Gate                   |
+  | ---------------- | ---------------------- | --------------------------- | ---------------------- |
+  | General          | School profile         | `/settings/profile`         | `schoolAccount:read`   |
+  | General          | Admissions rules       | `/settings/admissions`      | `schoolAccount:read`   |
+  | General          | Approval rules         | `/settings/approvals`       | `schoolAccount:read`   |
+  | School structure | School years and terms | `/calendar`                 | `session:read`         |
+  | School structure | Campuses               | `/campuses`                 | `team:read`            |
+  | Finance          | Payment rules          | `/settings/payment-rules`   | `schoolAccount:read`   |
+  | Finance          | Online payments        | `/settings/online-payments` | `wallet:manageGateway` |
+  | Access           | Roles and permissions  | `/roles`                    | `ac:read`              |
+  | Access           | Danger zone            | `/settings/danger`          | `organization:delete`  |
 
 - The sidebar's Settings entry opens the first section the person can open and is active on any settings route (including a role's page).
 - On phones the settings nav becomes a select labelled "Settings section", grouped by the headings above; with no current section it shows "Choose a section".

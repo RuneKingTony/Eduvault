@@ -128,4 +128,30 @@ describe('loadEnv', () => {
       /AUTH_RATE_LIMIT/
     );
   });
+
+  describe('gateway encryption key', () => {
+    const key = Buffer.alloc(32, 7).toString('base64');
+
+    it('is optional, so a school that never connects Monnify needs none', () => {
+      expect(loadEnv(valid).GATEWAY_ENCRYPTION_KEY).toBeUndefined();
+    });
+
+    it('takes 32 bytes of base64', () => {
+      expect(
+        loadEnv({ ...valid, GATEWAY_ENCRYPTION_KEY: key })
+          .GATEWAY_ENCRYPTION_KEY
+      ).toBe(key);
+    });
+
+    it.each([
+      Buffer.alloc(16, 7).toString('base64'),
+      Buffer.alloc(33, 7).toString('base64'),
+      'not base64!',
+      '',
+    ])('refuses %j', (bad) => {
+      expect(() => loadEnv({ ...valid, GATEWAY_ENCRYPTION_KEY: bad })).toThrow(
+        /GATEWAY_ENCRYPTION_KEY/
+      );
+    });
+  });
 });

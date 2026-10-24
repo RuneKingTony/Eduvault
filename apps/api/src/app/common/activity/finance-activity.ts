@@ -25,6 +25,7 @@ type FinanceSubject =
   | 'stock_delivery'
   | 'invoice'
   | 'wallet_topup'
+  | 'gateway_topup'
   | 'wallet_spend';
 
 export interface FinanceActor {
@@ -115,6 +116,11 @@ interface WalletTopUpFacts {
   guardianName: string;
   amountMinor: number;
   campusIds: readonly string[];
+}
+
+interface GatewayTopUpFacts extends WalletTopUpFacts {
+  grossMinor: number;
+  feeMinor: number;
 }
 
 interface WalletSpendFacts {
@@ -742,6 +748,42 @@ export const walletToppedUpActivity = (
         topUpId: topUp.id,
         walletId: topUp.walletId,
         amountMinor: topUp.amountMinor,
+      },
+    })
+  );
+
+/** The actor is the gateway itself: no staff member recorded this money. */
+export const GATEWAY_ACTOR_ID = 'system:monnify';
+
+export const gatewayActor = (
+  organizationId: string,
+  currency: string
+): FinanceActor =>
+  financeActor(
+    { organizationId, userId: GATEWAY_ACTOR_ID, name: 'Monnify' },
+    currency
+  );
+
+export const walletGatewayToppedUpActivity = (
+  actor: FinanceActor,
+  topUp: GatewayTopUpFacts
+): ActivityInput[] =>
+  topUp.campusIds.map((campusId) =>
+    finance(actor, {
+      campusId,
+      kind: 'wallet.topped_up',
+      subject: { type: 'gateway_topup', id: topUp.id },
+      text:
+        topUp.feeMinor > 0
+          ? `${topUp.guardianName} paid ${money(topUp.grossMinor, actor.currency)} online; ${money(topUp.amountMinor, actor.currency)} reached their wallet after the ${money(topUp.feeMinor, actor.currency)} fee.`
+          : `${topUp.guardianName} paid ${money(topUp.amountMinor, actor.currency)} into their wallet online.`,
+      data: {
+        topUpId: topUp.id,
+        walletId: topUp.walletId,
+        amountMinor: topUp.amountMinor,
+        grossMinor: topUp.grossMinor,
+        feeMinor: topUp.feeMinor,
+        source: 'monnify',
       },
     })
   );

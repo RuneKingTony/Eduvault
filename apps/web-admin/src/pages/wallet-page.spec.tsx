@@ -1,6 +1,7 @@
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ApiError } from '@eduvault/api-contract';
+import { toast } from '@eduvault/ui';
 import { starterAccess } from '../test-utils';
 import {
   OTHER_WALLET_ID,
@@ -8,6 +9,7 @@ import {
   TOBI,
   WALLET_ID,
   movementList,
+  monnifyMovement,
   movement,
   renderWallets,
   spendMovement,
@@ -16,6 +18,11 @@ import {
   walletChild,
 } from '../test-wallets';
 import { WalletPage } from './wallet-page';
+
+vi.mock('@eduvault/ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@eduvault/ui')>()),
+  toast: { success: vi.fn(), error: vi.fn() },
+}));
 
 function setup(
   options: {
@@ -43,6 +50,7 @@ function setup(
           options.movements ?? movementList([spendMovement(), movement()])
         ),
       topUpOptions: vi.fn().mockResolvedValue(topUpOptions()),
+      reservedAccount: vi.fn().mockResolvedValue(wallet()),
     },
   };
   const onSearchChange = vi.fn();
@@ -61,6 +69,7 @@ function setup(
 let user: ReturnType<typeof userEvent.setup>;
 
 beforeEach(() => {
+  vi.clearAllMocks();
   user = userEvent.setup();
 });
 
@@ -197,5 +206,129 @@ describe('WalletPage', () => {
     expect(await screen.findByText('No wallet here')).toBeVisible();
     expect(screen.getByRole('link', { name: 'Back to wallets' })).toBeVisible();
     expect(OTHER_WALLET_ID).not.toBe(WALLET_ID);
+  });
+});
+
+const withAccount = () =>
+  wallet({
+    gatewayConnected: true,
+    reservedAccount: {
+      accountNumber: '5000000001',
+      bankName: 'Wema Bank',
+      accountName: 'Ngozi Okeke',
+    },
+  });
+
+describe('WalletPage Monnify account', () => {
+  it('shows the family’s bank, account number and account name', async () => {
+    setup({ wallet: withAccount() });
+
+    const card = await screen.findByRole('group', { name: 'Monnify account' });
+    expect(within(card).getByText('Wema Bank')).toBeVisible();
+    expect(within(card).getByText('5000000001')).toBeVisible();
+    expect(within(card).getByText('Ngozi Okeke')).toBeVisible();
+    expect(
+      within(card).queryByRole('button', { name: 'Create account' })
+    ).toBeNull();
+  });
+
+  it('offers Create account to a school that has connected but made none, and refreshes the wallet', async () => {
+    const { api } = setup({
+      wallet: wallet({ gatewayConnected: true }),
+      access: starterAccess('bursar'),
+    });
+    await user.click(
+      await screen.findByRole('button', { name: 'Create account' })
+    );
+
+    await waitFor(() => {
+      expect(api.wallets.reservedAccount).toHaveBeenCalledWith({
+        params: { walletId: WALLET_ID },
+      });
+    });
+    await waitFor(() => {
+      expect(toast.success).toHaveBeenCalledWith('Monnify account created.');
+    });
+    await waitFor(() => {
+      expect(api.wallets.get).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  it('toasts the refusal when Monnify cannot make the account', async () => {
+    const { api } = setup({
+      wallet: wallet({ gatewayConnected: true }),
+      access: starterAccess('bursar'),
+    });
+    api.wallets.reservedAccount.mockRejectedValue(
+      new ApiError(502, {
+        code: 'InternalError',
+        message: 'Monnify did not create the account.',
+      })
+    );
+    await user.click(
+      await screen.findByRole('button', { name: 'Create account' })
+    );
+
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith(
+        'Monnify did not create the account.'
+      );
+    });
+  });
+
+  it('points to Settings when the school has not connected Monnify', async () => {
+    setup({ wallet: wallet({ gatewayConnected: false }) });
+
+    const card = await screen.findByRole('group', { name: 'Monnify account' });
+    expect(
+      within(card).getByText(/Online payments aren’t connected/)
+    ).toBeVisible();
+    expect(
+      within(card).queryByRole('button', { name: 'Create account' })
+    ).toBeNull();
+  });
+
+  it('keeps Create account from someone who may only look', async () => {
+    setup({
+      wallet: wallet({ gatewayConnected: true }),
+      access: starterAccess('principal'),
+    });
+
+    const card = await screen.findByRole('group', { name: 'Monnify account' });
+    expect(
+      within(card).queryByRole('button', { name: 'Create account' })
+    ).toBeNull();
+  });
+});
+
+describe('WalletPage Trace', () => {
+  it('titles an online top-up and offers a Trace only on it', async () => {
+    setup({ movements: movementList([monnifyMovement(), movement()]) });
+
+    const online = await screen.findByRole('row', {
+      name: /Online top-up · Monnify/,
+    });
+    expect(within(online).getByText('₦49,500.00')).toBeVisible();
+    expect(within(online).getByRole('button', { name: 'Trace' })).toBeVisible();
+    const staff = screen.getByRole('row', { name: /Top-up from Uncle Bode/ });
+    expect(within(staff).queryByRole('button', { name: 'Trace' })).toBeNull();
+  });
+
+  it('opens the Trace with the Monnify reference, the signature check, the confirmation and the amounts', async () => {
+    setup({ movements: movementList([monnifyMovement()]) });
+    await user.click(await screen.findByRole('button', { name: 'Trace' }));
+
+    const trace = await screen.findByRole('dialog', { name: 'Trace' });
+    expect(
+      within(trace).getAllByText('MNFY|20|20261024120000|000001')
+    ).toHaveLength(2);
+    expect(within(trace).getByText('pay-1')).toBeVisible();
+    expect(within(trace).getByText('Valid')).toBeVisible();
+    expect(
+      within(trace).getByText(/Checked with Monnify on 2026-10-24/)
+    ).toBeVisible();
+    expect(within(trace).getByText('₦50,000.00')).toBeVisible();
+    expect(within(trace).getByText('₦500.00')).toBeVisible();
+    expect(within(trace).getByText('₦49,500.00')).toBeVisible();
   });
 });

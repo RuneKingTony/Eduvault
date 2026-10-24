@@ -760,6 +760,7 @@ export const dashboardFinanceQueryOptions = (api: Api) =>
 
 const PAYMENTS_KEY = ['payments'] as const;
 const WALLETS_KEY = ['wallets'] as const;
+const GATEWAY_KEY = ['gateway'] as const;
 const BALANCES_KEY = ['balances'] as const;
 const STATEMENTS_KEY = ['statements'] as const;
 
@@ -850,6 +851,12 @@ export const walletMovementsQueryOptions = (
     queryFn: () =>
       api.wallets.movements({ params: { walletId }, query: { page } }),
     placeholderData: keepPreviousData,
+  });
+
+export const gatewayConnectionQueryOptions = (api: Api) =>
+  queryOptions({
+    queryKey: [...GATEWAY_KEY, 'monnify'],
+    queryFn: () => api.gateway.get({}),
   });
 
 export const topUpOptionsQueryOptions = (api: Api) =>
@@ -1229,6 +1236,13 @@ export const invalidateLeave = (queryClient: QueryClient): Promise<void> =>
 
 export const invalidatePayments = (queryClient: QueryClient): Promise<void> =>
   invalidateAll(queryClient, MONEY_VIEW_KEYS);
+
+/** The connection decides whether a wallet can offer an account, so both move together. */
+export const invalidateGateway = (queryClient: QueryClient): Promise<void> =>
+  invalidateAll(queryClient, [GATEWAY_KEY, WALLETS_KEY]);
+
+export const invalidateWallets = (queryClient: QueryClient): Promise<void> =>
+  invalidateAll(queryClient, [WALLETS_KEY]);
 
 export const invalidateTopUp = (queryClient: QueryClient): Promise<void> =>
   invalidateAll(queryClient, [WALLETS_KEY, ...MONEY_VIEW_KEYS]);

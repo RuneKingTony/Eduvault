@@ -10,6 +10,7 @@ import {
   DetailPage,
 } from '../components/detail-page';
 import { BalanceCards } from '../components/wallets/wallet-cards';
+import { ReservedAccountCard } from '../components/wallets/reserved-account-card';
 import { ChildrenCard } from '../components/wallets/wallet-children-card';
 import { WalletsLink } from '../components/wallets/wallet-links';
 import { MovementsCard } from '../components/wallets/wallet-movements-card';
@@ -85,6 +86,7 @@ function WalletBody({
         }}
       />
       <BalanceCards wallet={wallet} />
+      <ReservedAccountCard wallet={wallet} />
       <ChildrenCard wallet={wallet} />
       <MovementsCard
         walletId={wallet.id}

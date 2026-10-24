@@ -3,8 +3,10 @@ import { ActivityModule } from '../../common/activity';
 import { EduvaultAuthModule } from '../../common/auth';
 import { CampusModule } from '../campus/campus.module';
 import { ClassModule } from '../class/class.module';
+import { GatewayModule } from '../gateway/gateway.module';
 import { GuardianModule } from '../guardian/guardian.module';
 import { AdmissionRepository } from './admission.repository';
+import { AdmitWithAccountService } from './admit-with-account.service';
 import { AdmissionService } from './admission.service';
 import { AdmissionsController } from './admissions.controller';
 import { GraduationController } from './graduation.controller';
@@ -33,6 +35,7 @@ import { StudentService } from './student.service';
     ClassModule,
     GuardianModule,
     ActivityModule,
+    GatewayModule,
   ],
   controllers: [
     NewSchoolYearController,
@@ -46,6 +49,7 @@ import { StudentService } from './student.service';
     StudentListService,
     StudentLoginService,
     AdmissionService,
+    AdmitWithAccountService,
     LifecycleRunner,
     LifecycleService,
     GraduationService,

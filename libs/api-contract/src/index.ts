@@ -9,6 +9,7 @@ export * from './calendar';
 export * from './classes';
 export * from './dashboard';
 export * from './finance';
+export * from './gateway';
 export * from './guardians';
 export * from './invoices';
 export * from './leave';

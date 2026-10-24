@@ -128,6 +128,13 @@ export const walletChildSchema = z.object({
 });
 export type WalletChild = z.infer<typeof walletChildSchema>;
 
+export const reservedAccountSchema = z.object({
+  accountNumber: z.string(),
+  bankName: z.string(),
+  accountName: z.string(),
+});
+export type ReservedAccount = z.infer<typeof reservedAccountSchema>;
+
 export const walletSchema = z.object({
   currency: currencySchema,
   id: idSchema,
@@ -136,6 +143,8 @@ export const walletSchema = z.object({
     name: z.string(),
     phone: z.string(),
   }),
+  reservedAccount: reservedAccountSchema.nullable(),
+  gatewayConnected: z.boolean(),
   balanceMinor: minorSchema,
   setAsideMinor: minorSchema,
   freeMinor: minorSchema,
@@ -156,6 +165,18 @@ export const walletMovementSourceSchema = z.discriminatedUnion('type', [
     method: paymentMethodSchema,
     depositorName: z.string().nullable(),
     proofFileId: idSchema,
+  }),
+  z.object({
+    type: z.literal('monnify'),
+    id: idSchema,
+    transactionReference: z.string(),
+    paymentReference: z.string(),
+    signatureVerified: z.literal(true),
+    paidAt: z.iso.datetime({ offset: true }),
+    confirmedAt: z.iso.datetime({ offset: true }),
+    grossMinor: minorSchema.positive(),
+    feeMinor: minorSchema.nonnegative(),
+    netMinor: minorSchema.positive(),
   }),
   z.object({ type: z.literal('spend'), id: idSchema }),
 ]);

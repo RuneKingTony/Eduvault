@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
   Param,
   Post,
   Query,
@@ -18,13 +19,17 @@ import {
 import { Org, OrganizationAuth, type OrgContext } from '../../common/auth';
 import { ReplayStatusInterceptor } from '../../common/http/replay-status.interceptor';
 import { zod } from '../../common/http/zod.pipe';
+import { WalletReservedAccountService } from './wallet-reserved-account.service';
 import { WalletService } from './wallet.service';
 
 const routes = contract.wallets;
 
 @Controller('finance/wallets')
 export class WalletController {
-  constructor(private readonly wallets: WalletService) {}
+  constructor(
+    private readonly wallets: WalletService,
+    private readonly reservedAccounts: WalletReservedAccountService
+  ) {}
 
   @Get()
   @OrganizationAuth('wallet', 'read')
@@ -71,5 +76,15 @@ export class WalletController {
     @Body(zod(routes.topUp.body)) body: TopUpWallet
   ): Promise<RouteOutput<typeof routes.topUp>> {
     return this.wallets.topUp(org, params.walletId, body);
+  }
+
+  @Post(':walletId/reserved-account')
+  @HttpCode(200)
+  @OrganizationAuth('wallet', 'topUp')
+  reservedAccount(
+    @Org() org: OrgContext,
+    @Param(zod(routes.reservedAccount.params)) params: WalletParams
+  ): Promise<RouteOutput<typeof routes.reservedAccount>> {
+    return this.reservedAccounts.create(org, params.walletId);
   }
 }

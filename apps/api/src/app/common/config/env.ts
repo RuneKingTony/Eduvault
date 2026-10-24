@@ -5,6 +5,17 @@ const flag = z
   .default('false')
   .transform((value) => value === 'true');
 
+const GATEWAY_KEY_BYTES = 32;
+
+const gatewayKey = z
+  .string()
+  .refine(
+    (value) =>
+      /^[\d+/a-z]+={0,2}$/i.test(value) &&
+      Buffer.from(value, 'base64').length === GATEWAY_KEY_BYTES,
+    'Must be 32 random bytes, base64 encoded (openssl rand -base64 32)'
+  );
+
 const envObject = z.object({
   NODE_ENV: z
     .enum(['development', 'test', 'production'])
@@ -30,6 +41,7 @@ const envObject = z.object({
   S3_FORCE_PATH_STYLE: flag,
   S3_ACCESS_KEY_ID: z.string().min(1).optional(),
   S3_SECRET_ACCESS_KEY: z.string().min(1).optional(),
+  GATEWAY_ENCRYPTION_KEY: gatewayKey.optional(),
 });
 
 export type Env = z.infer<typeof envObject>;

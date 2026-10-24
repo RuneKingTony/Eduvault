@@ -232,6 +232,39 @@ export interface FileObject {
   uploaded_by: string | null;
 }
 
+export interface GatewayConnection {
+  api_key_enc: string;
+  api_key_tail: string;
+  contract_code: string;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  last_test_ok: boolean | null;
+  last_tested_at: Timestamp | null;
+  mode: string;
+  organization_id: string;
+  secret_key_enc: string;
+  secret_key_tail: string;
+  updated_at: Generated<Timestamp>;
+  updated_by: string;
+}
+
+export interface GatewayTopup {
+  confirmed_at: Generated<Timestamp>;
+  created_at: Generated<Timestamp>;
+  fee_minor: Int8;
+  gross_minor: Int8;
+  id: Generated<string>;
+  journal_entry_id: string;
+  net_minor: Int8;
+  organization_id: string;
+  paid_at: Timestamp;
+  payment_reference: string;
+  reference: string;
+  reserved_account_id: string;
+  signature_verified: boolean;
+  wallet_id: string;
+}
+
 export interface Guardian {
   address: string | null;
   created_at: Generated<Timestamp>;
@@ -840,6 +873,17 @@ export interface WalletEarmark {
   wallet_id: string;
 }
 
+export interface WalletReservedAccount {
+  account_name: string;
+  account_number: string;
+  account_reference: string;
+  bank_name: string;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  organization_id: string;
+  wallet_id: string;
+}
+
 export interface WalletSpend {
   created_at: Generated<Timestamp>;
   created_by: string;
@@ -885,6 +929,8 @@ export interface DB {
   fee_line: FeeLine;
   file_blob: FileBlob;
   file_object: FileObject;
+  gateway_connection: GatewayConnection;
+  gateway_topup: GatewayTopup;
   guardian: Guardian;
   guardian_student: GuardianStudent;
   invitation: Invitation;
@@ -931,6 +977,7 @@ export interface DB {
   verification: Verification;
   wallet: Wallet;
   wallet_earmark: WalletEarmark;
+  wallet_reserved_account: WalletReservedAccount;
   wallet_spend: WalletSpend;
   wallet_topup: WalletTopup;
 }

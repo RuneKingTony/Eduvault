@@ -44,6 +44,7 @@ import { Route as SettingsAdmissionsRouteImport } from './routes/settings.admiss
 import { Route as SettingsApprovalsRouteImport } from './routes/settings.approvals'
 import { Route as SettingsDangerRouteImport } from './routes/settings.danger'
 import { Route as SettingsLevelsRouteImport } from './routes/settings.levels'
+import { Route as SettingsOnlinePaymentsRouteImport } from './routes/settings.online-payments'
 import { Route as SettingsPaymentRulesRouteImport } from './routes/settings.payment-rules'
 import { Route as SettingsProfileRouteImport } from './routes/settings.profile'
 import { Route as StudentsStudentIdRouteImport } from './routes/students_.$studentId'
@@ -231,6 +232,11 @@ const SettingsLevelsRoute = SettingsLevelsRouteImport.update({
   path: '/levels',
   getParentRoute: () => SettingsRoute,
 } as any)
+const SettingsOnlinePaymentsRoute = SettingsOnlinePaymentsRouteImport.update({
+  id: '/online-payments',
+  path: '/online-payments',
+  getParentRoute: () => SettingsRoute,
+} as any)
 const SettingsPaymentRulesRoute = SettingsPaymentRulesRouteImport.update({
   id: '/payment-rules',
   path: '/payment-rules',
@@ -325,6 +331,7 @@ export interface FileRoutesByFullPath {
   '/settings/approvals': typeof SettingsApprovalsRoute
   '/settings/danger': typeof SettingsDangerRoute
   '/settings/levels': typeof SettingsLevelsRoute
+  '/settings/online-payments': typeof SettingsOnlinePaymentsRoute
   '/settings/payment-rules': typeof SettingsPaymentRulesRoute
   '/settings/profile': typeof SettingsProfileRoute
   '/students/$studentId': typeof StudentsStudentIdRoute
@@ -371,6 +378,7 @@ export interface FileRoutesByTo {
   '/settings/approvals': typeof SettingsApprovalsRoute
   '/settings/danger': typeof SettingsDangerRoute
   '/settings/levels': typeof SettingsLevelsRoute
+  '/settings/online-payments': typeof SettingsOnlinePaymentsRoute
   '/settings/payment-rules': typeof SettingsPaymentRulesRoute
   '/settings/profile': typeof SettingsProfileRoute
   '/students/$studentId': typeof StudentsStudentIdRoute
@@ -420,6 +428,7 @@ export interface FileRoutesById {
   '/settings/approvals': typeof SettingsApprovalsRoute
   '/settings/danger': typeof SettingsDangerRoute
   '/settings/levels': typeof SettingsLevelsRoute
+  '/settings/online-payments': typeof SettingsOnlinePaymentsRoute
   '/settings/payment-rules': typeof SettingsPaymentRulesRoute
   '/settings/profile': typeof SettingsProfileRoute
   '/students_/$studentId': typeof StudentsStudentIdRoute
@@ -470,6 +479,7 @@ export interface FileRouteTypes {
     | '/settings/approvals'
     | '/settings/danger'
     | '/settings/levels'
+    | '/settings/online-payments'
     | '/settings/payment-rules'
     | '/settings/profile'
     | '/students/$studentId'
@@ -516,6 +526,7 @@ export interface FileRouteTypes {
     | '/settings/approvals'
     | '/settings/danger'
     | '/settings/levels'
+    | '/settings/online-payments'
     | '/settings/payment-rules'
     | '/settings/profile'
     | '/students/$studentId'
@@ -564,6 +575,7 @@ export interface FileRouteTypes {
     | '/settings/approvals'
     | '/settings/danger'
     | '/settings/levels'
+    | '/settings/online-payments'
     | '/settings/payment-rules'
     | '/settings/profile'
     | '/students_/$studentId'
@@ -864,6 +876,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsLevelsRouteImport
       parentRoute: typeof SettingsRoute
     }
+    '/settings/online-payments': {
+      id: '/settings/online-payments'
+      path: '/online-payments'
+      fullPath: '/settings/online-payments'
+      preLoaderRoute: typeof SettingsOnlinePaymentsRouteImport
+      parentRoute: typeof SettingsRoute
+    }
     '/settings/payment-rules': {
       id: '/settings/payment-rules'
       path: '/payment-rules'
@@ -967,6 +986,7 @@ interface SettingsRouteChildren {
   SettingsApprovalsRoute: typeof SettingsApprovalsRoute
   SettingsDangerRoute: typeof SettingsDangerRoute
   SettingsLevelsRoute: typeof SettingsLevelsRoute
+  SettingsOnlinePaymentsRoute: typeof SettingsOnlinePaymentsRoute
   SettingsPaymentRulesRoute: typeof SettingsPaymentRulesRoute
   SettingsProfileRoute: typeof SettingsProfileRoute
   SettingsIndexRoute: typeof SettingsIndexRoute
@@ -977,6 +997,7 @@ const SettingsRouteChildren: SettingsRouteChildren = {
   SettingsApprovalsRoute: SettingsApprovalsRoute,
   SettingsDangerRoute: SettingsDangerRoute,
   SettingsLevelsRoute: SettingsLevelsRoute,
+  SettingsOnlinePaymentsRoute: SettingsOnlinePaymentsRoute,
   SettingsPaymentRulesRoute: SettingsPaymentRulesRoute,
   SettingsProfileRoute: SettingsProfileRoute,
   SettingsIndexRoute: SettingsIndexRoute,

@@ -6,7 +6,7 @@ import type {
 } from '@eduvault/api-contract';
 import { ClassService } from '../../../src/app/modules/class/class.service';
 import { AdmissionRepository } from '../../../src/app/modules/student/admission.repository';
-import { AdmissionService } from '../../../src/app/modules/student/admission.service';
+import { AdmitWithAccountService } from '../../../src/app/modules/student/admit-with-account.service';
 import { createClass } from './classes';
 import { createSchoolYear } from './calendar';
 import { orgContextFor } from './org-context';
@@ -60,25 +60,27 @@ export async function createStudent(
   const classArmId =
     input.classArmId ?? (await ensureClass(app, actor, input.campusId));
   const ctx = await orgContextFor(app, actor);
-  const result = await app.get(AdmissionService, { strict: false }).admit(ctx, {
-    firstName: input.firstName ?? `Student${sequence}`,
-    lastName: input.lastName ?? 'Tester',
-    gender: input.gender ?? 'F',
-    dateOfBirth: input.dateOfBirth ?? '2014-03-03',
-    classArmId,
-    guardians: input.guardians ?? [
-      {
-        new: {
-          fullName: `Guardian ${sequence}`,
-          phone: '08012345678',
-          address: '1 Test Street',
-          relationship: 'mother',
-          paysFees: true,
-          login: { kind: 'username' },
+  const result = await app
+    .get(AdmitWithAccountService, { strict: false })
+    .admit(ctx, {
+      firstName: input.firstName ?? `Student${sequence}`,
+      lastName: input.lastName ?? 'Tester',
+      gender: input.gender ?? 'F',
+      dateOfBirth: input.dateOfBirth ?? '2014-03-03',
+      classArmId,
+      guardians: input.guardians ?? [
+        {
+          new: {
+            fullName: `Guardian ${sequence}`,
+            phone: '08012345678',
+            address: '1 Test Street',
+            relationship: 'mother',
+            paysFees: true,
+            login: { kind: 'username' },
+          },
         },
-      },
-    ],
-  });
+      ],
+    });
   return { ...result.student, logins: result.logins };
 }
 

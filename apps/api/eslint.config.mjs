@@ -141,8 +141,11 @@ export default [
     },
   },
   {
-    // The health probe is the one deliberately public route.
-    files: ['src/app/modules/health/health.controller.ts'],
+    // The health probe and Monnify's webhook, which signs its body, are the deliberately public routes.
+    files: [
+      'src/app/modules/health/health.controller.ts',
+      'src/app/modules/gateway/monnify-webhook.controller.ts',
+    ],
     rules: {
       'no-restricted-syntax': [
         'error',

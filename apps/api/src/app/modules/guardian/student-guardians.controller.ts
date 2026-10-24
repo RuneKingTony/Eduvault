@@ -11,12 +11,16 @@ import { contract, type RouteOutput } from '@eduvault/api-contract';
 import { Org, OrganizationAuth, type OrgContext } from '../../common/auth';
 import { zod } from '../../common/http/zod.pipe';
 import { GuardianService } from './guardian.service';
+import { LinkWithAccountService } from './link-with-account.service';
 
 const routes = contract.students;
 
 @Controller('students')
 export class StudentGuardiansController {
-  constructor(private readonly guardians: GuardianService) {}
+  constructor(
+    private readonly guardians: GuardianService,
+    private readonly links: LinkWithAccountService
+  ) {}
 
   @Get(':id/guardians')
   @OrganizationAuth('guardian', 'read')
@@ -35,7 +39,7 @@ export class StudentGuardiansController {
     @Body(zod(routes.linkGuardian.body))
     body: Parameters<GuardianService['link']>[2]
   ): Promise<RouteOutput<typeof routes.linkGuardian>> {
-    return this.guardians.link(org, params.id, body);
+    return this.links.link(org, params.id, body);
   }
 
   @Patch(':id/guardians/:guardianId')
@@ -47,7 +51,7 @@ export class StudentGuardiansController {
     @Body(zod(routes.updateGuardianLink.body))
     body: Parameters<GuardianService['updateLink']>[2]
   ): Promise<RouteOutput<typeof routes.updateGuardianLink>> {
-    return this.guardians.updateLink(
+    return this.links.updateLink(
       org,
       { studentId: params.id, guardianId: params.guardianId },
       body
