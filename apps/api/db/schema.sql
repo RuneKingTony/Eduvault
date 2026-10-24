@@ -942,6 +942,60 @@ CREATE TABLE public.file_object (
 );
 
 --
+-- Name: gateway_connection; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.gateway_connection (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id text NOT NULL,
+    mode text NOT NULL,
+    contract_code text NOT NULL,
+    api_key_enc text NOT NULL,
+    api_key_tail text NOT NULL,
+    secret_key_enc text NOT NULL,
+    secret_key_tail text NOT NULL,
+    last_tested_at timestamp with time zone,
+    last_test_ok boolean,
+    updated_by text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT gateway_connection_api_key_enc_check CHECK ((char_length(api_key_enc) > 0)),
+    CONSTRAINT gateway_connection_api_key_tail_check CHECK (((char_length(api_key_tail) >= 1) AND (char_length(api_key_tail) <= 4))),
+    CONSTRAINT gateway_connection_contract_code_check CHECK (((char_length(btrim(contract_code)) >= 1) AND (char_length(btrim(contract_code)) <= 60))),
+    CONSTRAINT gateway_connection_mode_check CHECK ((mode = ANY (ARRAY['sandbox'::text, 'live'::text]))),
+    CONSTRAINT gateway_connection_secret_key_enc_check CHECK ((char_length(secret_key_enc) > 0)),
+    CONSTRAINT gateway_connection_secret_key_tail_check CHECK (((char_length(secret_key_tail) >= 1) AND (char_length(secret_key_tail) <= 4))),
+    CONSTRAINT gateway_connection_test_pair CHECK (((last_tested_at IS NULL) = (last_test_ok IS NULL)))
+);
+
+--
+-- Name: gateway_topup; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.gateway_topup (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id text NOT NULL,
+    wallet_id uuid NOT NULL,
+    reserved_account_id uuid NOT NULL,
+    reference text NOT NULL,
+    payment_reference text NOT NULL,
+    gross_minor bigint NOT NULL,
+    fee_minor bigint NOT NULL,
+    net_minor bigint NOT NULL,
+    paid_at timestamp with time zone NOT NULL,
+    confirmed_at timestamp with time zone DEFAULT now() NOT NULL,
+    signature_verified boolean NOT NULL,
+    journal_entry_id uuid NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT gateway_topup_fee_not_negative CHECK ((fee_minor >= 0)),
+    CONSTRAINT gateway_topup_gross_is_net_plus_fee CHECK ((gross_minor = (net_minor + fee_minor))),
+    CONSTRAINT gateway_topup_net_positive CHECK ((net_minor > 0)),
+    CONSTRAINT gateway_topup_payment_reference_check CHECK (((char_length(btrim(payment_reference)) >= 1) AND (char_length(btrim(payment_reference)) <= 120))),
+    CONSTRAINT gateway_topup_reference_check CHECK (((char_length(btrim(reference)) >= 1) AND (char_length(btrim(reference)) <= 120))),
+    CONSTRAINT gateway_topup_signature_verified CHECK (signature_verified)
+);
+
+--
 -- Name: guardian; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1877,6 +1931,25 @@ CREATE TABLE public.wallet_earmark (
 );
 
 --
+-- Name: wallet_reserved_account; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.wallet_reserved_account (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id text NOT NULL,
+    wallet_id uuid NOT NULL,
+    account_reference text NOT NULL,
+    account_number text NOT NULL,
+    bank_name text NOT NULL,
+    account_name text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT wallet_reserved_account_account_name_check CHECK (((char_length(btrim(account_name)) >= 1) AND (char_length(btrim(account_name)) <= 200))),
+    CONSTRAINT wallet_reserved_account_account_number_check CHECK (((char_length(btrim(account_number)) >= 1) AND (char_length(btrim(account_number)) <= 30))),
+    CONSTRAINT wallet_reserved_account_account_reference_check CHECK (((char_length(btrim(account_reference)) >= 1) AND (char_length(btrim(account_reference)) <= 80))),
+    CONSTRAINT wallet_reserved_account_bank_name_check CHECK (((char_length(btrim(bank_name)) >= 1) AND (char_length(btrim(bank_name)) <= 120)))
+);
+
+--
 -- Name: wallet_spend; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2154,6 +2227,48 @@ ALTER TABLE ONLY public.file_object
 
 ALTER TABLE ONLY public.file_object
     ADD CONSTRAINT file_object_pkey PRIMARY KEY (id);
+
+--
+-- Name: gateway_connection gateway_connection_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.gateway_connection
+    ADD CONSTRAINT gateway_connection_organization_id_key UNIQUE (organization_id);
+
+--
+-- Name: gateway_connection gateway_connection_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.gateway_connection
+    ADD CONSTRAINT gateway_connection_pkey PRIMARY KEY (id);
+
+--
+-- Name: gateway_topup gateway_topup_id_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.gateway_topup
+    ADD CONSTRAINT gateway_topup_id_organization_id_key UNIQUE (id, organization_id);
+
+--
+-- Name: gateway_topup gateway_topup_journal_entry_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.gateway_topup
+    ADD CONSTRAINT gateway_topup_journal_entry_id_key UNIQUE (journal_entry_id);
+
+--
+-- Name: gateway_topup gateway_topup_organization_id_reference_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.gateway_topup
+    ADD CONSTRAINT gateway_topup_organization_id_reference_key UNIQUE (organization_id, reference);
+
+--
+-- Name: gateway_topup gateway_topup_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.gateway_topup
+    ADD CONSTRAINT gateway_topup_pkey PRIMARY KEY (id);
 
 --
 -- Name: guardian guardian_id_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
@@ -2975,6 +3090,41 @@ ALTER TABLE ONLY public.wallet
     ADD CONSTRAINT wallet_pkey PRIMARY KEY (id);
 
 --
+-- Name: wallet_reserved_account wallet_reserved_account_id_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wallet_reserved_account
+    ADD CONSTRAINT wallet_reserved_account_id_organization_id_key UNIQUE (id, organization_id);
+
+--
+-- Name: wallet_reserved_account wallet_reserved_account_organization_id_account_reference_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wallet_reserved_account
+    ADD CONSTRAINT wallet_reserved_account_organization_id_account_reference_key UNIQUE (organization_id, account_reference);
+
+--
+-- Name: wallet_reserved_account wallet_reserved_account_organization_id_bank_name_account_n_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wallet_reserved_account
+    ADD CONSTRAINT wallet_reserved_account_organization_id_bank_name_account_n_key UNIQUE (organization_id, bank_name, account_number);
+
+--
+-- Name: wallet_reserved_account wallet_reserved_account_organization_id_wallet_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wallet_reserved_account
+    ADD CONSTRAINT wallet_reserved_account_organization_id_wallet_id_key UNIQUE (organization_id, wallet_id);
+
+--
+-- Name: wallet_reserved_account wallet_reserved_account_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wallet_reserved_account
+    ADD CONSTRAINT wallet_reserved_account_pkey PRIMARY KEY (id);
+
+--
 -- Name: wallet_spend wallet_spend_id_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3198,6 +3348,12 @@ CREATE INDEX fee_line_term_idx ON public.fee_line USING btree (organization_id, 
 --
 
 CREATE INDEX file_object_organization_uploaded_idx ON public.file_object USING btree (organization_id, uploaded_at);
+
+--
+-- Name: gateway_topup_wallet_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX gateway_topup_wallet_idx ON public.gateway_topup USING btree (organization_id, wallet_id, created_at DESC);
 
 --
 -- Name: guardian_email_unique; Type: INDEX; Schema: public; Owner: -
@@ -3686,6 +3842,12 @@ CREATE TRIGGER audit_log_append_only BEFORE DELETE OR UPDATE ON public.audit_log
 CREATE TRIGGER fee_line_fee_income_child BEFORE INSERT ON public.fee_line FOR EACH ROW EXECUTE FUNCTION public.fee_line_fee_income_child();
 
 --
+-- Name: gateway_topup gateway_topup_append_only; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER gateway_topup_append_only BEFORE DELETE OR UPDATE ON public.gateway_topup FOR EACH ROW EXECUTE FUNCTION public.wallet_append_only();
+
+--
 -- Name: guardian_student guardian_student_creates_wallet; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -3858,6 +4020,12 @@ CREATE TRIGGER wallet_append_only BEFORE DELETE OR UPDATE ON public.wallet FOR E
 --
 
 CREATE TRIGGER wallet_earmark_append_only BEFORE DELETE OR UPDATE ON public.wallet_earmark FOR EACH ROW EXECUTE FUNCTION public.wallet_append_only();
+
+--
+-- Name: wallet_reserved_account wallet_reserved_account_append_only; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER wallet_reserved_account_append_only BEFORE DELETE OR UPDATE ON public.wallet_reserved_account FOR EACH ROW EXECUTE FUNCTION public.wallet_append_only();
 
 --
 -- Name: wallet_spend wallet_spend_append_only; Type: TRIGGER; Schema: public; Owner: -
@@ -4248,6 +4416,48 @@ ALTER TABLE ONLY public.file_object
 
 ALTER TABLE ONLY public.file_object
     ADD CONSTRAINT file_object_uploaded_by_fkey FOREIGN KEY (uploaded_by) REFERENCES public."user"(id) ON DELETE SET NULL;
+
+--
+-- Name: gateway_connection gateway_connection_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.gateway_connection
+    ADD CONSTRAINT gateway_connection_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE CASCADE;
+
+--
+-- Name: gateway_connection gateway_connection_updated_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.gateway_connection
+    ADD CONSTRAINT gateway_connection_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES public."user"(id) ON DELETE RESTRICT;
+
+--
+-- Name: gateway_topup gateway_topup_journal_entry_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.gateway_topup
+    ADD CONSTRAINT gateway_topup_journal_entry_id_organization_id_fkey FOREIGN KEY (journal_entry_id, organization_id) REFERENCES public.journal_entry(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: gateway_topup gateway_topup_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.gateway_topup
+    ADD CONSTRAINT gateway_topup_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE RESTRICT;
+
+--
+-- Name: gateway_topup gateway_topup_reserved_account_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.gateway_topup
+    ADD CONSTRAINT gateway_topup_reserved_account_id_organization_id_fkey FOREIGN KEY (reserved_account_id, organization_id) REFERENCES public.wallet_reserved_account(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: gateway_topup gateway_topup_wallet_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.gateway_topup
+    ADD CONSTRAINT gateway_topup_wallet_id_organization_id_fkey FOREIGN KEY (wallet_id, organization_id) REFERENCES public.wallet(id, organization_id) ON DELETE RESTRICT;
 
 --
 -- Name: guardian guardian_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -5349,6 +5559,20 @@ ALTER TABLE ONLY public.wallet
     ADD CONSTRAINT wallet_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE RESTRICT;
 
 --
+-- Name: wallet_reserved_account wallet_reserved_account_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wallet_reserved_account
+    ADD CONSTRAINT wallet_reserved_account_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE RESTRICT;
+
+--
+-- Name: wallet_reserved_account wallet_reserved_account_wallet_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wallet_reserved_account
+    ADD CONSTRAINT wallet_reserved_account_wallet_id_organization_id_fkey FOREIGN KEY (wallet_id, organization_id) REFERENCES public.wallet(id, organization_id) ON DELETE RESTRICT;
+
+--
 -- Name: wallet_spend wallet_spend_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -5462,4 +5686,5 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20261018100000'),
     ('20261022120000'),
     ('20261022130000'),
-    ('20261023090000');
+    ('20261023090000'),
+    ('20261024120000');
