@@ -44,7 +44,7 @@ export interface SpendSplit extends SpendRequestLine {
 }
 
 export type SpendAllocation =
-  | { ok: true; lines: SpendSplit[]; freeLeftMinor: number }
+  | { ok: true; lines: SpendSplit[] }
   | { ok: false; studentId: string; spendableMinor: number };
 
 export function allocateSpend(
@@ -67,5 +67,5 @@ export function allocateSpend(
     freeLeftMinor -= fromFreeMinor;
     split.push({ ...line, fromEarmarkMinor, fromFreeMinor });
   }
-  return { ok: true, lines: split, freeLeftMinor };
+  return { ok: true, lines: split };
 }
