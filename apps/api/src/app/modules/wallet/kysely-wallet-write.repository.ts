@@ -50,36 +50,16 @@ interface LockedWallet {
   guardianName: string;
 }
 
-export async function findTopUpRow(
+export async function findReferenceRow(
+  table: 'wallet_topup' | 'wallet_spend',
   db: Kysely<DB>,
-  organizationId: string,
-  reference: string
+  key: { organizationId: string; reference: string }
 ): Promise<ExistingEntry | undefined> {
   const row = await db
-    .selectFrom('wallet_topup')
+    .selectFrom(table)
     .select(['id', 'wallet_id', 'request_hash'])
-    .where('organization_id', '=', organizationId)
-    .where('reference', '=', reference)
-    .executeTakeFirst();
-  return (
-    row && {
-      id: row.id,
-      walletId: row.wallet_id,
-      requestHash: row.request_hash,
-    }
-  );
-}
-
-export async function findSpendRow(
-  db: Kysely<DB>,
-  organizationId: string,
-  reference: string
-): Promise<ExistingEntry | undefined> {
-  const row = await db
-    .selectFrom('wallet_spend')
-    .select(['id', 'wallet_id', 'request_hash'])
-    .where('organization_id', '=', organizationId)
-    .where('reference', '=', reference)
+    .where('organization_id', '=', key.organizationId)
+    .where('reference', '=', key.reference)
     .executeTakeFirst();
   return (
     row && {
@@ -142,7 +122,11 @@ async function claimTopUp(
   const claim = await claimReference(trx, {
     lockKey: `wallet-topup:${organizationId}:${input.reference}`,
     requestHash: input.requestHash,
-    find: () => findTopUpRow(trx, organizationId, input.reference),
+    find: () =>
+      findReferenceRow('wallet_topup', trx, {
+        organizationId,
+        reference: input.reference,
+      }),
   });
   if (claim.status === 'replayed') {
     return { status: 'replayed', id: claim.existing.id };
@@ -299,7 +283,11 @@ export async function writeSpend(
   const claim = await claimReference(trx, {
     lockKey: `wallet-spend:${organizationId}:${input.reference}`,
     requestHash: input.requestHash,
-    find: () => findSpendRow(trx, organizationId, input.reference),
+    find: () =>
+      findReferenceRow('wallet_spend', trx, {
+        organizationId,
+        reference: input.reference,
+      }),
   });
   if (claim.status === 'replayed') {
     return { status: 'replayed', id: claim.existing.id };
@@ -443,6 +431,16 @@ async function recordSpend(
   return { status: 'spent', id: write.spendId };
 }
 
+const earmarkRequestHash = (earmark: {
+  walletId: string;
+  studentId: string;
+  kind: string;
+  amountMinor: number;
+}): string =>
+  [earmark.walletId, earmark.studentId, earmark.kind, earmark.amountMinor].join(
+    '|'
+  );
+
 async function findEarmarkRow(
   trx: Kysely<DB>,
   organizationId: string,
@@ -457,12 +455,12 @@ async function findEarmarkRow(
   return (
     row && {
       id: row.id,
-      requestHash: [
-        row.wallet_id,
-        row.student_id,
-        row.kind,
-        Math.abs(Number(row.delta_minor)),
-      ].join('|'),
+      requestHash: earmarkRequestHash({
+        walletId: row.wallet_id,
+        studentId: row.student_id,
+        kind: row.kind,
+        amountMinor: Math.abs(Number(row.delta_minor)),
+      }),
     }
   );
 }
@@ -474,12 +472,7 @@ export async function writeEarmark(
   const { organizationId } = input;
   const claim = await claimReference(trx, {
     lockKey: `wallet-earmark:${organizationId}:${input.reference}`,
-    requestHash: [
-      input.walletId,
-      input.studentId,
-      input.kind,
-      input.amountMinor,
-    ].join('|'),
+    requestHash: earmarkRequestHash(input),
     find: () => findEarmarkRow(trx, organizationId, input.reference),
   });
   if (claim.status === 'replayed') {
