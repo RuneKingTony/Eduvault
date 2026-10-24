@@ -333,3 +333,73 @@ describe('WalletPortalService earmarks', () => {
     expect(repository.earmarks).toHaveLength(0);
   });
 });
+
+describe('WalletPortalService auto-pay', () => {
+  it('is off until the guardian turns it on, and reads back as the wallet', async () => {
+    const { service } = setup();
+    expect((await service.mine(ojoUser)).autoPay).toBe(false);
+    const on = await service.setAutoPay(ojoUser, {
+      enabled: true,
+      reference: 'APY-1',
+    });
+    expect(on.autoPay).toBe(true);
+    const off = await service.setAutoPay(ojoUser, {
+      enabled: false,
+      reference: 'APY-2',
+    });
+    expect(off.autoPay).toBe(false);
+  });
+
+  it('is idempotent by reference: the same request replays, a different one answers 409', async () => {
+    const { repository, service } = setup();
+    await service.setAutoPay(ojoUser, { enabled: true, reference: 'APY-3' });
+    const again = await service.setAutoPay(ojoUser, {
+      enabled: true,
+      reference: 'APY-3',
+    });
+    expect(again.autoPay).toBe(true);
+    expect(repository.autoPays).toHaveLength(1);
+    await expect(
+      service.setAutoPay(ojoUser, { enabled: false, reference: 'APY-3' })
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('keeps another guardian’s switch to itself', async () => {
+    const { service } = setup();
+    await service.setAutoPay(ojoUser, { enabled: true, reference: 'APY-4' });
+    expect((await service.mine(belloUser)).autoPay).toBe(false);
+  });
+
+  it('answers 404 when the user has no wallet', async () => {
+    const { service } = setup();
+    await expect(
+      service.setAutoPay(ctxOf('user-nobody'), {
+        enabled: true,
+        reference: 'APY-5',
+      })
+    ).rejects.toThrow(WALLET_NOT_FOUND_MESSAGE);
+  });
+});
+
+describe('WalletPortalService movements', () => {
+  const query = { page: 1, pageSize: 10 };
+
+  it('lists the signed-in guardian’s movements with the school currency', async () => {
+    const { service } = setup();
+    expect(await service.movements(ojoUser, query)).toEqual({
+      currency: 'NGN',
+      items: [],
+      total: 0,
+    });
+  });
+
+  it('answers 404 for a user with no wallet', async () => {
+    const { service } = setup();
+    await expect(
+      service.movements(ctxOf('user-nobody'), query)
+    ).rejects.toThrow(WALLET_NOT_FOUND_MESSAGE);
+    await expect(
+      service.movements(ctxOf('user-ojo', 'school-b'), query)
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+});

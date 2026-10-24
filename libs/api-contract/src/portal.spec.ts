@@ -53,10 +53,17 @@ describe('portal schemas', () => {
         admissionPrefix: 'GF',
         currency: 'NGN',
         logoUrl: null,
+        email: null,
       },
       children: [child],
     };
     expect(portalMeSchema.parse(me)).toEqual(me);
+    expect(
+      portalMeSchema.parse({
+        ...me,
+        school: { ...me.school, email: 'bursar@greenfield.test' },
+      }).school.email
+    ).toBe('bursar@greenfield.test');
     expect(portalMeSchema.safeParse({ ...me, kind: 'staff' }).success).toBe(
       false
     );

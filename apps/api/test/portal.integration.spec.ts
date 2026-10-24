@@ -1093,6 +1093,7 @@ test.describe('a read-only portal', () => {
     ).toEqual([
       'WalletPortalController.release',
       'WalletPortalController.setAside',
+      'WalletPortalController.setAutoPay',
       'WalletPortalController.spend',
     ]);
   });

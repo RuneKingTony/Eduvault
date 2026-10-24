@@ -1,7 +1,6 @@
 import { sql, type Kysely, type RawBuilder } from 'kysely';
 import { z } from 'zod';
 import {
-  STUDENT_WALLETS_SYSTEM_KEY,
   journalKindSchema,
   paymentMethodSchema,
   type WalletChild,
@@ -18,11 +17,24 @@ import { fileProofState, type ProofState } from '../../common/payments';
 import { receivableBalanceSql } from '../../common/ledger';
 import type { OrgScope } from '../../common/scope';
 import {
+  earmarksByChild,
+  latestAutoPay,
+  oldestUnpaidByChild,
+  walletBalance,
+  walletsAccountIdSql,
+} from '../../common/wallet';
+import {
   anyChildInScopeSql,
   currentCampusSql,
   inScope,
 } from '../../common/students';
-import type { MovementPage, WalletPage, WalletView } from './wallet.repository';
+import { portalMovementOf } from './wallet-portal-movement';
+import type {
+  MovementPage,
+  PortalMovementPage,
+  WalletPage,
+  WalletView,
+} from './wallet.repository';
 
 interface WalletRow {
   id: string;
@@ -40,42 +52,6 @@ interface ChildRow {
   in_scope: boolean;
   owed: string;
   earmark: string;
-}
-
-const walletsAccountIdSql = (
-  organizationId: string | RawBuilder<unknown>
-): RawBuilder<string> => sql<string>`(
-  select la.id from ledger_account la
-  where la.organization_id = ${organizationId}
-    and la.system_key = ${STUDENT_WALLETS_SYSTEM_KEY}
-)`;
-
-export async function walletBalance(
-  db: Kysely<DB>,
-  family: { organizationId: string; guardianId: string }
-): Promise<number> {
-  const { rows } = await sql<{ balance: string }>`
-    SELECT COALESCE(SUM(jl.credit_minor - jl.debit_minor), 0)::text AS balance
-    FROM journal_line jl
-    WHERE jl.organization_id = ${family.organizationId}
-      AND jl.family_id = ${family.guardianId}
-      AND jl.ledger_account_id = ${walletsAccountIdSql(family.organizationId)}`.execute(
-    db
-  );
-  return Number(rows[0]?.balance ?? 0);
-}
-
-export async function earmarksByChild(
-  db: Kysely<DB>,
-  wallet: { organizationId: string; walletId: string }
-): Promise<Map<string, number>> {
-  const { rows } = await sql<{ student_id: string; earmark: string }>`
-    SELECT e.student_id, SUM(e.delta_minor)::text AS earmark
-    FROM wallet_earmark e
-    WHERE e.organization_id = ${wallet.organizationId}
-      AND e.wallet_id = ${wallet.walletId}
-    GROUP BY e.student_id`.execute(db);
-  return new Map(rows.map((row) => [row.student_id, Number(row.earmark)]));
 }
 
 async function childRows(
@@ -132,43 +108,56 @@ async function gatewayConnected(
   return row !== undefined;
 }
 
+function toChild(
+  row: ChildRow,
+  context: { freeMinor: number; oldest: ReadonlyMap<string, string> }
+): WalletChild {
+  const owedMinor = Number(row.owed);
+  const earmarkMinor = Number(row.earmark);
+  return {
+    studentId: row.student_id,
+    name: `${row.first_name} ${row.last_name}`,
+    admissionNumber: row.admission_number,
+    inScope: row.in_scope,
+    owedMinor,
+    earmarkMinor,
+    spendableMinor: childSpendable(
+      { owedMinor, earmarkMinor },
+      context.freeMinor
+    ),
+    oldestUnpaidOn: context.oldest.get(row.student_id) ?? null,
+  };
+}
+
 async function viewOf(
   db: Kysely<DB>,
   wallet: WalletRow & { organization_id: string },
   scope: OrgScope['campusScope']
 ): Promise<WalletView> {
-  const [rows, balanceMinor, marked, reservedAccount, connected] =
+  const family = {
+    organizationId: wallet.organization_id,
+    guardianId: wallet.guardian_id,
+  };
+  const [rows, balanceMinor, marked, reservedAccount, connected, autoPay] =
     await Promise.all([
       childRows(db, wallet, scope),
-      walletBalance(db, {
-        organizationId: wallet.organization_id,
-        guardianId: wallet.guardian_id,
-      }),
+      walletBalance(db, family),
       earmarksByChild(db, {
         organizationId: wallet.organization_id,
         walletId: wallet.id,
       }),
       reservedAccountOf(db, wallet),
       gatewayConnected(db, wallet.organization_id),
+      latestAutoPay(db, family),
     ]);
+  const oldest = await oldestUnpaidByChild(db, {
+    organizationId: wallet.organization_id,
+    studentIds: rows
+      .filter((row) => Number(row.owed) > 0)
+      .map((row) => row.student_id),
+  });
   const figures = walletFigures(balanceMinor, [...marked.values()]);
-  const children = rows
-    .filter(
-      (row) =>
-        !row.archived || Number(row.owed) !== 0 || Number(row.earmark) !== 0
-    )
-    .map((row): WalletChild => ({
-      studentId: row.student_id,
-      name: `${row.first_name} ${row.last_name}`,
-      admissionNumber: row.admission_number,
-      inScope: row.in_scope,
-      owedMinor: Number(row.owed),
-      earmarkMinor: Number(row.earmark),
-      spendableMinor: childSpendable(
-        { owedMinor: Number(row.owed), earmarkMinor: Number(row.earmark) },
-        figures.freeMinor
-      ),
-    }));
+  const context = { freeMinor: figures.freeMinor, oldest };
   return {
     id: wallet.id,
     guardian: {
@@ -178,8 +167,14 @@ async function viewOf(
     },
     reservedAccount,
     gatewayConnected: connected,
+    autoPay: autoPay?.enabled ?? false,
     ...figures,
-    children,
+    children: rows
+      .filter(
+        (row) =>
+          !row.archived || Number(row.owed) !== 0 || Number(row.earmark) !== 0
+      )
+      .map((row) => toChild(row, context)),
   };
 }
 
@@ -432,6 +427,37 @@ export async function walletMovements(
   return {
     items: page.rows.map((row) => toMovement(row)),
     total: Number(count.rows[0]?.count ?? 0),
+  };
+}
+
+export async function ownMovements(
+  db: Kysely<DB>,
+  guardian: { organizationId: string; userId: string },
+  paging: { page: number; pageSize: number }
+): Promise<PortalMovementPage | undefined> {
+  const { organizationId, userId } = guardian;
+  const wallet = await db
+    .selectFrom('wallet as w')
+    .innerJoin('guardian as g', (join) =>
+      join
+        .onRef('g.id', '=', 'w.guardian_id')
+        .onRef('g.organization_id', '=', 'w.organization_id')
+    )
+    .select('w.guardian_id')
+    .where('w.organization_id', '=', organizationId)
+    .where('g.user_id', '=', userId)
+    .executeTakeFirst();
+  if (wallet === undefined) {
+    return undefined;
+  }
+  const page = await walletMovements(
+    db,
+    { organizationId, guardianId: wallet.guardian_id },
+    paging
+  );
+  return {
+    items: page.items.map((item) => portalMovementOf(item)),
+    total: page.total,
   };
 }
 

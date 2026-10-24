@@ -1,16 +1,21 @@
 import { useState } from 'react';
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { ApiError } from '@eduvault/api-contract';
 import type { Permission } from '@eduvault/policy';
 import {
   ADA_ID,
+  EFE_ID,
   TOBI_ID,
   calendarCurrent,
   portalChild,
   portalMe,
+  portalMovements,
   portalStatement,
+  portalWallet,
   renderWithApi,
   testId,
+  walletChild,
 } from '../test-utils';
 import { FeesPage } from './fees-page';
 
@@ -90,10 +95,10 @@ describe('FeesPage', () => {
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 
-  it('reads Paid up and Nothing owed at zero', async () => {
+  it('reads Owing ₦0.00 and Nothing owed at zero', async () => {
     renderFees(apiWith(withBalance(0)));
-    const stat = await screen.findByRole('group', { name: 'School fees' });
-    expect(within(stat).getByText('Paid up')).toBeInTheDocument();
+    const stat = await screen.findByRole('group', { name: 'Owing' });
+    expect(within(stat).getByText('₦0.00')).toBeInTheDocument();
     expect(within(stat).getByText('Nothing owed')).toBeInTheDocument();
   });
 
@@ -330,5 +335,196 @@ describe('FeesPage term filter', () => {
     expect(onTerm).toHaveBeenLastCalledWith(TERM_2);
     await user.selectOptions(select, '');
     expect(onTerm).toHaveBeenLastCalledWith(undefined);
+  });
+});
+
+const guardianApi = (
+  wallet = portalWallet(),
+  statement = portalStatement()
+) => ({
+  portal: { statement: vi.fn().mockResolvedValue(statement) },
+  portalWallet: {
+    get: vi.fn().mockResolvedValue(wallet),
+    movements: vi.fn().mockResolvedValue(portalMovements()),
+  },
+  calendar: { current: vi.fn().mockResolvedValue(calendarCurrent()) },
+});
+
+describe('FeesPage for a guardian with a wallet', () => {
+  const GUARDIAN_HELD: Permission[] = [
+    'student:readOwn',
+    'invoice:readOwn',
+    'wallet:readOwn',
+    'wallet:spend',
+  ];
+  const renderGuardian = (api: ReturnType<typeof guardianApi>, me = guardian) =>
+    renderWithApi(
+      <FeesPage me={me} childId={ADA_ID} term={undefined} onTerm={vi.fn()} />,
+      api,
+      GUARDIAN_HELD
+    );
+
+  it('stacks the wallet, the Owing tile, the child’s charges and statement, History and the refund note on one page', async () => {
+    renderGuardian(guardianApi());
+    expect(
+      await screen.findByRole('heading', { name: 'Wallet' })
+    ).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Fees' })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Balance' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Top up' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('switch', { name: 'Auto-pay' })
+    ).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Owing' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('group', { name: 'Charges' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Statement' })
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByRole('group', { name: 'History' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Sent money to the wrong account\?/)
+    ).toBeInTheDocument();
+  });
+
+  it('has no separate Wallet link or page: the wallet lives on Fees', async () => {
+    renderGuardian(guardianApi());
+    await screen.findByRole('heading', { name: 'Wallet' });
+    expect(
+      screen.queryByRole('link', { name: /wallet/i })
+    ).not.toBeInTheDocument();
+  });
+
+  it('adds up what the family owes across the children on the Owing tile', async () => {
+    const wallet = portalWallet({
+      children: [
+        walletChild({ studentId: ADA_ID, owedMinor: 6_000_000 }),
+        walletChild({
+          studentId: TOBI_ID,
+          name: 'Tobi Okeke',
+          owedMinor: 2_500_000,
+        }),
+        walletChild({
+          studentId: EFE_ID,
+          name: 'Efe Okeke',
+          owedMinor: -300_000,
+        }),
+      ],
+    });
+    renderGuardian(guardianApi(wallet));
+    const owing = await screen.findByRole('group', { name: 'Owing' });
+    expect(within(owing).getByText('₦85,000')).toBeInTheDocument();
+    expect(within(owing).getByText('Still to pay')).toBeInTheDocument();
+  });
+
+  it('reads ₦0.00 on the Owing tile when the family owes nothing', async () => {
+    const wallet = portalWallet({
+      children: [walletChild({ owedMinor: 0, spendableMinor: 0 })],
+    });
+    renderGuardian(guardianApi(wallet));
+    const owing = await screen.findByRole('group', { name: 'Owing' });
+    expect(within(owing).getByText('₦0.00')).toBeInTheDocument();
+    expect(within(owing).getByText('Nothing owed')).toBeInTheDocument();
+  });
+
+  it('lists the child’s unpaid charges once, in the Charges card', async () => {
+    renderGuardian(guardianApi());
+    const charges = await screen.findByRole('group', { name: 'Charges' });
+    expect(within(charges).getByText('CHG-0001')).toBeInTheDocument();
+    expect(within(charges).getByText('₦60,000')).toBeInTheDocument();
+    expect(screen.queryByText('CHG-0001 · ₦60,000')).not.toBeInTheDocument();
+  });
+
+  it('puts the school email in the refund note, or none', async () => {
+    renderGuardian(
+      guardianApi(),
+      portalMe({
+        children: [ada, tobi],
+        school: { ...guardian.school, email: 'bursar@greenfield.test' },
+      })
+    );
+    expect(
+      await screen.findByRole('link', { name: 'bursar@greenfield.test' })
+    ).toBeInTheDocument();
+  });
+
+  it('says the refund request goes to the school when it has no email', async () => {
+    renderGuardian(guardianApi());
+    expect(
+      await screen.findByText(/Contact the school with the reference/)
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /@/ })).not.toBeInTheDocument();
+  });
+
+  it('opens Pay from wallet, and Set aside and Release for the selected child', async () => {
+    renderGuardian(
+      guardianApi(
+        portalWallet({ children: [walletChild({ earmarkMinor: 500_000 })] })
+      )
+    );
+    await user.click(
+      await screen.findByRole('button', { name: 'Pay from wallet' })
+    );
+    expect(
+      await screen.findByRole('dialog', { name: 'Pay from wallet' })
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    await user.click(screen.getByRole('button', { name: 'Set aside' }));
+    expect(
+      await screen.findByRole('dialog', { name: 'Set money aside' })
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    await user.click(screen.getByRole('button', { name: 'Release' }));
+    expect(
+      await screen.findByRole('dialog', { name: 'Release set-aside money' })
+    ).toBeInTheDocument();
+  });
+
+  it('keeps the plain student Fees page for a guardian who pays for no child', async () => {
+    const api = guardianApi();
+    api.portalWallet.get.mockRejectedValue(
+      new ApiError(404, { code: 'NotFound', message: 'Wallet not found' })
+    );
+    renderGuardian(api);
+    expect(
+      await screen.findByRole('group', { name: 'Owing' })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Wallet' })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Top up' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows the error when the wallet cannot be loaded', async () => {
+    const api = guardianApi();
+    api.portalWallet.get.mockRejectedValue(new Error('The school is away'));
+    renderGuardian(api);
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'The school is away'
+    );
+  });
+});
+
+describe('FeesPage for a student', () => {
+  it('has no wallet, Top up or History without wallet:readOwn', async () => {
+    renderFees(apiWith());
+    await screen.findByRole('heading', { name: 'Fees' });
+    expect(
+      screen.queryByRole('heading', { name: 'Wallet' })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Top up' })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('group', { name: 'History' })
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/wrong account/)).not.toBeInTheDocument();
   });
 });

@@ -1,15 +1,22 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import type { PortalChild, PortalMe } from '@eduvault/api-contract';
+import {
+  ApiError,
+  type PortalChild,
+  type PortalMe,
+} from '@eduvault/api-contract';
+import { useCan } from '@eduvault/auth-client';
 import { feesStat } from '@eduvault/shared';
 import { ErrorMessage, PageSkeleton, TermSelect } from '@eduvault/ui';
 import { useApi } from '../api';
 import { NoChildren } from '../components/no-children';
+import { GuardianFees } from '../components/wallet/guardian-fees';
 import { PortalStatementCard } from '../components/portal-statement-card';
 import { StatTile } from '../components/stat-tile';
 import {
   calendarCurrentQueryOptions,
   portalStatementQueryOptions,
+  portalWalletQueryOptions,
 } from '../queries';
 import { selectChild } from '../selected-child';
 
@@ -71,6 +78,39 @@ function ChildFees({
   );
 }
 
+interface FeesProps {
+  me: PortalMe;
+  child: PortalChild;
+  term: string | undefined;
+  onTerm: (term: string | undefined) => void;
+}
+
+const hasNoWallet = (error: unknown): boolean =>
+  error instanceof ApiError && error.status === 404;
+
+function GuardianFeesLoader({ me, child, term, onTerm }: FeesProps) {
+  const wallet = useQuery(portalWalletQueryOptions(useApi()));
+  if (wallet.data !== undefined) {
+    return (
+      <GuardianFees
+        me={me}
+        child={child}
+        wallet={wallet.data}
+        termId={term}
+        onTerm={onTerm}
+      />
+    );
+  }
+  if (wallet.isPending) {
+    return <PageSkeleton rows={4} />;
+  }
+  return hasNoWallet(wallet.error) ? (
+    <ChildFees child={child} termId={term} onTerm={onTerm} />
+  ) : (
+    <ErrorMessage error={wallet.error} />
+  );
+}
+
 export function FeesPage({
   me,
   childId,
@@ -82,11 +122,20 @@ export function FeesPage({
   term: string | undefined;
   onTerm: (term: string | undefined) => void;
 }) {
+  const hasWallet = useCan('wallet', 'readOwn');
   const selected = selectChild(me.children, childId);
   if (selected === undefined) {
     return <NoChildren />;
   }
-  return (
+  return hasWallet ? (
+    <GuardianFeesLoader
+      key={selected.id}
+      me={me}
+      child={selected}
+      term={term}
+      onTerm={onTerm}
+    />
+  ) : (
     <ChildFees
       key={selected.id}
       child={selected}

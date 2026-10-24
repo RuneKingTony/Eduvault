@@ -41,3 +41,20 @@ export function generatePaymentReference(
 ): string {
   return paymentReference(method, lagosDate, randomReferenceSuffix(random));
 }
+
+export const WALLET_REFERENCE_PREFIXES = {
+  spend: 'WSP',
+  setAside: 'WSA',
+  release: 'WRL',
+  autoPay: 'WAP',
+} as const;
+
+export type WalletReferenceKind = keyof typeof WALLET_REFERENCE_PREFIXES;
+
+export function generateWalletReference(
+  kind: WalletReferenceKind,
+  lagosDate: string,
+  random?: RandomBytes
+): string {
+  return `${WALLET_REFERENCE_PREFIXES[kind]}-${lagosDate.replaceAll('-', '')}-${randomReferenceSuffix(random)}`;
+}

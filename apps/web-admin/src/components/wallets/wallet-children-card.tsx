@@ -1,6 +1,7 @@
 import { Link } from '@tanstack/react-router';
 import { UsersIcon } from 'lucide-react';
 import type { Wallet, WalletChild } from '@eduvault/api-contract';
+import { walletMoney } from '@eduvault/shared';
 import {
   Card,
   CardContent,
@@ -16,7 +17,6 @@ import {
 } from '@eduvault/ui';
 import { searchFor } from '../../route-search-defaults';
 import { PersonAvatar } from '../person-avatar';
-import { walletMoney } from './wallet-text';
 
 function ChildRow({
   child,

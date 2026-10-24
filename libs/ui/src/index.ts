@@ -64,3 +64,6 @@ export * from './components/custom/field-error';
 export * from './components/custom/confirm-dialog';
 export * from './components/custom/statement-card';
 export * from './components/custom/term-select';
+export * from './components/custom/fact';
+export * from './components/custom/wallet-figure';
+export * from './components/custom/trace-dialog';

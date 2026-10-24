@@ -1,4 +1,4 @@
-import { assertBalancedLines } from '../../common/ledger';
+import { assertBalancedLines } from '../ledger';
 import { spendPostingLines, topUpPostingLines } from './wallet-posting';
 
 const wallets = 'wallets-2200';

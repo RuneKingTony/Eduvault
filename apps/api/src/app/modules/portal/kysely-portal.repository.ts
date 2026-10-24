@@ -100,6 +100,7 @@ export class KyselyPortalRepository extends PortalRepository {
         'school_account.admission_prefix',
         'school_account.currency',
         'school_account.logo_file_id',
+        'school_account.email as school_email',
       ])
       .executeTakeFirst();
     return (
@@ -114,6 +115,7 @@ export class KyselyPortalRepository extends PortalRepository {
           currency: row.currency,
           logoUrl:
             row.logo_file_id === null ? null : `/files/${row.logo_file_id}`,
+          email: row.school_email,
         },
       }
     );

@@ -19,7 +19,7 @@ import {
 } from './statement-copy';
 
 describe('balanceTile', () => {
-  it('is Owing with the balance, Extra paid with the credit, and Owing: Nothing at zero', () => {
+  it('is Owing with the balance, Extra paid with the credit, and Owing ₦0.00 at zero', () => {
     expect(balanceTile(6_000_000, 'NGN')).toEqual({
       label: 'Owing',
       value: '₦60,000',
@@ -28,7 +28,7 @@ describe('balanceTile', () => {
       label: 'Extra paid',
       value: '₦5,000',
     });
-    expect(balanceTile(0, 'NGN')).toEqual({ label: 'Owing', value: 'Nothing' });
+    expect(balanceTile(0, 'NGN')).toEqual({ label: 'Owing', value: '₦0.00' });
   });
 });
 
@@ -44,7 +44,7 @@ describe('entriesFooter', () => {
     });
     expect(entriesFooter(0, 'NGN')).toEqual({
       label: 'Nothing owing',
-      value: '₦0',
+      value: '₦0.00',
     });
   });
 });
@@ -114,10 +114,10 @@ describe('feesStat', () => {
     });
   });
 
-  it('reads School fees, Paid up and Nothing owed at zero', () => {
+  it('reads Owing ₦0.00 and Nothing owed at zero', () => {
     expect(feesStat(0, 'NGN')).toEqual({
-      label: 'School fees',
-      value: 'Paid up',
+      label: 'Owing',
+      value: '₦0.00',
       sub: 'Nothing owed',
     });
   });
@@ -298,7 +298,10 @@ describe('termStatementView', () => {
       },
       'NGN'
     );
-    expect(view.broughtForward).toMatchObject({ amount: '₦0', tone: 'paid' });
+    expect(view.broughtForward).toMatchObject({
+      amount: '₦0.00',
+      tone: 'paid',
+    });
   });
 
   it('reads at end of term in the footer of a term that has ended', () => {
@@ -312,7 +315,7 @@ describe('termStatementView', () => {
     });
     expect(footerOf(0)).toEqual({
       label: 'Nothing owing at end of term',
-      value: '₦0',
+      value: '₦0.00',
     });
   });
 

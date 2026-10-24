@@ -3,6 +3,7 @@ import { ActivityModule } from '../../common/activity';
 import { EduvaultAuthModule } from '../../common/auth';
 import { LedgerPosterModule } from '../../common/ledger';
 import { GatewayModule } from '../gateway/gateway.module';
+import { WalletAutoPayModule } from '../../common/wallet';
 import { MoneyAccountModule } from '../money-account/money-account.module';
 import { KyselyWalletRepository } from './kysely-wallet.repository';
 import { WalletReservedAccountService } from './wallet-reserved-account.service';
@@ -17,6 +18,7 @@ import { WalletService } from './wallet.service';
     EduvaultAuthModule,
     LedgerPosterModule,
     ActivityModule,
+    WalletAutoPayModule,
     MoneyAccountModule,
     GatewayModule,
   ],

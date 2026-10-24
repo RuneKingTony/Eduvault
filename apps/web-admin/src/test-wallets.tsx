@@ -44,6 +44,7 @@ export const walletChild = (over: Partial<WalletChild> = {}): WalletChild => ({
   owedMinor: 18_000_000,
   earmarkMinor: 0,
   spendableMinor: 5_000_000,
+  oldestUnpaidOn: '2026-09-01',
   ...over,
 });
 
@@ -53,6 +54,7 @@ export const wallet = (over: Partial<Wallet> = {}): Wallet => ({
   guardian: { id: GUARDIAN_ID, name: 'Ngozi Okeke', phone: '08012345678' },
   reservedAccount: null,
   gatewayConnected: false,
+  autoPay: false,
   balanceMinor: 5_000_000,
   setAsideMinor: 1_000_000,
   freeMinor: 4_000_000,

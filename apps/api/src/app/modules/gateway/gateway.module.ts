@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ActivityModule } from '../../common/activity';
 import { EduvaultAuthModule } from '../../common/auth';
 import { LedgerPosterModule } from '../../common/ledger';
+import { WalletAutoPayModule } from '../../common/wallet';
 import { FetchMonnifyClient } from './fetch-monnify-client';
 import { GatewayConnectionController } from './gateway-connection.controller';
 import { GatewayConnectionService } from './gateway-connection.service';
@@ -15,7 +16,12 @@ import { MonnifyWebhookService } from './monnify-webhook.service';
 import { ReservedAccountService } from './reserved-account.service';
 
 @Module({
-  imports: [EduvaultAuthModule, LedgerPosterModule, ActivityModule],
+  imports: [
+    EduvaultAuthModule,
+    LedgerPosterModule,
+    ActivityModule,
+    WalletAutoPayModule,
+  ],
   controllers: [GatewayConnectionController, MonnifyWebhookController],
   providers: [
     GatewaySecrets,

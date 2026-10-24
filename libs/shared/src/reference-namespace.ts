@@ -10,6 +10,7 @@ export const SYSTEM_REFERENCE_PREFIXES = {
   void: 'VOID',
   opening: 'OPEN',
   monnify: 'MNFY',
+  autopay: 'AUTOPAY',
 } as const;
 
 export type SystemReferenceKind = keyof typeof SYSTEM_REFERENCE_PREFIXES;

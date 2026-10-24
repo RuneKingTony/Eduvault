@@ -5,7 +5,7 @@ import {
   type WalletList,
   type WalletListTotals,
 } from '@eduvault/api-contract';
-import { countOf } from '@eduvault/shared';
+import { countOf, walletMoney } from '@eduvault/shared';
 import {
   Card,
   CardContent,
@@ -23,7 +23,6 @@ import {
 import { useApi } from '../api';
 import { QueryState } from '../components/money/query-state';
 import { useSearchText } from '../components/use-search-text';
-import { walletMoney } from '../components/wallets/wallet-text';
 import { WalletsTable } from '../components/wallets/wallets-table';
 import { walletsQueryOptions } from '../queries';
 import type { WalletsSearch } from '../wallets-search';

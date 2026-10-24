@@ -195,6 +195,8 @@ import {
 import {
   earmarkSchema,
   earmarkedWalletSchema,
+  portalWalletMovementListSchema,
+  setAutoPaySchema,
   spendWalletSchema,
   spentWalletSchema,
   topUpWalletSchema,
@@ -1186,6 +1188,18 @@ export const contract = defineContract({
     get: defineRoute({
       method: 'GET',
       path: '/portal/wallet',
+      response: walletSchema,
+    }),
+    movements: defineRoute({
+      method: 'GET',
+      path: '/portal/wallet/movements',
+      query: walletMovementQuerySchema,
+      response: portalWalletMovementListSchema,
+    }),
+    setAutoPay: defineRoute({
+      method: 'PUT',
+      path: '/portal/wallet/auto-pay',
+      body: setAutoPaySchema,
       response: walletSchema,
     }),
     spend: defineRoute({

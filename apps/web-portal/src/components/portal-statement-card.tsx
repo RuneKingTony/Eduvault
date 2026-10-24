@@ -28,9 +28,11 @@ function rowsOf({ rows, currency }: PortalStatement): StatementCardRow[] {
 export function PortalStatementCard({
   statement,
   onPage,
+  showUnpaid = true,
 }: {
   statement: PortalStatement;
   onPage: (page: number) => void;
+  showUnpaid?: boolean;
 }) {
   const { student, totals, currency } = statement;
   const { broughtForward, footer } = termStatementView(statement, currency);
@@ -49,10 +51,14 @@ export function PortalStatementCard({
       rows={rowsOf(statement)}
       {...(broughtForward === undefined ? {} : { broughtForward })}
       footer={footer}
-      unpaid={statement.unpaid.map((item, index) => ({
-        key: `${item.number}-${index}`,
-        label: `${item.number} · ${money(item.outstandingMinor, currency)}`,
-      }))}
+      unpaid={
+        showUnpaid
+          ? statement.unpaid.map((item, index) => ({
+              key: `${item.number}-${index}`,
+              label: `${item.number} · ${money(item.outstandingMinor, currency)}`,
+            }))
+          : []
+      }
       pager={{
         page: statement.page,
         total: statement.total,

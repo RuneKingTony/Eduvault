@@ -19,6 +19,7 @@ import {
   systemAccountId,
 } from '../../common/ledger';
 import type { OrgScope } from '../../common/scope';
+import { WalletWriters, type WalletAutoPayService } from '../../common/wallet';
 import { anyChildInScopeSql, currentCampusSql } from '../../common/students';
 import {
   GatewayRepository,
@@ -106,8 +107,7 @@ const WALLET_JOINS = sql`
 export class KyselyGatewayRepository extends GatewayRepository {
   constructor(
     @Inject(KYSELY_TOKEN) private readonly db: Database,
-    private readonly poster: LedgerPoster,
-    private readonly activity: ActivityWriter
+    private readonly writers: WalletWriters
   ) {
     super();
   }
@@ -253,19 +253,14 @@ export class KyselyGatewayRepository extends GatewayRepository {
   postTopUp(input: NewGatewayTopUp): Promise<GatewayTopUpOutcome> {
     return this.db
       .transaction()
-      .execute((trx) =>
-        writeGatewayTopUp(
-          trx,
-          { poster: this.poster, activity: this.activity },
-          input
-        )
-      );
+      .execute((trx) => writeGatewayTopUp(trx, this.writers, input));
   }
 }
 
 interface WriteDeps {
   poster: LedgerPoster;
   activity: ActivityWriter;
+  autoPay: WalletAutoPayService;
 }
 
 async function familyCampuses(
@@ -422,5 +417,10 @@ async function writeGatewayTopUp(
     })
     .execute();
   await recordActivity(trx, deps.activity, posting);
+  await deps.autoPay.applyAfterCredit(trx, {
+    organizationId: input.organizationId,
+    guardianId: posting.family.guardianId,
+    reference: input.reference,
+  });
   return { status: 'posted', id: posting.topUpId };
 }
