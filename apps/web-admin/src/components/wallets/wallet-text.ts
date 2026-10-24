@@ -16,6 +16,9 @@ export function movementTitle(movement: WalletMovement): string {
         : ` from ${movement.source.depositorName}`;
     return `Top-up${from} · ${PAYMENT_METHOD_LABELS[movement.source.method]}`;
   }
+  if (movement.source?.type === 'monnify') {
+    return 'Online top-up · Monnify';
+  }
   return movement.studentName === null
     ? 'Paid from wallet'
     : `Paid ${movement.studentName}’s charges`;

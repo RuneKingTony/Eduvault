@@ -44,6 +44,7 @@ const built = new Set([
   '/settings/admissions',
   '/settings/approvals',
   '/settings/payment-rules',
+  '/settings/online-payments',
   '/settings/danger',
   '/settings/levels',
 ]);
@@ -125,6 +126,7 @@ describe('nav model', () => {
       'Admissions rules',
       'Approval rules',
       'Payment rules',
+      'Online payments',
       'School years and terms',
       'Campuses',
       'Levels',
@@ -155,6 +157,7 @@ describe('settings sections', () => {
       ['Admissions rules', 'General'],
       ['Approval rules', 'General'],
       ['Payment rules', 'Finance'],
+      ['Online payments', 'Finance'],
       ['School years and terms', 'School structure'],
       ['Campuses', 'School structure'],
       ['Levels', 'School structure'],
@@ -169,6 +172,7 @@ describe('settings sections', () => {
       'admissions',
       'approvals',
       'payment-rules',
+      'online-payments',
       'calendar',
       'campuses',
       'levels',
@@ -190,6 +194,18 @@ describe('settings sections', () => {
       'roles',
     ]);
     expect(settingsRoute(starter('administrator'))).toBe('/settings/profile');
+  });
+
+  it('shows Online payments to whoever may manage the gateway, and to nobody else', () => {
+    expect(idsFor({ wallet: ['manageGateway'] })).toEqual(['online-payments']);
+    expect(settingsRoute({ wallet: ['manageGateway'] })).toBe(
+      '/settings/online-payments'
+    );
+    expect(routeGate('/settings/online-payments')).toEqual([
+      'wallet:manageGateway',
+    ]);
+    expect(idsFor(starter('bursar'))).not.toContain('online-payments');
+    expect(idsFor(starter('principal'))).not.toContain('online-payments');
   });
 
   it('opens Settings on the calendar for a session:read-only member, who sees only that section', () => {

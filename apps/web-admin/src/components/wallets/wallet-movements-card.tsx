@@ -30,6 +30,7 @@ import { walletMovementsQueryOptions } from '../../queries';
 import { ProofLink } from '../money/proof-link';
 import { QueryState } from '../money/query-state';
 import { movementTitle, walletMoney } from './wallet-text';
+import { TraceButton } from './wallet-trace';
 
 function Receipt({ movement }: { movement: WalletMovement }) {
   if (movement.source?.type !== 'topup') {
@@ -65,6 +66,7 @@ function MovementRow({
           <span className="flex items-center gap-2 font-mono text-xs text-muted-foreground">
             {movement.reference}
             <Receipt movement={movement} />
+            <TraceButton movement={movement} currency={currency} />
           </span>
         </span>
       </TableCell>

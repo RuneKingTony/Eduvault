@@ -32,6 +32,9 @@ const LINE_A = testId(0x1_70_61);
 const LINE_B = testId(0x1_70_62);
 const ENTRY_A = testId(0x1_70_71);
 const ENTRY_B = testId(0x1_70_72);
+const ENTRY_C = testId(0x1_70_73);
+const LINE_C = testId(0x1_70_63);
+const GATEWAY_TOP_UP_ID = testId(0x1_70_43);
 
 export const walletChild = (over: Partial<WalletChild> = {}): WalletChild => ({
   studentId: ADA,
@@ -48,6 +51,8 @@ export const wallet = (over: Partial<Wallet> = {}): Wallet => ({
   currency: 'NGN',
   id: WALLET_ID,
   guardian: { id: GUARDIAN_ID, name: 'Ngozi Okeke', phone: '08012345678' },
+  reservedAccount: null,
+  gatewayConnected: false,
   balanceMinor: 5_000_000,
   setAsideMinor: 1_000_000,
   freeMinor: 4_000_000,
@@ -116,6 +121,31 @@ export const movement = (
   madeBy: 'Chika Eze',
   ...over,
 });
+
+export const monnifyMovement = (
+  over: Partial<WalletMovement> = {}
+): WalletMovement =>
+  movement({
+    lineId: LINE_C,
+    entryId: ENTRY_C,
+    effectiveOn: '2026-10-24',
+    reference: 'MNFY|20|20261024120000|000001',
+    amountMinor: 4_950_000,
+    source: {
+      type: 'monnify',
+      id: GATEWAY_TOP_UP_ID,
+      transactionReference: 'MNFY|20|20261024120000|000001',
+      paymentReference: 'pay-1',
+      signatureVerified: true,
+      paidAt: '2026-10-24T11:15:29.000Z',
+      confirmedAt: '2026-10-24T11:15:31.000Z',
+      grossMinor: 5_000_000,
+      feeMinor: 50_000,
+      netMinor: 4_950_000,
+    },
+    madeBy: null,
+    ...over,
+  });
 
 export const spendMovement = (): WalletMovement =>
   movement({

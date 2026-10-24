@@ -250,6 +250,14 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
     gate: ['schoolAccount:read'],
   },
   {
+    id: 'online-payments',
+    label: 'Online payments',
+    route: '/settings/online-payments',
+    group: 'Finance',
+    icon: 'landmark',
+    gate: ['wallet:manageGateway'],
+  },
+  {
     id: 'calendar',
     label: 'School years and terms',
     route: '/calendar',
