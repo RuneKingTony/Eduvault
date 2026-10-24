@@ -1,5 +1,12 @@
 import type { ReactElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import {
+  RouterProvider,
+  createMemoryHistory,
+  createRootRoute,
+  createRoute,
+  createRouter,
+} from '@tanstack/react-router';
 import { render } from '@testing-library/react';
 import type {
   AuditRow,
@@ -129,4 +136,45 @@ export function seedFeeSetup(queryClient: QueryClient) {
   const setup = { terms: [], levels: [] };
   queryClient.setQueryData(key, setup);
   return { key, setup };
+}
+
+type RouteTable = readonly (readonly [
+  string,
+  ((search: Record<string, unknown>) => object) | undefined,
+])[];
+
+export function renderRoutes(
+  page: ReactElement,
+  api: Partial<Record<keyof Api, unknown>>,
+  setup: { routes: RouteTable; access: MePermissions; path: string }
+) {
+  const { routes, access, path } = setup;
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  const root = createRootRoute({
+    component: () => (
+      <QueryClientProvider client={queryClient}>
+        <ApiProvider api={checked(api)}>
+          <PermissionsProvider value={access}>
+            <TooltipProvider>{page}</TooltipProvider>
+          </PermissionsProvider>
+        </ApiProvider>
+      </QueryClientProvider>
+    ),
+  });
+  const router = createRouter({
+    routeTree: root.addChildren(
+      routes.map(([routePath, validateSearch]) =>
+        createRoute({
+          getParentRoute: () => root,
+          path: routePath,
+          validateSearch,
+        })
+      )
+    ),
+    history: createMemoryHistory({ initialEntries: [path] }),
+  });
+  render(<RouterProvider router={router} />);
+  return { router, queryClient };
 }

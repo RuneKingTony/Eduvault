@@ -1,25 +1,19 @@
 import { useState, type SubmitEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CheckIcon } from 'lucide-react';
-import {
-  PAYMENT_METHOD_LABELS,
-  type PaymentMethod,
-  type ToppedUpWallet,
-  type TopUpOptions,
-  type Wallet,
+import type {
+  PaymentMethod,
+  ToppedUpWallet,
+  TopUpOptions,
+  Wallet,
 } from '@eduvault/api-contract';
-import { PAYMENT_METHODS, generatePaymentReference } from '@eduvault/shared';
+import { generatePaymentReference } from '@eduvault/shared';
 import {
-  Button,
   ConfirmDialog,
   ErrorMessage,
   FieldError,
-  NativeSelectOption,
-  SelectField,
   Sheet,
   SheetContent,
   SheetDescription,
-  SheetFooter,
   SheetHeader,
   SheetTitle,
   Skeleton,
@@ -33,7 +27,13 @@ import {
   uploadProofOnce,
   type UploadedProof,
 } from '../record-once';
-import { accountsFor } from '../payments/record-payment-model';
+import {
+  accountNotice,
+  Hint,
+  MoneyAccountFields,
+  PROOF_ACCEPT,
+  SheetActionsFooter,
+} from '../recording-parts';
 import { useConfirmStep, type ConfirmStep } from '../use-confirm-step';
 import {
   confirmDetails,
@@ -111,10 +111,6 @@ interface FieldsProps {
   onFile: (file: File | undefined) => void;
 }
 
-const Hint = ({ children }: { children: string }) => (
-  <p className="text-xs text-muted-foreground">{children}</p>
-);
-
 function AmountFields({ options, state, errors, onChange }: FieldsProps) {
   return (
     <div className="grid gap-3 sm:grid-cols-2">
@@ -145,43 +141,6 @@ function AmountFields({ options, state, errors, onChange }: FieldsProps) {
   );
 }
 
-function AccountFields({ options, state, onChange, onMethod }: FieldsProps) {
-  return (
-    <div className="grid gap-3 sm:grid-cols-2">
-      <SelectField
-        label="Into"
-        name="accountId"
-        value={state.accountId}
-        onChange={(event) => {
-          onChange({ accountId: event.target.value });
-        }}
-      >
-        {accountsFor(options.accounts, state.method).map((account) => (
-          <NativeSelectOption key={account.id} value={account.id}>
-            {account.label}
-          </NativeSelectOption>
-        ))}
-      </SelectField>
-      <SelectField
-        label="How they paid"
-        name="method"
-        value={state.method}
-        onChange={(event) => {
-          onMethod(event.target.value as PaymentMethod);
-        }}
-      >
-        {PAYMENT_METHODS.filter((method) => options.methods[method]).map(
-          (method) => (
-            <NativeSelectOption key={method} value={method}>
-              {PAYMENT_METHOD_LABELS[method]}
-            </NativeSelectOption>
-          )
-        )}
-      </SelectField>
-    </div>
-  );
-}
-
 function ReceiptFields({ state, errors, onChange, onFile }: FieldsProps) {
   return (
     <>
@@ -190,7 +149,7 @@ function ReceiptFields({ state, errors, onChange, onFile }: FieldsProps) {
           label="Receipt or proof of payment"
           name="receipt"
           type="file"
-          accept="image/jpeg,image/png,image/webp,image/heic,application/pdf,.heic"
+          accept={PROOF_ACCEPT}
           aria-invalid={errors.receipt === undefined ? undefined : true}
           onChange={(event) => {
             onFile(event.target.files?.[0]);
@@ -230,19 +189,6 @@ function ReceiptFields({ state, errors, onChange, onFile }: FieldsProps) {
       </div>
     </>
   );
-}
-
-function accountNotice(
-  options: TopUpOptions,
-  method: PaymentMethod
-): string | undefined {
-  if (options.accounts.length === 0) {
-    return 'Add a bank, POS or cash account before recording top-ups.';
-  }
-  if (accountsFor(options.accounts, method).length === 0) {
-    return 'No account takes this way of paying. Add one in Accounts first.';
-  }
-  return undefined;
 }
 
 function ConfirmTopUp({
@@ -294,26 +240,6 @@ function useFormState(options: TopUpOptions) {
   return { state, file, handlers };
 }
 
-function SheetActionsFooter({
-  onClose,
-  disabled,
-}: {
-  onClose: () => void;
-  disabled: boolean;
-}) {
-  return (
-    <SheetFooter>
-      <Button type="button" variant="ghost" onClick={onClose}>
-        Cancel
-      </Button>
-      <Button type="submit" form="record-top-up" disabled={disabled}>
-        <CheckIcon />
-        Record top-up
-      </Button>
-    </SheetFooter>
-  );
-}
-
 function TopUpForm({
   fields,
   failure,
@@ -331,11 +257,24 @@ function TopUpForm({
       className="flex flex-col gap-4 overflow-y-auto px-4"
     >
       <AmountFields {...fields} />
-      <AccountFields {...fields} />
+      <MoneyAccountFields
+        accounts={fields.options.accounts}
+        methods={fields.options.methods}
+        accountId={fields.state.accountId}
+        method={fields.state.method}
+        onAccount={(accountId) => {
+          fields.onChange({ accountId });
+        }}
+        onMethod={fields.onMethod}
+      />
       <ReceiptFields {...fields} />
       <ErrorMessage error={failure} />
       <FieldError
-        message={accountNotice(fields.options, fields.state.method)}
+        message={accountNotice(fields.options.accounts, fields.state.method, {
+          none: 'Add a bank, POS or cash account before recording top-ups.',
+          unsupported:
+            'No account takes this way of paying. Add one in Accounts first.',
+        })}
       />
     </form>
   );
@@ -378,11 +317,11 @@ function SheetForm({
     <>
       <TopUpForm fields={fields} failure={topUp.error} onSubmit={submit} />
       <SheetActionsFooter
+        form={{ id: 'record-top-up', label: 'Record top-up' }}
         onClose={onClose}
-        disabled={
-          topUp.isPending ||
-          accountsFor(options.accounts, state.method).length === 0
-        }
+        pending={topUp.isPending}
+        options={options}
+        method={state.method}
       />
       <ConfirmTopUp
         options={options}

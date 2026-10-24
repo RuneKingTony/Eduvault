@@ -1,13 +1,5 @@
 import type { ReactElement } from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import {
-  RouterProvider,
-  createMemoryHistory,
-  createRootRoute,
-  createRoute,
-  createRouter,
-} from '@tanstack/react-router';
-import { render } from '@testing-library/react';
+
 import type {
   BalanceList,
   BalanceRow,
@@ -20,18 +12,16 @@ import type {
   RecordingOptions,
   StudentStatement,
 } from '@eduvault/api-contract';
-import { PermissionsProvider } from '@eduvault/auth-client';
-import { TooltipProvider } from '@eduvault/ui';
 import { parseStoreSearch } from './store-search';
 import { parseAccountsSearch, parseStatementSearch } from './accounts-search';
 import { parseAdjustmentsSearch } from './adjustments-search';
-import { ApiProvider, type Api } from './api';
-import { checked, testId } from './test-api';
+import type { Api } from './api';
+import { testId } from './test-api';
 import { parseBillingSearch } from './billing-search';
 import { parseFeesSearch } from './fees-search';
 import { parseInvoicesSearch } from './invoices-search';
 import { parsePaymentsSearch, parseReceiptSearch } from './payments-search';
-import { ownerAccess } from './test-utils';
+import { ownerAccess, renderRoutes } from './test-utils';
 
 export const PAYMENT_ID = testId(0x1_60_01);
 export const ADA = testId(0x1_60_11);
@@ -304,20 +294,6 @@ export function renderPayments(
   api: Partial<Record<keyof Api, unknown>>,
   { access = ownerAccess(), path = '/finance/payments' }: RenderOptions = {}
 ) {
-  const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false } },
-  });
-  const root = createRootRoute({
-    component: () => (
-      <QueryClientProvider client={queryClient}>
-        <ApiProvider api={checked(api)}>
-          <PermissionsProvider value={access}>
-            <TooltipProvider>{page}</TooltipProvider>
-          </PermissionsProvider>
-        </ApiProvider>
-      </QueryClientProvider>
-    ),
-  });
   const routes = [
     ['/approvals', undefined],
     ['/settings/approvals', undefined],
@@ -334,18 +310,5 @@ export function renderPayments(
     ['/finance/store', parseStoreSearch],
     ['/finance/other-fees', parseFeesSearch],
   ] as const;
-  const router = createRouter({
-    routeTree: root.addChildren(
-      routes.map(([routePath, validateSearch]) =>
-        createRoute({
-          getParentRoute: () => root,
-          path: routePath,
-          validateSearch,
-        })
-      )
-    ),
-    history: createMemoryHistory({ initialEntries: [path] }),
-  });
-  render(<RouterProvider router={router} />);
-  return { router, queryClient };
+  return renderRoutes(page, api, { routes, access, path });
 }

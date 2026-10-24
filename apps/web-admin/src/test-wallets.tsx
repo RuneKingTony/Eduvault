@@ -1,13 +1,5 @@
 import type { ReactElement } from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import {
-  RouterProvider,
-  createMemoryHistory,
-  createRootRoute,
-  createRoute,
-  createRouter,
-} from '@tanstack/react-router';
-import { render } from '@testing-library/react';
+
 import type {
   MePermissions,
   ToppedUpWallet,
@@ -19,13 +11,11 @@ import type {
   WalletMovementList,
   WalletSummary,
 } from '@eduvault/api-contract';
-import { PermissionsProvider } from '@eduvault/auth-client';
-import { TooltipProvider } from '@eduvault/ui';
 import { parseAccountsSearch, parseStatementSearch } from './accounts-search';
-import { ApiProvider, type Api } from './api';
-import { checked, testId } from './test-api';
+import type { Api } from './api';
+import { testId } from './test-api';
 import { parseWalletSearch, parseWalletsSearch } from './wallets-search';
-import { ownerAccess } from './test-utils';
+import { ownerAccess, renderRoutes } from './test-utils';
 
 export const WALLET_ID = testId(0x1_70_01);
 export const OTHER_WALLET_ID = testId(0x1_70_02);
@@ -187,38 +177,11 @@ export function renderWallets(
   api: Partial<Record<keyof Api, unknown>>,
   { access = ownerAccess(), path = '/finance/wallets' }: RenderOptions = {}
 ) {
-  const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false } },
-  });
-  const root = createRootRoute({
-    component: () => (
-      <QueryClientProvider client={queryClient}>
-        <ApiProvider api={checked(api)}>
-          <PermissionsProvider value={access}>
-            <TooltipProvider>{page}</TooltipProvider>
-          </PermissionsProvider>
-        </ApiProvider>
-      </QueryClientProvider>
-    ),
-  });
   const routes = [
     ['/finance/wallets', parseWalletsSearch],
     ['/finance/wallets/$walletId', parseWalletSearch],
     ['/finance/accounts', parseAccountsSearch],
     ['/finance/accounts/$studentId', parseStatementSearch],
   ] as const;
-  const router = createRouter({
-    routeTree: root.addChildren(
-      routes.map(([routePath, validateSearch]) =>
-        createRoute({
-          getParentRoute: () => root,
-          path: routePath,
-          validateSearch,
-        })
-      )
-    ),
-    history: createMemoryHistory({ initialEntries: [path] }),
-  });
-  render(<RouterProvider router={router} />);
-  return { router, queryClient };
+  return renderRoutes(page, api, { routes, access, path });
 }
