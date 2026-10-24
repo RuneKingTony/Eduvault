@@ -185,6 +185,14 @@ import {
 } from './portal';
 import { defineContract, defineRoute } from './route';
 import {
+  gatewayConnectionSchema,
+  gatewayTestResultSchema,
+  monnifyWebhookBodySchema,
+  monnifyWebhookParamsSchema,
+  monnifyWebhookResultSchema,
+  saveGatewayConnectionSchema,
+} from './gateway';
+import {
   earmarkSchema,
   earmarkedWalletSchema,
   spendWalletSchema,
@@ -1139,6 +1147,39 @@ export const contract = defineContract({
       params: walletParamsSchema,
       body: topUpWalletSchema,
       response: toppedUpWalletSchema,
+    }),
+    reservedAccount: defineRoute({
+      method: 'POST',
+      path: '/finance/wallets/:walletId/reserved-account',
+      params: walletParamsSchema,
+      response: walletSchema,
+    }),
+  },
+  gateway: {
+    get: defineRoute({
+      method: 'GET',
+      path: '/finance/gateway/monnify',
+      response: gatewayConnectionSchema,
+    }),
+    save: defineRoute({
+      method: 'PUT',
+      path: '/finance/gateway/monnify',
+      body: saveGatewayConnectionSchema,
+      response: gatewayConnectionSchema,
+    }),
+    test: defineRoute({
+      method: 'POST',
+      path: '/finance/gateway/monnify/test',
+      response: gatewayTestResultSchema,
+    }),
+  },
+  webhooks: {
+    monnify: defineRoute({
+      method: 'POST',
+      path: '/webhooks/monnify/:organizationId',
+      params: monnifyWebhookParamsSchema,
+      body: monnifyWebhookBodySchema,
+      response: monnifyWebhookResultSchema,
     }),
   },
   portalWallet: {
