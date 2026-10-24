@@ -277,6 +277,20 @@ CREATE TRIGGER wallet_earmark_append_only
   FOR EACH ROW EXECUTE FUNCTION wallet_append_only();
 
 -- migrate:down
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM wallet_topup)
+    OR EXISTS (SELECT 1 FROM wallet_spend)
+    OR EXISTS (SELECT 1 FROM wallet_earmark)
+    OR EXISTS (SELECT 1 FROM journal_line WHERE family_id IS NOT NULL)
+    OR EXISTS (SELECT 1 FROM journal_entry WHERE kind IN ('wallet_topup', 'wallet_spend'))
+  THEN
+    RAISE EXCEPTION 'wallet money has been posted, so this migration cannot be rolled back'
+      USING ERRCODE = 'check_violation';
+  END IF;
+END;
+$$;
+
 ALTER TABLE journal_entry DROP CONSTRAINT journal_entry_kind_check;
 
 ALTER TABLE journal_entry
