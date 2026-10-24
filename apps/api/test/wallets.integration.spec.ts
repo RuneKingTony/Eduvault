@@ -1,5 +1,7 @@
+import { readFileSync } from 'node:fs';
 import {
   WALLET_ACCOUNT_GATEWAY_MESSAGE,
+  WALLET_ACCOUNT_NOT_FOUND_MESSAGE,
   WALLET_NOT_FOUND_MESSAGE,
   WALLET_PROOF_NOT_FOUND_MESSAGE,
   WALLET_PROOF_TAKEN_MESSAGE,
@@ -9,6 +11,7 @@ import {
   walletEarmarkSetOverMessage,
   walletSpendOverMessage,
   type EarmarkedWallet,
+  type FileRef,
   type SpentWallet,
   type StudentStatement,
   type ToppedUpWallet,
@@ -17,10 +20,11 @@ import {
   type WalletList,
   type WalletMovementList,
 } from '@eduvault/api-contract';
-import { expect } from './support/base-test';
+import { acting, expect } from './support/base-test';
 import { receivableBalance } from './support/factories/billing';
 import { gatewayAccountId } from './support/factories/store';
-import { nextReference, owes } from './support/factories/payments';
+import { ledgerAccountId } from './support/factories/finance';
+import { PDF_BYTES, nextReference, owes } from './support/factories/payments';
 import {
   cashAccount,
   postTopUp,
@@ -46,6 +50,13 @@ const sumOf = async (
   sql: string,
   values: unknown[]
 ) => Number((await pool.query(sql, values)).rows[0]?.n);
+
+const walletWrites = (pool: Parameters<typeof sumOf>[0]) =>
+  sumOf(
+    pool,
+    `SELECT (SELECT count(*) FROM wallet_topup) + (SELECT count(*) FROM wallet_spend) + (SELECT count(*) FROM wallet_earmark) AS n`,
+    []
+  );
 
 const familyBalance = (
   pool: Parameters<typeof sumOf>[0],
@@ -1010,29 +1021,186 @@ test.describe('isolation', () => {
     await api().post('/portal/wallet/earmarks/release').send({}).expect(401);
   });
 
-  test('7: the database refuses a wallet, top-up or earmark that names another school’s guardian, student or account', async ({
+  test('7: a top-up in A naming school B’s money account or receipt answers 404 and posts nothing', async ({
+    api,
     app,
     pool,
-    schools: { owner, ownerB, orgA, studentLekki, studentB },
+    schools: { owner, ownerB, studentLekki },
   }) => {
     const walletId = await walletIdOf(pool, guardianIdOf(studentLekki.logins));
-    const foreignGuardian = guardianIdOf(studentB.logins);
-    const foreignAccount = await cashAccount(app, ownerB);
     const account = await cashAccount(app, owner);
-    await expect(
-      pool.query(
-        'INSERT INTO wallet (organization_id, guardian_id) VALUES ($1, $2)',
-        [orgA.id, foreignGuardian]
-      )
-    ).rejects.toMatchObject({ code: '23503' });
-    await expect(
-      pool.query(
-        `INSERT INTO wallet_earmark (organization_id, wallet_id, student_id, kind, delta_minor, reference, created_by)
-         VALUES ($1, $2, $3, 'set', 100, 'RAW-ERM', $4)`,
-        [orgA.id, walletId, studentB.id, owner.id]
-      )
-    ).rejects.toMatchObject({ code: '23503' });
-    expect(foreignAccount.id).not.toBe(account.id);
+    const foreignAccount = await cashAccount(app, ownerB);
+    const foreignProof = await uploadWalletProof(api, ownerB);
+
+    const byAccount = await postTopUp(api, owner, {
+      walletId,
+      accountId: foreignAccount.id,
+      status: 404,
+    });
+    expect(byAccount.body.message).toBe(WALLET_ACCOUNT_NOT_FOUND_MESSAGE);
+    const byProof = await postTopUp(api, owner, {
+      walletId,
+      accountId: account.id,
+      proofFileId: foreignProof.id,
+      status: 404,
+    });
+    expect(byProof.body.message).toBe(WALLET_PROOF_NOT_FOUND_MESSAGE);
+    expect(
+      await sumOf(pool, 'SELECT count(*)::text AS n FROM wallet_topup', [])
+    ).toBe(0);
+  });
+
+  test('7: the database refuses a wallet, top-up, spend, earmark or ledger line that names another school’s guardian, student, account, receipt or entry', async ({
+    api,
+    app,
+    pool,
+    schools: { owner, ownerB, orgA, orgB, studentLekki, studentB },
+  }) => {
+    const walletId = await walletIdOf(pool, guardianIdOf(studentLekki.logins));
+    const guardianId = guardianIdOf(studentLekki.logins);
+    const foreignGuardian = guardianIdOf(studentB.logins);
+    const account = await cashAccount(app, owner);
+    const foreignAccount = await cashAccount(app, ownerB);
+    const proof = await uploadWalletProof(api, owner);
+    const foreignProof = await uploadWalletProof(api, ownerB);
+    const ledgerAccount = await ledgerAccountId(pool, orgA.id, 2200);
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const entryIn = async (organizationId: string, reference: string) => {
+        const { rows } = await client.query<{ id: string }>(
+          `INSERT INTO journal_entry (organization_id, reference, kind, effective_on)
+           VALUES ($1, $2, 'wallet_topup', '2026-10-07') RETURNING id`,
+          [organizationId, reference]
+        );
+        return rows[0]?.id ?? '';
+      };
+      const topUpEntry = await entryIn(orgA.id, 'RAW-TOPUP');
+      const spendEntry = await entryIn(orgA.id, 'RAW-SPEND');
+      const foreignEntry = await entryIn(orgB.id, 'RAW-FOREIGN');
+      const insertWallet = (forGuardian: string) =>
+        client.query(
+          'INSERT INTO wallet (organization_id, guardian_id) VALUES ($1, $2)',
+          [orgA.id, forGuardian]
+        );
+      const insertTopUp = (using: {
+        accountId: string;
+        proofId: string;
+        entryId: string;
+      }) =>
+        client.query(
+          `INSERT INTO wallet_topup (organization_id, wallet_id, reference, money_account_id, method, amount_minor, received_on, proof_file_id, request_hash, journal_entry_id, created_by)
+           VALUES ($1, $2, 'RAW-TOPUP', $3, 'cash', 100, '2026-10-07', $4, 'raw', $5, $6)`,
+          [
+            orgA.id,
+            walletId,
+            using.accountId,
+            using.proofId,
+            using.entryId,
+            owner.id,
+          ]
+        );
+      const insertSpend = (entryId: string) =>
+        client.query(
+          `INSERT INTO wallet_spend (organization_id, wallet_id, reference, request_hash, journal_entry_id, created_by)
+           VALUES ($1, $2, 'RAW-SPEND', 'raw', $3, $4)`,
+          [orgA.id, walletId, entryId, owner.id]
+        );
+      const insertEarmark = (studentId: string) =>
+        client.query(
+          `INSERT INTO wallet_earmark (organization_id, wallet_id, student_id, kind, delta_minor, reference, created_by)
+           VALUES ($1, $2, $3, 'set', 100, 'RAW-ERM', $4)`,
+          [orgA.id, walletId, studentId, owner.id]
+        );
+      const insertLine = (familyId: string) =>
+        client.query(
+          `INSERT INTO journal_line (organization_id, entry_id, ledger_account_id, family_id, credit_minor)
+           VALUES ($1, $2, $3, $4, 100)`,
+          [orgA.id, spendEntry, ledgerAccount, familyId]
+        );
+      const refuses = async (
+        attempt: () => Promise<unknown>,
+        constraint: string
+      ) => {
+        await client.query('SAVEPOINT attempt');
+        await expect(attempt()).rejects.toMatchObject({
+          code: '23503',
+          constraint,
+        });
+        await client.query('ROLLBACK TO SAVEPOINT attempt');
+      };
+      const own = {
+        accountId: account.id,
+        proofId: proof.id,
+        entryId: topUpEntry,
+      };
+
+      await refuses(
+        () => insertWallet(foreignGuardian),
+        'wallet_guardian_id_organization_id_fkey'
+      );
+      await refuses(
+        () => insertEarmark(studentB.id),
+        'wallet_earmark_student_id_organization_id_fkey'
+      );
+      await refuses(
+        () => insertTopUp({ ...own, accountId: foreignAccount.id }),
+        'wallet_topup_money_account_id_organization_id_fkey'
+      );
+      await refuses(
+        () => insertTopUp({ ...own, proofId: foreignProof.id }),
+        'wallet_topup_proof_file_id_organization_id_fkey'
+      );
+      await refuses(
+        () => insertTopUp({ ...own, entryId: foreignEntry }),
+        'wallet_topup_journal_entry_id_organization_id_fkey'
+      );
+      await refuses(
+        () => insertSpend(foreignEntry),
+        'wallet_spend_journal_entry_id_organization_id_fkey'
+      );
+      await refuses(
+        () => insertLine(foreignGuardian),
+        'journal_line_family_fkey'
+      );
+
+      await insertTopUp(own);
+      await insertSpend(spendEntry);
+      await insertEarmark(studentLekki.id);
+      await insertLine(guardianId);
+    } finally {
+      await client.query('ROLLBACK');
+      client.release();
+    }
+  });
+
+  test('refuses to roll the wallet migration back once a top-up has been posted', async ({
+    api,
+    app,
+    pool,
+    schools: { owner, studentLekki },
+  }) => {
+    const account = await cashAccount(app, owner);
+    const walletId = await walletIdOf(pool, guardianIdOf(studentLekki.logins));
+    await topUpWallet(api, owner, { walletId, accountId: account.id });
+    const migration = readFileSync(
+      new URL(
+        '../db/migrations/20261023090000_wallet_ledger_core.sql',
+        import.meta.url
+      ),
+      'utf8'
+    );
+    const [, down = ''] = migration.split('-- migrate:down');
+
+    await expect(pool.query(down)).rejects.toMatchObject({
+      code: '23514',
+      message:
+        'wallet money has been posted, so this migration cannot be rolled back',
+    });
+    expect(
+      await sumOf(pool, 'SELECT count(*)::text AS n FROM wallet_topup', [])
+    ).toBe(1);
   });
 
   test('keeps the wallet tables append-only', async ({
@@ -1057,14 +1225,98 @@ test.describe('isolation', () => {
     }
   });
 
-  test('9: a top-up amount, spend line or earmark of zero or less is refused before anything is posted', async ({
+  test('9: a guardian asking to spend or set aside money for another family’s child answers 404 on every portal write', async ({
     api,
     app,
     pool,
-    schools: { owner, studentLekki },
+    schools,
+  }) => {
+    const { owner, orgA, studentLekki } = schools;
+    const account = await cashAccount(app, owner);
+    const { ada, guardianLogin } = await family(app, schools);
+    const walletId = await walletIdOf(pool, guardianLogin?.guardianId ?? '');
+    await owes(app, owner, { studentId: ada.id, amountMinor: OWED });
+    await topUpWallet(api, owner, { walletId, accountId: account.id });
+    const guardian = await signInAs(api, guardianLogin);
+    const body = { studentId: studentLekki.id, amountMinor: 100 };
+    const before = await walletWrites(pool);
+
+    for (const [path, send] of [
+      [
+        '/portal/wallet/spend',
+        { reference: nextReference('WSP'), lines: [body] },
+      ],
+      ['/portal/wallet/earmarks', { reference: nextReference('ERM'), ...body }],
+      [
+        '/portal/wallet/earmarks/release',
+        { reference: nextReference('ERM'), ...body },
+      ],
+    ] as const) {
+      const refused = await api(guardian).post(path).send(send).expect(404);
+      expect(refused.body.message).toBe(WALLET_STUDENT_NOT_FOUND_MESSAGE);
+    }
+    expect(await walletWrites(pool)).toBe(before);
+    expect(await receivableBalance(pool, orgA.id, ada.id)).toBe(OWED);
+  });
+
+  test('12: an acting super admin without a reason gets 403 on a top-up, and with a reason can write', async ({
+    api,
+    app,
+    createUser,
+    makeSuperAdmin,
+    pool,
+    schools: { owner, orgA, studentLekki },
   }) => {
     const account = await cashAccount(app, owner);
     const walletId = await walletIdOf(pool, guardianIdOf(studentLekki.logins));
+    const admin = await makeSuperAdmin(await createUser());
+    const reason = 'SUP-2207 record the cash the school counted';
+    const body = await topUpBody(api, owner, { accountId: account.id });
+
+    const refused = await api(admin)
+      .post(`/finance/wallets/${walletId}/top-ups`)
+      .set(acting(orgA.id))
+      .send(body)
+      .expect(403);
+    expect(refused.body.code).toBe('ActingReadOnly');
+    expect(
+      await sumOf(pool, 'SELECT count(*)::text AS n FROM wallet_topup', [])
+    ).toBe(0);
+    await api(admin)
+      .get(`/finance/wallets/${walletId}`)
+      .set(acting(orgA.id))
+      .expect(200);
+
+    const proof = await api(admin)
+      .post('/files')
+      .set(acting(orgA.id, reason))
+      .field('kind', 'wallet_proof')
+      .attach('file', PDF_BYTES, { filename: 'receipt.pdf' })
+      .expect(201);
+    await api(admin)
+      .post(`/finance/wallets/${walletId}/top-ups`)
+      .set(acting(orgA.id, reason))
+      .send({ ...body, proofFileId: (proof.body as FileRef).id })
+      .expect(201);
+  });
+});
+
+test.describe('refused amounts', () => {
+  test('a top-up amount, spend line or earmark of zero or less is refused before anything is posted', async ({
+    api,
+    app,
+    pool,
+    schools,
+  }) => {
+    const { owner } = schools;
+    const account = await cashAccount(app, owner);
+    const { ada, guardianLogin } = await family(app, schools);
+    const walletId = await walletIdOf(pool, guardianLogin?.guardianId ?? '');
+    await owes(app, owner, { studentId: ada.id, amountMinor: OWED });
+    await topUpWallet(api, owner, { walletId, accountId: account.id });
+    const guardian = await signInAs(api, guardianLogin);
+    const before = await walletWrites(pool);
+
     for (const amountMinor of [0, -1]) {
       await postTopUp(api, owner, {
         walletId,
@@ -1072,9 +1324,24 @@ test.describe('isolation', () => {
         amountMinor,
         status: 400,
       });
+      await api(guardian)
+        .post('/portal/wallet/spend')
+        .send({
+          reference: nextReference('WSP'),
+          lines: [{ studentId: ada.id, amountMinor }],
+        })
+        .expect(400);
+      for (const path of ['', '/release']) {
+        await api(guardian)
+          .post(`/portal/wallet/earmarks${path}`)
+          .send({
+            reference: nextReference('ERM'),
+            studentId: ada.id,
+            amountMinor,
+          })
+          .expect(400);
+      }
     }
-    expect(
-      await sumOf(pool, 'SELECT count(*)::text AS n FROM wallet_topup', [])
-    ).toBe(0);
+    expect(await walletWrites(pool)).toBe(before);
   });
 });
