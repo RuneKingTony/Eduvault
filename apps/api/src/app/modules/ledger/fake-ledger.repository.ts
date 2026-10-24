@@ -1,7 +1,9 @@
 import type { JournalList, LedgerAccount } from '@eduvault/api-contract';
+import type { ActivityInput } from '../../common/activity';
 import type { ChartAccount } from '../../common/ledger';
 import {
   LedgerRepository,
+  type AccountActivity,
   type LedgerAccountRef,
   type LedgerOutcome,
   type MoneyAccountRef,
@@ -19,6 +21,7 @@ export class FakeLedgerRepository extends LedgerRepository {
   alreadyPosted = new Set<string>();
   outcome: LedgerOutcome | undefined;
   scopes: OrgScope[] = [];
+  recorded: ActivityInput[] = [];
 
   chart(scope: OrgScope): Promise<ChartAccount[]> {
     this.scopes.push(scope);
@@ -36,11 +39,14 @@ export class FakeLedgerRepository extends LedgerRepository {
     return Promise.resolve(this.accounts.find((row) => row.id === id));
   }
 
-  createAccount(input: {
-    organizationId: string;
-    parentId: string;
-    name: string;
-  }): Promise<LedgerOutcome> {
+  createAccount(
+    input: {
+      organizationId: string;
+      parentId: string;
+      name: string;
+    },
+    activity: AccountActivity
+  ): Promise<LedgerOutcome> {
     const account: LedgerAccount = {
       id: 'new-account',
       code: 4090,
@@ -50,7 +56,11 @@ export class FakeLedgerRepository extends LedgerRepository {
       systemKey: null,
       balanceMinor: 0,
     };
-    return Promise.resolve(this.outcome ?? { status: 'saved', account });
+    const outcome = this.outcome ?? { status: 'saved', account };
+    if (outcome.status === 'saved') {
+      this.recorded.push(...activity(outcome.account));
+    }
+    return Promise.resolve(outcome);
   }
 
   journal(): Promise<JournalList> {

@@ -18,6 +18,7 @@ import {
   type OpeningBalances,
   type OpeningBalancesResult,
 } from '@eduvault/api-contract';
+import { feeTypeCreatedActivity, financeActorIn } from '../../common/activity';
 import type { OrgContext } from '../../common/auth';
 import { Clock } from '../../common/clock';
 import {
@@ -80,11 +81,17 @@ export class LedgerService {
       throw new BadRequestException(LEDGER_ACCOUNT_PARENT_MESSAGE);
     }
     const name = input.name.trim();
-    const outcome = await this.ledger.createAccount({
-      organizationId: ctx.organizationId,
-      parentId: parent.id,
-      name,
+    const actor = await financeActorIn(ctx, {
+      currency: () => this.ledger.currency(ctx.organizationId),
     });
+    const outcome = await this.ledger.createAccount(
+      {
+        organizationId: ctx.organizationId,
+        parentId: parent.id,
+        name,
+      },
+      (account) => feeTypeCreatedActivity(actor, account)
+    );
     if (outcome.status === 'saved') {
       return outcome.account;
     }

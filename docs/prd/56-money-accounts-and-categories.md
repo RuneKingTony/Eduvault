@@ -112,7 +112,7 @@ A school's opening debts and credits, and the money already in each money accoun
 2. **System accounts are fixed.** A row with `system_key` can't be retired, renamed to another type, or re-parented. Its type never changes.
 3. **Codes are unique per school** (`UNIQUE (organization_id, code)`); a `system_key` is unique per school.
 4. **New fee category code** = the parent's highest child code + 10, or the parent's code + 10 if it has none. Two concurrent creates must not get the same code: the unique constraint answers 409 for the loser and the client retries.
-5. **Who can add a category.** `ledger:manageAccounts` may add a child under any non-system-locked parent the UI offers (today only 4000). `feeLine:create` alone may add only under `fee_income` (4000).
+5. **Who can add a category.** `ledger:manageAccounts` may add a child under any non-system-locked parent the UI offers (today only 4000). `feeLine:create` alone may add only under `fee_income` (4000). Adding one writes a `fee_type.created` activity row in the same transaction, as adding a fee type does (D-353, D-384): school-wide, shown per D-315, and none for a duplicate or refused add.
 6. **Category names** are not blank and are unique among siblings (case-insensitive). New rule; the prototype doesn't check (see gaps).
 7. **Money account creates its ledger account** in the same transaction: an asset child of 1200, code = next multiple of 10 above the highest child of 1200 (1210 → 1220 → 1230). Its name is the money account's name.
 8. **Money account kinds** creatable from the screen: `bank`, `pos`, `cash` (a cash box). `gateway` waits for the gateway phase. A bank account may carry a `bank_name`.
