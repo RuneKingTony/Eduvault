@@ -1,4 +1,5 @@
 import { sql, type Kysely, type RawBuilder } from 'kysely';
+import { z } from 'zod';
 import {
   STUDENT_WALLETS_SYSTEM_KEY,
   journalKindSchema,
@@ -6,6 +7,7 @@ import {
   type WalletChild,
   type WalletListQuery,
   type WalletMovement,
+  type ReservedAccount,
   type WalletMovementSource,
   type WalletSummary,
 } from '@eduvault/api-contract';
@@ -99,22 +101,56 @@ async function childRows(
   return rows;
 }
 
+async function reservedAccountOf(
+  db: Kysely<DB>,
+  wallet: { organization_id: string; id: string }
+): Promise<ReservedAccount | null> {
+  const row = await db
+    .selectFrom('wallet_reserved_account')
+    .select(['account_number', 'bank_name', 'account_name'])
+    .where('organization_id', '=', wallet.organization_id)
+    .where('wallet_id', '=', wallet.id)
+    .executeTakeFirst();
+  return row === undefined
+    ? null
+    : {
+        accountNumber: row.account_number,
+        bankName: row.bank_name,
+        accountName: row.account_name,
+      };
+}
+
+async function gatewayConnected(
+  db: Kysely<DB>,
+  organizationId: string
+): Promise<boolean> {
+  const row = await db
+    .selectFrom('gateway_connection')
+    .select('id')
+    .where('organization_id', '=', organizationId)
+    .executeTakeFirst();
+  return row !== undefined;
+}
+
 async function viewOf(
   db: Kysely<DB>,
   wallet: WalletRow & { organization_id: string },
   scope: OrgScope['campusScope']
 ): Promise<WalletView> {
-  const [rows, balanceMinor, marked] = await Promise.all([
-    childRows(db, wallet, scope),
-    walletBalance(db, {
-      organizationId: wallet.organization_id,
-      guardianId: wallet.guardian_id,
-    }),
-    earmarksByChild(db, {
-      organizationId: wallet.organization_id,
-      walletId: wallet.id,
-    }),
-  ]);
+  const [rows, balanceMinor, marked, reservedAccount, connected] =
+    await Promise.all([
+      childRows(db, wallet, scope),
+      walletBalance(db, {
+        organizationId: wallet.organization_id,
+        guardianId: wallet.guardian_id,
+      }),
+      earmarksByChild(db, {
+        organizationId: wallet.organization_id,
+        walletId: wallet.id,
+      }),
+      reservedAccountOf(db, wallet),
+      gatewayConnected(db, wallet.organization_id),
+    ]);
   const figures = walletFigures(balanceMinor, [...marked.values()]);
   const children = rows
     .filter(
@@ -140,6 +176,8 @@ async function viewOf(
       name: wallet.full_name,
       phone: wallet.phone,
     },
+    reservedAccount,
+    gatewayConnected: connected,
     ...figures,
     children,
   };
@@ -283,10 +321,39 @@ interface MovementRow {
   depositor_name: string | null;
   proof_file_id: string | null;
   spend_id: string | null;
+  gateway: unknown;
   made_by: string | null;
 }
 
+const gatewayFactsSchema = z
+  .object({
+    id: z.uuid(),
+    transactionReference: z.string(),
+    paymentReference: z.string(),
+    paidAt: z.string(),
+    confirmedAt: z.string(),
+    grossMinor: z.number(),
+    feeMinor: z.number(),
+    netMinor: z.number(),
+  })
+  .nullable();
+
 function sourceOf(row: MovementRow): WalletMovementSource | null {
+  const gateway = gatewayFactsSchema.parse(row.gateway);
+  if (gateway !== null) {
+    return {
+      type: 'monnify',
+      id: gateway.id,
+      transactionReference: gateway.transactionReference,
+      paymentReference: gateway.paymentReference,
+      signatureVerified: true,
+      paidAt: new Date(gateway.paidAt).toISOString(),
+      confirmedAt: new Date(gateway.confirmedAt).toISOString(),
+      grossMinor: gateway.grossMinor,
+      feeMinor: gateway.feeMinor,
+      netMinor: gateway.netMinor,
+    };
+  }
   if (
     row.topup_id !== null &&
     row.method !== null &&
@@ -340,12 +407,19 @@ export async function walletMovements(
         (jl.credit_minor - jl.debit_minor)::text AS amount,
         t.id AS topup_id, t.method, t.depositor_name, t.proof_file_id,
         s.id AS spend_id,
+        CASE WHEN gt.id IS NULL THEN NULL ELSE jsonb_build_object(
+          'id', gt.id, 'transactionReference', gt.reference,
+          'paymentReference', gt.payment_reference,
+          'paidAt', gt.paid_at, 'confirmedAt', gt.confirmed_at,
+          'grossMinor', gt.gross_minor, 'feeMinor', gt.fee_minor,
+          'netMinor', gt.net_minor) END AS gateway,
         u.name AS made_by
       FROM journal_line jl
       JOIN journal_entry e ON e.id = jl.entry_id AND e.organization_id = jl.organization_id
       LEFT JOIN student st ON st.id = jl.student_id AND st.organization_id = jl.organization_id
       LEFT JOIN wallet_topup t ON t.journal_entry_id = e.id AND t.organization_id = e.organization_id
       LEFT JOIN wallet_spend s ON s.journal_entry_id = e.id AND s.organization_id = e.organization_id
+      LEFT JOIN gateway_topup gt ON gt.journal_entry_id = e.id AND gt.organization_id = e.organization_id
       LEFT JOIN "user" u ON u.id = COALESCE(t.created_by, s.created_by)
       WHERE ${mine}
       ORDER BY e.sequence DESC, lower(st.first_name), jl.id

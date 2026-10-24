@@ -2,8 +2,10 @@ import { Module } from '@nestjs/common';
 import { ActivityModule } from '../../common/activity';
 import { EduvaultAuthModule } from '../../common/auth';
 import { LedgerPosterModule } from '../../common/ledger';
+import { GatewayModule } from '../gateway/gateway.module';
 import { MoneyAccountModule } from '../money-account/money-account.module';
 import { KyselyWalletRepository } from './kysely-wallet.repository';
+import { WalletReservedAccountService } from './wallet-reserved-account.service';
 import { WalletPortalController } from './wallet-portal.controller';
 import { WalletPortalService } from './wallet-portal.service';
 import { WalletController } from './wallet.controller';
@@ -16,10 +18,12 @@ import { WalletService } from './wallet.service';
     LedgerPosterModule,
     ActivityModule,
     MoneyAccountModule,
+    GatewayModule,
   ],
   controllers: [WalletController, WalletPortalController],
   providers: [
     WalletService,
+    WalletReservedAccountService,
     WalletPortalService,
     { provide: WalletRepository, useClass: KyselyWalletRepository },
   ],

@@ -22,6 +22,7 @@ import { CalendarModule } from './modules/calendar/calendar.module';
 import { CampusModule } from './modules/campus/campus.module';
 import { ClassModule } from './modules/class/class.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { GatewayModule } from './modules/gateway/gateway.module';
 import { GuardianModule } from './modules/guardian/guardian.module';
 import { FeeLineModule } from './modules/fee-line/fee-line.module';
 import { InvoiceModule } from './modules/invoice/invoice.module';
@@ -70,6 +71,7 @@ import { SubjectModule } from './modules/subject/subject.module';
     BillingModule,
     PaymentModule,
     WalletModule,
+    GatewayModule,
     StoreModule,
     AdjustmentModule,
     LeaveModule,

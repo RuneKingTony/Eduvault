@@ -23,6 +23,7 @@ export default defineConfig({
       BETTER_AUTH_URL: 'http://localhost:3000',
       WEB_ADMIN_URL: 'http://localhost:4200',
       WEB_PORTAL_URL: 'http://localhost:4201',
+      GATEWAY_ENCRYPTION_KEY: 'S/bCNrzfpqWqRs0JcPLeVL4QeFVqwWfwz28sPtbYjKM=',
     },
   },
 });

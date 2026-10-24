@@ -10,7 +10,7 @@ import {
 import { contract, type RouteOutput } from '@eduvault/api-contract';
 import { Org, OrganizationAuth, type OrgContext } from '../../common/auth';
 import { zod } from '../../common/http/zod.pipe';
-import { AdmissionService } from './admission.service';
+import { AdmitWithAccountService } from './admit-with-account.service';
 import { StudentListService } from './student-list.service';
 import { StudentService } from './student.service';
 
@@ -20,7 +20,7 @@ const routes = contract.students;
 export class StudentController {
   constructor(
     private readonly students: StudentService,
-    private readonly admissions: AdmissionService,
+    private readonly admissions: AdmitWithAccountService,
     private readonly listing: StudentListService
   ) {}
 
@@ -48,7 +48,7 @@ export class StudentController {
   create(
     @Org() org: OrgContext,
     @Body(zod(routes.create.body))
-    body: Parameters<AdmissionService['admit']>[1]
+    body: Parameters<AdmitWithAccountService['admit']>[1]
   ): Promise<RouteOutput<typeof routes.create>> {
     return this.admissions.admit(org, body);
   }

@@ -132,6 +132,8 @@ export class FakeWalletRepository extends WalletRepository {
         name: wallet.name,
         phone: wallet.phone,
       },
+      reservedAccount: null,
+      gatewayConnected: false,
       ...figures,
       children,
     };

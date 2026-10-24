@@ -22,6 +22,7 @@ import { syncAllStarterRoles } from './starter-roles';
       useFactory: (pool: Pool, env: Env) => ({
         auth: createAuth(pool, env),
         disableTrustedOriginsCors: true,
+        bodyParser: { rawBody: true },
       }),
       inject: [DB_TOKEN, ENV_TOKEN],
       disableGlobalAuthGuard: true,

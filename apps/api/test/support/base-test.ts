@@ -19,6 +19,8 @@ import { AccountService, type AppAuth } from '../../src/app/common/auth';
 import { castToBetterAuthRoles } from '../../src/app/common/auth/better-auth-roles';
 import { Clock } from '../../src/app/common/clock';
 import { loadEnv } from '../../src/app/common/config/env';
+import { FakeMonnifyClient } from '../../src/app/modules/gateway/fake-monnify-client';
+import { MonnifyClient } from '../../src/app/modules/gateway/monnify-client';
 import { PlatformRepository } from '../../src/app/modules/platform/platform.repository';
 import { configureApp } from '../../src/app/configure-app';
 
@@ -136,6 +138,9 @@ export interface Fixtures {
   pool: Pool;
   resetDatabase: undefined;
   resetClock: undefined;
+  resetMonnify: undefined;
+  /** The scripted Monnify the app talks to; nothing leaves the process. */
+  monnify: FakeMonnifyClient;
   /** The app's clock; pin it per test, it is cleared before and after each one. */
   clock: Clock;
   /** supertest against the app, signed in as `user` when given. */
@@ -188,12 +193,22 @@ export interface Fixtures {
 }
 
 export const baseTest = vitestTest.extend<Fixtures>({
-  app: [
+  monnify: [
     // eslint-disable-next-line no-empty-pattern
     async ({}, use) => {
+      await use(new FakeMonnifyClient());
+    },
+    { scope: 'file' },
+  ],
+
+  app: [
+    async ({ monnify }, use) => {
       const moduleRef = await Test.createTestingModule({
         imports: [AppModule],
-      }).compile();
+      })
+        .overrideProvider(MonnifyClient)
+        .useValue(monnify)
+        .compile();
       const app = moduleRef.createNestApplication({ bodyParser: false });
       configureApp(app, loadEnv());
       await app.init();
@@ -237,6 +252,14 @@ export const baseTest = vitestTest.extend<Fixtures>({
   clock: async ({ app }, use) => {
     await use(app.get(Clock));
   },
+
+  resetMonnify: [
+    async ({ monnify }, use) => {
+      monnify.reset();
+      await use(undefined);
+    },
+    { auto: true },
+  ],
 
   resetClock: [
     async ({ clock }, use) => {

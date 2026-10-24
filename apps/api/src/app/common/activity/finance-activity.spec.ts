@@ -32,7 +32,10 @@ import {
   type StoreSaleFacts,
   type StoreWriteOffFacts,
   walletSpentActivity,
+  walletGatewayToppedUpActivity,
   walletToppedUpActivity,
+  gatewayActor,
+  GATEWAY_ACTOR_ID,
 } from './finance-activity';
 
 const LEKKI = 'campus-lekki';
@@ -1110,6 +1113,67 @@ describe('walletToppedUpActivity', () => {
     expect(walletToppedUpActivity(actor, { ...topUp, campusIds: [] })).toEqual(
       []
     );
+  });
+});
+
+describe('walletGatewayToppedUpActivity', () => {
+  const monnify = gatewayActor('org-1', 'NGN');
+  const topUp = {
+    id: 'gateway-topup-1',
+    walletId: 'wallet-1',
+    guardianName: 'Mrs Ojo',
+    amountMinor: 4_950_000,
+    grossMinor: 5_000_000,
+    feeMinor: 50_000,
+    campusIds: [LEKKI, IKEJA],
+  };
+
+  it('writes one finance row per campus, by the gateway and not a staff member', () => {
+    const rows = walletGatewayToppedUpActivity(monnify, topUp);
+    expect(rows.map((row) => row.campusId)).toEqual([LEKKI, IKEJA]);
+    expect(rows[0]).toEqual({
+      organizationId: 'org-1',
+      campusId: LEKKI,
+      pillar: 'finance',
+      kind: 'wallet.topped_up',
+      actorUserId: GATEWAY_ACTOR_ID,
+      subjectType: 'gateway_topup',
+      subjectId: 'gateway-topup-1',
+      text: `Mrs Ojo paid ${money(5_000_000, 'NGN')} online; ${money(4_950_000, 'NGN')} reached their wallet after the ${money(50_000, 'NGN')} fee.`,
+      data: {
+        topUpId: 'gateway-topup-1',
+        walletId: 'wallet-1',
+        amountMinor: 4_950_000,
+        grossMinor: 5_000_000,
+        feeMinor: 50_000,
+        source: 'monnify',
+      },
+    });
+  });
+
+  it('leaves the fee out of the wording when there is none', () => {
+    const [row] = walletGatewayToppedUpActivity(monnify, {
+      ...topUp,
+      grossMinor: 4_950_000,
+      feeMinor: 0,
+    });
+    expect(row?.text).toBe(
+      `Mrs Ojo paid ${money(4_950_000, 'NGN')} into their wallet online.`
+    );
+  });
+
+  it('keeps secret-like names out of its data', () => {
+    for (const row of walletGatewayToppedUpActivity(monnify, topUp)) {
+      expect(Object.keys(row.data ?? {}).join(' ')).not.toMatch(
+        /pass(?:word|wd)|secret|token/i
+      );
+    }
+  });
+
+  it('writes nothing for a family with no child on a campus', () => {
+    expect(
+      walletGatewayToppedUpActivity(monnify, { ...topUp, campusIds: [] })
+    ).toEqual([]);
   });
 });
 
