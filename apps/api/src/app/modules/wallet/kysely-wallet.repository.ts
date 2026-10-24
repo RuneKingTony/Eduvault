@@ -19,8 +19,7 @@ import {
   walletProofState,
 } from './kysely-wallet-read.repository';
 import {
-  findSpendRow,
-  findTopUpRow,
+  findReferenceRow,
   writeEarmark,
   writeSpend,
   writeTopUp,
@@ -139,14 +138,20 @@ export class KyselyWalletRepository extends WalletRepository {
     organizationId: string,
     reference: string
   ): Promise<ExistingEntry | undefined> {
-    return findTopUpRow(this.db, organizationId, reference);
+    return findReferenceRow('wallet_topup', this.db, {
+      organizationId,
+      reference,
+    });
   }
 
   findSpend(
     organizationId: string,
     reference: string
   ): Promise<ExistingEntry | undefined> {
-    return findSpendRow(this.db, organizationId, reference);
+    return findReferenceRow('wallet_spend', this.db, {
+      organizationId,
+      reference,
+    });
   }
 
   async insertTopUp(input: NewTopUp): Promise<TopUpOutcome> {

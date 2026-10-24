@@ -8,7 +8,6 @@ import {
   type TopUpWalletInput,
 } from '@eduvault/api-contract';
 import {
-  PAYMENT_METHODS,
   generatePaymentReference,
   isProofFile,
   money,
@@ -17,7 +16,9 @@ import {
 } from '@eduvault/shared';
 import {
   accountsFor,
+  firstMethod,
   preferredAccountId,
+  referenceOrFresh,
 } from '../payments/record-payment-model';
 
 export interface TopUpState {
@@ -41,10 +42,6 @@ export interface Receipt {
 
 export const amountOf = (state: Pick<TopUpState, 'amount'>): number =>
   parseNaira(state.amount) ?? 0;
-
-function firstMethod(methods: TopUpOptions['methods']): PaymentMethod {
-  return PAYMENT_METHODS.find((method) => methods[method]) ?? 'cash';
-}
 
 export function initialState(
   options: TopUpOptions,
@@ -71,7 +68,7 @@ export function withMethod(
   const next = {
     ...state,
     method,
-    reference: state.referenceTouched ? state.reference : fresh,
+    reference: referenceOrFresh(state, fresh),
   };
   const fits = accountsFor(options.accounts, method).some(
     (account) => account.id === state.accountId

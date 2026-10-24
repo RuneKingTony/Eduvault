@@ -13,6 +13,7 @@ import { createAuth } from './better-auth';
 import { MemberAdminService } from './member-admin.service';
 import { OrganizationAdminService } from './organization-admin.service';
 import { RoleAdminService } from './role-admin.service';
+import { seedAllLedgerAccounts } from '../ledger/seed-ledger-accounts';
 import { syncAllStarterRoles } from './starter-roles';
 
 @Module({
@@ -53,5 +54,6 @@ export class EduvaultAuthModule implements OnApplicationBootstrap {
 
   async onApplicationBootstrap() {
     await syncAllStarterRoles(this.pool);
+    await seedAllLedgerAccounts(this.pool);
   }
 }

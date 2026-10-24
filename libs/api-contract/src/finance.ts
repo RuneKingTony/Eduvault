@@ -16,7 +16,6 @@ export const BAD_DEBT_SYSTEM_KEY = 'bad_debt';
 export const STORE_SALES_SYSTEM_KEY = 'store_sales';
 export const STORE_COST_SYSTEM_KEY = 'store_cost';
 export const STUDENT_WALLETS_SYSTEM_KEY = 'student_wallets';
-export const MONNIFY_COLLECTIONS_SYSTEM_KEY = 'monnify_collections';
 export const LEDGER_ACCOUNT_TYPES = [
   'asset',
   'liability',

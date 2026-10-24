@@ -83,7 +83,6 @@ describe('allocateSpend', () => {
           fromFreeMinor: 400_000,
         },
       ],
-      freeLeftMinor: 100_000,
     });
   });
 
@@ -100,7 +99,6 @@ describe('allocateSpend', () => {
           fromFreeMinor: 0,
         },
       ],
-      freeLeftMinor: 0,
     });
   });
 
@@ -159,7 +157,6 @@ describe('allocateSpend', () => {
           fromFreeMinor: 1_000_000,
         },
       ],
-      freeLeftMinor: 0,
     });
   });
 });

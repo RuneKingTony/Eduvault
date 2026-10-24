@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import { FileIcon, PackageIcon } from 'lucide-react';
+import { PackageIcon } from 'lucide-react';
 import { PAYMENT_METHOD_LABELS, type Sale } from '@eduvault/api-contract';
 import { useCan, useCanAny } from '@eduvault/auth-client';
 import { FINANCE_READ_GATE } from '@eduvault/policy';
@@ -22,8 +22,8 @@ import {
   TableRow,
 } from '@eduvault/ui';
 import { useApi } from '../../api';
-import { API_URL } from '../../env';
 import { storeSaleQueryOptions } from '../../queries';
+import { ProofFileLink } from '../money/proof-link';
 import { Fact } from './fact';
 import { SheetPending } from './sheet-pending';
 
@@ -93,15 +93,10 @@ function PaymentFacts({ sale }: { sale: Sale }) {
       {sale.proof === null ? null : (
         <Fact label="Payment receipt">
           {canReadPayments ? (
-            <a
-              href={`${API_URL}/files/${sale.proof.fileId}`}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1 underline-offset-4 hover:underline"
-            >
-              <FileIcon className="size-3.5" />
-              {sale.proof.fileName}
-            </a>
+            <ProofFileLink
+              fileId={sale.proof.fileId}
+              fileName={sale.proof.fileName}
+            />
           ) : (
             `Receipt uploaded: ${sale.proof.fileName}`
           )}

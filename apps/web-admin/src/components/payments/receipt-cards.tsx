@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router';
-import { FileIcon, UsersIcon } from 'lucide-react';
+import { UsersIcon } from 'lucide-react';
 import {
   PAYMENT_METHOD_LABELS,
   type Payment,
@@ -22,7 +22,7 @@ import {
   TableRow,
 } from '@eduvault/ui';
 import { searchFor } from '../../route-search-defaults';
-import { API_URL } from '../../env';
+import { ProofFileLink } from '../money/proof-link';
 import { PersonAvatar } from '../person-avatar';
 import { BalanceBadge } from './balance-badge';
 
@@ -163,15 +163,10 @@ function ProofRow({ payment }: { payment: Payment }) {
   }
   return (
     <Row label={label}>
-      <a
-        href={`${API_URL}/files/${payment.proof.fileId}`}
-        target="_blank"
-        rel="noreferrer"
-        className="inline-flex items-center gap-1 underline-offset-4 hover:underline"
-      >
-        <FileIcon className="size-3.5" />
-        {payment.proof.fileName}
-      </a>
+      <ProofFileLink
+        fileId={payment.proof.fileId}
+        fileName={payment.proof.fileName}
+      />
     </Row>
   );
 }

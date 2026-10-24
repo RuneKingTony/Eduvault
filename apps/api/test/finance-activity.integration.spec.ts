@@ -34,6 +34,14 @@ import {
   sell,
   submitCount,
 } from './support/factories/store';
+import {
+  cashAccount,
+  postTopUp,
+  topUpBody,
+  topUpWallet,
+  walletIdOf,
+} from './support/factories/wallets';
+import { family, signInAs } from './support/portal';
 import { schoolsTest as test } from './support/two-schools';
 
 const SCHEDULE_KINDS: string[] = Object.values(FEE_SCHEDULE_KINDS);
@@ -898,5 +906,110 @@ test.describe('finance activity', () => {
     expect(invoiceSees.join(' ')).toContain(receipt.receiptNumber);
     expect(invoiceSees.join(' ')).toContain(credit.adjustment.number);
     expect(await financeTexts(api, closed)).toEqual([]);
+  });
+});
+
+test.describe('wallet activity', () => {
+  test('a top-up writes one row per campus the family has a child on, and a replay writes none', async ({
+    api,
+    app,
+    pool,
+    schools,
+  }) => {
+    const { owner, orgA, lekki, ikeja } = schools;
+    const account = await cashAccount(app, owner);
+    const { guardianLogin } = await family(app, schools);
+    const walletId = await walletIdOf(pool, guardianLogin?.guardianId ?? '');
+    const body = await topUpBody(api, owner, {
+      accountId: account.id,
+      amountMinor: 5_000_000,
+      reference: 'WACT-1',
+    });
+    const send = () =>
+      api(owner).post(`/finance/wallets/${walletId}/top-ups`).send(body);
+    await send().expect(201);
+    const { rows: topUps } = await pool.query<{ id: string }>(
+      'SELECT id FROM wallet_topup WHERE reference = $1',
+      ['WACT-1']
+    );
+
+    const rows = await financeRows(pool, orgA.id);
+    expect(rows.map((row) => row.kind)).toEqual([
+      'wallet.topped_up',
+      'wallet.topped_up',
+    ]);
+    expect(rows.map((row) => row.campus_id ?? '').toSorted(compare)).toEqual(
+      [lekki.id, ikeja.id].toSorted(compare)
+    );
+    for (const row of rows) {
+      expect(row).toMatchObject({
+        subject_type: 'wallet_topup',
+        subject_id: topUps[0]?.id,
+      });
+      expect(row.text).toMatch(/^.+ topped up .+’s wallet with ₦50,000\.$/);
+    }
+
+    await send().expect(200);
+    expect(await financeRows(pool, orgA.id)).toHaveLength(2);
+  });
+
+  test('a refused top-up writes no activity', async ({
+    api,
+    app,
+    pool,
+    schools,
+  }) => {
+    const { owner, orgA } = schools;
+    const account = await cashAccount(app, owner);
+    const { guardianLogin } = await family(app, schools);
+    const walletId = await walletIdOf(pool, guardianLogin?.guardianId ?? '');
+    await postTopUp(api, owner, {
+      walletId,
+      accountId: account.id,
+      amountMinor: 0,
+      status: 400,
+    });
+    expect(await financeRows(pool, orgA.id)).toEqual([]);
+  });
+
+  test('a spend writes one row per campus of the children it paid for, with that campus’s share', async ({
+    api,
+    app,
+    pool,
+    schools,
+  }) => {
+    const { owner, orgA, lekki, ikeja } = schools;
+    const account = await cashAccount(app, owner);
+    const { ada, tobi, guardianLogin } = await family(app, schools);
+    const walletId = await walletIdOf(pool, guardianLogin?.guardianId ?? '');
+    await owes(app, owner, { studentId: ada.id, amountMinor: OWED });
+    await owes(app, owner, { studentId: tobi.id, amountMinor: OWED });
+    await topUpWallet(api, owner, { walletId, accountId: account.id });
+    const guardian = await signInAs(api, guardianLogin);
+
+    await api(guardian)
+      .post('/portal/wallet/spend')
+      .send({
+        reference: 'WACT-SPEND',
+        lines: [
+          { studentId: ada.id, amountMinor: 1_500_000 },
+          { studentId: tobi.id, amountMinor: 600_000 },
+        ],
+      })
+      .expect(201);
+
+    const spent = (await financeRows(pool, orgA.id)).filter(
+      (row) => row.kind === 'wallet.spent'
+    );
+    const textOn = (campusId: string) =>
+      spent.find((row) => row.campus_id === campusId)?.text;
+    expect(spent).toHaveLength(2);
+    expect(textOn(lekki.id)).toMatch(
+      /^.+ paid ₦15,000 of their children’s charges on this campus from the wallet\.$/
+    );
+    expect(textOn(ikeja.id)).toMatch(
+      /^.+ paid ₦6,000 of their children’s charges on this campus from the wallet\.$/
+    );
+    expect(new Set(spent.map((row) => row.subject_id)).size).toBe(1);
   });
 });

@@ -26,8 +26,8 @@ import {
   cn,
 } from '@eduvault/ui';
 import { useApi } from '../../api';
-import { API_URL } from '../../env';
 import { walletMovementsQueryOptions } from '../../queries';
+import { ProofLink } from '../money/proof-link';
 import { QueryState } from '../money/query-state';
 import { movementTitle, walletMoney } from './wallet-text';
 
@@ -36,15 +36,13 @@ function Receipt({ movement }: { movement: WalletMovement }) {
     return null;
   }
   return (
-    <a
-      href={`${API_URL}/files/${movement.source.proofFileId}`}
-      target="_blank"
-      rel="noreferrer"
+    <ProofLink
+      fileId={movement.source.proofFileId}
       className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:underline"
     >
       <FileTextIcon className="size-3" />
       Receipt
-    </a>
+    </ProofLink>
   );
 }
 
