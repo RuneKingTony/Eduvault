@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import {
   ApiError,
@@ -519,6 +519,11 @@ describe('AnnouncementsPage row actions', () => {
   it('withdraws a published item and opens the Withdrawn tab', async () => {
     const api = setup();
     await user.click(await screen.findByRole('button', { name: 'Withdraw' }));
+    await user.click(
+      within(await screen.findByRole('dialog')).getByRole('button', {
+        name: 'Withdraw',
+      })
+    );
     await waitFor(() => {
       expect(api.announcements.withdraw).toHaveBeenCalledWith({
         params: { id: LIVE_ID },

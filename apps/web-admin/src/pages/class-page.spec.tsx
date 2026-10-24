@@ -288,6 +288,13 @@ describe('ClassPage', () => {
       await user.click(
         await screen.findByRole('button', { name: 'Remove Ayo Bassey' })
       );
+      await user.click(
+        within(
+          await screen.findByRole('dialog', {
+            name: 'Remove Ayo Bassey as class teacher?',
+          })
+        ).getByRole('button', { name: 'Remove teacher' })
+      );
       await waitFor(() => {
         expect(api.classes.removeTeacher).toHaveBeenCalledWith({
           params: { id: IDS.gold, userId: IDS.ayo },

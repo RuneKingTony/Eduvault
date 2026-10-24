@@ -60,7 +60,7 @@ function RecordCell({
   return (
     <Button
       type="button"
-      variant="ghost"
+      variant="outline"
       size="sm"
       aria-label={`Record payment for ${row.name}`}
       onClick={() => {

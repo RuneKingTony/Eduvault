@@ -1,9 +1,11 @@
+import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { PlusIcon, XIcon } from 'lucide-react';
 import type { Holiday } from '@eduvault/api-contract';
 import { Can } from '@eduvault/auth-client';
 import { fmtDate } from '@eduvault/shared';
 import {
+  ConfirmDialog,
   Button,
   Dialog,
   DialogContent,
@@ -63,6 +65,52 @@ function HolidayRow({
   );
 }
 
+function RemovableHolidays({ target }: { target: TermInYear }) {
+  const remove = useRemoveHoliday(target);
+  const [removing, setRemoving] = useState<Holiday | null>(null);
+  return (
+    <>
+      <ul className="flex flex-col divide-y rounded-md border text-sm">
+        {target.term.holidays.map((holiday) => (
+          <HolidayRow
+            key={holiday.id}
+            holiday={holiday}
+            disabled={remove.isPending}
+            onRemove={() => {
+              setRemoving(holiday);
+            }}
+          />
+        ))}
+      </ul>
+      <ErrorMessage error={remove.error} />
+      <ConfirmDialog
+        open={removing !== null}
+        title={`Remove ${removing?.name ?? 'holiday'}?`}
+        description={
+          removing === null
+            ? ''
+            : `${fmtDate(removing.date)} · ${removing.name} comes off the calendar. The term’s school days are recounted.`
+        }
+        tone="destructive"
+        confirmLabel="Remove holiday"
+        pending={remove.isPending}
+        onConfirm={() => {
+          if (removing !== null) {
+            remove.mutate(removing.id, {
+              onSettled: () => {
+                setRemoving(null);
+              },
+            });
+          }
+        }}
+        onCancel={() => {
+          setRemoving(null);
+        }}
+      />
+    </>
+  );
+}
+
 export function HolidaysDialog({
   target,
   onAddHoliday,
@@ -73,7 +121,6 @@ export function HolidaysDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const { term, year } = target;
-  const remove = useRemoveHoliday(target);
   return (
     <Dialog open onOpenChange={onOpenChange}>
       <DialogContent>
@@ -84,19 +131,7 @@ export function HolidaysDialog({
             add it again.
           </DialogDescription>
         </DialogHeader>
-        <ul className="flex flex-col divide-y rounded-md border text-sm">
-          {term.holidays.map((holiday) => (
-            <HolidayRow
-              key={holiday.id}
-              holiday={holiday}
-              disabled={remove.isPending}
-              onRemove={() => {
-                remove.mutate(holiday.id);
-              }}
-            />
-          ))}
-        </ul>
-        <ErrorMessage error={remove.error} />
+        <RemovableHolidays target={target} />
         <DialogFooter>
           <Can permission="session:update">
             <Button type="button" variant="ghost" onClick={onAddHoliday}>

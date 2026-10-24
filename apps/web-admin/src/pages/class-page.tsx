@@ -11,6 +11,7 @@ import type { CalendarCurrent, ClassDetail } from '@eduvault/api-contract';
 import { Can, UserAvatar } from '@eduvault/auth-client';
 import { countOf } from '@eduvault/shared';
 import {
+  ConfirmDialog,
   Badge,
   Breadcrumb,
   BreadcrumbItem,
@@ -156,31 +157,56 @@ function AddTeacherButton({ onClick }: { onClick: () => void }) {
 
 function TeacherRows({ classRow }: { classRow: ClassDetail }) {
   const remove = useRemoveTeacher(classRow);
+  const [removing, setRemoving] = useState<
+    ClassDetail['classTeachers'][number] | null
+  >(null);
   return (
-    <ul className="flex flex-col gap-2">
-      {classRow.classTeachers.map((teacher) => (
-        <li key={teacher.userId} className="flex items-center gap-3">
-          <UserAvatar name={teacher.name} className="size-7" />
-          <span className="flex-1 font-medium">{teacher.name}</span>
-          <Badge variant={teacher.role === 'lead' ? 'default' : 'secondary'}>
-            {ROLE_LABELS[teacher.role]}
-          </Badge>
-          <Can permission="class:assignTeacher">
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              aria-label={`Remove ${teacher.name}`}
-              onClick={() => {
-                remove.mutate(teacher);
-              }}
-            >
-              <XIcon />
-            </Button>
-          </Can>
-        </li>
-      ))}
-    </ul>
+    <>
+      <ul className="flex flex-col gap-2">
+        {classRow.classTeachers.map((teacher) => (
+          <li key={teacher.userId} className="flex items-center gap-3">
+            <UserAvatar name={teacher.name} className="size-7" />
+            <span className="flex-1 font-medium">{teacher.name}</span>
+            <Badge variant={teacher.role === 'lead' ? 'default' : 'secondary'}>
+              {ROLE_LABELS[teacher.role]}
+            </Badge>
+            <Can permission="class:assignTeacher">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-label={`Remove ${teacher.name}`}
+                onClick={() => {
+                  setRemoving(teacher);
+                }}
+              >
+                <XIcon />
+              </Button>
+            </Can>
+          </li>
+        ))}
+      </ul>
+      <ConfirmDialog
+        open={removing !== null}
+        title={`Remove ${removing?.name ?? 'teacher'} as class teacher?`}
+        description={`They stop teaching ${classRow.displayName} as its class teacher. You can add them back later.`}
+        tone="destructive"
+        confirmLabel="Remove teacher"
+        pending={remove.isPending}
+        onConfirm={() => {
+          if (removing !== null) {
+            remove.mutate(removing, {
+              onSettled: () => {
+                setRemoving(null);
+              },
+            });
+          }
+        }}
+        onCancel={() => {
+          setRemoving(null);
+        }}
+      />
+    </>
   );
 }
 
