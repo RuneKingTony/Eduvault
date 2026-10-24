@@ -7,7 +7,18 @@ export async function seedLedgerAccounts(
   await pool.query('SELECT seed_ledger_accounts($1)', [organizationId]);
 }
 
-/** The seeded gateway money account blocks deleting a school; an unused one is dropped first and put back if the delete fails. */
+/** Boot runs this so a school whose gateway account was dropped for a delete the process never finished gets it back. */
+export async function seedAllLedgerAccounts(
+  pool: Pick<Pool, 'query'>
+): Promise<void> {
+  await pool.query(
+    `SELECT pg_advisory_xact_lock(hashtextextended('seed_ledger_accounts', 0)),
+            seed_ledger_accounts("id")
+     FROM "organization"`
+  );
+}
+
+/** The seeded gateway money account blocks deleting a school; an unused one is dropped first and put back if the delete fails, or at the next boot. */
 export async function withoutGatewayAccounts<T>(
   pool: Pick<Pool, 'query'>,
   organizationId: string,

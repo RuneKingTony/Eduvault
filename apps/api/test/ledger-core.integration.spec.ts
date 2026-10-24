@@ -1,6 +1,7 @@
 import type { Pool, PoolClient } from 'pg';
 import { KYSELY_TOKEN, type Database } from '../src/app/common/db/tokens';
 import { allocateDocumentNumber } from '../src/app/common/documents';
+import { EduvaultAuthModule } from '../src/app/common/auth/auth.module';
 import { LedgerPoster, withoutGatewayAccounts } from '../src/app/common/ledger';
 import { expect } from './support/base-test';
 import { ledgerAccountId, postEntry } from './support/factories/finance';
@@ -239,6 +240,31 @@ test.describe('the chart', () => {
       )
     ).rejects.toThrow('delete refused');
     expect(await gateways()).toBe(1);
+  });
+
+  test('gives a school back the gateway account a delete that never finished dropped, at the next boot', async ({
+    pool,
+    schools,
+  }) => {
+    const { orgA, orgB } = schools;
+    const gateways = (organizationId: string) =>
+      countOf(
+        pool,
+        `SELECT count(*) FROM money_account WHERE organization_id = $1 AND kind = 'gateway'`,
+        [organizationId]
+      );
+    await pool.query(
+      `DELETE FROM money_account WHERE organization_id = $1 AND kind = 'gateway'`,
+      [orgA.id]
+    );
+    expect(await gateways(orgA.id)).toBe(0);
+
+    const boot = new EduvaultAuthModule(pool);
+    await boot.onApplicationBootstrap();
+    await boot.onApplicationBootstrap();
+
+    expect(await gateways(orgA.id)).toBe(1);
+    expect(await gateways(orgB.id)).toBe(1);
   });
 
   test('shows 2200 Student wallets as a liability that needs a family', async ({
