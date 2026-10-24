@@ -24,6 +24,20 @@ describe('portal nav', () => {
     ]);
   });
 
+  it('has no Wallet entry even for a guardian holding the wallet permissions: it lives on Fees', () => {
+    const wallet = toPermissionMap([
+      'student:readOwn',
+      'invoice:readOwn',
+      'wallet:readOwn',
+      'wallet:spend',
+    ]);
+    expect(idsFor('guardian', wallet, new Set([...BUILT, '/wallet']))).toEqual([
+      'children',
+      'home',
+      'fees',
+    ]);
+  });
+
   it('gives a guardian My children, Home and Fees with invoice:readOwn', () => {
     expect(idsFor('guardian', readOwnFees)).toEqual([
       'children',

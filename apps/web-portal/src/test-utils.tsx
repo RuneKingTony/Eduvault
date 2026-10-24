@@ -15,6 +15,10 @@ import type {
   PortalPurchase,
   PortalPurchases,
   PortalStudent,
+  PortalWalletMovement,
+  PortalWalletMovementList,
+  Wallet,
+  WalletChild,
 } from '@eduvault/api-contract';
 import { PermissionsProvider } from '@eduvault/auth-client';
 import { accessOfStarter } from '@eduvault/auth-client/testing';
@@ -53,6 +57,7 @@ export const portalMe = (overrides: Partial<PortalMe> = {}): PortalMe => ({
     admissionPrefix: 'GF',
     currency: 'NGN',
     logoUrl: null,
+    email: null,
   },
   children: [portalChild()],
   ...overrides,
@@ -274,3 +279,57 @@ export function renderWithApi(
     </QueryClientProvider>
   );
 }
+
+const WALLET_ID = testId(0x2_00_01);
+const GUARDIAN_ID = testId(0x2_00_02);
+
+export const walletChild = (over: Partial<WalletChild> = {}): WalletChild => ({
+  studentId: ADA_ID,
+  name: 'Ada Okeke',
+  admissionNumber: 'GF-0123',
+  inScope: true,
+  owedMinor: 6_000_000,
+  earmarkMinor: 0,
+  spendableMinor: 5_000_000,
+  oldestUnpaidOn: '2026-09-07',
+  ...over,
+});
+
+export const portalWallet = (over: Partial<Wallet> = {}): Wallet => ({
+  currency: 'NGN',
+  id: WALLET_ID,
+  guardian: { id: GUARDIAN_ID, name: 'Ngozi Okeke', phone: '08012345678' },
+  reservedAccount: null,
+  gatewayConnected: false,
+  autoPay: false,
+  balanceMinor: 5_000_000,
+  setAsideMinor: 0,
+  freeMinor: 5_000_000,
+  children: [walletChild()],
+  ...over,
+});
+
+export const portalMovement = (
+  over: Partial<PortalWalletMovement> = {}
+): PortalWalletMovement => ({
+  id: testId(0x2_00_11),
+  effectiveOn: '2026-10-07',
+  postedAt: '2026-10-07T09:00:00.000Z',
+  kind: 'wallet_topup',
+  reference: 'CSH-20261007-K3Q7ZA',
+  studentId: null,
+  studentName: null,
+  amountMinor: 5_000_000,
+  source: { type: 'topup', method: 'cash', depositorName: 'Uncle Bode' },
+  ...over,
+});
+
+export const portalMovements = (
+  items: PortalWalletMovement[] = [portalMovement()],
+  over: Partial<PortalWalletMovementList> = {}
+): PortalWalletMovementList => ({
+  currency: 'NGN',
+  items,
+  total: items.length,
+  ...over,
+});

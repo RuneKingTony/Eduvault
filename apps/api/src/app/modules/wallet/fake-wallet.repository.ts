@@ -16,12 +16,15 @@ import type { ProofState } from '../../common/payments';
 import type { OrgScope } from '../../common/scope';
 import {
   WalletRepository,
+  type AutoPayOutcome,
   type EarmarkOutcome,
   type ExistingEntry,
   type MovementPage,
+  type NewAutoPay,
   type NewEarmark,
   type NewSpend,
   type NewTopUp,
+  type PortalMovementPage,
   type SpendOutcome,
   type TopUpOutcome,
   type WalletPage,
@@ -34,6 +37,7 @@ export interface FakeChild {
   admissionNumber: string;
   campusId: string;
   owedMinor: number;
+  oldestUnpaidOn?: string;
 }
 
 export interface FakeWallet {
@@ -46,6 +50,7 @@ export interface FakeWallet {
   paying: boolean;
   balanceMinor: number;
   children: FakeChild[];
+  autoPay?: boolean;
 }
 
 interface Earmark {
@@ -61,6 +66,7 @@ export class FakeWalletRepository extends WalletRepository {
   topUps: (NewTopUp & { id: string })[] = [];
   spends: (NewSpend & { id: string; split: SpendSplit[] })[] = [];
   earmarks: Earmark[] = [];
+  autoPays: (NewAutoPay & { guardianId: string })[] = [];
   accounts = new Map<string, UsableMoneyAccount>();
   proofs = new Map<string, ProofState>();
   methods: PaymentMethods = { cash: true, transfer: true, pos: true };
@@ -123,6 +129,7 @@ export class FakeWalletRepository extends WalletRepository {
           { owedMinor: child.owedMinor, earmarkMinor },
           figures.freeMinor
         ),
+        oldestUnpaidOn: child.oldestUnpaidOn ?? null,
       };
     });
     return {
@@ -134,6 +141,7 @@ export class FakeWalletRepository extends WalletRepository {
       },
       reservedAccount: null,
       gatewayConnected: false,
+      autoPay: wallet.autoPay ?? false,
       ...figures,
       children,
     };
@@ -199,6 +207,16 @@ export class FakeWalletRepository extends WalletRepository {
 
   movements(): Promise<MovementPage> {
     return Promise.resolve({ items: [], total: 0 });
+  }
+
+  ownMovements(
+    organizationId: string,
+    userId: string
+  ): Promise<PortalMovementPage | undefined> {
+    const wallet = this.wallets.find(
+      (row) => row.organizationId === organizationId && row.userId === userId
+    );
+    return Promise.resolve(wallet && { items: [], total: 0 });
   }
 
   guardianPays(organizationId: string, walletId: string): Promise<boolean> {
@@ -383,6 +401,27 @@ export class FakeWalletRepository extends WalletRepository {
       reference: input.reference,
       key,
     });
+    return Promise.resolve({ status: 'applied' });
+  }
+
+  setAutoPay(input: NewAutoPay): Promise<AutoPayOutcome> {
+    const wallet = this.walletOf(input.walletId);
+    const existing = this.autoPays.find(
+      (row) =>
+        row.organizationId === input.organizationId &&
+        row.reference === input.reference
+    );
+    if (existing !== undefined) {
+      return Promise.resolve({
+        status:
+          existing.guardianId === wallet.guardianId &&
+          existing.enabled === input.enabled
+            ? 'replayed'
+            : 'reference_used',
+      });
+    }
+    this.autoPays.push({ ...input, guardianId: wallet.guardianId });
+    wallet.autoPay = input.enabled;
     return Promise.resolve({ status: 'applied' });
   }
 }

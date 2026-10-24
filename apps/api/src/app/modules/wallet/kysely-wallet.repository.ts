@@ -1,9 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { PaymentMethods, WalletListQuery } from '@eduvault/api-contract';
-import { ActivityWriter } from '../../common/activity';
 import { KYSELY_TOKEN, type Database } from '../../common/db/tokens';
 import { uniqueViolation } from '../../common/db/unique-violation';
-import { LedgerPoster, schoolCurrency } from '../../common/ledger';
+import { schoolCurrency } from '../../common/ledger';
 import {
   usableMoneyAccount,
   type UsableMoneyAccount,
@@ -12,23 +11,31 @@ import type { ProofState } from '../../common/payments';
 import { readPaymentMethods } from '../../common/school-setting/payment-methods';
 import type { OrgScope } from '../../common/scope';
 import {
+  WalletWriters,
+  findReferenceRow,
+  writeSpend,
+} from '../../common/wallet';
+import {
   findOwnWallet,
   findWallet,
   listWallets,
+  ownMovements,
   walletMovements,
   walletProofState,
 } from './kysely-wallet-read.repository';
 import {
-  findReferenceRow,
+  writeAutoPay,
   writeEarmark,
-  writeSpend,
   writeTopUp,
 } from './kysely-wallet-write.repository';
 import {
   WalletRepository,
+  type AutoPayOutcome,
   type EarmarkOutcome,
   type ExistingEntry,
   type MovementPage,
+  type PortalMovementPage,
+  type NewAutoPay,
   type NewEarmark,
   type NewSpend,
   type NewTopUp,
@@ -44,8 +51,7 @@ const PROOF_FILE_KEY = 'wallet_topup_proof_file_id_key';
 export class KyselyWalletRepository extends WalletRepository {
   constructor(
     @Inject(KYSELY_TOKEN) private readonly db: Database,
-    private readonly poster: LedgerPoster,
-    private readonly activity: ActivityWriter
+    private readonly writers: WalletWriters
   ) {
     super();
   }
@@ -93,6 +99,14 @@ export class KyselyWalletRepository extends WalletRepository {
           },
           paging
         );
+  }
+
+  ownMovements(
+    organizationId: string,
+    userId: string,
+    paging: { page: number; pageSize: number }
+  ): Promise<PortalMovementPage | undefined> {
+    return ownMovements(this.db, { organizationId, userId }, paging);
   }
 
   async guardianPays(
@@ -158,7 +172,7 @@ export class KyselyWalletRepository extends WalletRepository {
     try {
       return await this.db
         .transaction()
-        .execute((trx) => writeTopUp(trx, this.deps(), input));
+        .execute((trx) => writeTopUp(trx, this.writers, input));
     } catch (error) {
       if (uniqueViolation(error) === PROOF_FILE_KEY) {
         return { status: 'proof_taken' };
@@ -170,14 +184,14 @@ export class KyselyWalletRepository extends WalletRepository {
   spend(input: NewSpend): Promise<SpendOutcome> {
     return this.db
       .transaction()
-      .execute((trx) => writeSpend(trx, this.deps(), input));
+      .execute((trx) => writeSpend(trx, this.writers, input));
   }
 
   earmark(input: NewEarmark): Promise<EarmarkOutcome> {
     return this.db.transaction().execute((trx) => writeEarmark(trx, input));
   }
 
-  private deps() {
-    return { poster: this.poster, activity: this.activity };
+  setAutoPay(input: NewAutoPay): Promise<AutoPayOutcome> {
+    return this.db.transaction().execute((trx) => writeAutoPay(trx, input));
   }
 }

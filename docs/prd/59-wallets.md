@@ -1,24 +1,24 @@
 # PRD: Wallets
 
-- Status: draft (EDU-304, first phase of the family wallets epic EDU-303: the ledger core, staff top-ups and the guardian API; EDU-305, second phase: the Monnify connection and online top-ups; the guardian screens, refunds and migration of old credits follow in their own issues)
+- Status: draft (EDU-304, first phase of the family wallets epic EDU-303: the ledger core, staff top-ups and the guardian API; EDU-305, second phase: the Monnify connection and online top-ups; EDU-306, third phase: the guardian Fees page, movements and auto-pay; refunds and migration of old credits follow in their own issues)
 - Source: not in the brand prototype. The Wallets screens follow [Payments](53-payments.md) and its Record payment sheet.
 - Milestone and slice: `M3.9` (see [roadmap](README.md))
-- Related: [53-payments.md](53-payments.md) (reference replay, proof, the sheet this one is modelled on), [56-money-accounts-and-categories.md](56-money-accounts-and-categories.md) (2200 and the Monnify account), [54-who-owes-and-statements.md](54-who-owes-and-statements.md), [72-portal.md](72-portal.md), [technical reference](../technical-reference.md) decisions D-385 to D-398, [ADR 0008](../adr/0008-append-only-balanced-journal.md)
+- Related: [53-payments.md](53-payments.md) (reference replay, proof, the sheet this one is modelled on), [56-money-accounts-and-categories.md](56-money-accounts-and-categories.md) (2200 and the Monnify account), [54-who-owes-and-statements.md](54-who-owes-and-statements.md), [72-portal.md](72-portal.md), [technical reference](../technical-reference.md) decisions D-385 to D-404, [ADR 0008](../adr/0008-append-only-balanced-journal.md)
 
 ## Summary
 
-A family can pay money in ahead and spend it on its children's charges. Staff record the money a guardian hands over (**Record top-up**, with the receipt) and see every wallet; the guardian, through the API in this phase, pays charges from it and can set some aside for one child. A wallet is a view over journal lines on `2200 Student wallets`; no balance is stored. Online payments (EDU-305): each paying family has a Monnify bank account; what is transferred to it reaches the wallet by itself, confirmed with Monnify first. The guardian's Fees screen, refunds and auto-pay are later phases.
+A family can pay money in ahead and spend it on its children's charges. Staff record the money a guardian hands over (**Record top-up**, with the receipt) and see every wallet; the guardian, through the API in this phase, pays charges from it and can set some aside for one child. A wallet is a view over journal lines on `2200 Student wallets`; no balance is stored. Online payments (EDU-305): each paying family has a Monnify bank account; what is transferred to it reaches the wallet by itself, confirmed with Monnify first. Guardians (EDU-306) see the wallet on their Fees page in the portal: the family's Monnify account, the balance, paying their children's charges from it, setting money aside, an opt-in auto-pay switch and the history with Trace. Refunds are a later phase.
 
 ## Who uses it
 
-| Persona                               | Permission(s)                    | What they can do here                                                                                    |
-| ------------------------------------- | -------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| Owner                                 | all                              | See every wallet, record a top-up, connect Monnify in Settings > Online payments                         |
-| Bursar (Lekki or Ikeja)               | `wallet:read`, `wallet:topUp`    | See and top up the wallets of families with a child on their campuses; create a family's Monnify account |
-| Administrator, Principal              | `wallet:read`                    | See wallets; no **Record top-up** button, the `POST` answers 403                                         |
-| Guardian                              | `wallet:readOwn`, `wallet:spend` | See their own wallet; pay their children's charges from it; set money aside (API only for now)           |
-| Student, teacher, member with no role | none                             | Not shown; the route redirects, the API answers 403                                                      |
-| Acting super admin, no reason         | read permissions                 | Button hidden; `POST` answers 403 `ActingReadOnly`, audited                                              |
+| Persona                               | Permission(s)                    | What they can do here                                                                                                                                     |
+| ------------------------------------- | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Owner                                 | all                              | See every wallet, record a top-up, connect Monnify in Settings > Online payments                                                                          |
+| Bursar (Lekki or Ikeja)               | `wallet:read`, `wallet:topUp`    | See and top up the wallets of families with a child on their campuses; create a family's Monnify account                                                  |
+| Administrator, Principal              | `wallet:read`                    | See wallets; no **Record top-up** button, the `POST` answers 403                                                                                          |
+| Guardian                              | `wallet:readOwn`, `wallet:spend` | See their own wallet and history on the portal Fees page; pay their children's charges from it; set money aside and release it; switch auto-pay on or off |
+| Student, teacher, member with no role | none                             | Not shown; the route redirects, the API answers 403                                                                                                       |
+| Acting super admin, no reason         | read permissions                 | Button hidden; `POST` answers 403 `ActingReadOnly`, audited                                                                                               |
 
 Scope: a staff member sees a wallet when the school matches and either they see every campus or any child linked to the wallet's guardian is on a campus they see. Anything else answers 404; a caller who can see it but lacks the permission answers 403 [tenancy-001]. A guardian reaches only their own wallet, found from the signed-in user, never from an id in the URL.
 
@@ -43,6 +43,20 @@ Scope: a staff member sees a wallet when the school matches and either they see 
 - **Movements** card: date, movement ("Top-up from Uncle Bode · Cash", "Online top-up · Monnify", "Paid Ada Okeke's charges"), reference with a **Receipt** link for a staff top-up and a **Trace** link for an online one, who made it (blank for online), and the signed amount; newest first, paged.
 - **Trace** (dialog on an online movement): Monnify reference, payment reference, signature check ("Valid"), confirmation ("Checked with Monnify on …"), paid on, paid by the family (gross), Monnify fee, credited to the wallet (net) and the journal entry reference.
 - States: loading, error, not found ("No wallet here", back to Wallets).
+
+### Guardian Fees (web-portal)
+
+There is no separate Wallet page. A guardian holding `wallet:readOwn` sees, on `/fees` ([72-portal.md](72-portal.md#fees-m37)), top to bottom:
+
+- **Wallet:** the three figures (**Balance**, **Free to use**, **Set aside**; an empty wallet reads **₦0.00**), a **Top up** dropdown and, for `wallet:spend`, **Pay from wallet**. **Top up** shows the family's Monnify bank, account number (with a **Copy** button) and account name; when the school has not connected Monnify it says online payments aren't switched on and to ask the office to record a top-up; when it has but the family has no account yet it says the account isn't ready. The **Auto-pay** switch (off by default) reads "When money reaches the wallet, pay your children's oldest charges first."; it toasts "Auto-pay is on." or "Auto-pay is off.".
+- **Owing** tile: what the family owes across the children who owe (a child in credit is not set against another's debt), **₦0.00** and "Nothing owed" at zero.
+- The selected child's **Charges** card (unpaid charges, **Set aside** and **Release** for `wallet:spend`), then the **Statement** with its Term select, as today.
+- **History:** every movement, newest first, ten a page, signed amounts; an online top-up has **Trace** (the same facts as the staff dialog).
+- A note: "Sent money to the wrong account? Email {school email} with the reference and we will look into a refund." Without a school email: "Contact the school with the reference …".
+
+**Pay from wallet** (dialog): a table of the children, the one who has owed longest first, with **Owes**, **Can use** and an amount field. A child's **Can use** is the lesser of what they owe and their set-aside money plus the free money; lines are taken in order, so two never count the same free money. Zero shows **₦0.00**; an amount over the cap shows the API's limit message and holds **Review payment**. **Pay all I can** fills the oldest first. Set-aside money is used for that child first. **Review payment** opens a confirmation (each child and the total); **Pay now** posts with a reference made when the dialog opened, so a retry replays. A 422 toasts the API's limit.
+
+**Set aside** and **Release** (dialogs): a child and an amount, held to the free money and to what is set aside for that child. Toast "₦X set aside for {child}." or "₦X released for {child}.".
 
 ### Record top-up (sheet)
 
@@ -72,12 +86,18 @@ Scope: a staff member sees a wallet when the school matches and either they see 
 17. **Reserved account.** One per wallet, made on demand by `POST /finance/wallets/:walletId/reserved-account` (idempotent; 409 until the school has connected, 400 when no guardian pays, 503 when Monnify cannot be reached, 502 when it refuses) and, best effort after the commit, when a guardian is admitted or made a payer. The account reference is `EDV-W-<wallet id>`, so a retry reuses the account ([D-397](../technical-reference.md#decision-log)).
 18. **Staff cannot type a Monnify reference.** A reference starting `MNFY-` or `MNFY|` answers 400 like the other system prefixes ([D-398](../technical-reference.md#decision-log)).
 19. **Activity.** An online top-up writes `wallet.topped_up` on each campus the family has a child on, by the system actor `system:monnify`, with no secret-like data key.
+20. **Auto-pay.** Off by default. A guardian turns it on or off with `PUT /portal/wallet/auto-pay`; each change is a row of an append-only log and the latest row counts. When money lands in the wallet, by a staff top-up or an online one, and auto-pay is on, the family's free money pays the children's charges in the same transaction, the child with the oldest unpaid charge first, set-aside money first, never more than a child owes. It is an ordinary `wallet_spend` posted as the guardian who switched it on, with reference `AUTOPAY-<credit reference>` and activity `wallet.spent`. A replayed credit pays nothing twice. If paying fails the credit still stands ([D-400](../technical-reference.md#decision-log)).
+21. **Guardian history.** `GET /portal/wallet/movements` lists the guardian's own movements without who recorded them, the receipt file or internal ids; no wallet answers 404 ([D-401](../technical-reference.md#decision-log)).
+22. **Zero.** Every figure in a wallet or a pay table shows kobo, so zero reads ₦0.00 ([D-404](../technical-reference.md#decision-log)).
+23. **Refund note.** The Fees page tells a family who sent money to the wrong account to email the school profile address with the reference ([D-402](../technical-reference.md#decision-log)); refund requests themselves are a later phase.
 
 ## Data
 
 Migration `20261023090000_wallet_ledger_core`: `ledger_account.requires_family`, `journal_line.family_id` (composite FK to `guardian`, trigger, index), the `wallet_topup` and `wallet_spend` journal kinds, `seed_ledger_accounts` (2200 `student_wallets`, `monnify_collections` and its gateway money account; backfilled), `wallet` and its trigger and backfill, `wallet_topup`, `wallet_spend`, `wallet_earmark` (unique `(organization_id, reference)`, sign checks, composite FKs, `ON DELETE RESTRICT`), the append-only triggers, and `wallet_proof` in `file_object_kind_check`. See [data-model-finance.md](../brainstorming/data-model-finance.md).
 
 Migration `20261024120000_monnify_gateway` (EDU-305): `gateway_connection` (one per school, encrypted keys and their masked tails, mode, contract code, last test result; `ON DELETE CASCADE` from `organization`), `wallet_reserved_account` (one per wallet, unique account reference, append-only) and `gateway_topup` (unique `(organization_id, reference)`, `gross = net + fee`, `net > 0`, `signature_verified` must be true, composite FKs to the wallet, reserved account and journal entry, append-only). `GATEWAY_ENCRYPTION_KEY` (32 bytes, base64) is the only new environment variable; the webhook URL given to Monnify is `{BETTER_AUTH_URL}/webhooks/monnify/{school id}`.
+
+Migration `20261025090000_wallet_auto_pay` (EDU-306): `wallet_auto_pay_setting`, an append-only log (organization, guardian, `enabled`, a `reference` unique per school, `created_by`, `created_at`, an identity `sequence` that orders it), with a composite foreign key to `wallet` (`ON DELETE RESTRICT`) and the `wallet_append_only` trigger. The current value is the latest row; nothing is stored on `wallet`.
 
 ## API
 
@@ -97,8 +117,10 @@ Migration `20261024120000_monnify_gateway` (EDU-305): `gateway_connection` (one 
 | POST   | `/portal/wallet/spend`                        | `wallet:spend`         | reference, one line per child                                           | `SpentWallet`, 201 or 200 replayed             | 401, 403, 404, 409, 422           |
 | POST   | `/portal/wallet/earmarks`                     | `wallet:spend`         | reference, child, amount                                                | `EarmarkedWallet`                              | 401, 403, 404, 409, 422           |
 | POST   | `/portal/wallet/earmarks/release`             | `wallet:spend`         | reference, child, amount                                                | `EarmarkedWallet`                              | 401, 403, 404, 409, 422           |
+| GET    | `/portal/wallet/movements`                    | `wallet:readOwn`       | `page`, `pageSize`                                                      | `PortalWalletMovementList`                     | 401, 403, 404                     |
+| PUT    | `/portal/wallet/auto-pay`                     | `wallet:spend`         | enabled, reference                                                      | `Wallet`, 200 (idempotent)                     | 401, 403, 404, 409                |
 
-Contract types live in `@eduvault/api-contract` (`wallets.ts`).
+Contract types live in `@eduvault/api-contract` (`wallets.ts`). `Wallet` carries `autoPay` and each child `oldestUnpaidOn`; `GET /portal/me` carries the school email ([72-portal.md](72-portal.md#api)).
 
 ## Acceptance criteria
 
@@ -118,3 +140,11 @@ Contract types live in `@eduvault/api-contract` (`wallets.ts`).
 14. Given a notification signed by school A that names school B's account, or school A's secret on school B's URL, when it arrives, then B's wallet is not credited.
 15. Given a bursar and a connected school, when she presses **Create account** twice on a family, then Monnify is asked for one account and both answers show it.
 16. Given a bursar, when she opens `/finance/gateway/monnify`, then the API answers 403; given an owner, no response ever contains a key.
+17. Given a guardian with ₦50,000 free and two children owing, when she opens Fees, then she sees the wallet, the Owing tile with the family total, each child's charges and statement, her History and the refund note, and there is no Wallet page.
+18. Given the same guardian, when she pays ₦15,000 for one child and ₦5,000 for the other from the dialog and confirms, then one balanced entry is posted, each child's statement shows "Paid from wallet", and the History lists it; sending the same request again posts nothing more.
+19. Given ₦20,000 free and the oldest child owing ₦15,000, when she enters ₦20,000 for the second child as well, then the dialog shows that child's limit and holds the payment back.
+20. Given auto-pay is off, when a bursar records a top-up, then no charge is paid; given she switches it on and a top-up or a Monnify payment arrives, then the oldest child's charges are paid in the same transaction by a `wallet_spend` named `AUTOPAY-…`, and the same top-up sent again pays nothing twice.
+21. Given guardian A and guardian B in the same school, or in two schools, when A asks for her movements, then she sees none of B's.
+22. Given a guardian without `wallet:spend`, when she asks to switch auto-pay on, then the API answers 403.
+23. Given a school with an email on its profile, when a guardian reads the refund note, then it names that address; with none, it asks her to contact the school.
+24. Given a wallet with no money, when the guardian opens Fees, then every figure and the Owing tile at zero read ₦0.00.

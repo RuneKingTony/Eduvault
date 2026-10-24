@@ -2,10 +2,11 @@ import { useQuery } from '@tanstack/react-query';
 import { FileTextIcon, HistoryIcon } from 'lucide-react';
 import {
   FINANCE_PAGE_SIZE,
+  movementTitle,
   type WalletMovement,
   type WalletMovementList,
 } from '@eduvault/api-contract';
-import { fmtDate } from '@eduvault/shared';
+import { fmtDate, walletMoney } from '@eduvault/shared';
 import {
   Card,
   CardContent,
@@ -29,7 +30,6 @@ import { useApi } from '../../api';
 import { walletMovementsQueryOptions } from '../../queries';
 import { ProofLink } from '../money/proof-link';
 import { QueryState } from '../money/query-state';
-import { movementTitle, walletMoney } from './wallet-text';
 import { TraceButton } from './wallet-trace';
 
 function Receipt({ movement }: { movement: WalletMovement }) {

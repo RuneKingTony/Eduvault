@@ -1,8 +1,10 @@
 import {
   generatePaymentReference,
+  generateWalletReference,
   paymentReference,
   randomReferenceSuffix,
 } from './payment-reference';
+import { isReservedReference } from './reference-namespace';
 
 const fixed =
   (...values: number[]) =>
@@ -43,5 +45,24 @@ describe('generatePaymentReference', () => {
     expect(
       generatePaymentReference('pos', '2026-01-31', fixed(2, 2, 2, 2, 2, 2))
     ).toBe('POS-20260131-CCCCCC');
+  });
+});
+
+describe('generateWalletReference', () => {
+  it.each([
+    ['spend', 'WSP'],
+    ['setAside', 'WSA'],
+    ['release', 'WRL'],
+    ['autoPay', 'WAP'],
+  ] as const)('prefixes %s with %s and the Lagos date', (kind, prefix) => {
+    expect(
+      generateWalletReference(kind, '2026-10-25', fixed(0, 1, 2, 3, 4, 5))
+    ).toBe(`${prefix}-20261025-ABCDEF`);
+  });
+
+  it('never starts like a number the system issues', () => {
+    expect(
+      isReservedReference(generateWalletReference('spend', '2026-10-25'))
+    ).toBe(false);
   });
 });

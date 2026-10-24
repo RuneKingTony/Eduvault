@@ -46,7 +46,7 @@ function byBalance<T>(
   }
   return balanceMinor < 0
     ? copy.credit(money(-balanceMinor, currency))
-    : copy.clear(money(0, currency));
+    : copy.clear(money(0, currency, { kobo: true }));
 }
 
 export const balanceTile = (
@@ -56,7 +56,7 @@ export const balanceTile = (
   byBalance(balanceMinor, currency, {
     owing: (amount) => ({ label: 'Owing', value: amount }),
     credit: (amount) => ({ label: 'Extra paid', value: amount }),
-    clear: () => ({ label: 'Owing', value: 'Nothing' }),
+    clear: (amount) => ({ label: 'Owing', value: amount }),
   });
 
 export function statementTiles(
@@ -213,9 +213,9 @@ export const feesStat = (
       value: 'Paid up',
       sub: `${amount} extra`,
     }),
-    clear: () => ({
-      label: 'School fees',
-      value: 'Paid up',
+    clear: (amount) => ({
+      label: 'Owing',
+      value: amount,
       sub: 'Nothing owed',
     }),
   });

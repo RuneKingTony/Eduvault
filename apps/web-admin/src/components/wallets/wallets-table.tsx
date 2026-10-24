@@ -1,6 +1,6 @@
 import { Link } from '@tanstack/react-router';
 import type { WalletSummary } from '@eduvault/api-contract';
-import { countOf } from '@eduvault/shared';
+import { countOf, walletMoney } from '@eduvault/shared';
 import {
   Table,
   TableBody,
@@ -11,7 +11,6 @@ import {
 } from '@eduvault/ui';
 import { searchFor } from '../../route-search-defaults';
 import { PersonAvatar } from '../person-avatar';
-import { walletMoney } from './wallet-text';
 
 function RowLink({
   wallet,

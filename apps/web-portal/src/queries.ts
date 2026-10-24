@@ -1,15 +1,22 @@
 import {
   keepPreviousData,
+  mutationOptions,
   queryOptions,
   type QueryClient,
   type QueryExecuteOptions,
   type QueryKey,
 } from '@tanstack/react-query';
+import type {
+  EarmarkInput,
+  SetAutoPayInput,
+  SpendWalletInput,
+} from '@eduvault/api-contract';
 import { termKeyOf } from '@eduvault/shared';
 import type { Api } from './api';
 
 const PORTAL_KEY = ['portal'] as const;
 const CALENDAR_KEY = ['calendar'] as const;
+const WALLET_KEY = [...PORTAL_KEY, 'wallet'] as const;
 
 export const portalMeQueryOptions = (api: Api) =>
   queryOptions({
@@ -100,6 +107,66 @@ export const portalPriceListQueryOptions = (api: Api, studentId: string) =>
   queryOptions({
     queryKey: [...PORTAL_KEY, 'price-list', studentId],
     queryFn: () => api.portal.priceList({ params: { studentId } }),
+  });
+
+export const WALLET_MOVEMENTS_PAGE_SIZE = 10;
+
+export const portalWalletQueryOptions = (api: Api) =>
+  queryOptions({
+    queryKey: WALLET_KEY,
+    queryFn: () => api.portalWallet.get({}),
+  });
+
+export const portalWalletMovementsQueryOptions = (api: Api, page: number) =>
+  queryOptions({
+    queryKey: [...WALLET_KEY, 'movements', page],
+    queryFn: () =>
+      api.portalWallet.movements({
+        query: { page, pageSize: WALLET_MOVEMENTS_PAGE_SIZE },
+      }),
+    placeholderData: keepPreviousData,
+  });
+
+/** Money that moves changes the wallet and its history, every child's statement, the family total and the balances on the children list. */
+const invalidatePortalMoney = async (
+  queryClient: QueryClient
+): Promise<void> => {
+  await Promise.all(
+    [
+      WALLET_KEY,
+      [...PORTAL_KEY, 'statement'],
+      [...PORTAL_KEY, 'family-statement'],
+      [...PORTAL_KEY, 'children'],
+    ].map((queryKey) => queryClient.invalidateQueries({ queryKey }))
+  );
+};
+
+export const spendWalletMutationOptions = (
+  api: Api,
+  queryClient: QueryClient
+) =>
+  mutationOptions({
+    mutationFn: (body: SpendWalletInput) => api.portalWallet.spend({ body }),
+    onSuccess: () => invalidatePortalMoney(queryClient),
+  });
+
+export const setAsideMutationOptions = (api: Api, queryClient: QueryClient) =>
+  mutationOptions({
+    mutationFn: (body: EarmarkInput) => api.portalWallet.setAside({ body }),
+    onSuccess: () => invalidatePortalMoney(queryClient),
+  });
+
+export const releaseMutationOptions = (api: Api, queryClient: QueryClient) =>
+  mutationOptions({
+    mutationFn: (body: EarmarkInput) => api.portalWallet.release({ body }),
+    onSuccess: () => invalidatePortalMoney(queryClient),
+  });
+
+export const autoPayMutationOptions = (api: Api, queryClient: QueryClient) =>
+  mutationOptions({
+    mutationFn: (body: SetAutoPayInput) =>
+      api.portalWallet.setAutoPay({ body }),
+    onSuccess: () => invalidatePortalMoney(queryClient),
   });
 
 export const calendarCurrentQueryOptions = (api: Api) =>

@@ -1,7 +1,7 @@
 import type {
   PaymentMethod,
   PaymentMethods,
-  SpendLine,
+  PortalWalletMovement,
   Wallet,
   WalletListQuery,
   WalletListTotals,
@@ -11,6 +11,17 @@ import type {
 import type { UsableMoneyAccount } from '../../common/money-accounts';
 import type { ProofState } from '../../common/payments';
 import type { OrgScope } from '../../common/scope';
+import type {
+  ExistingEntry,
+  NewSpend,
+  SpendOutcome,
+} from '../../common/wallet';
+
+export type {
+  ExistingEntry,
+  NewSpend,
+  SpendOutcome,
+} from '../../common/wallet';
 
 export type WalletView = Omit<Wallet, 'currency'>;
 
@@ -25,16 +36,15 @@ export interface MovementPage {
   total: number;
 }
 
+export interface PortalMovementPage {
+  items: PortalWalletMovement[];
+  total: number;
+}
+
 interface Actor {
   organizationId: string;
   userId: string;
   userName: string;
-}
-
-export interface ExistingEntry {
-  id: string;
-  walletId: string;
-  requestHash: string;
 }
 
 export interface NewTopUp extends Actor {
@@ -57,20 +67,6 @@ export type TopUpOutcome =
   | { status: 'reference_used' }
   | { status: 'proof_taken' };
 
-export interface NewSpend extends Actor {
-  walletId: string;
-  reference: string;
-  requestHash: string;
-  lines: readonly SpendLine[];
-  spentOn: string;
-}
-
-export type SpendOutcome =
-  | { status: 'spent'; id: string }
-  | { status: 'replayed'; id: string }
-  | { status: 'reference_used' }
-  | { status: 'over'; studentId: string; spendableMinor: number };
-
 export interface NewEarmark extends Actor {
   walletId: string;
   kind: 'set' | 'release';
@@ -84,6 +80,17 @@ export type EarmarkOutcome =
   | { status: 'replayed' }
   | { status: 'reference_used' }
   | { status: 'over'; limitMinor: number };
+
+export interface NewAutoPay {
+  organizationId: string;
+  userId: string;
+  walletId: string;
+  enabled: boolean;
+  reference: string;
+}
+
+export type AutoPayOutcome =
+  { status: 'applied' } | { status: 'replayed' } | { status: 'reference_used' };
 
 export abstract class WalletRepository {
   abstract currency(organizationId: string): Promise<string>;
@@ -105,6 +112,12 @@ export abstract class WalletRepository {
     walletId: string,
     paging: { page: number; pageSize: number }
   ): Promise<MovementPage>;
+
+  abstract ownMovements(
+    organizationId: string,
+    userId: string,
+    paging: { page: number; pageSize: number }
+  ): Promise<PortalMovementPage | undefined>;
 
   abstract guardianPays(
     organizationId: string,
@@ -139,4 +152,6 @@ export abstract class WalletRepository {
   abstract spend(input: NewSpend): Promise<SpendOutcome>;
 
   abstract earmark(input: NewEarmark): Promise<EarmarkOutcome>;
+
+  abstract setAutoPay(input: NewAutoPay): Promise<AutoPayOutcome>;
 }

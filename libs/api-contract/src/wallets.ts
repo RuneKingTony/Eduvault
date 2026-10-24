@@ -125,6 +125,7 @@ export const walletChildSchema = z.object({
   owedMinor: minorSchema,
   earmarkMinor: minorSchema.nonnegative(),
   spendableMinor: minorSchema.nonnegative(),
+  oldestUnpaidOn: z.iso.date().nullable(),
 });
 export type WalletChild = z.infer<typeof walletChildSchema>;
 
@@ -145,6 +146,7 @@ export const walletSchema = z.object({
   }),
   reservedAccount: reservedAccountSchema.nullable(),
   gatewayConnected: z.boolean(),
+  autoPay: z.boolean(),
   balanceMinor: minorSchema,
   setAsideMinor: minorSchema,
   freeMinor: minorSchema,
@@ -203,6 +205,51 @@ export const walletMovementListSchema = z.object({
   total: countSchema,
 });
 export type WalletMovementList = z.infer<typeof walletMovementListSchema>;
+
+export const portalWalletMovementSourceSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('topup'),
+    method: paymentMethodSchema,
+    depositorName: z.string().nullable(),
+  }),
+  z.object({
+    type: z.literal('monnify'),
+    transactionReference: z.string(),
+    paymentReference: z.string(),
+    signatureVerified: z.literal(true),
+    paidAt: z.iso.datetime({ offset: true }),
+    confirmedAt: z.iso.datetime({ offset: true }),
+    grossMinor: minorSchema.positive(),
+    feeMinor: minorSchema.nonnegative(),
+    netMinor: minorSchema.positive(),
+  }),
+  z.object({ type: z.literal('spend') }),
+]);
+export type PortalWalletMovementSource = z.infer<
+  typeof portalWalletMovementSourceSchema
+>;
+
+export const portalWalletMovementSchema = z.object({
+  id: idSchema,
+  effectiveOn: z.iso.date(),
+  postedAt: z.iso.datetime({ offset: true }),
+  kind: journalKindSchema,
+  reference: z.string(),
+  studentId: idSchema.nullable(),
+  studentName: z.string().nullable(),
+  amountMinor: minorSchema,
+  source: portalWalletMovementSourceSchema.nullable(),
+});
+export type PortalWalletMovement = z.infer<typeof portalWalletMovementSchema>;
+
+export const portalWalletMovementListSchema = z.object({
+  currency: currencySchema,
+  items: z.array(portalWalletMovementSchema),
+  total: countSchema,
+});
+export type PortalWalletMovementList = z.infer<
+  typeof portalWalletMovementListSchema
+>;
 
 export const topUpOptionsSchema = z.object({
   currency: currencySchema,
@@ -296,5 +343,12 @@ export const earmarkedWalletSchema = z.object({
   wallet: walletSchema,
 });
 export type EarmarkedWallet = z.infer<typeof earmarkedWalletSchema>;
+
+export const setAutoPaySchema = z.object({
+  enabled: z.boolean(),
+  reference: paymentReferenceSchema,
+});
+export type SetAutoPayInput = z.input<typeof setAutoPaySchema>;
+export type SetAutoPay = z.output<typeof setAutoPaySchema>;
 
 export { PAYMENT_PROOF as WALLET_PROOF } from './payments';

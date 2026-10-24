@@ -247,7 +247,7 @@ describe('StudentPage Fees tab', () => {
     expect(screen.queryByText('Owing')).not.toBeInTheDocument();
   });
 
-  it('shows Owing Nothing for a zero balance', async () => {
+  it('shows Owing ₦0.00 for a zero balance', async () => {
     setup({
       statement: {
         totals: {
@@ -260,7 +260,7 @@ describe('StudentPage Fees tab', () => {
     });
     await openFees();
     expect(await screen.findByText('Owing')).toBeInTheDocument();
-    expect(screen.getByText('Nothing')).toBeInTheDocument();
+    expect(screen.getByText('₦0.00')).toBeInTheDocument();
   });
 
   it('shows Reduced only when something was reduced', async () => {

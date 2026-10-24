@@ -1,9 +1,19 @@
-import { Body, Controller, Get, Post, UseInterceptors } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Post,
+  Put,
+  Query,
+  UseInterceptors,
+} from '@nestjs/common';
 import {
   contract,
   type Earmark,
   type RouteOutput,
+  type SetAutoPay,
   type SpendWallet,
+  type WalletMovementQuery,
 } from '@eduvault/api-contract';
 import { Org, OrganizationAuth, type OrgContext } from '../../common/auth';
 import { ReplayStatusInterceptor } from '../../common/http/replay-status.interceptor';
@@ -20,6 +30,24 @@ export class WalletPortalController {
   @OrganizationAuth('wallet', 'readOwn')
   get(@Org() org: OrgContext): Promise<RouteOutput<typeof routes.get>> {
     return this.wallet.mine(org);
+  }
+
+  @Get('movements')
+  @OrganizationAuth('wallet', 'readOwn')
+  movements(
+    @Org() org: OrgContext,
+    @Query(zod(routes.movements.query)) query: WalletMovementQuery
+  ): Promise<RouteOutput<typeof routes.movements>> {
+    return this.wallet.movements(org, query);
+  }
+
+  @Put('auto-pay')
+  @OrganizationAuth('wallet', 'spend')
+  setAutoPay(
+    @Org() org: OrgContext,
+    @Body(zod(routes.setAutoPay.body)) body: SetAutoPay
+  ): Promise<RouteOutput<typeof routes.setAutoPay>> {
+    return this.wallet.setAutoPay(org, body);
   }
 
   @Post('spend')

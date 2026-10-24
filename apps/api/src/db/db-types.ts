@@ -860,6 +860,17 @@ export interface Wallet {
   organization_id: string;
 }
 
+export interface WalletAutoPaySetting {
+  created_at: Generated<Timestamp>;
+  created_by: string;
+  enabled: boolean;
+  guardian_id: string;
+  id: Generated<string>;
+  organization_id: string;
+  reference: string;
+  sequence: Generated<Int8>;
+}
+
 export interface WalletEarmark {
   created_at: Generated<Timestamp>;
   created_by: string;
@@ -976,6 +987,7 @@ export interface DB {
   user: User;
   verification: Verification;
   wallet: Wallet;
+  wallet_auto_pay_setting: WalletAutoPaySetting;
   wallet_earmark: WalletEarmark;
   wallet_reserved_account: WalletReservedAccount;
   wallet_spend: WalletSpend;

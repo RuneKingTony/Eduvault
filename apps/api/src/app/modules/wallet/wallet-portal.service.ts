@@ -13,13 +13,16 @@ import {
   walletSpendOverMessage,
   type Earmark,
   type EarmarkedWallet,
+  type PortalWalletMovementList,
+  type SetAutoPay,
   type SpendWallet,
   type SpentWallet,
   type Wallet,
+  type WalletMovementQuery,
 } from '@eduvault/api-contract';
 import type { OrgContext } from '../../common/auth';
 import { Clock } from '../../common/clock';
-import { spendRequestHash } from './wallet-request-hash';
+import { spendRequestHash } from '../../common/wallet';
 import { WalletRepository, type EarmarkOutcome } from './wallet.repository';
 
 const sumOf = (rows: readonly { amountMinor: number }[]): number =>
@@ -41,6 +44,35 @@ export class WalletPortalService {
       throw new NotFoundException(WALLET_NOT_FOUND_MESSAGE);
     }
     return { currency, ...found };
+  }
+
+  async movements(
+    ctx: OrgContext,
+    query: WalletMovementQuery
+  ): Promise<PortalWalletMovementList> {
+    const [currency, page] = await Promise.all([
+      this.wallets.currency(ctx.organizationId),
+      this.wallets.ownMovements(ctx.organizationId, ctx.user.id, query),
+    ]);
+    if (page === undefined) {
+      throw new NotFoundException(WALLET_NOT_FOUND_MESSAGE);
+    }
+    return { currency, ...page };
+  }
+
+  async setAutoPay(ctx: OrgContext, input: SetAutoPay): Promise<Wallet> {
+    const wallet = await this.mine(ctx);
+    const outcome = await this.wallets.setAutoPay({
+      organizationId: ctx.organizationId,
+      userId: ctx.user.id,
+      walletId: wallet.id,
+      enabled: input.enabled,
+      reference: input.reference,
+    });
+    if (outcome.status === 'reference_used') {
+      throw new ConflictException(WALLET_REFERENCE_TAKEN_MESSAGE);
+    }
+    return this.mine(ctx);
   }
 
   private childOf(wallet: Wallet, studentId: string) {

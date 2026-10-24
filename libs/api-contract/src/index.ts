@@ -23,3 +23,4 @@ export * from './wallets';
 export * from './contract';
 export * from './client';
 export * from './checked-fake';
+export * from './wallet-text';

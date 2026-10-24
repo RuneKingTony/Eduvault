@@ -1910,6 +1910,35 @@ CREATE TABLE public.wallet (
 );
 
 --
+-- Name: wallet_auto_pay_setting; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.wallet_auto_pay_setting (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    sequence bigint NOT NULL,
+    organization_id text NOT NULL,
+    guardian_id uuid NOT NULL,
+    enabled boolean NOT NULL,
+    reference text NOT NULL,
+    created_by text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT wallet_auto_pay_setting_reference_check CHECK (((char_length(btrim(reference)) >= 1) AND (char_length(btrim(reference)) <= 80)))
+);
+
+--
+-- Name: wallet_auto_pay_setting_sequence_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.wallet_auto_pay_setting ALTER COLUMN sequence ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME public.wallet_auto_pay_setting_sequence_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+--
 -- Name: wallet_earmark; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -3048,6 +3077,20 @@ ALTER TABLE ONLY public.verification
     ADD CONSTRAINT verification_pkey PRIMARY KEY (id);
 
 --
+-- Name: wallet_auto_pay_setting wallet_auto_pay_setting_organization_id_reference_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wallet_auto_pay_setting
+    ADD CONSTRAINT wallet_auto_pay_setting_organization_id_reference_key UNIQUE (organization_id, reference);
+
+--
+-- Name: wallet_auto_pay_setting wallet_auto_pay_setting_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wallet_auto_pay_setting
+    ADD CONSTRAINT wallet_auto_pay_setting_pkey PRIMARY KEY (id);
+
+--
 -- Name: wallet_earmark wallet_earmark_id_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3800,6 +3843,12 @@ CREATE UNIQUE INDEX user_username_uidx ON public."user" USING btree (username);
 CREATE INDEX verification_identifier_idx ON public.verification USING btree (identifier);
 
 --
+-- Name: wallet_auto_pay_setting_latest_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX wallet_auto_pay_setting_latest_idx ON public.wallet_auto_pay_setting USING btree (organization_id, guardian_id, sequence DESC);
+
+--
 -- Name: wallet_earmark_wallet_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4014,6 +4063,12 @@ CREATE CONSTRAINT TRIGGER store_sale_not_empty AFTER INSERT ON public.store_sale
 --
 
 CREATE TRIGGER wallet_append_only BEFORE DELETE OR UPDATE ON public.wallet FOR EACH ROW EXECUTE FUNCTION public.wallet_append_only();
+
+--
+-- Name: wallet_auto_pay_setting wallet_auto_pay_setting_append_only; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER wallet_auto_pay_setting_append_only BEFORE DELETE OR UPDATE ON public.wallet_auto_pay_setting FOR EACH ROW EXECUTE FUNCTION public.wallet_append_only();
 
 --
 -- Name: wallet_earmark wallet_earmark_append_only; Type: TRIGGER; Schema: public; Owner: -
@@ -5510,6 +5565,27 @@ ALTER TABLE ONLY public.term
     ADD CONSTRAINT term_session_id_organization_id_fkey FOREIGN KEY (session_id, organization_id) REFERENCES public.academic_session(id, organization_id) ON DELETE CASCADE;
 
 --
+-- Name: wallet_auto_pay_setting wallet_auto_pay_setting_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wallet_auto_pay_setting
+    ADD CONSTRAINT wallet_auto_pay_setting_created_by_fkey FOREIGN KEY (created_by) REFERENCES public."user"(id) ON DELETE RESTRICT;
+
+--
+-- Name: wallet_auto_pay_setting wallet_auto_pay_setting_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wallet_auto_pay_setting
+    ADD CONSTRAINT wallet_auto_pay_setting_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE RESTRICT;
+
+--
+-- Name: wallet_auto_pay_setting wallet_auto_pay_setting_organization_id_guardian_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wallet_auto_pay_setting
+    ADD CONSTRAINT wallet_auto_pay_setting_organization_id_guardian_id_fkey FOREIGN KEY (organization_id, guardian_id) REFERENCES public.wallet(organization_id, guardian_id) ON DELETE RESTRICT;
+
+--
 -- Name: wallet_earmark wallet_earmark_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -5687,4 +5763,5 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20261022120000'),
     ('20261022130000'),
     ('20261023090000'),
-    ('20261024120000');
+    ('20261024120000'),
+    ('20261025090000');

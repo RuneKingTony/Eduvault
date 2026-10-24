@@ -9,11 +9,11 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  Fact,
   toast,
 } from '@eduvault/ui';
 import { useApi } from '../../api';
 import { invalidateWallets } from '../../queries';
-import { Fact } from './wallet-trace';
 
 const DENIED = 'You need permission to create a Monnify account.';
 

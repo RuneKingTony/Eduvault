@@ -19,6 +19,7 @@ export interface PortalProfile {
     admissionPrefix: string;
     currency: string;
     logoUrl: string | null;
+    email: string | null;
   };
 }
 

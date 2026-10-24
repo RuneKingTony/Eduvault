@@ -33,10 +33,12 @@ import {
   portalChild,
   portalFamilyStatement,
   portalMe,
+  portalMovements,
   portalStatement,
   portalPriceList,
   portalPurchases,
   portalStudent,
+  portalWallet,
 } from './test-utils';
 
 const authClient = {
@@ -92,6 +94,10 @@ function fakeApi(
       familyStatement: vi.fn().mockResolvedValue(portalFamilyStatement()),
       purchases: vi.fn().mockResolvedValue(portalPurchases()),
       priceList: vi.fn().mockResolvedValue(portalPriceList()),
+    },
+    portalWallet: {
+      get: vi.fn().mockResolvedValue(portalWallet()),
+      movements: vi.fn().mockResolvedValue(portalMovements()),
     },
     calendar: {
       current: vi.fn().mockResolvedValue(calendarCurrent()),

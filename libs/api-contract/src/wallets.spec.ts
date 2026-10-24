@@ -6,6 +6,8 @@ import {
   WALLET_SPEND_NO_LINES_MESSAGE,
   WALLET_SPEND_TWICE_MESSAGE,
   earmarkSchema,
+  portalWalletMovementSchema,
+  setAutoPaySchema,
   spendWalletSchema,
   topUpWalletSchema,
   walletEarmarkReleaseOverMessage,
@@ -148,6 +150,95 @@ describe('earmarkSchema', () => {
   });
 });
 
+describe('setAutoPaySchema', () => {
+  it('takes the switch and a reference, trimmed', () => {
+    expect(
+      setAutoPaySchema.parse({ enabled: true, reference: ' APY-1 ' })
+    ).toEqual({ enabled: true, reference: 'APY-1' });
+  });
+
+  it('needs the switch to be a boolean and refuses a system reference', () => {
+    expect(
+      setAutoPaySchema.safeParse({ enabled: 'yes', reference: 'APY-1' }).success
+    ).toBe(false);
+    expect(
+      messages(
+        setAutoPaySchema.safeParse({ enabled: true, reference: 'ADJ-1' })
+      )
+    ).toEqual([RESERVED_REFERENCE_MESSAGE]);
+    expect(
+      messages(
+        setAutoPaySchema.safeParse({
+          enabled: false,
+          reference: 'AUTOPAY-CSH-20261024-K3Q7ZA',
+        })
+      )
+    ).toEqual([RESERVED_REFERENCE_MESSAGE]);
+  });
+});
+
+describe('portalWalletMovementSchema', () => {
+  const movement = {
+    id,
+    effectiveOn: '2026-10-24',
+    postedAt: '2026-10-24T09:00:00.000Z',
+    kind: 'wallet_topup',
+    reference: 'CSH-20261024-K3Q7ZA',
+    studentId: null,
+    studentName: null,
+    amountMinor: 5_000_000,
+    source: { type: 'topup', method: 'cash', depositorName: 'Uncle Bode' },
+  };
+
+  it('accepts a staff top-up without who made it or the receipt file', () => {
+    expect(portalWalletMovementSchema.parse(movement).source).toEqual({
+      type: 'topup',
+      method: 'cash',
+      depositorName: 'Uncle Bode',
+    });
+  });
+
+  it('drops the fields only staff may see', () => {
+    const parsed = portalWalletMovementSchema.parse({
+      ...movement,
+      entryId: other,
+      lineId: other,
+      madeBy: 'Bursar',
+      source: {
+        type: 'topup',
+        method: 'cash',
+        depositorName: null,
+        id: other,
+        proofFileId: other,
+      },
+    });
+    expect(parsed).not.toHaveProperty('madeBy');
+    expect(parsed).not.toHaveProperty('entryId');
+    expect(parsed.source).toEqual({
+      type: 'topup',
+      method: 'cash',
+      depositorName: null,
+    });
+  });
+
+  it('keeps what Trace shows for an online top-up', () => {
+    const source = {
+      type: 'monnify',
+      transactionReference: 'MNFY|20|1',
+      paymentReference: 'PAY-1',
+      signatureVerified: true,
+      paidAt: '2026-10-24T08:00:00.000Z',
+      confirmedAt: '2026-10-24T08:00:05.000Z',
+      grossMinor: 5_000_000,
+      feeMinor: 50_000,
+      netMinor: 4_950_000,
+    };
+    expect(
+      portalWalletMovementSchema.parse({ ...movement, source }).source
+    ).toEqual(source);
+  });
+});
+
 describe('list and movement queries', () => {
   it('default to the first page of ten', () => {
     expect(walletListQuerySchema.parse({})).toEqual({ page: 1, pageSize: 10 });
@@ -195,6 +286,13 @@ describe('the wallet routes', () => {
     expect(contract.portalWallet.setAside.path).toBe('/portal/wallet/earmarks');
     expect(contract.portalWallet.release.path).toBe(
       '/portal/wallet/earmarks/release'
+    );
+    expect(contract.portalWallet.movements.path).toBe(
+      '/portal/wallet/movements'
+    );
+    expect(contract.portalWallet.setAutoPay.method).toBe('PUT');
+    expect(contract.portalWallet.setAutoPay.path).toBe(
+      '/portal/wallet/auto-pay'
     );
   });
 

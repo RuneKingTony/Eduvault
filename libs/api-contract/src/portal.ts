@@ -53,6 +53,7 @@ export const portalMeSchema = z.object({
     admissionPrefix: z.string(),
     currency: currencySchema,
     logoUrl: z.string().nullable(),
+    email: z.string().nullable(),
   }),
   children: z.array(portalChildSchema),
 });

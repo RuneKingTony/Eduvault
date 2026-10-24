@@ -6,7 +6,7 @@ import type {
   TopUpOptions,
   Wallet,
 } from '@eduvault/api-contract';
-import { generatePaymentReference } from '@eduvault/shared';
+import { generatePaymentReference, walletMoney } from '@eduvault/shared';
 import {
   ConfirmDialog,
   ErrorMessage,
@@ -45,7 +45,6 @@ import {
   type TopUpErrors,
   type TopUpState,
 } from './top-up-model';
-import { walletMoney } from './wallet-text';
 
 interface Attempt {
   state: TopUpState;
