@@ -2,11 +2,13 @@ import type {
   PortalWalletMovement,
   WalletMovement,
 } from '@eduvault/api-contract';
+import { SYSTEM_REFERENCE_PREFIXES } from '@eduvault/shared';
 
 type PortalSource = NonNullable<PortalWalletMovement['source']>;
 
 function portalSourceOf(
-  source: NonNullable<WalletMovement['source']>
+  source: NonNullable<WalletMovement['source']>,
+  reference: string
 ): PortalSource {
   switch (source.type) {
     case 'topup': {
@@ -21,7 +23,12 @@ function portalSourceOf(
       return facts;
     }
     case 'spend': {
-      return { type: 'spend' };
+      return {
+        type: 'spend',
+        automatic: reference.startsWith(
+          `${SYSTEM_REFERENCE_PREFIXES.autopay}-`
+        ),
+      };
     }
   }
 }
@@ -38,5 +45,8 @@ export const portalMovementOf = (
   studentId: movement.studentId,
   studentName: movement.studentName,
   amountMinor: movement.amountMinor,
-  source: movement.source === null ? null : portalSourceOf(movement.source),
+  source:
+    movement.source === null
+      ? null
+      : portalSourceOf(movement.source, movement.reference),
 });

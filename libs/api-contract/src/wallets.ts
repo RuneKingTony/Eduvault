@@ -223,7 +223,7 @@ export const portalWalletMovementSourceSchema = z.discriminatedUnion('type', [
     feeMinor: minorSchema.nonnegative(),
     netMinor: minorSchema.positive(),
   }),
-  z.object({ type: z.literal('spend') }),
+  z.object({ type: z.literal('spend'), automatic: z.boolean() }),
 ]);
 export type PortalWalletMovementSource = z.infer<
   typeof portalWalletMovementSourceSchema

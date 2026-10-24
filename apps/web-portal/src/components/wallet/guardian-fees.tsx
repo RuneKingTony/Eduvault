@@ -12,15 +12,13 @@ import { PortalStatementCard } from '../portal-statement-card';
 import { StatTile } from '../stat-tile';
 import { ChildChargesCard } from './child-charges-card';
 import { EarmarkDialog, type EarmarkKind } from './earmark-dialog';
+import { familyBalanceMinor } from './family-balance';
 import { PayFromWalletDialog } from './pay-dialog';
 import { RefundNote } from './refund-note';
 import { WalletHistoryCard } from './wallet-history-card';
 import { WalletSection } from './wallet-section';
 
 type OpenDialog = { kind: 'pay' } | { kind: 'earmark'; earmark: EarmarkKind };
-
-const familyOwedMinor = (wallet: Wallet): number =>
-  wallet.children.reduce((sum, child) => sum + Math.max(0, child.owedMinor), 0);
 
 function ChildSection({
   child,
@@ -137,7 +135,7 @@ export function GuardianFees({
   onTerm: (term: string | undefined) => void;
 }) {
   const [dialog, setDialog] = useState<OpenDialog | null>(null);
-  const owing = feesStat(familyOwedMinor(wallet), wallet.currency);
+  const owing = feesStat(familyBalanceMinor(wallet.children), wallet.currency);
   return (
     <div className="flex flex-col gap-6">
       <FeesHeader child={child} />
