@@ -39,6 +39,7 @@ Scopes: settings are school-wide (one row per school). Another school's settings
   | School structure | Campuses (building)                  | `/campuses` ([32](32-campuses.md))               | `team:read`                                    |
   | School structure | Levels (layers)                      | `/settings/levels` ([31](31-classes.md))         | `class:read`                                   |
   | Finance          | Payment rules (receipt)              | `/settings/payment-rules`                        | `schoolAccount:read`                           |
+  | Finance          | Online payments (landmark)           | `/settings/online-payments`                      | `wallet:manageGateway`                         |
   | Access           | Roles and permissions (shield-check) | `/roles` ([21](21-roles-and-permissions.md))     | `ac:read`                                      |
   | Access           | Danger zone (shield-alert)           | `/settings/danger`                               | `organization:delete` or `organization:update` |
 
@@ -123,6 +124,17 @@ This file owns the screen: route, layout and copy. What the switches do when a p
 
 - Section **Discounts**: the "Sibling discount" row ("Not active yet" in the prototype) is hidden in production and the automatic sibling discount doesn't ship ([D-021](../technical-reference.md#decision-log)), so the section doesn't render. Sibling discounts are per-student discounts ([55](55-discounts-and-refunds.md)).
 - Section **Receipt wording** (**new** copy): "Receipt footer" (text, max 120, default "Thank you for your payment.", hint "Printed at the bottom of every receipt.") and a "Save changes" button; toast "Receipt wording saved."
+
+### Online payments (EDU-305)
+
+The screen where a school connects its own Monnify account. What the connection does with money (reserved accounts, the webhook, the Trace) is owned by [59-wallets](59-wallets.md); where they differ, 59 wins on behaviour.
+
+- Route `/settings/online-payments`, rendered in the Settings frame under **Finance**, after Payment rules. Gate `wallet:manageGateway`, which only an owner holds ([D-391](../technical-reference.md#decision-log)); the route redirects anyone else and the API answers 403.
+- Header: title "Online payments", description "Let families pay into their wallet by bank transfer through Monnify."
+- Section **Monnify**, description "The school's own Monnify account. Families' bank transfers go to it, and each payment is confirmed with Monnify before it reaches a wallet." Fields: **Mode** (Sandbox (testing) or Live, hint "Sandbox is for trying it out with test money. Changing the mode needs new keys."), **Contract code**, **API key** and **Secret key** (password inputs, never filled in). Once saved, a key shows only as a mask in the placeholder and the hint "Saved as ••••ABCD. Leave blank to keep it." Footer **Save connection**; toast "Online payments saved. Test the connection next." A refusal toasts the API's message. Validation: "Enter the contract code."
+- Section **Test the connection**: a row "Check the keys with Monnify" with **Test connection** (outline, disabled until saved). The description reads "Save the connection first.", "Not tested yet.", "Connected when tested on {date time}." or "The last test failed on {date time}." A good result toasts "Connected to Monnify."; a bad one toasts "Monnify did not accept these keys. Check the mode, API key and secret key." or "Monnify could not be reached right now. Try again in a moment."
+- Section **Webhook**, description "In the Monnify dashboard, set this as the transaction completion URL, and allow Monnify's IP addresses to reach it." A read-only **Webhook URL** field.
+- Secrets are write-only: no response, page, log or activity row ever repeats a key. Saving them needs `GATEWAY_ENCRYPTION_KEY` on the server (503 otherwise).
 
 ### Look and wording (hidden in the prototype)
 
