@@ -30,6 +30,7 @@ import {
   invalidateSubjectTeachers,
   subjectCandidatesQueryOptions,
 } from '../../queries';
+import { useConfirmStep, type ConfirmStep } from '../use-confirm-step';
 import { defaultTeacher } from './subject-model';
 
 export interface AssignTarget {
@@ -105,12 +106,14 @@ function CandidateField({
 
 function useAssignForm(target: AssignTarget, onClose: () => void) {
   const [error, setError] = useState<string | undefined>();
-  const [confirming, setConfirming] = useState(false);
   const assign = useAssign(target, onClose);
   const remove = useRemove(target, onClose);
   const fail = (failure: Error) => {
     setError(failure.message);
   };
+  const unassign = useConfirmStep<AssignTarget>((_, settled) => {
+    remove.mutate(undefined, { onError: fail, onSettled: settled });
+  });
 
   function submit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -128,18 +131,9 @@ function useAssignForm(target: AssignTarget, onClose: () => void) {
     submit,
     saving: assign.isPending,
     removing: remove.isPending,
-    confirming,
-    setConfirming,
-    removeTeacher: () => {
-      setConfirming(true);
-    },
-    confirmRemove: () => {
-      remove.mutate(undefined, {
-        onError: fail,
-        onSettled: () => {
-          setConfirming(false);
-        },
-      });
+    unassign,
+    askUnassign: () => {
+      unassign.ask(target);
     },
   };
 }
@@ -163,9 +157,9 @@ function AssignFooter({
           variant="ghost"
           className="text-destructive sm:mr-auto"
           disabled={form.removing}
-          onClick={form.removeTeacher}
+          onClick={form.askUnassign}
         >
-          Remove teacher
+          Unassign teacher
         </Button>
       ) : null}
       <Button type="button" variant="ghost" onClick={onClose}>
@@ -179,25 +173,35 @@ function AssignFooter({
   );
 }
 
-function RemoveTeacherConfirm({
-  form,
-  target,
+function unassignDetails({ arm, row }: AssignTarget) {
+  const details = [
+    { label: 'Subject', value: row.name },
+    { label: 'Class', value: arm.displayName },
+  ];
+  return row.teacher === null
+    ? details
+    : [...details, { label: 'Teacher', value: row.teacher.name }];
+}
+
+function UnassignConfirm({
+  step,
+  pending,
 }: {
-  form: ReturnType<typeof useAssignForm>;
-  target: AssignTarget;
+  step: ConfirmStep<AssignTarget>;
+  pending: boolean;
 }) {
+  const target = step.target;
   return (
     <ConfirmDialog
-      open={form.confirming}
-      title={`Remove the teacher of ${target.row.name}?`}
-      description={`${target.row.name} in ${target.arm.displayName} will have no teacher until you assign one.`}
+      open={target !== null}
+      title="Unassign this subject teacher?"
+      description="The subject has no teacher until you assign one."
+      details={target === null ? [] : unassignDetails(target)}
       tone="destructive"
-      confirmLabel="Remove teacher"
-      pending={form.removing}
-      onConfirm={form.confirmRemove}
-      onCancel={() => {
-        form.setConfirming(false);
-      }}
+      confirmLabel="Unassign"
+      pending={pending}
+      onConfirm={step.confirm}
+      onCancel={step.cancel}
     />
   );
 }
@@ -249,7 +253,7 @@ function AssignForm({
           onClose={onClose}
         />
       </form>
-      <RemoveTeacherConfirm form={form} target={target} />
+      <UnassignConfirm step={form.unassign} pending={form.removing} />
     </>
   );
 }

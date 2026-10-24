@@ -683,7 +683,7 @@ describe('SubjectsPage subject teachers', () => {
       expect(select).toHaveValue(SUBJECT_IDS.emeka);
     });
     expect(
-      screen.getByRole('button', { name: 'Remove teacher' })
+      screen.getByRole('button', { name: 'Unassign teacher' })
     ).toBeInTheDocument();
     expect(api.classes.teacherCandidates).toHaveBeenCalledWith({
       params: { id: SUBJECT_IDS.gold },
@@ -696,18 +696,40 @@ describe('SubjectsPage subject teachers', () => {
     renderWithApi(page('teachers'), withMe(api));
     await user.click(await screen.findByRole('button', { name: 'Change' }));
     await user.click(
-      await screen.findByRole('button', { name: 'Remove teacher' })
+      await screen.findByRole('button', { name: 'Unassign teacher' })
     );
     const dialog = await screen.findByRole('dialog', {
-      name: /Remove the teacher of/,
+      name: 'Unassign this subject teacher?',
     });
     expect(api.subjectTeachers.remove).not.toHaveBeenCalled();
+    await user.click(within(dialog).getByRole('button', { name: 'Unassign' }));
+    await waitFor(() => {
+      expect(api.subjectTeachers.remove).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('returns to the assign form without saving when the removal is cancelled', async () => {
+    const api = apiFor();
+    renderWithApi(page('teachers'), withMe(api));
+    await user.click(await screen.findByRole('button', { name: 'Change' }));
     await user.click(
-      within(dialog).getByRole('button', { name: 'Remove teacher' })
+      await screen.findByRole('button', { name: 'Unassign teacher' })
+    );
+    await user.click(
+      within(
+        await screen.findByRole('dialog', {
+          name: 'Unassign this subject teacher?',
+        })
+      ).getByRole('button', { name: 'Cancel' })
     );
     await waitFor(() => {
-      expect(api.subjectTeachers.remove).toHaveBeenCalled();
+      expect(
+        screen.queryByRole('dialog', { name: 'Unassign this subject teacher?' })
+      ).not.toBeInTheDocument();
     });
+    expect(screen.getByLabelText('Teacher')).toBeInTheDocument();
+    expect(api.subjectTeachers.remove).not.toHaveBeenCalled();
+    expect(api.subjectTeachers.assign).not.toHaveBeenCalled();
   });
 
   it('shows the no-candidate hint and disables Save teacher', async () => {

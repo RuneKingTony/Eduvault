@@ -142,7 +142,7 @@ One card, "Subject catalogue", icon `book-marked`, description "`{n}` subjects."
   - Closes the dialog.
   - Toast (success): "`{Member name}` now teaches `{Subject name}` in `{Arm name}`."
 - No candidates: the prototype shows an empty select. Build: show the hint the class-teacher dialog uses, "No teachers on the `{Campus}` campus yet. Add one under People first.", and disable "Save teacher".
-- When the subject has a teacher, the dialog also shows **Remove teacher** (ghost, destructive, gate `class:assignTeacher`). It deletes this term's row only and the class leaves that member's class scope unless another row keeps it there. Toast (success): "`{Subject name}` in `{Arm name}` has no teacher now."
+- When the subject has a teacher, the dialog also shows **Unassign teacher** (ghost, destructive, gate `class:assignTeacher`), which asks first in a confirm titled "Unassign this subject teacher?" (confirm button "Unassign"). Confirming deletes this term's row only and the class leaves that member's class scope unless another row keeps it there. Toast (success): "`{Subject name}` in `{Arm name}` has no teacher now."
 
 #### Sheet: New subject
 
@@ -190,7 +190,7 @@ Listed so the build keeps them in step; they are specified in their own PRDs.
 2. Subjects are referenced by id everywhere (levels, electives, teachers, later scores), never by name or code text [grading: Curriculum].
 3. A subject sits on a class level at most once, as core or elective, with a `sequence` that orders the level list and later the report card [grading: Curriculum].
 4. Core subjects apply to every student at the level. An elective applies only to students who take it this session, recorded through their enrolment [grading: Curriculum].
-5. One subject teacher per arm, subject and term. Assigning again replaces the previous teacher for that term [grading: Curriculum]. **Remove teacher** deletes the current term's row; no scores exist at F2, so no history is lost.
+5. One subject teacher per arm, subject and term. Assigning again replaces the previous teacher for that term [grading: Curriculum]. **Unassign teacher** deletes the current term's row; no scores exist at F2, so no history is lost.
 6. Subject teachers are set for the current term only. Past terms are read-only; future terms are not addressable until current.
 7. The teacher must be a candidate for the arm's campus: holds `class:read` and works on that campus or holds `campus:readAll` [D-006]. Anyone else is refused (400).
 8. The subject must be on the arm's level list and not retired. Otherwise the assignment is refused (400).
@@ -272,7 +272,7 @@ The candidate list endpoint ships with class-teacher assignment in M2.3; this mo
 15. Given a super admin acting without a reason, when they open the screen, then "Add subject", "Assign" and "Change" are hidden, and any write answers 403.
 16. Given French is on the JSS 1 list, when an administrator retires it, then the API answers 409 and the toast reads "Take French off every class level first."; given AGR (retired), when they press Restore, then it shows as Active.
 17. Given an administrator renames ENG to "English Studies", then the catalogue shows the new name and the code stays `ENG`.
-18. Given Mathematics in JSS 2 Silver has a teacher, when an administrator presses Remove teacher, then the row reads "Unassigned" and the teacher no longer sees JSS 2 Silver unless another row gives it to them.
+18. Given Mathematics in JSS 2 Silver has a teacher, when an administrator presses Unassign teacher and confirms, then the row reads "Unassigned" and the teacher no longer sees JSS 2 Silver unless another row gives it to them.
 19. Given second term is current and first term had nine subject teachers, one of whom has since left the campus, when an administrator copies from last term, then eight rows are created, one is reported as skipped, and no row assigned this term is changed.
 20. (M4.2) Given an administrator saves JSS 2 with Agricultural Science added as Elective 7, then By level shows it seventh with an Elective badge; adding AGR while retired answers 400.
 21. (M4.2) Given an administrator ticks Ada and Zainab under French, then both take French this session, and a student of a level where French is core answers 400.

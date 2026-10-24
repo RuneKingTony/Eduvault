@@ -529,6 +529,7 @@ describe('AnnouncementsPage row actions', () => {
         params: { id: LIVE_ID },
       });
     });
+    expect(api.announcements.withdraw).toHaveBeenCalledTimes(1);
     await waitFor(() => {
       expect(toast.success).toHaveBeenCalledWith(
         'Withdrawn. It no longer shows on the portal.'
@@ -540,6 +541,20 @@ describe('AnnouncementsPage row actions', () => {
         'true'
       );
     });
+  });
+
+  it('sends nothing when the withdraw confirmation is cancelled', async () => {
+    const api = setup();
+    await user.click(await screen.findByRole('button', { name: 'Withdraw' }));
+    await user.click(
+      within(await screen.findByRole('dialog')).getByRole('button', {
+        name: 'Cancel',
+      })
+    );
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+    expect(api.announcements.withdraw).not.toHaveBeenCalled();
   });
 
   it('unpins a pinned item', async () => {

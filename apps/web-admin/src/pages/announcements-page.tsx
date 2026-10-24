@@ -32,7 +32,9 @@ import {
   EMPTY_STATES,
   STATUS_TABS,
 } from '../components/announcements/announcement-text';
+import { ConfirmWithdraw } from '../components/announcements/confirm-withdraw';
 import { useRowAction } from '../components/announcements/use-announcement-actions';
+import { useConfirmStep } from '../components/use-confirm-step';
 import { announcementsQueryOptions } from '../queries';
 
 interface EditorState {
@@ -144,6 +146,10 @@ function usePageState() {
     setStatus(next);
     setPage(1);
   };
+  const act = useRowAction(showTab);
+  const withdraw = useConfirmStep<Announcement>((row, settled) => {
+    act.mutate({ id: row.id, action: 'withdraw' }, { onSettled: settled });
+  });
   return {
     status,
     page,
@@ -152,7 +158,8 @@ function usePageState() {
     editor,
     setEditor,
     list: useQuery(announcementsQueryOptions(api, status, page)),
-    act: useRowAction(showTab),
+    act,
+    withdraw,
   };
 }
 
@@ -163,7 +170,7 @@ function ListBody({
   state: ReturnType<typeof usePageState>;
   onEdit: (row: Announcement | null) => void;
 }) {
-  const { list, act, status } = state;
+  const { list, act, withdraw, status } = state;
   const data = list.data;
   return (
     <>
@@ -190,7 +197,11 @@ function ListBody({
               busy={act.isPending}
               onEdit={onEdit}
               onAct={(target, action) => {
-                act.mutate({ id: target.id, action });
+                if (action === 'withdraw') {
+                  withdraw.ask(target);
+                } else {
+                  act.mutate({ id: target.id, action });
+                }
               }}
             />
           ))}
@@ -232,6 +243,7 @@ export function AnnouncementsPage() {
           <ListBody state={state} onEdit={openEditor} />
         </CardContent>
       </Card>
+      <ConfirmWithdraw step={state.withdraw} pending={state.act.isPending} />
       <AnnouncementSheet
         open={editor.open}
         editing={editor.editing}

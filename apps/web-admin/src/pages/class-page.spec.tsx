@@ -291,7 +291,7 @@ describe('ClassPage', () => {
       await user.click(
         within(
           await screen.findByRole('dialog', {
-            name: 'Remove Ayo Bassey as class teacher?',
+            name: 'Remove this class teacher?',
           })
         ).getByRole('button', { name: 'Remove teacher' })
       );
@@ -303,6 +303,25 @@ describe('ClassPage', () => {
           'Ayo Bassey removed as class teacher of JSS 2 Gold.'
         );
       });
+      expect(api.classes.removeTeacher).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps the teacher when the removal is cancelled', async () => {
+      const { api } = setup();
+      await user.click(
+        await screen.findByRole('button', { name: 'Remove Ayo Bassey' })
+      );
+      await user.click(
+        within(
+          await screen.findByRole('dialog', {
+            name: 'Remove this class teacher?',
+          })
+        ).getByRole('button', { name: 'Cancel' })
+      );
+      await waitFor(() => {
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      });
+      expect(api.classes.removeTeacher).not.toHaveBeenCalled();
     });
 
     it.each([

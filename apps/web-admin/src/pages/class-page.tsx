@@ -52,6 +52,7 @@ import { AddClassTeacherDialog } from '../components/add-class-teacher-dialog';
 import { ROLE_LABELS } from '../components/class-text';
 import { GraduateClassDialog } from '../components/graduate-class-dialog';
 import { ClassSubjectTeachers } from '../components/subjects/class-subject-teachers';
+import { useConfirmStep } from '../components/use-confirm-step';
 import {
   classQueryOptions,
   currentTermQueryOptions,
@@ -157,9 +158,11 @@ function AddTeacherButton({ onClick }: { onClick: () => void }) {
 
 function TeacherRows({ classRow }: { classRow: ClassDetail }) {
   const remove = useRemoveTeacher(classRow);
-  const [removing, setRemoving] = useState<
-    ClassDetail['classTeachers'][number] | null
-  >(null);
+  const step = useConfirmStep<ClassDetail['classTeachers'][number]>(
+    (teacher, settled) => {
+      remove.mutate(teacher, { onSettled: settled });
+    }
+  );
   return (
     <>
       <ul className="flex flex-col gap-2">
@@ -177,7 +180,7 @@ function TeacherRows({ classRow }: { classRow: ClassDetail }) {
                 size="icon-sm"
                 aria-label={`Remove ${teacher.name}`}
                 onClick={() => {
-                  setRemoving(teacher);
+                  step.ask(teacher);
                 }}
               >
                 <XIcon />
@@ -187,24 +190,22 @@ function TeacherRows({ classRow }: { classRow: ClassDetail }) {
         ))}
       </ul>
       <ConfirmDialog
-        open={removing !== null}
-        title={`Remove ${removing?.name ?? 'teacher'} as class teacher?`}
-        description={`They stop teaching ${classRow.displayName} as its class teacher. You can add them back later.`}
+        open={step.target !== null}
+        title="Remove this class teacher?"
+        description="They stop being a class teacher of this class. You can add them back later."
+        details={
+          step.target === null
+            ? []
+            : [
+                { label: 'Teacher', value: step.target.name },
+                { label: 'Class', value: classRow.displayName },
+              ]
+        }
         tone="destructive"
         confirmLabel="Remove teacher"
         pending={remove.isPending}
-        onConfirm={() => {
-          if (removing !== null) {
-            remove.mutate(removing, {
-              onSettled: () => {
-                setRemoving(null);
-              },
-            });
-          }
-        }}
-        onCancel={() => {
-          setRemoving(null);
-        }}
+        onConfirm={step.confirm}
+        onCancel={step.cancel}
       />
     </>
   );

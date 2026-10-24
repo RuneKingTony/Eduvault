@@ -1,13 +1,7 @@
-import { useState } from 'react';
 import { MapPinIcon, PinIcon, UsersIcon } from 'lucide-react';
 import type { Announcement } from '@eduvault/api-contract';
 import { useCan } from '@eduvault/auth-client';
-import {
-  ConfirmDialog,
-  AnnouncementTagBadge,
-  Badge,
-  Button,
-} from '@eduvault/ui';
+import { AnnouncementTagBadge, Badge, Button } from '@eduvault/ui';
 import { audienceLabel, footerLine } from './announcement-text';
 import type { RowAction } from './use-announcement-actions';
 
@@ -90,7 +84,6 @@ function RowActions({ row, busy, onEdit, onAct }: RowProps) {
 
 export function AnnouncementRow(props: RowProps) {
   const { row } = props;
-  const [withdrawing, setWithdrawing] = useState(false);
   const AudienceIcon = row.campusId === null ? UsersIcon : MapPinIcon;
   return (
     <li className="flex flex-wrap items-start justify-between gap-3 p-4">
@@ -114,31 +107,7 @@ export function AnnouncementRow(props: RowProps) {
         </p>
         <p className="text-xs text-muted-foreground">{footerLine(row)}</p>
       </div>
-      <RowActions
-        {...props}
-        onAct={(target, action) => {
-          if (action === 'withdraw') {
-            setWithdrawing(true);
-          } else {
-            props.onAct(target, action);
-          }
-        }}
-      />
-      <ConfirmDialog
-        open={withdrawing}
-        title={`Withdraw “${row.title}”?`}
-        description="It stops showing on the portal. You can publish it again later."
-        tone="destructive"
-        confirmLabel="Withdraw"
-        pending={props.busy}
-        onConfirm={() => {
-          props.onAct(row, 'withdraw');
-          setWithdrawing(false);
-        }}
-        onCancel={() => {
-          setWithdrawing(false);
-        }}
-      />
+      <RowActions {...props} />
     </li>
   );
 }

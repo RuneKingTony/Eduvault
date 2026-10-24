@@ -87,12 +87,12 @@ Scopes: campus scope. A member sees announcements for everyone plus those for ca
 
 #### Row actions
 
-| Action                  | Gate                  | Effect                                                    | Toast                                           |
-| ----------------------- | --------------------- | --------------------------------------------------------- | ----------------------------------------------- |
-| Pin to top              | `announcement:update` | Sets pinned on a published item                           | "Pinned to the top of the portal."              |
-| Unpin                   | `announcement:update` | Clears pinned                                             | "Unpinned."                                     |
-| Withdraw                | `announcement:update` | Published → withdrawn, unpinned. No confirm dialog        | "Withdrawn. It no longer shows on the portal."  |
-| Publish / Publish again | `announcement:update` | Draft or withdrawn → published, publish date set to today | "Published. Families see it on the portal now." |
+| Action                  | Gate                  | Effect                                                                       | Toast                                           |
+| ----------------------- | --------------------- | ---------------------------------------------------------------------------- | ----------------------------------------------- |
+| Pin to top              | `announcement:update` | Sets pinned on a published item                                              | "Pinned to the top of the portal."              |
+| Unpin                   | `announcement:update` | Clears pinned                                                                | "Unpinned."                                     |
+| Withdraw                | `announcement:update` | Published → withdrawn, unpinned. Asks first in a destructive confirm (D-399) | "Withdrawn. It no longer shows on the portal."  |
+| Publish / Publish again | `announcement:update` | Draft or withdrawn → published, publish date set to today                    | "Published. Families see it on the portal now." |
 
 #### States
 
@@ -131,7 +131,7 @@ Built in M2.8 inside [72-portal](72-portal.md) Home; specified here so the rules
 14. **R14** The dashboard task "{n} announcement draft(s) not published" counts drafts in the member's campus scope, for holders of `announcement:update`.
 15. **R15** Any member of the school may read the feed of published announcements in their campus scope (`GET /announcements/feed`), with or without `announcement:read`; the teacher dashboard card uses it ([70-dashboard](70-dashboard.md)). The content is already public to families.
 16. **R16** There is no scheduling or expiry: an item shows from the moment it is published until it is withdrawn.
-17. **R17** Publishing and withdrawing take effect at once, with no confirmation; both can be undone and nothing is lost.
+17. **R17** Publishing takes effect at once. Withdrawing asks first in a destructive confirm (D-399) and then takes effect at once; both can be undone and nothing is lost.
 
 ## Data
 
@@ -205,7 +205,7 @@ New `announcement` module.
 | #       | Question                                                                                                                              | Options                                                                                                                       | Recommendation                                                                              | Confidence                                                      | Decided                                      |
 | ------- | ------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | --------------------------------------------------------------- | -------------------------------------------- |
 | OD-71-1 | May a member without `campus:readAll` publish, edit or withdraw an announcement for everyone? The prototype always offers "Everyone". | (a) yes; (b) only `campus:readAll` holders may target or change "everyone" items; campus-scoped members target their campuses | (b): a campus office shouldn't speak for the whole school or withdraw another campus's news | Medium: some schools may want campus heads to post school-wide  | Adopted                                      |
-| OD-71-2 | Should publishing or withdrawing ask for confirmation? The prototype acts at once.                                                    | (a) no confirm, rely on Publish again; (b) confirm dialog                                                                     | (a) no confirm                                                                              | Medium: both actions are reversible and kept on file            | Adopted                                      |
+| OD-71-2 | Should publishing or withdrawing ask for confirmation? The prototype acts at once.                                                    | (a) no confirm, rely on Publish again; (b) confirm dialog; (c) no confirm to publish, confirm dialog to withdraw              | (c) no confirm to publish, confirm dialog to withdraw (D-399)                               | Medium: both actions are reversible and kept on file            | Adopted                                      |
 | OD-71-3 | Maximum message length?                                                                                                               | (a) none; (b) 2,000 characters                                                                                                | (b) 2,000, with a counter in the sheet                                                      | Medium: the hint says "Keep it short"; protects the portal card | Adopted                                      |
 | OD-71-4 | How do members without `announcement:read` (teachers) read the dashboard card?                                                        | (a) `GET /announcements/feed` for any member, published only; (b) require `announcement:read` and drop the card for teachers  | (a)                                                                                         | Medium: the content is already public to families               | Adopted                                      |
 | OD-71-5 | Scheduled publishing or expiry dates?                                                                                                 | (a) not now; (b) `publish_at` / `expires_on`                                                                                  | (a) not now                                                                                 | High: not in the prototype                                      | Adopted                                      |
