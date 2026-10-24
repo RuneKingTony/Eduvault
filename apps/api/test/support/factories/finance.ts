@@ -71,8 +71,10 @@ export async function moneyFingerprint(
 export async function createMoneyAccount(
   app: INestApplication,
   actor: { cookie: string },
-  input: Partial<CreateMoneyAccountInput> &
-    Pick<CreateMoneyAccountInput, 'name'>
+  input: Partial<Omit<CreateMoneyAccountInput, 'kind'>> & {
+    kind?: 'bank' | 'pos' | 'cash';
+    name: string;
+  }
 ): Promise<MoneyAccount> {
   const ctx = await orgContextFor(app, actor);
   return app.get(MoneyAccountService, { strict: false }).create(ctx, {

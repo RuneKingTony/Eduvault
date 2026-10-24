@@ -205,7 +205,7 @@ function SheetFields({
       <ErrorMessage error={failure} />
       <FieldError
         message={accountNotice(options.accounts, state.method, {
-          none: 'Add a bank, POS or cash account before recording payments.',
+          none: 'Add a bank or cash account before recording payments.',
           unsupported:
             'No account takes this payment method. Add one in Accounts first.',
         })}

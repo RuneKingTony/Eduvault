@@ -272,7 +272,7 @@ describe('SaleSheet', () => {
     });
 
     it('says no account takes the method and disables Record purchase', async () => {
-      setup();
+      setup({ options: saleOptions({ accounts: [] }) });
       await choose(TOBI_ID);
       await screen.findByText('Books for JSS 1');
       await user.selectOptions(screen.getByLabelText('Payment'), 'pos');

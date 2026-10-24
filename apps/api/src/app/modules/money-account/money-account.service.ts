@@ -71,7 +71,9 @@ export class MoneyAccountService {
 
   async create(
     ctx: OrgContext,
-    input: CreateMoneyAccountInput
+    input: Omit<CreateMoneyAccountInput, 'kind'> & {
+      kind: CreateMoneyAccountInput['kind'] | 'pos';
+    }
   ): Promise<MoneyAccount> {
     if (input.campusId === null && ctx.campusScope !== 'all') {
       throw new ForbiddenException(MONEY_ACCOUNT_SCHOOL_WIDE_MESSAGE);

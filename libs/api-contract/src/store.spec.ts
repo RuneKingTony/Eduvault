@@ -418,7 +418,7 @@ describe('storeSaleReference', () => {
 
 describe('saleAccountKinds', () => {
   it('maps POS to pos, transfer to bank and cash to cash then bank', () => {
-    expect(saleAccountKinds('pos')).toEqual(['pos']);
+    expect(saleAccountKinds('pos')).toEqual(['pos', 'bank']);
     expect(saleAccountKinds('transfer')).toEqual(['bank']);
     expect(saleAccountKinds('cash')).toEqual(['cash', 'bank']);
   });
@@ -569,10 +569,14 @@ const account = (overrides: Partial<TestAccount> = {}): TestAccount => ({
 });
 
 describe('fittingSaleAccounts', () => {
-  it('finds the one POS account', () => {
+  it('prefers a POS account and falls back to the linked bank account', () => {
     const pos = account({ id: 'pos', kind: 'pos' });
     const bank = account({ id: 'bank', kind: 'bank' });
-    expect(fittingSaleAccounts('pos', 'lekki', [bank, pos])).toEqual([pos]);
+    expect(fittingSaleAccounts('pos', 'lekki', [bank, pos])).toEqual([
+      pos,
+      bank,
+    ]);
+    expect(fittingSaleAccounts('pos', 'lekki', [bank])).toEqual([bank]);
   });
 
   it('takes a transfer into a bank account only', () => {
