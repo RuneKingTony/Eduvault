@@ -93,7 +93,7 @@ function prefilled(
   return { amount: nairaInputText(totalOwed(owedOf(children))), shares };
 }
 
-function firstMethod(methods: PaymentMethods): PaymentMethod {
+export function firstMethod(methods: PaymentMethods): PaymentMethod {
   return PAYMENT_METHODS.find((method) => methods[method]) ?? 'cash';
 }
 
@@ -207,6 +207,11 @@ export function preferredAccountId(
   return '';
 }
 
+export const referenceOrFresh = (
+  state: { reference: string; referenceTouched: boolean },
+  fresh: string
+): string => (state.referenceTouched ? state.reference : fresh);
+
 export function withMethod(
   state: SheetState,
   method: PaymentMethod,
@@ -215,7 +220,7 @@ export function withMethod(
   return {
     ...state,
     method,
-    reference: state.referenceTouched ? state.reference : fresh,
+    reference: referenceOrFresh(state, fresh),
   };
 }
 
