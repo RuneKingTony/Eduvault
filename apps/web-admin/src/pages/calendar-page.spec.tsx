@@ -369,6 +369,13 @@ describe('CalendarPage', () => {
         name: 'Remove Mid-term break, 29 Oct 2026',
       })
     );
+    await user.click(
+      within(
+        await screen.findByRole('dialog', { name: 'Remove Mid-term break?' })
+      ).getByRole('button', {
+        name: 'Remove holiday',
+      })
+    );
     await vi.waitFor(() => {
       expect(api.holidays.remove).toHaveBeenCalledWith({
         params: { id: HOLIDAY_2 },

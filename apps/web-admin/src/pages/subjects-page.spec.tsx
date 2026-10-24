@@ -691,6 +691,25 @@ describe('SubjectsPage subject teachers', () => {
     });
   });
 
+  it('asks before removing the subject teacher', async () => {
+    const api = apiFor();
+    renderWithApi(page('teachers'), withMe(api));
+    await user.click(await screen.findByRole('button', { name: 'Change' }));
+    await user.click(
+      await screen.findByRole('button', { name: 'Remove teacher' })
+    );
+    const dialog = await screen.findByRole('dialog', {
+      name: /Remove the teacher of/,
+    });
+    expect(api.subjectTeachers.remove).not.toHaveBeenCalled();
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Remove teacher' })
+    );
+    await waitFor(() => {
+      expect(api.subjectTeachers.remove).toHaveBeenCalled();
+    });
+  });
+
   it('shows the no-candidate hint and disables Save teacher', async () => {
     renderWithApi(page('teachers'), withMe(apiFor()));
     await user.click(await screen.findByRole('button', { name: 'Assign' }));

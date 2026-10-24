@@ -7,6 +7,7 @@ import type {
   TeacherCandidate,
 } from '@eduvault/api-contract';
 import {
+  ConfirmDialog,
   Alert,
   AlertDescription,
   Button,
@@ -104,6 +105,7 @@ function CandidateField({
 
 function useAssignForm(target: AssignTarget, onClose: () => void) {
   const [error, setError] = useState<string | undefined>();
+  const [confirming, setConfirming] = useState(false);
   const assign = useAssign(target, onClose);
   const remove = useRemove(target, onClose);
   const fail = (failure: Error) => {
@@ -126,8 +128,18 @@ function useAssignForm(target: AssignTarget, onClose: () => void) {
     submit,
     saving: assign.isPending,
     removing: remove.isPending,
+    confirming,
+    setConfirming,
     removeTeacher: () => {
-      remove.mutate(undefined, { onError: fail });
+      setConfirming(true);
+    },
+    confirmRemove: () => {
+      remove.mutate(undefined, {
+        onError: fail,
+        onSettled: () => {
+          setConfirming(false);
+        },
+      });
     },
   };
 }
@@ -167,6 +179,29 @@ function AssignFooter({
   );
 }
 
+function RemoveTeacherConfirm({
+  form,
+  target,
+}: {
+  form: ReturnType<typeof useAssignForm>;
+  target: AssignTarget;
+}) {
+  return (
+    <ConfirmDialog
+      open={form.confirming}
+      title={`Remove the teacher of ${target.row.name}?`}
+      description={`${target.row.name} in ${target.arm.displayName} will have no teacher until you assign one.`}
+      tone="destructive"
+      confirmLabel="Remove teacher"
+      pending={form.removing}
+      onConfirm={form.confirmRemove}
+      onCancel={() => {
+        form.setConfirming(false);
+      }}
+    />
+  );
+}
+
 function AssignForm({
   target,
   termName,
@@ -181,38 +216,41 @@ function AssignForm({
   );
   const form = useAssignForm(target, onClose);
   return (
-    <form className="flex flex-col gap-4" onSubmit={form.submit} noValidate>
-      <DialogHeader>
-        <DialogTitle>Assign {target.row.name}</DialogTitle>
-        <DialogDescription>
-          {termName === undefined
-            ? target.arm.displayName
-            : `${target.arm.displayName} · ${termName}`}
-        </DialogDescription>
-      </DialogHeader>
-      {candidates.data === undefined ? (
-        <Skeleton className="h-16 w-full" />
-      ) : (
-        <CandidateField
-          candidates={candidates.data}
-          campus={target.arm.campus.name}
-          current={target.row.teacher?.userId}
+    <>
+      <form className="flex flex-col gap-4" onSubmit={form.submit} noValidate>
+        <DialogHeader>
+          <DialogTitle>Assign {target.row.name}</DialogTitle>
+          <DialogDescription>
+            {termName === undefined
+              ? target.arm.displayName
+              : `${target.arm.displayName} · ${termName}`}
+          </DialogDescription>
+        </DialogHeader>
+        {candidates.data === undefined ? (
+          <Skeleton className="h-16 w-full" />
+        ) : (
+          <CandidateField
+            candidates={candidates.data}
+            campus={target.arm.campus.name}
+            current={target.row.teacher?.userId}
+          />
+        )}
+        <Alert>
+          <AlertDescription>
+            Saving makes this person the teacher of this subject in this class,
+            and adds the class to their list.
+          </AlertDescription>
+        </Alert>
+        <FieldError message={form.error ?? candidates.error?.message} />
+        <AssignFooter
+          form={form}
+          hasTeacher={target.row.teacher !== null}
+          canSave={(candidates.data?.length ?? 0) > 0}
+          onClose={onClose}
         />
-      )}
-      <Alert>
-        <AlertDescription>
-          Saving makes this person the teacher of this subject in this class,
-          and adds the class to their list.
-        </AlertDescription>
-      </Alert>
-      <FieldError message={form.error ?? candidates.error?.message} />
-      <AssignFooter
-        form={form}
-        hasTeacher={target.row.teacher !== null}
-        canSave={(candidates.data?.length ?? 0) > 0}
-        onClose={onClose}
-      />
-    </form>
+      </form>
+      <RemoveTeacherConfirm form={form} target={target} />
+    </>
   );
 }
 
