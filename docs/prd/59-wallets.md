@@ -3,7 +3,7 @@
 - Status: draft (EDU-304, first phase of the family wallets epic EDU-303: the ledger core, staff top-ups and the guardian API; Monnify, the guardian screens, refunds and migration of old credits follow in their own issues)
 - Source: not in the brand prototype. The Wallets screens follow [Payments](53-payments.md) and its Record payment sheet.
 - Milestone and slice: `M3.9` (see [roadmap](README.md))
-- Related: [53-payments.md](53-payments.md) (reference replay, proof, the sheet this one is modelled on), [56-money-accounts-and-categories.md](56-money-accounts-and-categories.md) (2200 and the Monnify account), [54-who-owes-and-statements.md](54-who-owes-and-statements.md), [72-portal.md](72-portal.md), [technical reference](../technical-reference.md) decisions D-385 to D-391, [ADR 0008](../adr/0008-append-only-balanced-journal.md)
+- Related: [53-payments.md](53-payments.md) (reference replay, proof, the sheet this one is modelled on), [56-money-accounts-and-categories.md](56-money-accounts-and-categories.md) (2200 and the Monnify account), [54-who-owes-and-statements.md](54-who-owes-and-statements.md), [72-portal.md](72-portal.md), [technical reference](../technical-reference.md) decisions D-385 to D-392, [ADR 0008](../adr/0008-append-only-balanced-journal.md)
 
 ## Summary
 
@@ -63,6 +63,7 @@ Scope: a staff member sees a wallet when the school matches and either they see 
 10. **Append-only.** `wallet`, `wallet_topup`, `wallet_spend` and `wallet_earmark` refuse UPDATE and DELETE. Undoing a top-up is a later phase.
 11. **Movements add up.** The movements of a wallet always sum to its journal balance.
 12. **Activity.** A top-up writes `wallet.topped_up` on each campus the family has a child on; a spend writes `wallet.spent` per campus of the children it paid for.
+13. **Whole-wallet visibility.** A wallet that is visible to a campus-scoped staff member (any linked child on their campuses) is shown whole: its Children card and movements include siblings on other campuses, flagged out of scope with no statement link ([D-392](../technical-reference.md#decision-log)).
 
 ## Data
 
