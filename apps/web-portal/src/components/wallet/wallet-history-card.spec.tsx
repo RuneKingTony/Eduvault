@@ -31,7 +31,15 @@ const spend = portalMovement({
   reference: 'WSP-20261008-ABCDEF',
   studentName: 'Ada Okeke',
   amountMinor: -1_000_000,
-  source: { type: 'spend' },
+  source: { type: 'spend', automatic: false },
+});
+const autoPaid = portalMovement({
+  id: testId(0x2_00_14),
+  kind: 'wallet_spend',
+  reference: 'AUTOPAY-CSH-20261008-000001',
+  studentName: 'Ada Okeke',
+  amountMinor: -500_000,
+  source: { type: 'spend', automatic: true },
 });
 
 let user: ReturnType<typeof userEvent.setup>;
@@ -64,6 +72,19 @@ describe('WalletHistoryCard', () => {
     ).toBeInTheDocument();
     expect(within(history).getByText('−₦10,000.00')).toBeInTheDocument();
     expect(within(history).getByText('₦49,500.00')).toBeInTheDocument();
+  });
+
+  it('names an auto-pay by what it did, without its internal reference', async () => {
+    renderWithApi(<WalletHistoryCard />, {
+      portalWallet: {
+        movements: vi.fn().mockResolvedValue(portalMovements([autoPaid])),
+      },
+    });
+    const history = await screen.findByRole('group', { name: 'History' });
+    expect(
+      await within(history).findByText('Auto-paid Ada Okeke’s charges')
+    ).toBeInTheDocument();
+    expect(within(history).queryByText(/AUTOPAY/)).not.toBeInTheDocument();
   });
 
   it('offers Trace on an online top-up only, and opens the Monnify facts', async () => {

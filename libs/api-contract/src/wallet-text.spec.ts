@@ -31,6 +31,21 @@ describe('movementTitle', () => {
       'Paid from wallet'
     );
   });
+
+  it('says Auto-paid for a spend auto-pay made', () => {
+    expect(
+      movementTitle({
+        studentName: 'Ada Okeke',
+        source: { type: 'spend', automatic: true },
+      })
+    ).toBe('Auto-paid Ada Okeke’s charges');
+    expect(
+      movementTitle({
+        studentName: null,
+        source: { type: 'spend', automatic: true },
+      })
+    ).toBe('Auto-paid from wallet');
+  });
 });
 
 describe('traceFacts', () => {

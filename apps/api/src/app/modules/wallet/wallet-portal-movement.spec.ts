@@ -22,6 +22,11 @@ const movement = (over: Partial<WalletMovement>): WalletMovement => ({
   ...over,
 });
 
+const spendSource = (reference: string) =>
+  portalMovementOf(
+    movement({ reference, source: { type: 'spend', id: OTHER } })
+  ).source;
+
 describe('portalMovementOf', () => {
   it('leaves out who made the movement and the entry id', () => {
     const portal = portalMovementOf(movement({}));
@@ -73,6 +78,14 @@ describe('portalMovementOf', () => {
       transactionReference: 'MNFY|20|1',
       netMinor: 4_950_000,
     });
+  });
+
+  it('marks a spend made by auto-pay and not one the guardian made', () => {
+    expect(spendSource('AUTOPAY-CSH-1')).toEqual({
+      type: 'spend',
+      automatic: true,
+    });
+    expect(spendSource('WSP-1')).toEqual({ type: 'spend', automatic: false });
   });
 
   it('answers what the portal contract parses', () => {

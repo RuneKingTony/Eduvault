@@ -53,7 +53,9 @@ function MovementRow({
         <span className="flex flex-col">
           <span>{movementTitle(movement)}</span>
           <span className="flex items-center gap-2 font-mono text-xs text-muted-foreground">
-            {movement.reference}
+            {source?.type === 'spend' && source.automatic
+              ? null
+              : movement.reference}
             {source?.type === 'monnify' ? (
               <TraceDialog
                 facts={traceFacts(source, {

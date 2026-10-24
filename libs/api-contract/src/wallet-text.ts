@@ -9,7 +9,7 @@ interface TitledMovement {
   source:
     | { type: 'topup'; method: PaymentMethod; depositorName: string | null }
     | { type: 'monnify' }
-    | { type: 'spend' }
+    | { type: 'spend'; automatic?: boolean }
     | null;
 }
 
@@ -22,9 +22,13 @@ export function movementTitle({ source, studentName }: TitledMovement): string {
   if (source?.type === 'monnify') {
     return 'Online top-up · Monnify';
   }
+  const verb =
+    source?.type === 'spend' && source.automatic === true
+      ? 'Auto-paid'
+      : 'Paid';
   return studentName === null
-    ? 'Paid from wallet'
-    : `Paid ${studentName}’s charges`;
+    ? `${verb} from wallet`
+    : `${verb} ${studentName}’s charges`;
 }
 
 export interface TraceFact {
