@@ -3,7 +3,7 @@ import { currencySchema, idSchema, minorSchema } from './schemas';
 
 export const MONEY_ACCOUNT_NAME_MAX = 80;
 export const MONEY_ACCOUNT_KINDS = ['cash', 'bank', 'pos', 'gateway'] as const;
-export const CREATABLE_MONEY_ACCOUNT_KINDS = ['bank', 'pos', 'cash'] as const;
+export const CREATABLE_MONEY_ACCOUNT_KINDS = ['bank', 'cash'] as const;
 export const FEE_INCOME_SYSTEM_KEY = 'fee_income';
 export const OTHER_CHARGES_SYSTEM_KEY = 'other_charges';
 export const MONEY_ACCOUNTS_SYSTEM_KEY = 'money_accounts';

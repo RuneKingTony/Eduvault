@@ -352,7 +352,7 @@ describe('MoneyAccountsPage add form', () => {
     setup();
     const sheet = await openAdd();
     expect(within(sheet).getByLabelText('Bank')).toBeInTheDocument();
-    await user.selectOptions(within(sheet).getByLabelText('Kind'), 'pos');
+    await user.selectOptions(within(sheet).getByLabelText('Kind'), 'cash');
     expect(within(sheet).queryByLabelText('Bank')).not.toBeInTheDocument();
     const campusOptions = within(within(sheet).getByLabelText('Campus'))
       .getAllByRole('option')

@@ -271,7 +271,7 @@ function TopUpForm({
       <ErrorMessage error={failure} />
       <FieldError
         message={accountNotice(fields.options.accounts, fields.state.method, {
-          none: 'Add a bank, POS or cash account before recording top-ups.',
+          none: 'Add a bank or cash account before recording top-ups.',
           unsupported:
             'No account takes this way of paying. Add one in Accounts first.',
         })}

@@ -465,7 +465,7 @@ describe('RecordPaymentSheet', () => {
     setup({ recordingOptions: recordingOptions({ accounts: [] }) });
     expect(
       await screen.findByText(
-        'Add a bank, POS or cash account before recording payments.'
+        'Add a bank or cash account before recording payments.'
       )
     ).toBeVisible();
     expect(

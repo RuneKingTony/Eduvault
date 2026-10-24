@@ -95,9 +95,13 @@ test.describe('adding an account', () => {
       .post('/finance/money-accounts')
       .send(bank)
       .expect(201);
-    const second = await api(owner)
+    await api(owner)
       .post('/finance/money-accounts')
       .send({ name: 'Moniepoint POS', kind: 'pos', campusId: lekki.id })
+      .expect(400);
+    const second = await api(owner)
+      .post('/finance/money-accounts')
+      .send({ name: 'Lekki petty cash', kind: 'cash', campusId: lekki.id })
       .expect(201);
     const third = await api(owner)
       .post('/finance/money-accounts')

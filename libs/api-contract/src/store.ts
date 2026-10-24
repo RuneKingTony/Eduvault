@@ -141,7 +141,7 @@ export const storeSaleReference = (date: string, uuid: string): string =>
   datedReference('STORE', date, uuid);
 
 const SALE_ACCOUNT_KINDS = {
-  pos: ['pos'],
+  pos: ['pos', 'bank'],
   transfer: ['bank'],
   cash: ['cash', 'bank'],
 } as const satisfies Record<PaymentMethod, readonly MoneyAccountKind[]>;

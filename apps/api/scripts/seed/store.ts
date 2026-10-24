@@ -167,6 +167,7 @@ interface SeedSale {
   on: string;
   student: string;
   method: PaymentMethod;
+  account?: string;
   lines: readonly { item: string; quantity: number }[];
 }
 
@@ -176,6 +177,7 @@ const SEED_SALES: readonly SeedSale[] = [
     on: '2026-09-22',
     student: 'Peace Akpan',
     method: 'pos',
+    account: 'Moniepoint POS',
     lines: [
       { item: 'School shirt, Size 12', quantity: 2 },
       { item: 'Mathematics (JSS2)', quantity: 1 },
@@ -217,6 +219,7 @@ const SEED_SALES: readonly SeedSale[] = [
     on: '2026-10-05',
     student: 'Zainab Bello',
     method: 'pos',
+    account: 'Moniepoint POS',
     lines: [
       { item: 'Pinafore, Size 14', quantity: 1 },
       { item: 'Sportswear set, Medium', quantity: 1 },
@@ -399,7 +402,10 @@ async function seedSales(
       studentId: await studentIdOf(db, owner.organizationId, sale.student),
       method: sale.method,
       proofFileId: proof?.id,
-      moneyAccountId: undefined,
+      moneyAccountId:
+        sale.account === undefined
+          ? undefined
+          : await moneyAccountId(db, owner.organizationId, sale.account),
       lines: sale.lines.map((line) => {
         const item = stocked.find(
           (candidate) => candidate.displayName === line.item

@@ -201,7 +201,7 @@ describe('intoFor', () => {
   });
 
   it('chooses the only fit itself', () => {
-    expect(intoFor('pos', ada, [pos, bank, cash])).toEqual({
+    expect(intoFor('pos', ada, [pos, cash])).toEqual({
       status: 'chosen',
       account: pos,
     });

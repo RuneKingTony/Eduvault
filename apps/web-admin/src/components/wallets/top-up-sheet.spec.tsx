@@ -266,7 +266,7 @@ describe('TopUpSheet', () => {
     setup({ options: topUpOptions({ accounts: [] }) });
     expect(
       await screen.findByText(
-        'Add a bank, POS or cash account before recording top-ups.'
+        'Add a bank or cash account before recording top-ups.'
       )
     ).toBeVisible();
     expect(

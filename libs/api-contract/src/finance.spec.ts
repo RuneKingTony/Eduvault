@@ -47,15 +47,8 @@ const issueMessages = (result: {
 }) => result.error?.issues.map((issue) => issue.message) ?? [];
 
 describe('createMoneyAccountSchema', () => {
-  it('takes a bank, pos or cash account for a campus or the whole school', () => {
+  it('takes a bank or cash account for a campus or the whole school', () => {
     expect(createMoneyAccountSchema.safeParse(account).success).toBe(true);
-    expect(
-      createMoneyAccountSchema.safeParse({
-        name: 'Moniepoint POS',
-        kind: 'pos',
-        campusId: id,
-      }).success
-    ).toBe(true);
     expect(
       createMoneyAccountSchema.safeParse({
         name: 'Petty cash',
@@ -66,7 +59,7 @@ describe('createMoneyAccountSchema', () => {
   });
 
   it('refuses the gateway kind, an unknown kind and a missing campus', () => {
-    for (const kind of ['gateway', 'wallet', '']) {
+    for (const kind of ['pos', 'gateway', 'wallet', '']) {
       expect(
         createMoneyAccountSchema.safeParse({ ...account, kind }).success
       ).toBe(false);
