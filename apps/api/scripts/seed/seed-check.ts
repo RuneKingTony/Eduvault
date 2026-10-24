@@ -458,9 +458,18 @@ async function checkAnnouncements(app: INestApplicationContext, check: Check) {
 
 async function checkFinance(app: INestApplicationContext, check: Check) {
   const funmi = await orgContextFor(app, emailOf('funmi'));
-  const { items: accounts } = await app
+  const { items: listed } = await app
     .get(MoneyAccountService, { strict: false })
     .list(funmi);
+  const accounts = listed.filter((account) => account.kind !== 'gateway');
+  check(
+    'built-in gateway accounts',
+    listed
+      .filter((account) => account.kind === 'gateway')
+      .map((account) => account.name)
+      .join(', '),
+    'Monnify collections'
+  );
   check('money accounts', accounts.length, SEED_MONEY_ACCOUNTS.length);
   check(
     'money account names',

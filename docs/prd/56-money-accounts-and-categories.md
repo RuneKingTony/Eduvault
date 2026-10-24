@@ -63,7 +63,7 @@ Both screens sit under the Finance nav item **Accounts** (section Finance, nav o
     | Campus        | select: each campus in the creator's scope, plus "School-wide" only for `campus:readAll` | yes      | first option | Must be in the creator's scope                   |
 
   - Buttons: **Cancel** (ghost), **Add account** (primary, plus).
-  - On submit: creates the money account and its asset ledger account under 1200 (code = next multiple of 10 above the highest child of 1200, so 1210, 1220 → 1230). The new account becomes the selected tile. Toast (success): "{name} added with ledger account {code}."
+  - On submit: creates the money account and its asset ledger account under 1200 (code = next multiple of 10 above the highest child of 1200; with Monnify collections at 1230 from the start, the first three are 1240, 1250, 1260). The new account becomes the selected tile. Toast (success): "{name} added with ledger account {code}."
   - Without the permission: "You need moneyAccount:create." (prototype toast; the API answers 403).
 - **Edit** and **Retire** (ghost, on the cash book card header, `moneyAccount:update`) for the selected account:
   - Edit sheet: title "Edit {name}"; fields Name, Bank (bank accounts only) and Last 4 digits, validated as above; **Save changes**. Toast "{name} saved."
@@ -114,22 +114,23 @@ A school's opening debts and credits, and the money already in each money accoun
 4. **New fee category code** = the parent's highest child code + 10, or the parent's code + 10 if it has none. Two concurrent creates must not get the same code: the unique constraint answers 409 for the loser and the client retries.
 5. **Who can add a category.** `ledger:manageAccounts` may add a child under any non-system-locked parent the UI offers (today only 4000). `feeLine:create` alone may add only under `fee_income` (4000). Adding one writes a `fee_type.created` activity row in the same transaction, as adding a fee type does (D-353, D-384): school-wide, shown per D-315, and none for a duplicate or refused add.
 6. **Category names** are not blank and are unique among siblings (case-insensitive). New rule; the prototype doesn't check (see gaps).
-7. **Money account creates its ledger account** in the same transaction: an asset child of 1200, code = next multiple of 10 above the highest child of 1200 (1210 → 1220 → 1230). Its name is the money account's name.
+7. **Money account creates its ledger account** in the same transaction: an asset child of 1200, code = next multiple of 10 above the highest child of 1200 (1240 → 1250 → 1260, because every school starts with Monnify collections at 1230, see rule 13). Its name is the money account's name.
 8. **Money account kinds** creatable from the screen: `bank`, `pos`, `cash` (a cash box). `gateway` waits for the gateway phase. A bank account may carry a `bank_name`.
 9. **Money account campus** must be in the creator's campus scope; only `campus:readAll` can create a school-wide account (null `campus_id`).
 10. **Visibility of school-wide accounts.** Without `campus:readAll`, school-wide accounts are left out of the list, the tiles and the cash book; the response carries a `hiddenSchoolWideCount` so the screen can show the callout. They still appear in the "Into" list when recording a payment and the "Refund paid from" list.
 11. **Balances are derived.** A money account's balance is the sum of `debit_minor - credit_minor` on its ledger account. A category's balance is the sum over itself and its descendants, restricted to lines in the viewer's campus scope, shown in natural sign. No balance column exists anywhere.
 12. **Cash book.** Lists every journal entry with a line on the account's ledger account, newest first by `effective_on` then `posted_at`, with the running balance computed oldest-first. Running balance is over the whole account, not the page.
-13. **Hidden categories.** 2100 and 4060 are kept in the books and in every balance roll-up but not listed on Money categories until a screen uses them.
-14. **Opening debt or credit** for a student is one journal entry with reference `OPEN-<student_id>`: Dr Fees receivable (student) / Cr Opening balance for a debt, or the reverse for a credit. Because the reference is unique per school, a student can have at most one opening entry, and re-running an import posts nothing twice.
-15. **Opening lines carry the student's campus** (their placement campus for the current term, else home campus) on both lines.
-16. **Entries never change.** Journal entries and lines are never updated or deleted. A wrong opening balance is corrected with an adjustment (see [55-discounts-and-refunds.md](55-discounts-and-refunds.md)), not by editing the entry.
-17. **Every entry balances.** A deferred constraint trigger refuses a commit where an entry's debits differ from its credits.
-18. **Every line has exactly one of debit or credit positive** (`CHECK`).
-19. **Acting read-only.** A super admin acting without a reason gets 403 on every write here.
-20. **Money account opening balance.** The money in an account at go-live is one entry with reference `OPEN-MA-<money_account_id>`: Dr the money account / Cr Opening balance, campus = the account's campus (null if school-wide), kind `opening`. At most one per account; a repeat posts nothing.
-21. **Retired money accounts** (`retired_at` set) keep their cash book and balance, and still show on Money accounts with a "Retired" badge. They are left out of `for-recording`, so they can't receive payments, refunds or pay for deliveries (400 if sent). Name, bank and last 4 can be edited; kind and campus can't.
-22. **Journal tab.** Lists entries and lines read-only, scoped by line campus as in rule 11. Nothing on it can be changed.
+13. **Monnify collections is built in** ([D-385](../technical-reference.md#decision-log), [59](59-wallets.md)). Every school has a school-wide `gateway` money account "Monnify collections" on ledger account `monnify_collections`, at code 1230 or, when a school already uses 1230, the next free code under 1200. It shows as a tile ("Online payments") and rolls into 1200, takes no hand-entered money (payments, refunds, deliveries and top-ups refuse it), and cannot be retired (the `PATCH` answers 409 and the cash book card shows no **Retire**). It does not count as a money record when a school is deleted. A campus member without `campus:readAll` counts it among the hidden school-wide accounts.
+14. **Hidden categories.** 2100 and 4060 are kept in the books and in every balance roll-up but not listed on Money categories until a screen uses them.
+15. **Opening debt or credit** for a student is one journal entry with reference `OPEN-<student_id>`: Dr Fees receivable (student) / Cr Opening balance for a debt, or the reverse for a credit. Because the reference is unique per school, a student can have at most one opening entry, and re-running an import posts nothing twice.
+16. **Opening lines carry the student's campus** (their placement campus for the current term, else home campus) on both lines.
+17. **Entries never change.** Journal entries and lines are never updated or deleted. A wrong opening balance is corrected with an adjustment (see [55-discounts-and-refunds.md](55-discounts-and-refunds.md)), not by editing the entry.
+18. **Every entry balances.** A deferred constraint trigger refuses a commit where an entry's debits differ from its credits.
+19. **Every line has exactly one of debit or credit positive** (`CHECK`).
+20. **Acting read-only.** A super admin acting without a reason gets 403 on every write here.
+21. **Money account opening balance.** The money in an account at go-live is one entry with reference `OPEN-MA-<money_account_id>`: Dr the money account / Cr Opening balance, campus = the account's campus (null if school-wide), kind `opening`. At most one per account; a repeat posts nothing.
+22. **Retired money accounts** (`retired_at` set) keep their cash book and balance, and still show on Money accounts with a "Retired" badge. They are left out of `for-recording`, so they can't receive payments, refunds or pay for deliveries (400 if sent). Name, bank and last 4 can be edited; kind and campus can't.
+23. **Journal tab.** Lists entries and lines read-only, scoped by line campus as in rule 11. Nothing on it can be changed.
 
 ## Data
 
@@ -177,7 +178,7 @@ New module `ledger` (accounts and journal) and `money-account`. Contract types i
 3. Given Funmi (owner), when she opens Money accounts, then she sees both tiles, no callout, and the GTBank cash book selected.
 4. Given Chika, when she requests the GTBank cash book by id, then the API answers 404.
 5. Given a payment of ₦300,000 into GTBank, when the owner opens the GTBank cash book, then the newest row shows "In ₦300,000" and the running balance includes it.
-6. Given an owner, when she adds "Access Bank savings", kind Bank, last 4 "1234", school-wide, then the tile appears selected with ₦0 and the toast says "Access Bank savings added with ledger account 1230."
+6. Given an owner, when she adds "Access Bank savings", kind Bank, last 4 "1234", school-wide, then the tile appears selected with ₦0 and the toast says "Access Bank savings added with ledger account 1240."
 7. Given a campus bursar with `moneyAccount:create`, when she submits a school-wide account, then the API answers 403.
 8. Given last 4 "12a", when the form is submitted, then the API answers 400.
 9. Given Chika, when she opens Money categories, then the "Showing Lekki campus only." callout shows, the balance header reads "Balance (your campuses)", and no school-wide line counts toward any balance.

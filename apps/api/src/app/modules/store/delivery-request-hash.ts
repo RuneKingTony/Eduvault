@@ -1,5 +1,8 @@
-import { createHash } from 'node:crypto';
 import type { RecordDelivery } from '@eduvault/api-contract';
+import {
+  hashCanonical,
+  sortedByFirst,
+} from '../../common/references/request-hash';
 
 type HashedFields = Omit<RecordDelivery, 'reference'>;
 
@@ -13,9 +16,11 @@ export function deliveryRequestHash(input: HashedFields): string {
     moneyAccountId: input.moneyAccountId ?? null,
     isOpening: input.isOpening ?? false,
     receivedOn: input.receivedOn ?? null,
-    lines: input.lines
-      .map((line) => [line.itemId, line.quantity, line.unitCostMinor] as const)
-      .toSorted(([a], [b]) => a.localeCompare(b)),
+    lines: sortedByFirst(
+      input.lines.map(
+        (line) => [line.itemId, line.quantity, line.unitCostMinor] as const
+      )
+    ),
   };
-  return createHash('sha256').update(JSON.stringify(canonical)).digest('hex');
+  return hashCanonical(canonical);
 }

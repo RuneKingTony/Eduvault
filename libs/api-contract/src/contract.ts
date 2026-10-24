@@ -185,6 +185,21 @@ import {
 } from './portal';
 import { defineContract, defineRoute } from './route';
 import {
+  earmarkSchema,
+  earmarkedWalletSchema,
+  spendWalletSchema,
+  spentWalletSchema,
+  topUpWalletSchema,
+  toppedUpWalletSchema,
+  topUpOptionsSchema,
+  walletListQuerySchema,
+  walletListSchema,
+  walletMovementListSchema,
+  walletMovementQuerySchema,
+  walletParamsSchema,
+  walletSchema,
+} from './wallets';
+import {
   balanceListQuerySchema,
   balanceListSchema,
   familyStatementQuerySchema,
@@ -1091,6 +1106,64 @@ export const contract = defineContract({
       params: idParamsSchema,
       body: declineSchema,
       response: paymentVoidItemSchema,
+    }),
+  },
+  wallets: {
+    list: defineRoute({
+      method: 'GET',
+      path: '/finance/wallets',
+      query: walletListQuerySchema,
+      response: walletListSchema,
+    }),
+    topUpOptions: defineRoute({
+      method: 'GET',
+      path: '/finance/wallets/top-up-options',
+      response: topUpOptionsSchema,
+    }),
+    get: defineRoute({
+      method: 'GET',
+      path: '/finance/wallets/:walletId',
+      params: walletParamsSchema,
+      response: walletSchema,
+    }),
+    movements: defineRoute({
+      method: 'GET',
+      path: '/finance/wallets/:walletId/movements',
+      params: walletParamsSchema,
+      query: walletMovementQuerySchema,
+      response: walletMovementListSchema,
+    }),
+    topUp: defineRoute({
+      method: 'POST',
+      path: '/finance/wallets/:walletId/top-ups',
+      params: walletParamsSchema,
+      body: topUpWalletSchema,
+      response: toppedUpWalletSchema,
+    }),
+  },
+  portalWallet: {
+    get: defineRoute({
+      method: 'GET',
+      path: '/portal/wallet',
+      response: walletSchema,
+    }),
+    spend: defineRoute({
+      method: 'POST',
+      path: '/portal/wallet/spend',
+      body: spendWalletSchema,
+      response: spentWalletSchema,
+    }),
+    setAside: defineRoute({
+      method: 'POST',
+      path: '/portal/wallet/earmarks',
+      body: earmarkSchema,
+      response: earmarkedWalletSchema,
+    }),
+    release: defineRoute({
+      method: 'POST',
+      path: '/portal/wallet/earmarks/release',
+      body: earmarkSchema,
+      response: earmarkedWalletSchema,
     }),
   },
   adjustments: {

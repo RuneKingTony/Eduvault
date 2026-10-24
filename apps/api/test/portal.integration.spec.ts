@@ -1079,12 +1079,21 @@ test.describe('a read-only portal', () => {
     }
   });
 
-  test('registers only GET handlers under the portal path', ({ app }) => {
+  test('registers only GET handlers under the portal path, but the wallet writes', ({
+    app,
+  }) => {
     const handlers = portalHandlers(app);
 
     expect(handlers.length).toBeGreaterThan(0);
     expect(
-      handlers.filter(({ method }) => method !== RequestMethod.GET)
-    ).toEqual([]);
+      handlers
+        .filter(({ method }) => method !== RequestMethod.GET)
+        .map(({ name }) => name)
+        .toSorted((a, b) => a.localeCompare(b))
+    ).toEqual([
+      'WalletPortalController.release',
+      'WalletPortalController.setAside',
+      'WalletPortalController.spend',
+    ]);
   });
 });

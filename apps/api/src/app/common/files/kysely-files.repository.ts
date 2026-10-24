@@ -10,6 +10,7 @@ import type { FileKind } from '@eduvault/api-contract';
 import type { DB } from '../../../db/db-types';
 import type { CampusScope } from '../campus-scope';
 import { KYSELY_TOKEN, type Database } from '../db/tokens';
+import { anyChildInScopeSql } from '../students/family-scope';
 import { anyAllocationInScopeSql } from '../students/payment-allocations';
 import {
   FilesRepository,
@@ -52,6 +53,13 @@ const OWNED_BY: Record<FileKind, (eb: FileEntry) => Expression<SqlBool>> = {
         .selectFrom('payment')
         .select('payment.id')
         .whereRef('payment.proof_file_id', '=', 'file_object.id')
+    ),
+  wallet_proof: (eb) =>
+    eb.exists(
+      eb
+        .selectFrom('wallet_topup')
+        .select('wallet_topup.id')
+        .whereRef('wallet_topup.proof_file_id', '=', 'file_object.id')
     ),
 };
 
@@ -106,13 +114,30 @@ export class KyselyFilesRepository extends FilesRepository {
     if (scope === 'all') {
       return true;
     }
-    const { rows } = await sql<{ id: string }>`
+    const { rows } =
+      file.kind === 'wallet_proof'
+        ? await this.walletProofOwners(file, scope)
+        : await this.paymentProofOwners(file, scope);
+    return rows.length > 0;
+  }
+
+  private paymentProofOwners(file: FileRecord, scope: CampusScope) {
+    return sql<{ id: string }>`
       SELECT p.id FROM payment p
       WHERE p.proof_file_id = ${file.id}
         AND p.organization_id = ${file.organizationId}
         AND ${anyAllocationInScopeSql('p', scope)}
       LIMIT 1`.execute(this.db);
-    return rows.length > 0;
+  }
+
+  private walletProofOwners(file: FileRecord, scope: CampusScope) {
+    return sql<{ id: string }>`
+      SELECT t.id FROM wallet_topup t
+      JOIN wallet w ON w.id = t.wallet_id AND w.organization_id = t.organization_id
+      WHERE t.proof_file_id = ${file.id}
+        AND t.organization_id = ${file.organizationId}
+        AND ${anyChildInScopeSql('w', scope)}
+      LIMIT 1`.execute(this.db);
   }
 
   async delete(organizationId: string, id: string): Promise<void> {

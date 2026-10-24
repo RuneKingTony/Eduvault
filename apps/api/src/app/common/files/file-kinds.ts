@@ -8,6 +8,9 @@ import {
   PAYMENT_PROOF_LOCKED_MESSAGE,
   PAYMENT_PROOF_SIZE_MESSAGE,
   PAYMENT_PROOF_TYPE_MESSAGE,
+  WALLET_PROOF,
+  WALLET_PROOF_DENIED_MESSAGE,
+  WALLET_PROOF_LOCKED_MESSAGE,
   type FileKind,
 } from '@eduvault/api-contract';
 import type { Permission } from '@eduvault/policy';
@@ -63,6 +66,18 @@ export const FILE_KIND_RULES: Record<FileKind, FileKindRule> = {
     campusScoped: true,
     locked: PAYMENT_PROOF_LOCKED_MESSAGE,
     denied: PAYMENT_PROOF_DENIED_MESSAGE,
+    tooLarge: PAYMENT_PROOF_SIZE_MESSAGE,
+    wrongType: PAYMENT_PROOF_TYPE_MESSAGE,
+    unusable: PAYMENT_PROOF_INVALID_MESSAGE,
+  },
+  wallet_proof: {
+    maxBytes: WALLET_PROOF.maxBytes,
+    types: WALLET_PROOF.types,
+    write: ['wallet:topUp'],
+    read: 'wallet:read',
+    campusScoped: true,
+    locked: WALLET_PROOF_LOCKED_MESSAGE,
+    denied: WALLET_PROOF_DENIED_MESSAGE,
     tooLarge: PAYMENT_PROOF_SIZE_MESSAGE,
     wrongType: PAYMENT_PROOF_TYPE_MESSAGE,
     unusable: PAYMENT_PROOF_INVALID_MESSAGE,

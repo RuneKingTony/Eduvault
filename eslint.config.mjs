@@ -457,6 +457,7 @@ export default [
     files: [
       '**/store-repository.integration.spec.ts',
       '**/fee-option-repository.integration.spec.ts',
+      '**/wallet-repository.integration.spec.ts',
     ],
     rules: {
       'vitest/expect-expect': [

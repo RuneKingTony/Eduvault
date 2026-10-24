@@ -259,9 +259,14 @@ describe('capSummary', () => {
       'Approves money requests',
       'Bank and POS accounts: add and change bank and POS accounts',
       'Store: add items, record deliveries, sell to students and count stock',
+      'Wallets: record money families pay into their wallets',
+      'Asks for wallet refunds',
+      'Approves wallet refunds',
+      'Manages the payment gateway',
       'Money categories: change the accountant’s categories',
       'Own records: can see',
       'Sees fees',
+      'Uses the family wallet',
     ]);
   });
 
@@ -285,6 +290,7 @@ describe('capSummary', () => {
       'Charges: can see',
       'Payments: can see',
       'Store: can see',
+      'Wallets: can see',
     ]);
   });
 
@@ -305,6 +311,8 @@ describe('capSummary', () => {
       'Discounts and refunds: ask for refunds, fee reductions, cancelled balances and discounts',
       'Bank and POS accounts: can see',
       'Store: add items, record deliveries, sell to students and count stock',
+      'Wallets: record money families pay into their wallets',
+      'Asks for wallet refunds',
       'Money categories: can see',
     ]);
   });
@@ -325,6 +333,8 @@ describe('capSummary', () => {
       'Approves money requests',
       'Bank and POS accounts: can see',
       'Store: can see',
+      'Wallets: can see',
+      'Approves wallet refunds',
     ]);
   });
 
@@ -540,7 +550,8 @@ describe('the Money areas', () => {
       ids.indexOf('discounts-refunds') + 1
     );
     expect(ids.indexOf('store')).toBe(ids.indexOf('money-accounts') + 1);
-    expect(ids.indexOf('money-categories')).toBe(ids.indexOf('store') + 1);
+    expect(ids.indexOf('wallets')).toBe(ids.indexOf('store') + 1);
+    expect(ids.indexOf('money-categories')).toBe(ids.indexOf('wallets') + 1);
     expect(ids.indexOf('portal')).toBe(ids.indexOf('money-categories') + 1);
     expect(accounts.group).toBe('Money');
     expect(categories.group).toBe('Money');
@@ -626,14 +637,49 @@ describe('the Portal area', () => {
         permissions: ['invoice:readOwn', 'payment:readOwn', 'feeLine:readOwn'],
         important: false,
       }),
+      expect.objectContaining({
+        label: 'Uses the family wallet',
+        permissions: ['wallet:readOwn', 'wallet:spend'],
+        important: false,
+      }),
     ]);
   });
 
-  it('summarises the student and guardian roles as own records that see fees', () => {
-    for (const slug of ['student', 'guardian']) {
-      expect(summaryFor(slug)).toEqual(['Own records: can see', 'Sees fees']);
-    }
+  it('summarises the student as own records that see fees and the guardian as also using the wallet', () => {
+    expect(summaryFor('student')).toEqual([
+      'Own records: can see',
+      'Sees fees',
+    ]);
+    expect(summaryFor('guardian')).toEqual([
+      'Own records: can see',
+      'Sees fees',
+      'Uses the family wallet',
+    ]);
     expect(summaryFor('teacher')).not.toContain('Own records: can see');
+  });
+});
+
+describe('the Wallets area', () => {
+  const wallets = area('wallets');
+
+  it('sits in Money, splitting seeing from topping up, with the refund and gateway grants as extras', () => {
+    expect(wallets.group).toBe('Money');
+    expect(wallets.label).toBe('Wallets');
+    expect(wallets.see).toEqual(['wallet:read']);
+    expect(wallets.change).toEqual(['wallet:topUp']);
+    expect(wallets.extras.map((extra) => extra.permissions)).toEqual([
+      ['wallet:requestRefund'],
+      ['wallet:approveRefund'],
+      ['wallet:manageGateway'],
+    ]);
+  });
+
+  it('is see for wallet:read, change with wallet:topUp and custom for a lone top-up', () => {
+    expect(capLevel(toPermissionMap(['wallet:read']), wallets)).toBe('see');
+    expect(
+      capLevel(toPermissionMap(['wallet:read', 'wallet:topUp']), wallets)
+    ).toBe('change');
+    expect(capLevel(toPermissionMap(['wallet:topUp']), wallets)).toBe('custom');
   });
 });
 

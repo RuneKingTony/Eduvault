@@ -335,6 +335,7 @@ test.describe('/me/permissions', () => {
         leave: ['approve'],
         moneyAccount: ['read'],
         store: ['read'],
+        wallet: ['read', 'approveRefund'],
       },
       campusScope: 'all',
       classScope: 'all',
@@ -374,6 +375,7 @@ test.describe('/me/permissions', () => {
       moneyAccount: ['read'],
       ledger: ['read'],
       store: ['read', 'receive', 'issue', 'count'],
+      wallet: ['read', 'topUp', 'requestRefund'],
     });
   });
 
@@ -538,6 +540,7 @@ test.describe('starter roles', () => {
       invoice: ['readOwn'],
       feeLine: ['readOwn'],
       payment: ['readOwn'],
+      wallet: ['readOwn', 'spend'],
     });
     expect(rows).toHaveLength(STARTER_ROLES.length);
   });
@@ -578,6 +581,7 @@ test.describe('starter roles', () => {
         invoice: ['readOwn'],
         feeLine: ['readOwn'],
         payment: ['readOwn'],
+        ...(slug === 'guardian' ? { wallet: ['readOwn', 'spend'] } : {}),
       });
     }
   });

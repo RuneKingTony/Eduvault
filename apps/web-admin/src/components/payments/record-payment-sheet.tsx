@@ -1,28 +1,22 @@
 import { useState, type SubmitEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
-import { CheckIcon } from 'lucide-react';
-import type {
-  PaymentMethod,
-  RecordedPayment,
-  RecordingOptions,
-} from '@eduvault/api-contract';
+import type { RecordedPayment, RecordingOptions } from '@eduvault/api-contract';
 import { generatePaymentReference, money } from '@eduvault/shared';
 import {
-  Button,
   ConfirmDialog,
   ErrorMessage,
   FieldError,
   Sheet,
   SheetContent,
   SheetDescription,
-  SheetFooter,
   SheetHeader,
   SheetTitle,
   Skeleton,
   toast,
 } from '@eduvault/ui';
 import { useApi } from '../../api';
+import { accountNotice, SheetActionsFooter } from '../recording-parts';
 import { useConfirmStep, type ConfirmStep } from '../use-confirm-step';
 import {
   announceReplay,
@@ -46,7 +40,6 @@ import {
   initialState,
   toRequest,
   validate,
-  accountsFor,
   confirmDetails,
   withAccount,
   withAmount,
@@ -190,19 +183,6 @@ function useSheetState(options: RecordingOptions, prefill: Prefill) {
   return { state, act };
 }
 
-function accountNotice(
-  options: RecordingOptions,
-  method: PaymentMethod
-): string | undefined {
-  if (options.accounts.length === 0) {
-    return 'Add a bank, POS or cash account before recording payments.';
-  }
-  if (accountsFor(options.accounts, method).length === 0) {
-    return 'No account takes this payment method. Add one in Accounts first.';
-  }
-  return undefined;
-}
-
 function SheetFields({
   fields,
   onFile,
@@ -223,28 +203,14 @@ function SheetFields({
       <SplitCard {...fields} />
       <ReferencesDisclosure state={state} errors={errors} act={act} />
       <ErrorMessage error={failure} />
-      <FieldError message={accountNotice(options, state.method)} />
+      <FieldError
+        message={accountNotice(options.accounts, state.method, {
+          none: 'Add a bank, POS or cash account before recording payments.',
+          unsupported:
+            'No account takes this payment method. Add one in Accounts first.',
+        })}
+      />
     </>
-  );
-}
-
-function SheetActionsFooter({
-  onClose,
-  disabled,
-}: {
-  onClose: () => void;
-  disabled: boolean;
-}) {
-  return (
-    <SheetFooter>
-      <Button type="button" variant="ghost" onClick={onClose}>
-        Cancel
-      </Button>
-      <Button type="submit" form="record-payment" disabled={disabled}>
-        <CheckIcon />
-        Record payment
-      </Button>
-    </SheetFooter>
   );
 }
 
@@ -327,11 +293,11 @@ function SheetForm({
         />
       </form>
       <SheetActionsFooter
+        form={{ id: 'record-payment', label: 'Record payment' }}
         onClose={onClose}
-        disabled={
-          record.isPending ||
-          accountsFor(options.accounts, state.method).length === 0
-        }
+        pending={record.isPending}
+        options={options}
+        method={state.method}
       />
       <ConfirmPayment
         options={options}

@@ -418,6 +418,8 @@ test.describe('deleting the school', () => {
       ['store', 'organization_id'],
       ['item', 'organization_id'],
       ['item_price_change', 'organization_id'],
+      ['money_account', 'organization_id'],
+      ['ledger_account', 'organization_id'],
     ]) {
       const { rows } = await pool.query(
         `SELECT 1 FROM ${table} WHERE ${column} = $1`,

@@ -30,6 +30,21 @@ describe('uploadProofOnce', () => {
     expect(remember).toHaveBeenCalledWith({ file, id: 'file-1' });
   });
 
+  it('stores the file as the kind it is given', async () => {
+    const { api, upload } = fakeApi();
+
+    await uploadProofOnce(api, {
+      file: proof(),
+      kind: 'wallet_proof',
+      needed: true,
+      uploaded: undefined,
+      remember: vi.fn(),
+    });
+
+    const body = (upload.mock.calls[0]?.[0] as { body: FormData }).body;
+    expect(body.get('kind')).toBe('wallet_proof');
+  });
+
   it('reuses the stored id when a retry sends the same file', async () => {
     const { api, upload } = fakeApi();
     const file = proof();

@@ -31,6 +31,8 @@ import {
   type StoreDeliveryFacts,
   type StoreSaleFacts,
   type StoreWriteOffFacts,
+  walletSpentActivity,
+  walletToppedUpActivity,
 } from './finance-activity';
 
 const LEKKI = 'campus-lekki';
@@ -1072,5 +1074,85 @@ describe('feeOptionChangedActivity', () => {
         },
       },
     ]);
+  });
+});
+
+describe('walletToppedUpActivity', () => {
+  const topUp = {
+    id: 'topup-1',
+    walletId: 'wallet-1',
+    guardianName: 'Mrs Ojo',
+    amountMinor: 5_000_000,
+    campusIds: [LEKKI, IKEJA],
+  };
+
+  it('writes one finance row on each campus the family has a child on', () => {
+    expect(walletToppedUpActivity(actor, topUp)).toEqual(
+      [LEKKI, IKEJA].map((campusId) => ({
+        organizationId: 'org-1',
+        campusId,
+        pillar: 'finance',
+        kind: 'wallet.topped_up',
+        actorUserId: 'user-1',
+        subjectType: 'wallet_topup',
+        subjectId: 'topup-1',
+        text: `Tunde Bakare topped up Mrs Ojo’s wallet with ${money(5_000_000, 'NGN')}.`,
+        data: {
+          topUpId: 'topup-1',
+          walletId: 'wallet-1',
+          amountMinor: 5_000_000,
+        },
+      }))
+    );
+  });
+
+  it('writes nothing for a family with no child on a campus', () => {
+    expect(walletToppedUpActivity(actor, { ...topUp, campusIds: [] })).toEqual(
+      []
+    );
+  });
+});
+
+describe('walletSpentActivity', () => {
+  const spend = {
+    id: 'spend-1',
+    walletId: 'wallet-1',
+    guardianName: 'Mrs Ojo',
+  };
+
+  it('writes one row for a single campus, in the guardian’s name', () => {
+    const [row, ...rest] = walletSpentActivity(actor, spend, [
+      { campusId: LEKKI, amountMinor: 1_800_000 },
+      { campusId: LEKKI, amountMinor: 200_000 },
+    ]);
+    expect(rest).toEqual([]);
+    expect(row).toMatchObject({
+      campusId: LEKKI,
+      kind: 'wallet.spent',
+      subjectType: 'wallet_spend',
+      subjectId: 'spend-1',
+      text: `Mrs Ojo paid ${money(2_000_000, 'NGN')} of their children’s charges from the wallet.`,
+      data: {
+        spendId: 'spend-1',
+        walletId: 'wallet-1',
+        amountMinor: 2_000_000,
+      },
+    });
+  });
+
+  it('splits across campuses, each row saying how much was on that campus', () => {
+    const rows = walletSpentActivity(actor, spend, [
+      { campusId: LEKKI, amountMinor: 1_800_000 },
+      { campusId: IKEJA, amountMinor: 600_000 },
+    ]);
+    expect(
+      rows.map((row) => [row.campusId, row.data?.['amountMinor']])
+    ).toEqual([
+      [LEKKI, 1_800_000],
+      [IKEJA, 600_000],
+    ]);
+    expect(rows[1]?.text).toBe(
+      `Mrs Ojo paid ${money(600_000, 'NGN')} of their children’s charges on this campus from the wallet.`
+    );
   });
 });

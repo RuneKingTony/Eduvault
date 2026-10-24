@@ -17,6 +17,15 @@ export const statements = {
   ledger: ['read', 'manageAccounts'],
   moneyAccount: ['create', 'read', 'update'],
   store: ['read', 'receive', 'issue', 'count'],
+  wallet: [
+    'read',
+    'readOwn',
+    'topUp',
+    'spend',
+    'requestRefund',
+    'approveRefund',
+    'manageGateway',
+  ],
   subject: ['create', 'read', 'update'],
   member: ['create', 'read', 'update', 'delete'],
   ac: ['create', 'read', 'update', 'delete'],
@@ -130,6 +139,18 @@ export const PERM_HELP: Partial<Record<Permission, string>> = {
     'Records student purchases at the store, on the campuses they see.',
   'store:count':
     'Counts store stock and submits the differences for approval, on the campuses they see.',
+  'wallet:read':
+    'Sees family wallets: balances, set-aside money and movements, for families with a child on the campuses they see.',
+  'wallet:readOwn': 'Guardians see their own family wallet.',
+  'wallet:topUp':
+    'Records cash, transfer and POS money a family pays into its wallet, with the receipt.',
+  'wallet:spend':
+    'Guardians use wallet money for their children’s charges and set money aside for a child.',
+  'wallet:requestRefund': 'Asks for wallet money to be paid back to a family.',
+  'wallet:approveRefund':
+    'Approves or declines wallet refund requests from other people, never their own.',
+  'wallet:manageGateway':
+    'Connects and changes the online payment gateway. Owner-only by default.',
 };
 
 const RESOURCE_LABELS: Record<Resource, string> = {
@@ -151,6 +172,7 @@ const RESOURCE_LABELS: Record<Resource, string> = {
   ledger: 'Money categories',
   moneyAccount: 'Bank and POS accounts',
   store: 'Store',
+  wallet: 'Wallets',
   subject: 'Subjects',
   member: 'Staff',
   ac: 'Roles',

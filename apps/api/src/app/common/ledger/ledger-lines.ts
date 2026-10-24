@@ -3,6 +3,7 @@ import type { JournalKind } from '@eduvault/api-contract';
 export interface LedgerLine {
   ledgerAccountId: string;
   studentId?: string | null;
+  familyId?: string | null;
   campusId?: string | null;
   debitMinor: number;
   creditMinor: number;

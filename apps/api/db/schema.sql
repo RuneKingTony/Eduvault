@@ -95,6 +95,23 @@ END;
 $$;
 
 --
+-- Name: guardian_student_creates_wallet(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.guardian_student_creates_wallet() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  IF NEW.pays_fees THEN
+    INSERT INTO wallet (organization_id, guardian_id)
+    VALUES (NEW.organization_id, NEW.guardian_id)
+    ON CONFLICT (organization_id, guardian_id) DO NOTHING;
+  END IF;
+  RETURN NULL;
+END;
+$$;
+
+--
 -- Name: invoice_immutable(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -249,6 +266,31 @@ END;
 $$;
 
 --
+-- Name: journal_line_requires_family(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.journal_line_requires_family() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+  needs_family BOOLEAN;
+BEGIN
+  SELECT requires_family INTO needs_family
+  FROM ledger_account
+  WHERE id = NEW.ledger_account_id AND organization_id = NEW.organization_id;
+  IF COALESCE(needs_family, FALSE) AND NEW.family_id IS NULL THEN
+    RAISE EXCEPTION 'a line on this account needs a family'
+      USING ERRCODE = 'check_violation', CONSTRAINT = 'journal_line_requires_family';
+  END IF;
+  IF NOT COALESCE(needs_family, FALSE) AND NEW.family_id IS NOT NULL THEN
+    RAISE EXCEPTION 'a line on this account cannot carry a family'
+      USING ERRCODE = 'check_violation', CONSTRAINT = 'journal_line_refuses_family';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+--
 -- Name: journal_line_requires_student(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -373,8 +415,14 @@ $$;
 --
 
 CREATE FUNCTION public.seed_ledger_accounts(org text) RETURNS void
-    LANGUAGE sql
+    LANGUAGE plpgsql
     AS $$
+DECLARE
+  money_parent UUID;
+  gateway_code INTEGER;
+  gateway_name TEXT := 'Monnify collections';
+  gateway_ledger UUID;
+BEGIN
   INSERT INTO ledger_account (organization_id, code, name, type, system_key, requires_student)
   VALUES
     (org, 1100, 'Fees owed to the school', 'asset', 'fees_receivable', TRUE),
@@ -388,6 +436,10 @@ CREATE FUNCTION public.seed_ledger_accounts(org text) RETURNS void
     (org, 5100, 'Bad debt', 'expense', 'bad_debt', FALSE),
     (org, 5200, 'Cost of store items sold', 'expense', 'store_cost', FALSE),
     (org, 5300, 'Store stock losses', 'expense', 'store_losses', FALSE)
+  ON CONFLICT DO NOTHING;
+
+  INSERT INTO ledger_account (organization_id, code, name, type, system_key, requires_family)
+  VALUES (org, 2200, 'Student wallets', 'liability', 'student_wallets', TRUE)
   ON CONFLICT DO NOTHING;
 
   INSERT INTO ledger_account (organization_id, code, name, type, parent_id, system_key)
@@ -406,6 +458,47 @@ CREATE FUNCTION public.seed_ledger_accounts(org text) RETURNS void
   JOIN ledger_account parent
     ON parent.organization_id = org AND parent.system_key = 'fee_income'
   ON CONFLICT DO NOTHING;
+
+  SELECT id INTO money_parent
+  FROM ledger_account
+  WHERE organization_id = org AND system_key = 'money_accounts';
+
+  SELECT id INTO gateway_ledger
+  FROM ledger_account
+  WHERE organization_id = org AND system_key = 'monnify_collections';
+
+  IF gateway_ledger IS NULL THEN
+    IF NOT EXISTS (
+      SELECT 1 FROM ledger_account WHERE organization_id = org AND code = 1230
+    ) THEN
+      gateway_code := 1230;
+    ELSE
+      SELECT GREATEST(1200, COALESCE(MAX(code), 0)) + 10 INTO gateway_code
+      FROM ledger_account
+      WHERE organization_id = org AND parent_id = money_parent;
+      WHILE EXISTS (
+        SELECT 1 FROM ledger_account WHERE organization_id = org AND code = gateway_code
+      ) LOOP
+        gateway_code := gateway_code + 10;
+      END LOOP;
+    END IF;
+    IF EXISTS (
+      SELECT 1 FROM ledger_account
+      WHERE organization_id = org AND parent_id = money_parent AND lower(name) = lower(gateway_name)
+    ) THEN
+      gateway_name := 'Monnify collections (gateway)';
+    END IF;
+    INSERT INTO ledger_account (organization_id, code, name, type, parent_id, system_key)
+    VALUES (org, gateway_code, gateway_name, 'asset', money_parent, 'monnify_collections')
+    RETURNING id INTO gateway_ledger;
+  END IF;
+
+  INSERT INTO money_account (organization_id, ledger_account_id, name, kind)
+  SELECT org, gateway_ledger, 'Monnify collections', 'gateway'
+  WHERE NOT EXISTS (
+    SELECT 1 FROM money_account WHERE organization_id = org AND ledger_account_id = gateway_ledger
+  );
+END;
 $$;
 
 --
@@ -514,6 +607,19 @@ BEGIN
       USING ERRCODE = 'check_violation', CONSTRAINT = 'store_sale_not_empty';
   END IF;
   RETURN NULL;
+END;
+$$;
+
+--
+-- Name: wallet_append_only(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.wallet_append_only() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  RAISE EXCEPTION '% is append-only', TG_TABLE_NAME
+    USING ERRCODE = 'check_violation', CONSTRAINT = 'wallet_append_only';
 END;
 $$;
 
@@ -832,7 +938,7 @@ CREATE TABLE public.file_object (
     uploaded_by text,
     uploaded_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT file_object_byte_size_check CHECK ((byte_size > 0)),
-    CONSTRAINT file_object_kind_check CHECK ((kind = ANY (ARRAY['school_logo'::text, 'guardian_photo'::text, 'payment_proof'::text])))
+    CONSTRAINT file_object_kind_check CHECK ((kind = ANY (ARRAY['school_logo'::text, 'guardian_photo'::text, 'payment_proof'::text, 'wallet_proof'::text])))
 );
 
 --
@@ -998,7 +1104,7 @@ CREATE TABLE public.journal_entry (
     posted_by text,
     memo text,
     reverses_entry_id uuid,
-    CONSTRAINT journal_entry_kind_check CHECK ((kind = ANY (ARRAY['invoice'::text, 'adhoc'::text, 'payment'::text, 'payment_void'::text, 'adjustment'::text, 'opening'::text, 'store'::text, 'store_receive'::text, 'store_cost'::text, 'store_count'::text]))),
+    CONSTRAINT journal_entry_kind_check CHECK ((kind = ANY (ARRAY['invoice'::text, 'adhoc'::text, 'payment'::text, 'payment_void'::text, 'adjustment'::text, 'opening'::text, 'store'::text, 'store_receive'::text, 'store_cost'::text, 'store_count'::text, 'wallet_topup'::text, 'wallet_spend'::text]))),
     CONSTRAINT journal_entry_memo_check CHECK ((char_length(memo) <= 500)),
     CONSTRAINT journal_entry_reference_check CHECK ((char_length(btrim(reference)) > 0))
 );
@@ -1029,6 +1135,7 @@ CREATE TABLE public.journal_line (
     campus_id text,
     debit_minor bigint DEFAULT 0 NOT NULL,
     credit_minor bigint DEFAULT 0 NOT NULL,
+    family_id uuid,
     CONSTRAINT journal_line_one_side CHECK ((((debit_minor > 0) AND (credit_minor = 0)) OR ((credit_minor > 0) AND (debit_minor = 0))))
 );
 
@@ -1047,6 +1154,7 @@ CREATE TABLE public.ledger_account (
     requires_student boolean DEFAULT false NOT NULL,
     retired_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
+    requires_family boolean DEFAULT false NOT NULL,
     CONSTRAINT ledger_account_code_check CHECK ((code > 0)),
     CONSTRAINT ledger_account_name_check CHECK (((char_length(btrim(name)) >= 1) AND (char_length(btrim(name)) <= 80))),
     CONSTRAINT ledger_account_type_check CHECK ((type = ANY (ARRAY['asset'::text, 'liability'::text, 'equity'::text, 'income'::text, 'expense'::text])))
@@ -1734,6 +1842,79 @@ CREATE TABLE public.verification (
     "expiresAt" timestamp with time zone NOT NULL,
     "createdAt" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     "updatedAt" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+--
+-- Name: wallet; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.wallet (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id text NOT NULL,
+    guardian_id uuid NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+--
+-- Name: wallet_earmark; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.wallet_earmark (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id text NOT NULL,
+    wallet_id uuid NOT NULL,
+    student_id uuid NOT NULL,
+    kind text NOT NULL,
+    delta_minor bigint NOT NULL,
+    reference text NOT NULL,
+    journal_entry_id uuid,
+    created_by text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT wallet_earmark_kind_check CHECK ((kind = ANY (ARRAY['set'::text, 'release'::text, 'spend'::text]))),
+    CONSTRAINT wallet_earmark_reference_check CHECK ((char_length(btrim(reference)) > 0)),
+    CONSTRAINT wallet_earmark_sign CHECK ((((kind = 'set'::text) AND (delta_minor > 0)) OR ((kind = ANY (ARRAY['release'::text, 'spend'::text])) AND (delta_minor < 0)))),
+    CONSTRAINT wallet_earmark_spend_entry CHECK (((kind = 'spend'::text) = (journal_entry_id IS NOT NULL)))
+);
+
+--
+-- Name: wallet_spend; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.wallet_spend (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id text NOT NULL,
+    wallet_id uuid NOT NULL,
+    reference text NOT NULL,
+    request_hash text NOT NULL,
+    journal_entry_id uuid NOT NULL,
+    created_by text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT wallet_spend_reference_check CHECK (((char_length(btrim(reference)) >= 1) AND (char_length(btrim(reference)) <= 80)))
+);
+
+--
+-- Name: wallet_topup; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.wallet_topup (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id text NOT NULL,
+    wallet_id uuid NOT NULL,
+    reference text NOT NULL,
+    money_account_id uuid NOT NULL,
+    method text NOT NULL,
+    amount_minor bigint NOT NULL,
+    received_on date NOT NULL,
+    depositor_name text,
+    proof_file_id uuid NOT NULL,
+    request_hash text NOT NULL,
+    journal_entry_id uuid NOT NULL,
+    created_by text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT wallet_topup_amount_minor_check CHECK ((amount_minor > 0)),
+    CONSTRAINT wallet_topup_depositor_name_check CHECK (((char_length(btrim(depositor_name)) >= 1) AND (char_length(btrim(depositor_name)) <= 120))),
+    CONSTRAINT wallet_topup_method_check CHECK ((method = ANY (ARRAY['cash'::text, 'transfer'::text, 'pos'::text]))),
+    CONSTRAINT wallet_topup_reference_check CHECK (((char_length(btrim(reference)) >= 1) AND (char_length(btrim(reference)) <= 80)))
 );
 
 --
@@ -2752,6 +2933,111 @@ ALTER TABLE ONLY public.verification
     ADD CONSTRAINT verification_pkey PRIMARY KEY (id);
 
 --
+-- Name: wallet_earmark wallet_earmark_id_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wallet_earmark
+    ADD CONSTRAINT wallet_earmark_id_organization_id_key UNIQUE (id, organization_id);
+
+--
+-- Name: wallet_earmark wallet_earmark_organization_id_reference_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wallet_earmark
+    ADD CONSTRAINT wallet_earmark_organization_id_reference_key UNIQUE (organization_id, reference);
+
+--
+-- Name: wallet_earmark wallet_earmark_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wallet_earmark
+    ADD CONSTRAINT wallet_earmark_pkey PRIMARY KEY (id);
+
+--
+-- Name: wallet wallet_id_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wallet
+    ADD CONSTRAINT wallet_id_organization_id_key UNIQUE (id, organization_id);
+
+--
+-- Name: wallet wallet_organization_id_guardian_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wallet
+    ADD CONSTRAINT wallet_organization_id_guardian_id_key UNIQUE (organization_id, guardian_id);
+
+--
+-- Name: wallet wallet_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wallet
+    ADD CONSTRAINT wallet_pkey PRIMARY KEY (id);
+
+--
+-- Name: wallet_spend wallet_spend_id_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wallet_spend
+    ADD CONSTRAINT wallet_spend_id_organization_id_key UNIQUE (id, organization_id);
+
+--
+-- Name: wallet_spend wallet_spend_journal_entry_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wallet_spend
+    ADD CONSTRAINT wallet_spend_journal_entry_id_key UNIQUE (journal_entry_id);
+
+--
+-- Name: wallet_spend wallet_spend_organization_id_reference_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wallet_spend
+    ADD CONSTRAINT wallet_spend_organization_id_reference_key UNIQUE (organization_id, reference);
+
+--
+-- Name: wallet_spend wallet_spend_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wallet_spend
+    ADD CONSTRAINT wallet_spend_pkey PRIMARY KEY (id);
+
+--
+-- Name: wallet_topup wallet_topup_id_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wallet_topup
+    ADD CONSTRAINT wallet_topup_id_organization_id_key UNIQUE (id, organization_id);
+
+--
+-- Name: wallet_topup wallet_topup_journal_entry_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wallet_topup
+    ADD CONSTRAINT wallet_topup_journal_entry_id_key UNIQUE (journal_entry_id);
+
+--
+-- Name: wallet_topup wallet_topup_organization_id_reference_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wallet_topup
+    ADD CONSTRAINT wallet_topup_organization_id_reference_key UNIQUE (organization_id, reference);
+
+--
+-- Name: wallet_topup wallet_topup_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wallet_topup
+    ADD CONSTRAINT wallet_topup_pkey PRIMARY KEY (id);
+
+--
+-- Name: wallet_topup wallet_topup_proof_file_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wallet_topup
+    ADD CONSTRAINT wallet_topup_proof_file_id_key UNIQUE (proof_file_id);
+
+--
 -- Name: account_userId_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3044,6 +3330,12 @@ CREATE INDEX journal_line_account_student_idx ON public.journal_line USING btree
 --
 
 CREATE INDEX journal_line_entry_idx ON public.journal_line USING btree (entry_id);
+
+--
+-- Name: journal_line_family_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX journal_line_family_idx ON public.journal_line USING btree (organization_id, ledger_account_id, family_id) INCLUDE (debit_minor, credit_minor);
 
 --
 -- Name: ledger_account_sibling_name_key; Type: INDEX; Schema: public; Owner: -
@@ -3352,6 +3644,24 @@ CREATE UNIQUE INDEX user_username_uidx ON public."user" USING btree (username);
 CREATE INDEX verification_identifier_idx ON public.verification USING btree (identifier);
 
 --
+-- Name: wallet_earmark_wallet_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX wallet_earmark_wallet_idx ON public.wallet_earmark USING btree (organization_id, wallet_id, student_id);
+
+--
+-- Name: wallet_spend_wallet_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX wallet_spend_wallet_idx ON public.wallet_spend USING btree (organization_id, wallet_id, created_at DESC);
+
+--
+-- Name: wallet_topup_wallet_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX wallet_topup_wallet_idx ON public.wallet_topup USING btree (organization_id, wallet_id, created_at DESC);
+
+--
 -- Name: activity_event activity_event_append_only; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -3374,6 +3684,12 @@ CREATE TRIGGER audit_log_append_only BEFORE DELETE OR UPDATE ON public.audit_log
 --
 
 CREATE TRIGGER fee_line_fee_income_child BEFORE INSERT ON public.fee_line FOR EACH ROW EXECUTE FUNCTION public.fee_line_fee_income_child();
+
+--
+-- Name: guardian_student guardian_student_creates_wallet; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER guardian_student_creates_wallet AFTER INSERT OR UPDATE OF pays_fees ON public.guardian_student FOR EACH ROW EXECUTE FUNCTION public.guardian_student_creates_wallet();
 
 --
 -- Name: invoice invoice_immutable; Type: TRIGGER; Schema: public; Owner: -
@@ -3422,6 +3738,12 @@ CREATE CONSTRAINT TRIGGER journal_entry_not_empty AFTER INSERT ON public.journal
 --
 
 CREATE TRIGGER journal_line_append_only BEFORE DELETE OR UPDATE ON public.journal_line FOR EACH ROW EXECUTE FUNCTION public.journal_append_only();
+
+--
+-- Name: journal_line journal_line_requires_family; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER journal_line_requires_family BEFORE INSERT ON public.journal_line FOR EACH ROW EXECUTE FUNCTION public.journal_line_requires_family();
 
 --
 -- Name: journal_line journal_line_requires_student; Type: TRIGGER; Schema: public; Owner: -
@@ -3524,6 +3846,30 @@ CREATE TRIGGER store_sale_line_append_only BEFORE DELETE OR UPDATE ON public.sto
 --
 
 CREATE CONSTRAINT TRIGGER store_sale_not_empty AFTER INSERT ON public.store_sale DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.store_sale_not_empty();
+
+--
+-- Name: wallet wallet_append_only; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER wallet_append_only BEFORE DELETE OR UPDATE ON public.wallet FOR EACH ROW EXECUTE FUNCTION public.wallet_append_only();
+
+--
+-- Name: wallet_earmark wallet_earmark_append_only; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER wallet_earmark_append_only BEFORE DELETE OR UPDATE ON public.wallet_earmark FOR EACH ROW EXECUTE FUNCTION public.wallet_append_only();
+
+--
+-- Name: wallet_spend wallet_spend_append_only; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER wallet_spend_append_only BEFORE DELETE OR UPDATE ON public.wallet_spend FOR EACH ROW EXECUTE FUNCTION public.wallet_append_only();
+
+--
+-- Name: wallet_topup wallet_topup_append_only; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER wallet_topup_append_only BEFORE DELETE OR UPDATE ON public.wallet_topup FOR EACH ROW EXECUTE FUNCTION public.wallet_append_only();
 
 --
 -- Name: academic_session academic_session_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -4119,6 +4465,13 @@ ALTER TABLE ONLY public.journal_line
 
 ALTER TABLE ONLY public.journal_line
     ADD CONSTRAINT journal_line_entry_id_organization_id_fkey FOREIGN KEY (entry_id, organization_id) REFERENCES public.journal_entry(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: journal_line journal_line_family_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.journal_line
+    ADD CONSTRAINT journal_line_family_fkey FOREIGN KEY (family_id, organization_id) REFERENCES public.guardian(id, organization_id) ON DELETE RESTRICT;
 
 --
 -- Name: journal_line journal_line_ledger_account_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -4947,6 +5300,125 @@ ALTER TABLE ONLY public.term
     ADD CONSTRAINT term_session_id_organization_id_fkey FOREIGN KEY (session_id, organization_id) REFERENCES public.academic_session(id, organization_id) ON DELETE CASCADE;
 
 --
+-- Name: wallet_earmark wallet_earmark_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wallet_earmark
+    ADD CONSTRAINT wallet_earmark_created_by_fkey FOREIGN KEY (created_by) REFERENCES public."user"(id) ON DELETE RESTRICT;
+
+--
+-- Name: wallet_earmark wallet_earmark_journal_entry_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wallet_earmark
+    ADD CONSTRAINT wallet_earmark_journal_entry_id_organization_id_fkey FOREIGN KEY (journal_entry_id, organization_id) REFERENCES public.journal_entry(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: wallet_earmark wallet_earmark_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wallet_earmark
+    ADD CONSTRAINT wallet_earmark_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE RESTRICT;
+
+--
+-- Name: wallet_earmark wallet_earmark_student_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wallet_earmark
+    ADD CONSTRAINT wallet_earmark_student_id_organization_id_fkey FOREIGN KEY (student_id, organization_id) REFERENCES public.student(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: wallet_earmark wallet_earmark_wallet_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wallet_earmark
+    ADD CONSTRAINT wallet_earmark_wallet_id_organization_id_fkey FOREIGN KEY (wallet_id, organization_id) REFERENCES public.wallet(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: wallet wallet_guardian_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wallet
+    ADD CONSTRAINT wallet_guardian_id_organization_id_fkey FOREIGN KEY (guardian_id, organization_id) REFERENCES public.guardian(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: wallet wallet_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wallet
+    ADD CONSTRAINT wallet_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE RESTRICT;
+
+--
+-- Name: wallet_spend wallet_spend_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wallet_spend
+    ADD CONSTRAINT wallet_spend_created_by_fkey FOREIGN KEY (created_by) REFERENCES public."user"(id) ON DELETE RESTRICT;
+
+--
+-- Name: wallet_spend wallet_spend_journal_entry_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wallet_spend
+    ADD CONSTRAINT wallet_spend_journal_entry_id_organization_id_fkey FOREIGN KEY (journal_entry_id, organization_id) REFERENCES public.journal_entry(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: wallet_spend wallet_spend_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wallet_spend
+    ADD CONSTRAINT wallet_spend_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE RESTRICT;
+
+--
+-- Name: wallet_spend wallet_spend_wallet_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wallet_spend
+    ADD CONSTRAINT wallet_spend_wallet_id_organization_id_fkey FOREIGN KEY (wallet_id, organization_id) REFERENCES public.wallet(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: wallet_topup wallet_topup_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wallet_topup
+    ADD CONSTRAINT wallet_topup_created_by_fkey FOREIGN KEY (created_by) REFERENCES public."user"(id) ON DELETE RESTRICT;
+
+--
+-- Name: wallet_topup wallet_topup_journal_entry_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wallet_topup
+    ADD CONSTRAINT wallet_topup_journal_entry_id_organization_id_fkey FOREIGN KEY (journal_entry_id, organization_id) REFERENCES public.journal_entry(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: wallet_topup wallet_topup_money_account_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wallet_topup
+    ADD CONSTRAINT wallet_topup_money_account_id_organization_id_fkey FOREIGN KEY (money_account_id, organization_id) REFERENCES public.money_account(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: wallet_topup wallet_topup_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wallet_topup
+    ADD CONSTRAINT wallet_topup_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE RESTRICT;
+
+--
+-- Name: wallet_topup wallet_topup_proof_file_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wallet_topup
+    ADD CONSTRAINT wallet_topup_proof_file_id_organization_id_fkey FOREIGN KEY (proof_file_id, organization_id) REFERENCES public.file_object(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: wallet_topup wallet_topup_wallet_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wallet_topup
+    ADD CONSTRAINT wallet_topup_wallet_id_organization_id_fkey FOREIGN KEY (wallet_id, organization_id) REFERENCES public.wallet(id, organization_id) ON DELETE RESTRICT;
+
+--
 -- PostgreSQL database dump complete
 --
 
@@ -4989,4 +5461,5 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20261018090000'),
     ('20261018100000'),
     ('20261022120000'),
-    ('20261022130000');
+    ('20261022130000'),
+    ('20261023090000');

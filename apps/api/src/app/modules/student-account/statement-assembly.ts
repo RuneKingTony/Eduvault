@@ -90,6 +90,8 @@ const DESCRIBERS: Record<
   store_receive: memoOrReference,
   store_cost: memoOrReference,
   store_count: memoOrReference,
+  wallet_topup: () => 'Wallet top-up',
+  wallet_spend: () => 'Paid from wallet',
 };
 
 export const describeMovement = (

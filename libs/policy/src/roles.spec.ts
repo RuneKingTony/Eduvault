@@ -251,6 +251,25 @@ describe('roles', () => {
     expect(READ_PERMS).not.toContain('store:count');
   });
 
+  it('grants wallet permissions by least privilege and keeps the gateway owner-only', () => {
+    expect(starter('bursar').wallet).toEqual([
+      'read',
+      'topUp',
+      'requestRefund',
+    ]);
+    expect(starter('principal').wallet).toEqual(['read', 'approveRefund']);
+    expect(starter('administrator').wallet).toEqual(['read']);
+    expect(starter('guardian').wallet).toEqual(['readOwn', 'spend']);
+    for (const slug of ['teacher', 'student']) {
+      expect(starter(slug).wallet).toBeUndefined();
+    }
+    for (const role of STARTER_ROLES) {
+      expect(role.permissions).not.toContain('wallet:manageGateway');
+    }
+    expect(READ_PERMS).toContain('wallet:read');
+    expect(READ_PERMS).not.toContain('wallet:readOwn');
+  });
+
   it('keeps ledger:manageAccounts and the money account writes out of every starter role', () => {
     for (const role of STARTER_ROLES) {
       for (const permission of [
@@ -375,6 +394,7 @@ describe('roles', () => {
       leave: ['approve'],
       moneyAccount: ['read'],
       store: ['read'],
+      wallet: ['read', 'approveRefund'],
     });
   });
 

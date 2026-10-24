@@ -43,16 +43,17 @@ Milestones follow the data model's phase order ([D-005](../technical-reference.m
 
 ### M3 Money (F1)
 
-| Slice | What ships                                                                                                                                                     | Needs      | PRDs           |
-| ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | -------------- |
-| M3.1  | Ledger core (documents, references, journal and balance trigger), money accounts (including cash box), money categories with the Journal tab, opening balances | M2.2       | 03, 56         |
-| M3.2  | School fees and other fees, fee types, opt-ins; drops `fee_schedule` and both old fees pages                                                                   | M3.1, M2.3 | 50             |
-| M3.3  | Charge students (prepare, check, send, cancel), charges list and detail, `student_discount` table and its application                                          | M3.2, M2.4 | 51, 52, 55     |
-| M3.4  | Payments with split allocation and proof, receipts (print view), payment rules, who owes, student and family statements                                        | M3.3, M2.2 | 53, 54, 33     |
-| M3.5  | Approvals queue (provider shape), counts and bell, approval rules, fee reductions, cancelled balances, refunds, discount screens, payment cancellations        | M3.4       | 57, 55, 53, 33 |
-| M3.6  | Staff leave: request, withdraw, approve and decline in Approvals (`leave:approve`)                                                                             | M3.5       | 22             |
-| M3.7  | Portal Fees and family statement                                                                                                                               | M3.4, M2.8 | 72             |
-| M3.8  | One-off charges: the New charge sheet and `POST /invoices`, a client reference with replay, billing and store charges on one shared send helper                | M3.3       | 58, 52         |
+| Slice | What ships                                                                                                                                                                                 | Needs      | PRDs           |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------- | -------------- |
+| M3.1  | Ledger core (documents, references, journal and balance trigger), money accounts (including cash box), money categories with the Journal tab, opening balances                             | M2.2       | 03, 56         |
+| M3.2  | School fees and other fees, fee types, opt-ins; drops `fee_schedule` and both old fees pages                                                                                               | M3.1, M2.3 | 50             |
+| M3.3  | Charge students (prepare, check, send, cancel), charges list and detail, `student_discount` table and its application                                                                      | M3.2, M2.4 | 51, 52, 55     |
+| M3.4  | Payments with split allocation and proof, receipts (print view), payment rules, who owes, student and family statements                                                                    | M3.3, M2.2 | 53, 54, 33     |
+| M3.5  | Approvals queue (provider shape), counts and bell, approval rules, fee reductions, cancelled balances, refunds, discount screens, payment cancellations                                    | M3.4       | 57, 55, 53, 33 |
+| M3.6  | Staff leave: request, withdraw, approve and decline in Approvals (`leave:approve`)                                                                                                         | M3.5       | 22             |
+| M3.7  | Portal Fees and family statement                                                                                                                                                           | M3.4, M2.8 | 72             |
+| M3.8  | One-off charges: the New charge sheet and `POST /invoices`, a client reference with replay, billing and store charges on one shared send helper                                            | M3.3       | 58, 52         |
+| M3.9  | Wallets, ledger core: `2200` and the family tag on journal lines, the Monnify collections account, wallet tables and trigger, staff top-ups with receipt, guardian spend and set-aside API | M3.4, M2.8 | 59, 56         |
 
 ### M4 Store and subjects (F2)
 
@@ -104,6 +105,7 @@ The dashboard grows with each slice; [70-dashboard.md](70-dashboard.md) maps eve
 | [56 Money accounts and categories](56-money-accounts-and-categories.md)          | M3.1                                              |
 | [57 Approvals](57-approvals.md)                                                  | M3.5, M3.6 (leave), M4.5 (store write-offs)       |
 | [58 One-off charges](58-one-off-charges.md)                                      | M3.8                                              |
+| [59 Wallets](59-wallets.md)                                                      | M3.9                                              |
 | [60 Subjects](60-subjects.md)                                                    | M4.1, M4.2                                        |
 | [61 Store](61-store.md)                                                          | M4.3, M4.4, M4.5                                  |
 | [70 Dashboard](70-dashboard.md)                                                  | M2.6, then a card per slice                       |

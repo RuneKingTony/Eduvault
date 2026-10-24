@@ -1,3 +1,4 @@
+import type { FileKind } from '@eduvault/api-contract';
 import { toast } from '@eduvault/ui';
 import type { Api } from '../api';
 
@@ -8,6 +9,7 @@ export interface UploadedProof {
 
 interface ProofUpload {
   file: File | undefined;
+  kind?: FileKind;
   /** Whether this payment method needs a proof; the contracts differ. */
   needed: boolean;
   uploaded: UploadedProof | undefined;
@@ -20,7 +22,7 @@ interface ProofUpload {
  */
 export async function uploadProofOnce(
   api: Api,
-  { file, needed, uploaded, remember }: ProofUpload
+  { file, kind = 'payment_proof', needed, uploaded, remember }: ProofUpload
 ): Promise<string | undefined> {
   if (!needed || file === undefined) {
     return undefined;
@@ -29,7 +31,7 @@ export async function uploadProofOnce(
     return uploaded.id;
   }
   const form = new FormData();
-  form.set('kind', 'payment_proof');
+  form.set('kind', kind);
   form.set('file', file);
   const stored = await api.files.upload({ body: form });
   remember({ file, id: stored.id });

@@ -423,3 +423,68 @@ describe('FilesService payment proofs', () => {
     expect(attached.files.rows.size).toBe(1);
   });
 });
+
+const uploadWalletProof = (ctx: OrgContext, buffer: Buffer) => {
+  const made = setup();
+  return {
+    ...made,
+    result: made.service.upload(ctx, {
+      kind: 'wallet_proof',
+      file: { originalname: 'receipt.pdf', buffer },
+    }),
+  };
+};
+
+describe('FilesService wallet proofs', () => {
+  const topUpClerk = context('wallet:topUp');
+  const walletReader = context('wallet:read');
+
+  it('takes a receipt from wallet:topUp', async () => {
+    await expect(
+      uploadWalletProof(topUpClerk, PDF).result
+    ).resolves.toMatchObject({ contentType: 'application/pdf' });
+  });
+
+  it('answers 403 to someone who may only read wallets or record payments', async () => {
+    for (const ctx of [walletReader, context('payment:record')]) {
+      await expect(uploadWalletProof(ctx, PDF).result).rejects.toBeInstanceOf(
+        ForbiddenException
+      );
+    }
+  });
+
+  it('serves an attached receipt to wallet:read and hides it from payment:read', async () => {
+    const { files, service, result } = uploadWalletProof(topUpClerk, PDF);
+    const { id } = await result;
+    files.attached.add(id);
+
+    await expect(service.read(walletReader, id)).resolves.toMatchObject({
+      originalName: 'receipt.pdf',
+    });
+    await expect(
+      service.read(context('payment:read'), id)
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('answers 404 when the family is outside the caller’s campuses', async () => {
+    const { files, service, result } = uploadWalletProof(topUpClerk, PDF);
+    const { id } = await result;
+    files.attached.add(id);
+    files.hidden.add(id);
+
+    await expect(service.read(walletReader, id)).rejects.toBeInstanceOf(
+      NotFoundException
+    );
+  });
+
+  it('refuses to remove an attached receipt with the wallet copy', async () => {
+    const { files, service, result } = uploadWalletProof(topUpClerk, PDF);
+    const { id } = await result;
+    files.attached.add(id);
+
+    await expect(service.remove(topUpClerk, id)).rejects.toThrow(
+      'A top-up receipt is kept with its top-up and can’t be removed.'
+    );
+    expect(files.rows.size).toBe(1);
+  });
+});

@@ -25,6 +25,7 @@ const built = new Set([
   '/members',
   '/finance/accounts',
   '/finance/payments',
+  '/finance/wallets',
   '/finance/store',
   '/finance/adjustments',
   '/finance/school-fees',
@@ -77,6 +78,7 @@ describe('nav model', () => {
       'Subjects',
       'Fees',
       'Payments',
+      'Wallets',
       'Store',
       'Accounts',
       'Settings',
@@ -94,6 +96,7 @@ describe('nav model', () => {
       '/subjects',
       '/finance/accounts',
       '/finance/payments',
+      '/finance/wallets',
       '/finance/store',
       '/finance/money-accounts',
       '/settings/profile',
@@ -314,6 +317,22 @@ describe('nav gates', () => {
     );
     expect(fees(toPermissionMap(['invoice:bill']))).toBe('/finance/billing');
     expect(fees(starter('teacher'))).toBeUndefined();
+  });
+
+  it('shows Wallets only with wallet:read', () => {
+    for (const slug of ['bursar', 'administrator', 'principal']) {
+      expect(routesFor(starter(slug))).toContain('/finance/wallets');
+    }
+    expect(routesFor(starter('teacher'))).not.toContain('/finance/wallets');
+    expect(routesFor(starter('guardian'))).not.toContain('/finance/wallets');
+    expect(routesFor(toPermissionMap([]))).not.toContain('/finance/wallets');
+    expect(routesFor(toPermissionMap(['wallet:topUp']))).not.toContain(
+      '/finance/wallets'
+    );
+    expect(routesFor(toPermissionMap(['wallet:read']))).toContain(
+      '/finance/wallets'
+    );
+    expect(routeGate('/finance/wallets')).toEqual(['wallet:read']);
   });
 
   it('shows Store only with store:read', () => {

@@ -11,6 +11,7 @@ describe('accessOfStarter', () => {
       invoice: ['readOwn'],
       feeLine: ['readOwn'],
       payment: ['readOwn'],
+      wallet: ['readOwn', 'spend'],
     });
     expect(STARTER_ROLES.map((role) => role.slug)).toContain('guardian');
   });

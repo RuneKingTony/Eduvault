@@ -67,7 +67,7 @@ export async function findPaymentByColumn(
   );
 }
 
-async function campusesOf(
+export async function campusesOf(
   trx: Kysely<DB>,
   organizationId: string,
   studentIds: readonly string[]

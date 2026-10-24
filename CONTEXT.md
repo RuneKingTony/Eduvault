@@ -112,6 +112,12 @@ Terms the code and the people using it share. Adapted from the earlier school-ma
 
 **Payment method** — how a payment was made: cash, bank transfer or POS. "Payment rules" switches each on or off, but never all three.
 
+**Wallet** — the money a family has paid in ahead, one for each paying guardian. A view over the journal lines on `2200 Student wallets` that carry the guardian's id, never a stored balance. The guardian spends it on their children's charges. Its figures are the balance, what is set aside and what is free to use.
+
+**Top-up** — money a guardian pays into their wallet, recorded by staff with a receipt (`wallet_topup`). It debits the cash, bank or POS account and credits the wallet. Applied once per reference, like a payment.
+
+**Earmark** — money in a wallet set aside for one child's charges ("Set aside" on screen). An append-only log: a set, a release, or a spend that uses it. A child's charges use their earmark before the free money.
+
 **Void** — undoing a payment. "Cancel a payment" on screen. The row is kept and marked, and the reversal is a new movement once approved. Money records are never deleted. A store sale's payment can't be cancelled on its own.
 
 **Adjustment** — a correction to a student's account: a credit note ("Reduce a fee"), a write-off ("Cancel a balance") or a refund of credit. Needs a second person's approval unless the school has switched that approval off. "Discounts and refunds" on screen.

@@ -64,6 +64,7 @@ export const STARTER_ROLES: readonly StarterRole[] = [
       'invoice:read',
       'payment:read',
       'store:read',
+      'wallet:read',
     ],
   },
   {
@@ -104,6 +105,9 @@ export const STARTER_ROLES: readonly StarterRole[] = [
       'store:receive',
       'store:issue',
       'store:count',
+      'wallet:read',
+      'wallet:topUp',
+      'wallet:requestRefund',
     ],
   },
   {
@@ -128,6 +132,8 @@ export const STARTER_ROLES: readonly StarterRole[] = [
       'leave:approve',
       'moneyAccount:read',
       'store:read',
+      'wallet:read',
+      'wallet:approveRefund',
     ],
   },
   {
@@ -150,6 +156,8 @@ export const STARTER_ROLES: readonly StarterRole[] = [
       'invoice:readOwn',
       'feeLine:readOwn',
       'payment:readOwn',
+      'wallet:readOwn',
+      'wallet:spend',
     ],
   },
 ];

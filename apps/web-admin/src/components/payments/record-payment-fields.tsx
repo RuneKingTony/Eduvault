@@ -1,10 +1,6 @@
 import { ChevronDownIcon } from 'lucide-react';
-import {
-  PAYMENT_METHOD_LABELS,
-  type PaymentMethod,
-  type RecordingOptions,
-} from '@eduvault/api-contract';
-import { PAYMENT_METHODS, countOf, money, splitLine } from '@eduvault/shared';
+import type { PaymentMethod, RecordingOptions } from '@eduvault/api-contract';
+import { countOf, money, splitLine } from '@eduvault/shared';
 import {
   Collapsible,
   CollapsibleContent,
@@ -23,10 +19,10 @@ import {
   childrenFor,
   owedTotal,
   splitTotal,
-  accountsFor,
   type SheetErrors,
   type SheetState,
 } from './record-payment-model';
+import { Hint, MoneyAccountFields, PROOF_ACCEPT } from '../recording-parts';
 
 export interface SheetActions {
   patch: (change: Partial<SheetState>) => void;
@@ -43,10 +39,6 @@ export interface FieldsProps {
   errors: SheetErrors;
   act: SheetActions;
 }
-
-const Hint = ({ children }: { children: string }) => (
-  <p className="text-xs text-muted-foreground">{children}</p>
-);
 
 export function PayerFields({ options, state, errors, act }: FieldsProps) {
   return (
@@ -138,48 +130,20 @@ function AmountFields({ options, state, errors, act }: FieldsProps) {
   );
 }
 
-function AccountFields({ options, state, act }: FieldsProps) {
-  return (
-    <div className="grid gap-3 sm:grid-cols-2">
-      <SelectField
-        label="Into"
-        name="accountId"
-        value={state.accountId}
-        onChange={(event) => {
-          act.patch({ accountId: event.target.value });
-        }}
-      >
-        {accountsFor(options.accounts, state.method).map((account) => (
-          <NativeSelectOption key={account.id} value={account.id}>
-            {account.label}
-          </NativeSelectOption>
-        ))}
-      </SelectField>
-      <SelectField
-        label="How they paid"
-        name="method"
-        value={state.method}
-        onChange={(event) => {
-          act.method(event.target.value as PaymentMethod);
-        }}
-      >
-        {PAYMENT_METHODS.filter((method) => options.methods[method]).map(
-          (method) => (
-            <NativeSelectOption key={method} value={method}>
-              {PAYMENT_METHOD_LABELS[method]}
-            </NativeSelectOption>
-          )
-        )}
-      </SelectField>
-    </div>
-  );
-}
-
 export function MoneyFields(props: FieldsProps) {
   return (
     <>
       <AmountFields {...props} />
-      <AccountFields {...props} />
+      <MoneyAccountFields
+        accounts={props.options.accounts}
+        methods={props.options.methods}
+        accountId={props.state.accountId}
+        method={props.state.method}
+        onAccount={(accountId) => {
+          props.act.patch({ accountId });
+        }}
+        onMethod={props.act.method}
+      />
     </>
   );
 }
@@ -197,7 +161,7 @@ export function ProofField({
         label="Proof of transfer (needed for bank transfers)"
         name="proof"
         type="file"
-        accept="image/jpeg,image/png,image/webp,image/heic,application/pdf,.heic"
+        accept={PROOF_ACCEPT}
         aria-invalid={error === undefined ? undefined : true}
         onChange={(event) => {
           onFile(event.target.files?.[0]);

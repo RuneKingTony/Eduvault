@@ -862,6 +862,7 @@ test.describe('starter role backfill', () => {
       invoice: ['readOwn'],
       feeLine: ['readOwn'],
       payment: ['readOwn'],
+      wallet: ['readOwn', 'spend'],
     });
     expect(await roleOf(pool, orgB.id)).toEqual({
       student: ['readOwn'],

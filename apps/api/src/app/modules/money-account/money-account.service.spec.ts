@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import {
   MONEY_ACCOUNT_BANK_NAME_MESSAGE,
+  MONEY_ACCOUNT_GATEWAY_RETIRE_MESSAGE,
   MONEY_ACCOUNT_RETIRE_MESSAGE,
   MONEY_ACCOUNT_SCHOOL_WIDE_MESSAGE,
   type MoneyAccount,
@@ -163,6 +164,22 @@ describe('MoneyAccountService.update', () => {
     const refused = service.update(everyone, 'ma-1', { retired: false });
     await expect(refused).rejects.toBeInstanceOf(BadRequestException);
     await expect(refused).rejects.toThrow(MONEY_ACCOUNT_RETIRE_MESSAGE);
+  });
+
+  it('answers 409 when the Monnify collections account is retired, and leaves it open', async () => {
+    const gateway = account({
+      id: 'ma-gw',
+      name: 'Monnify collections',
+      kind: 'gateway',
+      bankName: null,
+      last4: null,
+      ledgerCode: 1230,
+    });
+    const { service } = setup(gateway);
+    const refused = service.update(everyone, 'ma-gw', { retired: true });
+    await expect(refused).rejects.toBeInstanceOf(ConflictException);
+    await expect(refused).rejects.toThrow(MONEY_ACCOUNT_GATEWAY_RETIRE_MESSAGE);
+    expect((await service.list(everyone)).items[0]?.retiredAt).toBeNull();
   });
 
   it('clears the last 4 with null and keeps it when left out', async () => {

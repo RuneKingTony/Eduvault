@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { AuthService } from '@thallesp/nestjs-better-auth';
 import { getOrgAdapter } from 'better-auth/plugins';
 import type { Pool } from 'pg';
+import { withoutGatewayAccounts } from '../ledger/seed-ledger-accounts';
 import { DB_TOKEN } from '../db/tokens';
 import { withSchoolLock } from '../db/with-school-lock';
 import type { AppAuth } from './better-auth';
@@ -79,14 +80,18 @@ export class OrganizationAdminService {
 
   async deleteById(organizationId: string): Promise<void> {
     const adapter = await this.adapter();
-    await adapter.deleteOrganization(organizationId);
+    await withoutGatewayAccounts(this.pool, organizationId, () =>
+      adapter.deleteOrganization(organizationId)
+    );
   }
 
   async deleteBySlug(slug: string): Promise<void> {
     const adapter = await this.adapter();
     const school = await adapter.findOrganizationBySlug(slug);
     if (school) {
-      await adapter.deleteOrganization(school.id);
+      await withoutGatewayAccounts(this.pool, school.id, () =>
+        adapter.deleteOrganization(school.id)
+      );
     }
   }
 

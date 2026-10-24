@@ -15,6 +15,7 @@ import { AnnouncementModule } from './modules/announcement/announcement.module';
 import { LeaveModule } from './modules/leave/leave.module';
 import { ApprovalsModule } from './modules/approvals/approvals.module';
 import { PaymentModule } from './modules/payment/payment.module';
+import { WalletModule } from './modules/wallet/wallet.module';
 import { PortalModule } from './modules/portal/portal.module';
 import { BillingModule } from './modules/billing/billing.module';
 import { CalendarModule } from './modules/calendar/calendar.module';
@@ -68,6 +69,7 @@ import { SubjectModule } from './modules/subject/subject.module';
     InvoiceModule,
     BillingModule,
     PaymentModule,
+    WalletModule,
     StoreModule,
     AdjustmentModule,
     LeaveModule,

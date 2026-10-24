@@ -78,6 +78,7 @@ export class KyselySchoolRepository extends SchoolRepository {
         .selectFrom('money_account')
         .select('id')
         .where('organization_id', '=', organizationId)
+        .where('kind', '<>', 'gateway')
         .limit(1)
         .executeTakeFirst(),
       this.db

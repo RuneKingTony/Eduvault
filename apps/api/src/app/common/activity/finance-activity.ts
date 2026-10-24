@@ -23,7 +23,9 @@ type FinanceSubject =
   | 'store_sale'
   | 'stock_count'
   | 'stock_delivery'
-  | 'invoice';
+  | 'invoice'
+  | 'wallet_topup'
+  | 'wallet_spend';
 
 export interface FinanceActor {
   organizationId: string;
@@ -105,6 +107,20 @@ export interface StoreDeliveryFacts {
   supplierName: string;
   lines: number;
   totalMinor: number;
+}
+
+interface WalletTopUpFacts {
+  id: string;
+  walletId: string;
+  guardianName: string;
+  amountMinor: number;
+  campusIds: readonly string[];
+}
+
+interface WalletSpendFacts {
+  id: string;
+  walletId: string;
+  guardianName: string;
 }
 
 export const financeActor = (
@@ -708,6 +724,48 @@ export function feeLinesCopiedActivity(
       subject: { type: 'term', id: terms.to.id },
       text: `${actor.name} copied ${countOf(count, 'fee line', 'fee lines')} from ${terms.from.label} to ${terms.to.label}${copyShare(campusId, copied.length > 1)}.`,
       data: { fromTermId: terms.from.id, toTermId: terms.to.id, copied: count },
+    })
+  );
+}
+
+export const walletToppedUpActivity = (
+  actor: FinanceActor,
+  topUp: WalletTopUpFacts
+): ActivityInput[] =>
+  topUp.campusIds.map((campusId) =>
+    finance(actor, {
+      campusId,
+      kind: 'wallet.topped_up',
+      subject: { type: 'wallet_topup', id: topUp.id },
+      text: `${actor.name} topped up ${topUp.guardianName}’s wallet with ${money(topUp.amountMinor, actor.currency)}.`,
+      data: {
+        topUpId: topUp.id,
+        walletId: topUp.walletId,
+        amountMinor: topUp.amountMinor,
+      },
+    })
+  );
+
+export function walletSpentActivity(
+  actor: FinanceActor,
+  spend: WalletSpendFacts,
+  lines: readonly CampusAmount[]
+): ActivityInput[] {
+  const shares = sumByCampus(lines);
+  return shares.map(({ campusId, amountMinor }) =>
+    finance(actor, {
+      campusId,
+      kind: 'wallet.spent',
+      subject: { type: 'wallet_spend', id: spend.id },
+      text:
+        shares.length > 1
+          ? `${spend.guardianName} paid ${money(amountMinor, actor.currency)} of their children’s charges on this campus from the wallet.`
+          : `${spend.guardianName} paid ${money(amountMinor, actor.currency)} of their children’s charges from the wallet.`,
+      data: {
+        spendId: spend.id,
+        walletId: spend.walletId,
+        amountMinor,
+      },
     })
   );
 }

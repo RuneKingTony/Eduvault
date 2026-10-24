@@ -36,6 +36,25 @@ describe('statements', () => {
     ]);
   });
 
+  it('lists the wallet actions and explains each one', () => {
+    const wallet = ALL_PERMISSIONS.filter((permission) =>
+      permission.startsWith('wallet:')
+    );
+    expect(wallet).toEqual([
+      'wallet:read',
+      'wallet:readOwn',
+      'wallet:topUp',
+      'wallet:spend',
+      'wallet:requestRefund',
+      'wallet:approveRefund',
+      'wallet:manageGateway',
+    ]);
+    for (const permission of wallet) {
+      expect(PERM_HELP[permission]).toMatch(/\S/);
+    }
+    expect(permLabel('wallet:topUp')).toBe('Wallets: top up');
+  });
+
   it('keeps SENSITIVE and PERM_HELP to listed permissions', () => {
     for (const permission of SENSITIVE) {
       expect(ALL_PERMISSIONS).toContain(permission);

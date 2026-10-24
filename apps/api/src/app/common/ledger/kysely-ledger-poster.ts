@@ -64,6 +64,7 @@ export class LedgerPoster {
           entry_id: inserted.id,
           ledger_account_id: line.ledgerAccountId,
           student_id: line.studentId ?? null,
+          family_id: line.familyId ?? null,
           campus_id: line.campusId ?? null,
           debit_minor: line.debitMinor,
           credit_minor: line.creditMinor,

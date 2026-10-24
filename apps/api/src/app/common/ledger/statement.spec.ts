@@ -26,6 +26,8 @@ describe('movementStatus', () => {
     ['payment_void', 'debit', 'cancelled'],
     ['adjustment', 'credit', 'reduced'],
     ['adjustment', 'debit', 'refunded'],
+    ['wallet_spend', 'credit', 'paid'],
+    ['wallet_spend', 'debit', 'cancelled'],
   ])('labels the %s %s as %s', (kind, side, status) => {
     expect(movementStatus(kind, side)).toBe(status);
   });
@@ -106,6 +108,8 @@ describe('statementTotals', () => {
       'store_receive',
       'store_cost',
       'store_count',
+      'wallet_topup',
+      'wallet_spend',
     ];
     for (const kind of kinds) {
       for (const [debit, credit] of [

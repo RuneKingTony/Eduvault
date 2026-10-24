@@ -45,13 +45,14 @@ Groups appear in this order. Inside a group, items sort by nav order, then by th
 | School   | Subjects          | Subjects          | `/subjects`                      | `subject:read`                      | F2    | `book-marked`      | –                                                        | M4.1                  |
 | Finance  | Fees              | Who owes          | `/finance/accounts`              | `invoice:read` or `payment:read`    | F1    | `wallet`           | –                                                        | M3.2–M3.4             |
 | Finance  | Payments          | Payments          | `/finance/payments`              | `payment:read`                      | F1    | `banknote`         | waiting corrections, discounts and payment cancellations | M3.4                  |
+| Finance  | Wallets           | Wallets           | `/finance/wallets`               | `wallet:read`                       | F1    | `wallet`           | –                                                        | M3.9                  |
 | Finance  | Store             | Store             | `/finance/store`                 | `store:read`                        | F2    | `store`            | waiting store write-offs                                 | M4.3                  |
 | Finance  | Accounts          | Money accounts    | `/finance/money-accounts`        | `moneyAccount:read`                 | F1    | `landmark`         | –                                                        | M3.1                  |
 | (none)   | Settings          | (first section)   | first permitted settings section | any settings section passes (below) | F0    | `settings`         | –                                                        | M2.2 (M1.4 for Roles) |
 
 - Roles, Campuses, School years and terms, Payment rules and the school profile are **settings sections**, not nav items ([D-035](../technical-reference.md#decision-log)). The school's own settings pages live under `/settings/*`; `/roles`, `/campuses` and `/calendar` keep their paths but sit under the Settings entry. This differs from the folder tree in the permissions doc, which puts `routes/roles/` at the top level.
 - The Settings entry sits alone at the bottom of the nav, in its own unlabelled group.
-- Detail pages are not nav items. They mark their parent active: Student → Students, Member → Staff and members, Class → Classes, Role → Settings, Charge (invoice) → Fees. The finance sub-pages mark their nav root active: Charge students, Charges, School fees, Other fees → Fees; Discounts and refunds → Payments; Money categories → Accounts.
+- Detail pages are not nav items. They mark their parent active: Student → Students, Member → Staff and members, Class → Classes, Role → Settings, Charge (invoice) → Fees, Wallet → Wallets. The finance sub-pages mark their nav root active: Charge students, Charges, School fees, Other fees → Fees; Discounts and refunds → Payments; Money categories → Accounts.
 - The active item carries `aria-current="page"`.
 - Each group label is a button that collapses or expands its group (`aria-expanded`). Collapsing does nothing in the rail.
 
