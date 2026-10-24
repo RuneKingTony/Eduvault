@@ -13,6 +13,11 @@ describe('isReservedReference', () => {
     }
   );
 
+  it('refuses a Monnify transaction reference', () => {
+    expect(isReservedReference('MNFY|20|20261024120000|000001')).toBe(true);
+    expect(isReservedReference(' mnfy|20|20261024120000|000001')).toBe(true);
+  });
+
   it('ignores case and surrounding spaces', () => {
     expect(isReservedReference('  adj-2026-0001 ')).toBe(true);
     expect(isReservedReference('Void-CSH-20261007-ABCDEF')).toBe(true);
@@ -22,6 +27,7 @@ describe('isReservedReference', () => {
     expect(isReservedReference('VOIDED-1')).toBe(false);
     expect(isReservedReference('CNTR-1')).toBe(false);
     expect(isReservedReference('OPENING-1')).toBe(false);
+    expect(isReservedReference('MNFYX|1')).toBe(false);
   });
 
   it('only looks at the start', () => {

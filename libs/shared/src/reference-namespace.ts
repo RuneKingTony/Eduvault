@@ -9,12 +9,14 @@ export const SYSTEM_REFERENCE_PREFIXES = {
   stock_count: 'CNT',
   void: 'VOID',
   opening: 'OPEN',
+  monnify: 'MNFY',
 } as const;
 
 export type SystemReferenceKind = keyof typeof SYSTEM_REFERENCE_PREFIXES;
 
-const RESERVED_STARTS = Object.values(SYSTEM_REFERENCE_PREFIXES).map(
-  (prefix) => `${prefix}-`
+/** Monnify numbers its transactions `MNFY|20|…`, so a pipe closes a prefix as well as a dash. */
+const RESERVED_STARTS = Object.values(SYSTEM_REFERENCE_PREFIXES).flatMap(
+  (prefix) => [`${prefix}-`, `${prefix}|`]
 );
 
 export function isReservedReference(reference: string): boolean {
