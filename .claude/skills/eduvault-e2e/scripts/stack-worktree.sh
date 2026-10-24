@@ -129,6 +129,7 @@ ADMIN_URL="http://localhost:$ADMIN_PORT"; PORTAL_URL="http://localhost:$PORTAL_P
    node "$TREE/apps/api/dist/bootstrap-admin.cjs") >"$DIR/bootstrap.log" 2>&1 || { tail -5 "$DIR/bootstrap.log" >&2; drop_db; die "bootstrap-admin failed"; }
 (cd "$TREE/apps/api" && exec env NODE_ENV=development PORT="$API_PORT" DATABASE_URL="$DB_URL" BETTER_AUTH_SECRET="$SECRET" \
    BETTER_AUTH_URL="http://localhost:$API_PORT" WEB_ADMIN_URL="$ADMIN_URL" WEB_PORTAL_URL="$PORTAL_URL" \
+   GATEWAY_ENCRYPTION_KEY="ZWR1dmF1bHQtZTJlLWdhdGV3YXkta2V5LTAwMDAwMDA=" \
    node --enable-source-maps "$TREE/apps/api/dist/main.cjs") >"$DIR/api.log" 2>&1 &
 API_PID=$!
 for app in admin portal; do
