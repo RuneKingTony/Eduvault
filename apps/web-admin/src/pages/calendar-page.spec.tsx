@@ -369,18 +369,42 @@ describe('CalendarPage', () => {
         name: 'Remove Mid-term break, 29 Oct 2026',
       })
     );
+    const confirm = await screen.findByRole('dialog', {
+      name: 'Remove this holiday?',
+    });
+    expect(within(confirm).getByText('Mid-term break')).toBeInTheDocument();
+    expect(within(confirm).getByText('29 Oct 2026')).toBeInTheDocument();
     await user.click(
-      within(
-        await screen.findByRole('dialog', { name: 'Remove Mid-term break?' })
-      ).getByRole('button', {
-        name: 'Remove holiday',
-      })
+      within(confirm).getByRole('button', { name: 'Remove holiday' })
     );
     await vi.waitFor(() => {
       expect(api.holidays.remove).toHaveBeenCalledWith({
         params: { id: HOLIDAY_2 },
       });
     });
+    expect(api.holidays.remove).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the holiday when the removal is cancelled', async () => {
+    const { api } = setup();
+    await yearToggle('2026/2027');
+    await user.click(screen.getByRole('button', { name: '3 days' }));
+    await user.click(
+      within(await screen.findByRole('dialog')).getByRole('button', {
+        name: 'Remove Mid-term break, 29 Oct 2026',
+      })
+    );
+    await user.click(
+      within(
+        await screen.findByRole('dialog', { name: 'Remove this holiday?' })
+      ).getByRole('button', { name: 'Cancel' })
+    );
+    await vi.waitFor(() => {
+      expect(
+        screen.queryByRole('dialog', { name: 'Remove this holiday?' })
+      ).not.toBeInTheDocument();
+    });
+    expect(api.holidays.remove).not.toHaveBeenCalled();
   });
 
   it('preselects the current term in Add a holiday and lists only terms not yet ended', async () => {

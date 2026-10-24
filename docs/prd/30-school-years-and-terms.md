@@ -120,7 +120,7 @@ Moving into a new school year needs every student to have a class in it first. P
 - Opened from a term's holiday count. Title "Holidays in {term name}, {year}".
 - One row per holiday by date: "{date} · {name}", with an icon button "Remove" (x icon, ghost), gate `session:update`. Holidays can be removed, not renamed; a rename is remove plus add.
 - Footer: "Add holiday" (ghost, plus icon) opening Add a holiday for this term, and "Close" (primary).
-- Removing has no confirmation. Toast (success) "Holiday removed. {term name}, {year} now has {n} school days." A term that ended meanwhile answers 409 "This term has already ended, so its holidays can’t change."
+- Removing asks first in a destructive confirm (D-399) showing the holiday name and date; confirm label "Remove holiday". Toast (success) "Holiday removed. {term name}, {year} now has {n} school days." A term that ended meanwhile answers 409 "This term has already ended, so its holidays can’t change."
 
 #### Delete {year}? (dialog)
 

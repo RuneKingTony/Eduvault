@@ -96,7 +96,7 @@ Scopes:
 
      Empty: the standard "Nothing here yet" empty state.
 
-- Remove class teacher: no confirmation. Toast (success) "**Ayo Bassey** removed as class teacher of JSS 2 Gold."
+- Remove class teacher: asks first in a destructive confirm (D-399) naming the teacher and class; confirm label "Remove teacher". Toast (success) "**Ayo Bassey** removed as class teacher of JSS 2 Gold."
 - Read-only acting super admin: no Add, Remove, Archive, Restore or Graduate controls.
 
 #### Add class teacher (dialog)

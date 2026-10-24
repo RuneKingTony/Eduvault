@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { PlusIcon, XIcon } from 'lucide-react';
 import type { Holiday } from '@eduvault/api-contract';
@@ -18,6 +17,7 @@ import {
 } from '@eduvault/ui';
 import { useApi } from '../../api';
 import { invalidateCalendar } from '../../queries';
+import { useConfirmStep } from '../use-confirm-step';
 import { schoolDaysText, termTitle, type TermInYear } from './calendar-text';
 
 function useRemoveHoliday({ term, year }: TermInYear) {
@@ -67,7 +67,9 @@ function HolidayRow({
 
 function RemovableHolidays({ target }: { target: TermInYear }) {
   const remove = useRemoveHoliday(target);
-  const [removing, setRemoving] = useState<Holiday | null>(null);
+  const step = useConfirmStep<Holiday>((holiday, settled) => {
+    remove.mutate(holiday.id, { onSettled: settled });
+  });
   return (
     <>
       <ul className="flex flex-col divide-y rounded-md border text-sm">
@@ -77,35 +79,29 @@ function RemovableHolidays({ target }: { target: TermInYear }) {
             holiday={holiday}
             disabled={remove.isPending}
             onRemove={() => {
-              setRemoving(holiday);
+              step.ask(holiday);
             }}
           />
         ))}
       </ul>
       <ErrorMessage error={remove.error} />
       <ConfirmDialog
-        open={removing !== null}
-        title={`Remove ${removing?.name ?? 'holiday'}?`}
-        description={
-          removing === null
-            ? ''
-            : `${fmtDate(removing.date)} · ${removing.name} comes off the calendar. The term’s school days are recounted.`
+        open={step.target !== null}
+        title="Remove this holiday?"
+        description="It comes off the calendar and the term’s school days are recounted."
+        details={
+          step.target === null
+            ? []
+            : [
+                { label: 'Holiday', value: step.target.name },
+                { label: 'Date', value: fmtDate(step.target.date) },
+              ]
         }
         tone="destructive"
         confirmLabel="Remove holiday"
         pending={remove.isPending}
-        onConfirm={() => {
-          if (removing !== null) {
-            remove.mutate(removing.id, {
-              onSettled: () => {
-                setRemoving(null);
-              },
-            });
-          }
-        }}
-        onCancel={() => {
-          setRemoving(null);
-        }}
+        onConfirm={step.confirm}
+        onCancel={step.cancel}
       />
     </>
   );
