@@ -6,6 +6,7 @@ import {
   journalKindSchema,
   moneyAccountKindSchema,
 } from './finance';
+import { approvalStatusSchema } from './approvals';
 import { paymentReferenceSchema } from './payments';
 import {
   currencySchema,
@@ -97,6 +98,7 @@ export const walletSummarySchema = z.object({
   childCount: countSchema,
   balanceMinor: minorSchema,
   setAsideMinor: minorSchema,
+  heldMinor: minorSchema.nonnegative(),
   freeMinor: minorSchema,
 });
 export type WalletSummary = z.infer<typeof walletSummarySchema>;
@@ -105,6 +107,7 @@ export const walletListTotalsSchema = z.object({
   walletCount: countSchema,
   balanceMinor: minorSchema,
   setAsideMinor: minorSchema,
+  heldMinor: minorSchema.nonnegative(),
   freeMinor: minorSchema,
 });
 export type WalletListTotals = z.infer<typeof walletListTotalsSchema>;
@@ -149,6 +152,7 @@ export const walletSchema = z.object({
   autoPay: z.boolean(),
   balanceMinor: minorSchema,
   setAsideMinor: minorSchema,
+  heldMinor: minorSchema.nonnegative(),
   freeMinor: minorSchema,
   children: z.array(walletChildSchema),
 });
@@ -167,6 +171,7 @@ export const walletMovementSourceSchema = z.discriminatedUnion('type', [
     method: paymentMethodSchema,
     depositorName: z.string().nullable(),
     proofFileId: idSchema,
+    cancellation: approvalStatusSchema.exclude(['rejected']).nullable(),
   }),
   z.object({
     type: z.literal('monnify'),
@@ -181,6 +186,17 @@ export const walletMovementSourceSchema = z.discriminatedUnion('type', [
     netMinor: minorSchema.positive(),
   }),
   z.object({ type: z.literal('spend'), id: idSchema }),
+  z.object({
+    type: z.literal('refund'),
+    id: idSchema,
+    payoutReference: z.string(),
+  }),
+  z.object({
+    type: z.literal('topup_cancellation'),
+    id: idSchema,
+    topUpReference: z.string(),
+    reason: z.string(),
+  }),
 ]);
 export type WalletMovementSource = z.infer<typeof walletMovementSourceSchema>;
 
@@ -224,6 +240,11 @@ export const portalWalletMovementSourceSchema = z.discriminatedUnion('type', [
     netMinor: minorSchema.positive(),
   }),
   z.object({ type: z.literal('spend'), automatic: z.boolean() }),
+  z.object({ type: z.literal('refund'), payoutReference: z.string() }),
+  z.object({
+    type: z.literal('topup_cancellation'),
+    topUpReference: z.string(),
+  }),
 ]);
 export type PortalWalletMovementSource = z.infer<
   typeof portalWalletMovementSourceSchema

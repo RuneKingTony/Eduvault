@@ -6,7 +6,6 @@ import {
 } from '@eduvault/api-contract';
 import {
   allocateSpend,
-  walletFigures,
   type SpendRequestLine,
   type SpendSplit,
 } from '@eduvault/shared';
@@ -20,7 +19,7 @@ import {
 } from '../ledger';
 import { campusesOf } from '../payments';
 import { claimReference } from '../references/apply-once';
-import { earmarksByChild, walletBalance } from './wallet-balance';
+import { walletFreeMoney } from './wallet-held';
 import { spendPostingLines } from './wallet-posting';
 
 export interface WalletWriteDeps {
@@ -171,12 +170,14 @@ export async function writeSpend(
   }
   const wallet = await lockWallet(trx, input);
   const studentIds = input.lines.map((line) => line.studentId);
-  const [balance, marked, owed] = await Promise.all([
-    walletBalance(trx, { organizationId, guardianId: wallet.guardianId }),
-    earmarksByChild(trx, { organizationId, walletId: input.walletId }),
+  const [{ freeMinor, marked }, owed] = await Promise.all([
+    walletFreeMoney(trx, {
+      organizationId,
+      walletId: input.walletId,
+      guardianId: wallet.guardianId,
+    }),
     owedByChild(trx, { organizationId, studentIds }),
   ]);
-  const { freeMinor } = walletFigures(balance, [...marked.values()]);
   const allocation = allocateSpend(
     input.lines,
     studentIds.map((studentId) => ({

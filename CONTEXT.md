@@ -118,6 +118,12 @@ Terms the code and the people using it share. Adapted from the earlier school-ma
 
 **Earmark** — money in a wallet set aside for one child's charges ("Set aside" on screen). An append-only log: a set, a release, or a spend that uses it. A child's charges use their earmark before the free money.
 
+**Held money** — money in a wallet kept out of the free money because a refund or a top-up cancellation is waiting for a second person. Free to use = balance − set aside − held. The balance does not move until the request is approved and its reversing entry posts; a decline releases the hold.
+
+**Wallet refund** — money paid back out of a family's wallet to the parent's bank account (`wallet_refund`). Asked for with the parent's email as the proof, approved by a second person who records the bank's payout reference, and posted as Dr `2200` (the family) and Cr the bank account. There is no Approval-rules switch for it.
+
+**Top-up cancellation** — a request to undo a staff top-up recorded by mistake (`wallet_topup_cancellation`). Once approved it posts a new `wallet_topup_void` entry that mirrors the top-up's lines, family tag included, and reverses the original; the original entry stays. A Monnify credit cannot be cancelled.
+
 **Void** — undoing a payment. "Cancel a payment" on screen. The row is kept and marked, and the reversal is a new movement once approved. Money records are never deleted. A store sale's payment can't be cancelled on its own.
 
 **Adjustment** — a correction to a student's account: a credit note ("Reduce a fee"), a write-off ("Cancel a balance") or a refund of credit. Needs a second person's approval unless the school has switched that approval off. "Discounts and refunds" on screen.

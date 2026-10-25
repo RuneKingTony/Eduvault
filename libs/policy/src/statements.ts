@@ -140,15 +140,16 @@ export const PERM_HELP: Partial<Record<Permission, string>> = {
   'store:count':
     'Counts store stock and submits the differences for approval, on the campuses they see.',
   'wallet:read':
-    'Sees family wallets: balances, set-aside money and movements, for families with a child on the campuses they see.',
+    'Sees family wallets: balances, set-aside money, movements and refund requests, for families with a child on the campuses they see.',
   'wallet:readOwn': 'Guardians see their own family wallet.',
   'wallet:topUp':
     'Records cash, transfer and POS money a family pays into its wallet, with the receipt.',
   'wallet:spend':
     'Guardians use wallet money for their children’s charges and set money aside for a child.',
-  'wallet:requestRefund': 'Asks for wallet money to be paid back to a family.',
+  'wallet:requestRefund':
+    'Asks for wallet money to be paid back to a family, or for a mistaken top-up to be cancelled.',
   'wallet:approveRefund':
-    'Approves or declines wallet refund requests from other people, never their own.',
+    'Approves or declines wallet refund and top-up cancellation requests from other people, never their own.',
   'wallet:manageGateway':
     'Connects and changes the online payment gateway. Owner-only by default.',
 };

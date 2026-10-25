@@ -61,6 +61,13 @@ const OWNED_BY: Record<FileKind, (eb: FileEntry) => Expression<SqlBool>> = {
         .select('wallet_topup.id')
         .whereRef('wallet_topup.proof_file_id', '=', 'file_object.id')
     ),
+  wallet_refund_request: (eb) =>
+    eb.exists(
+      eb
+        .selectFrom('wallet_refund')
+        .select('wallet_refund.id')
+        .whereRef('wallet_refund.proof_file_id', '=', 'file_object.id')
+    ),
 };
 
 @Injectable()
@@ -114,11 +121,18 @@ export class KyselyFilesRepository extends FilesRepository {
     if (scope === 'all') {
       return true;
     }
-    const { rows } =
-      file.kind === 'wallet_proof'
-        ? await this.walletProofOwners(file, scope)
-        : await this.paymentProofOwners(file, scope);
+    const { rows } = await this.ownersOf(file, scope);
     return rows.length > 0;
+  }
+
+  private ownersOf(file: FileRecord, scope: CampusScope) {
+    if (file.kind === 'wallet_proof') {
+      return this.walletProofOwners(file, scope);
+    }
+    if (file.kind === 'wallet_refund_request') {
+      return this.refundProofOwners(file, scope);
+    }
+    return this.paymentProofOwners(file, scope);
   }
 
   private paymentProofOwners(file: FileRecord, scope: CampusScope) {
@@ -136,6 +150,16 @@ export class KyselyFilesRepository extends FilesRepository {
       JOIN wallet w ON w.id = t.wallet_id AND w.organization_id = t.organization_id
       WHERE t.proof_file_id = ${file.id}
         AND t.organization_id = ${file.organizationId}
+        AND ${anyChildInScopeSql('w', scope)}
+      LIMIT 1`.execute(this.db);
+  }
+
+  private refundProofOwners(file: FileRecord, scope: CampusScope) {
+    return sql<{ id: string }>`
+      SELECT r.id FROM wallet_refund r
+      JOIN wallet w ON w.id = r.wallet_id AND w.organization_id = r.organization_id
+      WHERE r.proof_file_id = ${file.id}
+        AND r.organization_id = ${file.organizationId}
         AND ${anyChildInScopeSql('w', scope)}
       LIMIT 1`.execute(this.db);
   }

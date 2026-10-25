@@ -25,6 +25,31 @@ export function topUpPostingLines(input: TopUpPosting): LedgerLine[] {
   ];
 }
 
+interface RefundPosting {
+  moneyLedgerAccountId: string;
+  moneyCampusId: string | null;
+  walletsAccountId: string;
+  familyId: string;
+  amountMinor: number;
+}
+
+export function refundPostingLines(input: RefundPosting): LedgerLine[] {
+  return [
+    {
+      ledgerAccountId: input.walletsAccountId,
+      familyId: input.familyId,
+      debitMinor: input.amountMinor,
+      creditMinor: 0,
+    },
+    {
+      ledgerAccountId: input.moneyLedgerAccountId,
+      campusId: input.moneyCampusId,
+      debitMinor: 0,
+      creditMinor: input.amountMinor,
+    },
+  ];
+}
+
 interface SpendPosting {
   walletsAccountId: string;
   receivableId: string;

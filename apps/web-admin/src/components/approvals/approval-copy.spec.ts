@@ -67,6 +67,59 @@ describe('approval copy', () => {
   });
 });
 
+describe('wallet request copy', () => {
+  it('says what approving and declining does for both kinds', () => {
+    expect(APPROVAL_KIND_UI.wallet_refund.approveEffect).toBe(
+      'Pays the money back: it leaves the family’s wallet and the bank account. Enter the bank’s own reference for the payout.'
+    );
+    expect(APPROVAL_KIND_UI.wallet_refund.declineEffect).toBe(
+      'No money is paid back and the held money goes back to the family’s wallet.'
+    );
+    expect(APPROVAL_KIND_UI.wallet_topup_cancellation.approveEffect).toBe(
+      'Takes the top-up back out of the wallet with a new entry. The original top-up stays on record.'
+    );
+    expect(APPROVAL_KIND_UI.wallet_topup_cancellation.declineEffect).toBe(
+      'The top-up stays in the wallet and the held money is released.'
+    );
+  });
+
+  it('decides each through its own route and sends both to the Requests tab', () => {
+    expect(APPROVAL_KIND_UI.wallet_refund).toMatchObject({
+      resource: 'walletRefunds',
+      tab: 'requests',
+    });
+    expect(APPROVAL_KIND_UI.wallet_topup_cancellation).toMatchObject({
+      resource: 'walletTopUpCancellations',
+      tab: 'requests',
+    });
+  });
+
+  it('toasts each outcome with a Wallets follow-up', () => {
+    for (const kind of [
+      'wallet_refund',
+      'wallet_topup_cancellation',
+    ] as const) {
+      expect(APPROVAL_KIND_UI[kind].approvedToast.action).toEqual({
+        label: 'Wallets',
+        to: '/finance/wallets',
+      });
+    }
+    expect(approvedMessage(item({ kind: 'wallet_refund' }))).toBe(
+      'Approved. The refund is recorded and the wallet is reduced.'
+    );
+  });
+
+  it('words the cell for someone else with the wallet approver, not the money approver', () => {
+    expect(otherTip('wallet_refund')).toBe(
+      'Needs someone who can approve wallet refunds'
+    );
+    expect(otherTip('wallet_topup_cancellation')).toBe(
+      'Needs someone who can approve wallet refunds'
+    );
+    expect(ownTip('wallet_refund', 'fallback')).toBe('fallback');
+  });
+});
+
 describe('leave copy', () => {
   it('says what approving leave does, in the PRD words', () => {
     expect(APPROVAL_KIND_UI.leave.approveEffect).toBe(

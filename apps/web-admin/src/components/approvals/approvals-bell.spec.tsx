@@ -9,6 +9,8 @@ import {
   storeWriteOffApproval,
   voidApproval,
   voidRow,
+  walletCancellationApproval,
+  walletRefundApproval,
 } from '../../test-approvals';
 import { myLeave } from '../../test-leave';
 import { renderPayments } from '../../test-payments';
@@ -96,7 +98,7 @@ describe('ApprovalsBell', () => {
     const { router } = setup({
       summary: approvalSummary({
         waitingForMe: 1,
-        byNav: { approvals: 1, payments: 0, store: 0 },
+        byNav: { approvals: 1, payments: 0, store: 0, wallets: 0 },
         preview: [leaveApproval()],
       }),
     });
@@ -115,7 +117,7 @@ describe('ApprovalsBell', () => {
       access: starterAccess('principal'),
       summary: approvalSummary({
         waitingForMe: 1,
-        byNav: { approvals: 1, payments: 0, store: 0 },
+        byNav: { approvals: 1, payments: 0, store: 0, wallets: 0 },
         preview: [leaveApproval()],
       }),
     });
@@ -129,7 +131,7 @@ describe('ApprovalsBell', () => {
     const { router } = setup({
       summary: approvalSummary({
         waitingForMe: 1,
-        byNav: { approvals: 1, payments: 0, store: 1 },
+        byNav: { approvals: 1, payments: 0, store: 1, wallets: 0 },
         preview: [storeWriteOffApproval()],
       }),
     });
@@ -142,12 +144,33 @@ describe('ApprovalsBell', () => {
     expect(router.state.location.search).toMatchObject({ tab: 'counts' });
   });
 
+  it.each([
+    ['Wallet refund', walletRefundApproval()],
+    ['Cancel a top-up', walletCancellationApproval()],
+  ])('opens the Requests tab of Wallets for a %s', async (label, item) => {
+    const user = userEvent.setup();
+    const { router } = setup({
+      summary: approvalSummary({
+        waitingForMe: 1,
+        byNav: { approvals: 1, payments: 0, store: 0, wallets: 1 },
+        preview: [item],
+      }),
+    });
+    await user.click(await screen.findByRole('button', { name: 'Approvals' }));
+    await user.click(await screen.findByText(label));
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/finance/wallets');
+    });
+    expect(router.state.location.search).toMatchObject({ tab: 'requests' });
+  });
+
   it('says All clear with no count when nothing waits', async () => {
     const user = userEvent.setup();
     setup({
       summary: approvalSummary({
         waitingForMe: 0,
-        byNav: { approvals: 0, payments: 0, store: 0 },
+        byNav: { approvals: 0, payments: 0, store: 0, wallets: 0 },
         preview: [],
       }),
     });

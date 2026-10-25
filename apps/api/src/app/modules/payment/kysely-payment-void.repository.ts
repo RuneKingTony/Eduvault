@@ -24,6 +24,7 @@ import { KYSELY_TOKEN, type Database } from '../../common/db/tokens';
 import { iso } from '../../common/db/rows';
 import {
   LedgerPoster,
+  entryLines,
   schoolCurrency,
   type LedgerLine,
 } from '../../common/ledger';
@@ -125,27 +126,11 @@ class KyselyVoidTx implements PaymentVoidTx {
     return isApprovalOn(this.trx, this.organizationId, 'payment_void');
   }
 
-  async originalLines(entryId: string): Promise<LedgerLine[]> {
-    const rows = await this.trx
-      .selectFrom('journal_line')
-      .select([
-        'ledger_account_id',
-        'student_id',
-        'campus_id',
-        'debit_minor',
-        'credit_minor',
-      ])
-      .where('organization_id', '=', this.organizationId)
-      .where('entry_id', '=', entryId)
-      .orderBy('id')
-      .execute();
-    return rows.map((row) => ({
-      ledgerAccountId: row.ledger_account_id,
-      studentId: row.student_id,
-      campusId: row.campus_id,
-      debitMinor: Number(row.debit_minor),
-      creditMinor: Number(row.credit_minor),
-    }));
+  originalLines(entryId: string): Promise<LedgerLine[]> {
+    return entryLines(this.trx, {
+      organizationId: this.organizationId,
+      entryId,
+    });
   }
 
   async post(entry: VoidPost): Promise<string> {

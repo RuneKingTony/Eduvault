@@ -6,6 +6,7 @@ import {
   APPROVAL_PAGE_SIZE,
   APPROVAL_PREVIEW_SIZE,
   isMoneyApproval,
+  walletApprovalKindSchema,
   type ApprovalDecide,
   type ApprovalKind,
   type ApprovalPillar,
@@ -27,6 +28,20 @@ const oldestFirst = (a: ApprovalItem, b: ApprovalItem): number =>
 
 const pillarOf = (kind: ApprovalKind): ApprovalPillar =>
   isMoneyApproval(kind) ? 'money' : 'leave';
+
+type BellGroup = 'payments' | 'store' | 'wallets' | 'leave';
+
+const bellGroupOf = (kind: ApprovalKind): BellGroup => {
+  if (!isMoneyApproval(kind)) {
+    return 'leave';
+  }
+  if (kind === 'store_write_off') {
+    return 'store';
+  }
+  return walletApprovalKindSchema.safeParse(kind).success
+    ? 'wallets'
+    : 'payments';
+};
 
 const decideFor = (
   ctx: OrgContext,
@@ -109,17 +124,23 @@ export class ApprovalsService {
       this.waiting(ctx),
     ]);
     const mine = items.filter((item) => item.decide === 'yes');
-    const store = mine.filter((item) => item.kind === 'store_write_off').length;
+    const counts: Record<BellGroup, number> = {
+      payments: 0,
+      store: 0,
+      wallets: 0,
+      leave: 0,
+    };
+    for (const item of mine) {
+      counts[bellGroupOf(item.kind)] += 1;
+    }
     return {
       currency,
       waitingForMe: mine.length,
       byNav: {
         approvals: mine.length,
-        payments: mine.filter(
-          (item) =>
-            isMoneyApproval(item.kind) && item.kind !== 'store_write_off'
-        ).length,
-        store,
+        payments: counts.payments,
+        store: counts.store,
+        wallets: counts.wallets,
       },
       preview: mine.slice(0, APPROVAL_PREVIEW_SIZE),
     };

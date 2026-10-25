@@ -5,6 +5,7 @@ export * from './kysely-ledger-poster';
 export * from './ledger-balance';
 export * from './ledger-lines';
 export * from './ledger-poster.module';
+export * from './mirror-lines';
 export * from './school-currency';
 export * from './system-account';
 export * from './seed-ledger-accounts';

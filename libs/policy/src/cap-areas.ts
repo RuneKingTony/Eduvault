@@ -268,14 +268,15 @@ export const CAP_AREAS: readonly CapArea[] = [
     extras: [
       {
         label: 'Asks for wallet refunds',
-        description: 'Asks for wallet money to be paid back to a family.',
+        description:
+          'Asks for wallet money to be paid back to a family, or for a mistaken top-up to be cancelled.',
         permissions: ['wallet:requestRefund'],
         important: false,
       },
       {
         label: 'Approves wallet refunds',
         description:
-          'Approves or declines refund requests from other people, never their own.',
+          'Approves or declines wallet refund and top-up cancellation requests from other people, never their own.',
         permissions: ['wallet:approveRefund'],
         important: true,
       },

@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { sql, type Kysely } from 'kysely';
-import { walletFigures, type PayTableChild } from '@eduvault/shared';
+import type { PayTableChild } from '@eduvault/shared';
 import type { DB } from '../../../db/db-types';
 import { ActivityWriter } from '../activity';
 import { Clock } from '../clock';
@@ -9,7 +9,7 @@ import { autoPayReference, planAutoPay } from './auto-pay-plan';
 import { latestAutoPay } from './auto-pay-setting';
 import { oldestUnpaidByChild } from './oldest-unpaid';
 import { spendRequestHash } from './spend-request-hash';
-import { earmarksByChild, walletBalance } from './wallet-balance';
+import { walletFreeMoney } from './wallet-held';
 import { writeSpend } from './wallet-spend';
 
 interface AutoPayCredit {
@@ -108,11 +108,11 @@ export class WalletAutoPayService {
     if (wallet === undefined) {
       return;
     }
-    const [balance, marked] = await Promise.all([
-      walletBalance(trx, { organizationId, guardianId }),
-      earmarksByChild(trx, { organizationId, walletId: wallet.walletId }),
-    ]);
-    const { freeMinor } = walletFigures(balance, [...marked.values()]);
+    const { freeMinor, marked } = await walletFreeMoney(trx, {
+      organizationId,
+      walletId: wallet.walletId,
+      guardianId,
+    });
     if (freeMinor <= 0) {
       return;
     }

@@ -1,13 +1,13 @@
 # PRD: Approvals
 
-- Status: implemented for M3.5 (EDU-37: money kinds), M4.5 (EDU-44: store write-offs) and M3.6 (EDU-38: leave, the `includeOthers` switch and the "Someone else" rows, EDU-191: each row gated on its own kind's read permission)
+- Status: implemented for M3.5 (EDU-37: money kinds), M4.5 (EDU-44: store write-offs) and M3.6 (EDU-38: leave, the `includeOthers` switch and the "Someone else" rows, EDU-191: each row gated on its own kind's read permission), and EDU-307 (wallet refunds and top-up cancellations, which always need a second person)
 - Source: brand prototype `https://claude.ai/artifact/1hsDyr1KdUaYD2hnuA9sfY`, version `1791539787-0c53`
 - Milestone and slice: `M3.5` (Approvals queue and approval rules; money kinds, including payment-cancellation requests, which ship with their approval, [D-032](../technical-reference.md#decision-log)). Leave items join with `M3.6`, store write-offs with `M4.5` (see [roadmap](README.md))
 - Related: [data-model-overview.md](../brainstorming/data-model-overview.md) (Rules every table follows: approval columns and null campus on approval items; Permission list), [data-model-finance.md](../brainstorming/data-model-finance.md) (Decisions: second person; Settings: approval rules), [data-model-inventory.md](../brainstorming/data-model-inventory.md) (stock counts), [53-payments.md](53-payments.md), [55-discounts-and-refunds.md](55-discounts-and-refunds.md), [22-staff-leave.md](22-staff-leave.md), [technical reference](../technical-reference.md) decisions [D-001](../technical-reference.md#decision-log), [D-006](../technical-reference.md#decision-log), [D-007](../technical-reference.md#decision-log), [D-013](../technical-reference.md#decision-log), [D-025](../technical-reference.md#decision-log), [D-027](../technical-reference.md#decision-log), [D-031](../technical-reference.md#decision-log), [D-032](../technical-reference.md#decision-log), [D-035](../technical-reference.md#decision-log), [D-036](../technical-reference.md#decision-log)
 
 ## Summary
 
-One inbox for every request that needs a second person: payment cancellations, fee reductions, cancelled balances, refunds, discounts, store write-offs and staff leave. An approver sees what is waiting on their campuses, confirms or declines with a reason, and can never decide their own request. A bell in the top bar and counts in the side nav say how many are waiting. The school decides, per money kind, whether approval is needed at all ("Approval rules").
+One inbox for every request that needs a second person: payment cancellations, fee reductions, cancelled balances, refunds, discounts, store write-offs, wallet refunds, cancelled top-ups and staff leave. An approver sees what is waiting on their campuses, confirms or declines with a reason, and can never decide their own request. A bell in the top bar and counts in the side nav say how many are waiting. The school decides, per money kind, whether approval is needed at all ("Approval rules"); wallet refunds and cancelled top-ups have no switch and always wait.
 
 ## Who uses it
 
@@ -15,6 +15,7 @@ One inbox for every request that needs a second person: payment cancellations, f
 | ------------------------- | ------------------------------------------------------- | -------------------------------------------------------------------------------------- |
 | Owner (Funmi)             | all                                                     | Decide every money item and every leave request, except her own; change Approval rules |
 | Principal (Grace, custom) | `adjustment:approve`, `leave:approve`, `campus:readAll` | Decide money items and leave across campuses, except her own                           |
+| Principal (starter role)  | `wallet:approveRefund`, `wallet:read`                   | Decide wallet refunds and cancelled top-ups, except her own                            |
 | Bursar (Chika)            | none of the approve permissions                         | Sees the leave-only page (her own leave), see [22-staff-leave.md](22-staff-leave.md)   |
 | Any other staff member    | none                                                    | The leave-only page                                                                    |
 | Administrator             | `schoolAccount:read`                                    | Leave-only page; Approval rules read-only                                              |
@@ -23,7 +24,7 @@ One inbox for every request that needs a second person: payment cancellations, f
 Scopes applied:
 
 - An item is visible when its campus (rule 3) is in the viewer's campus scope; an item with no campus is visible to every approver ([overview](../brainstorming/data-model-overview.md#rules-every-table-follows)).
-- Deciding needs the item's permission: `adjustment:approve` for money and store items, `leave:approve` for leave.
+- Deciding needs the item's permission: `adjustment:approve` for money and store items, `wallet:approveRefund` for wallet refunds and cancelled top-ups, `leave:approve` for leave.
 - Deciding an item outside scope answers 404; in scope without the permission answers 403; your own item answers 409 [tenancy-001].
 
 ## Screens
@@ -50,18 +51,20 @@ Scopes applied:
 
 - Items by kind:
 
-  | Kind label         | Source                                | Details                                                                   | Amount                        | Permission           | Opens (from bell)     |
-  | ------------------ | ------------------------------------- | ------------------------------------------------------------------------- | ----------------------------- | -------------------- | --------------------- |
-  | "Cancel a payment" | waiting `payment_void`                | "{RCT-2026-00098} from {payer}: {reason}"                                 | the payment amount            | `adjustment:approve` | Discounts and refunds |
-  | "Reduce a fee"     | waiting `adjustment` `credit_note`    | "{student}: {reason}"                                                     | the amount                    | `adjustment:approve` | Discounts and refunds |
-  | "Cancel a balance" | waiting `adjustment` `write_off`      | "{student}: {reason}"                                                     | the amount                    | `adjustment:approve` | Discounts and refunds |
-  | "Refund"           | waiting `adjustment` `refund`         | "{student}: {reason}"                                                     | the amount                    | `adjustment:approve` | Discounts and refunds |
-  | "Discount"         | waiting `student_discount`            | "{student}: {reason} ({5%} \| {₦15,000})"                                 | "{5}% off" or "₦{15,000} off" | `adjustment:approve` | Discounts and refunds |
-  | "Store write-off"  | waiting stock count with a difference | "{Lekki} stock count: {summary}" (summary per [61-store.md](61-store.md)) | the loss at cost              | `adjustment:approve` | Store                 |
-  | "Leave"            | waiting `staff_leave`                 | "{member} · {Sick leave} · {range}. {reason}"                             | "{n} day(s)"                  | `leave:approve`      | Approvals             |
+  | Kind label         | Source                                | Details                                                                   | Amount                        | Permission             | Opens (from bell)     |
+  | ------------------ | ------------------------------------- | ------------------------------------------------------------------------- | ----------------------------- | ---------------------- | --------------------- |
+  | "Cancel a payment" | waiting `payment_void`                | "{RCT-2026-00098} from {payer}: {reason}"                                 | the payment amount            | `adjustment:approve`   | Discounts and refunds |
+  | "Reduce a fee"     | waiting `adjustment` `credit_note`    | "{student}: {reason}"                                                     | the amount                    | `adjustment:approve`   | Discounts and refunds |
+  | "Cancel a balance" | waiting `adjustment` `write_off`      | "{student}: {reason}"                                                     | the amount                    | `adjustment:approve`   | Discounts and refunds |
+  | "Refund"           | waiting `adjustment` `refund`         | "{student}: {reason}"                                                     | the amount                    | `adjustment:approve`   | Discounts and refunds |
+  | "Discount"         | waiting `student_discount`            | "{student}: {reason} ({5%} \| {₦15,000})"                                 | "{5}% off" or "₦{15,000} off" | `adjustment:approve`   | Discounts and refunds |
+  | "Store write-off"  | waiting stock count with a difference | "{Lekki} stock count: {summary}" (summary per [61-store.md](61-store.md)) | the loss at cost              | `adjustment:approve`   | Store                 |
+  | "Wallet refund"    | waiting `wallet_refund`               | "Refund to {guardian}: {reason}"                                          | the amount to pay back        | `wallet:approveRefund` | Wallets, Requests tab |
+  | "Cancel a top-up"  | waiting `wallet_topup_cancellation`   | "Top-up {reference} of {guardian}: {reason}"                              | the top-up's amount           | `wallet:approveRefund` | Wallets, Requests tab |
+  | "Leave"            | waiting `staff_leave`                 | "{member} · {Sick leave} · {range}. {reason}"                             | "{n} day(s)"                  | `leave:approve`        | Approvals             |
 
 - **Actions cell** per row:
-  - The viewer lacks the item's permission (only seen with the switch on): badge "Someone else" (outline), tip "The owner or principal decides leave" for leave, "Needs someone who can approve money changes" otherwise.
+  - The viewer lacks the item's permission (only seen with the switch on): badge "Someone else" (outline), tip "The owner or principal decides leave" for leave, "Needs someone who can approve wallet refunds" for the wallet kinds, "Needs someone who can approve money changes" otherwise.
   - The viewer asked for it: badge "Your own" (warning), tip with the self-approval message (rule 6).
   - Otherwise: **Approve** (primary, small, check) and **Decline** (ghost, small, x).
 - Empty: "Nothing waiting for you", "When staff ask for leave, or to refund, discount, write off or void a payment, the request appears here." (check icon).
@@ -76,6 +79,8 @@ Scopes applied:
     - Discount: "Applies the discount to the student from the next round of charges."
     - Store write-off: "Brings store stock in line with the count and records the missing items as a loss at their average cost." (the store values stock at a moving average, [D-031](../technical-reference.md#decision-log))
     - Leave: "The staff member is marked on leave for those school days and sees your decision on their Approvals page."
+    - Wallet refund: "Pays the money back: it leaves the family’s wallet and the bank account. Enter the bank’s own reference for the payout." The dialog also asks for the required **Payout reference** (the bank's own reference for the transfer).
+    - Cancel a top-up: "Takes the top-up back out of the wallet with a new entry. The original top-up stays on record."
     - Fallback: "Approving records you as the approver."
   - Buttons: **Cancel** (ghost), **Approve** (primary, check).
   - Toasts (success):
@@ -84,6 +89,8 @@ Scopes applied:
     - Discount: "Discount approved."
     - Store write-off: "Approved. Stock now matches the count." with a **Store** action.
     - Leave: "Leave approved for {name}."
+    - Wallet refund: "Approved. The refund is recorded and the wallet is reduced." with a **Wallets** action.
+    - Cancel a top-up: "Approved. The top-up is cancelled and the wallet is reduced." with a **Wallets** action.
 - **Decline dialog**:
   - Title "Decline this request?"; description "The request stays on record with your reason. Nothing is changed."
   - Field **Reason**: textarea, required, placeholder "The person who asked will see this".
@@ -93,6 +100,7 @@ Scopes applied:
   - Own request: the self-approval message (rule 6), destructive.
   - Already decided by someone else: "This has already been decided." The list refreshes.
   - Refund above the credit now held (new): "{name} now holds ₦{x} credit, less than this refund. Decline it and ask again."
+  - A wallet refund or cancelled top-up whose money is no longer free (422): "The money is no longer free in this wallet. Decline the request, or ask the office to check the wallet."; the request stays waiting for a decline.
 - States: loading skeleton; error through `ErrorMessage`; acting read-only: rows show, no Approve or Decline (writes answer 403).
 
 ### Approvals bell (top bar)
@@ -104,7 +112,7 @@ Scopes applied:
 
 ### Nav counts and dashboard
 
-- Side nav counts (rule 14): **Approvals** shows the number the viewer can decide. Money items that live on Discounts and refunds also count on **Payments**; store write-offs count on **Store**.
+- Side nav counts (rule 14): **Approvals** shows the number the viewer can decide. Money items that live on Discounts and refunds also count on **Payments**; store write-offs count on **Store**; wallet refunds and cancelled top-ups count on **Wallets** (`byNav.wallets`) and not on Payments.
 - The dashboard's "Today" list shows "{n} request(s) waiting for your approval", sub-line the first two as "{kind}: {details}" joined by " · ", button **Review** to Approvals ([70-dashboard.md](70-dashboard.md), M2.6).
 
 ### Approval rules (settings)
@@ -130,12 +138,13 @@ The settings frame, route and layout are owned by [33-school-settings.md](33-sch
 
 ## Business rules
 
-1. **What waits.** An item is waiting while its record's `status` is `submitted`. Kinds: payment cancellation (request and approval both in M3.5, [D-032](../technical-reference.md#decision-log)), fee reduction, cancelled balance, refund, discount (M3.5); store write-off (M4.5); leave (M3.6).
-2. **Who decides.** Money and store items need `adjustment:approve`; leave needs `leave:approve` (D-006). The owner holds both.
+1. **What waits.** An item is waiting while its record's `status` is `submitted`. Kinds: payment cancellation (request and approval both in M3.5, [D-032](../technical-reference.md#decision-log)), fee reduction, cancelled balance, refund, discount (M3.5); store write-off (M4.5); leave (M3.6); wallet refund and cancelled top-up (EDU-307, [59-wallets.md](59-wallets.md), [D-406](../technical-reference.md#decision-log)).
+2. **Who decides.** Money and store items need `adjustment:approve`; wallet refunds and cancelled top-ups need `wallet:approveRefund`; leave needs `leave:approve` (D-006). The owner holds all three.
 3. **Item campus**, for scope:
    - Fee reduction, cancelled balance, refund, discount: the student's current-term placement campus, else home campus.
    - Payment cancellation: the campuses of the payment's allocated students; visible when any is in scope (the prototype uses the money account's campus; see gaps).
    - Store write-off: the store's campus.
+   - Wallet refund and cancelled top-up: the first campus, by child name, that the family has a child on and the viewer can see; visible when any is in scope.
    - Leave: per [22-staff-leave.md](22-staff-leave.md) (the prototype uses the member's first campus).
    - An item with no campus is visible to every approver.
 4. **The queue** lists waiting items in the viewer's scope that the viewer can decide; with "include others" on, it adds waiting in-scope items they can't decide, marked "Someone else".
@@ -144,20 +153,20 @@ The settings frame, route and layout are owned by [33-school-settings.md](33-sch
 7. **Decline needs a reason**, stored as `rejection_reason` with `rejected_by` and the time; the record stays. A declined payment cancellation sets the payment back to Recorded.
 8. **Approve once.** Approve and decline update `WHERE status = 'submitted'` in the same transaction as any posting; if no row changes, the answer is 409 and nothing posts. Approving writes `approved_by` and `approved_at`.
 9. **Effects on approval** are each kind's own rules: [53](53-payments.md) rules 12 to 13 (cancellation), [55](55-discounts-and-refunds.md) rules 4 to 6 and 13 (adjustments, discounts), [61-store.md](61-store.md) (write-offs), [22-staff-leave.md](22-staff-leave.md) (leave).
-10. **Approval rules.** One switch per money kind (`refund`, `write_off`, `credit_note`, `discount`, `payment_void`), on by default. Store write-offs follow `write_off`. Leave approval can't be switched off. Payments themselves never wait.
+10. **Approval rules.** One switch per money kind (`refund`, `write_off`, `credit_note`, `discount`, `payment_void`), on by default. Store write-offs follow `write_off`. Leave approval can't be switched off, and neither can wallet refunds or cancelled top-ups: they have no switch and always wait. Payments themselves never wait.
 11. **Switched off.** A new request of a switched-off kind is approved on creation with `approved_by` null (D-007) and posts at once. It never appears in the queue.
 12. **Switching changes only new requests.** Requests already waiting stay waiting when their kind is switched off, and must still be decided ([D-027](../technical-reference.md#decision-log)).
 13. **Who can approve list** shows "Owner" and every role whose permissions include `adjustment:approve`.
 14. **Counts.**
     - The bell, the Approvals nav count and the dashboard task count the items the viewer can decide, excluding their own ([D-036](../technical-reference.md#decision-log)).
-    - Money kinds (cancellation, reduction, cancelled balance, refund, discount) also count on the Payments nav item, and store write-offs on Store.
+    - Money kinds (cancellation, reduction, cancelled balance, refund, discount) also count on the Payments nav item, store write-offs on Store, and wallet refunds and cancelled top-ups on Wallets.
     - Counts refresh after any decision and on navigation; the bell also refetches every minute.
 15. **Acting.** A super admin acting read-only sees the queue but every decision answers 403. With a reason they may decide; the audit log records it. They never count as the creator.
 16. **Audit trail.** Every decision keeps who, when and the reason on the record itself; nothing is deleted.
 
 ## Data
 
-No new tables. Every approvable table has one column shape ([D-025](../technical-reference.md#decision-log)): `status`, `created_by`, `approved_by`, `approved_at`, `rejected_by`, `rejected_at`, `rejection_reason`, with the database checks. That covers `payment_void`, `adjustment`, `student_discount` ([finance](../brainstorming/data-model-finance.md#model)), and later `stock_count` ([inventory](../brainstorming/data-model-inventory.md); its counter is `created_by`) and `staff_leave` ([22-staff-leave.md](22-staff-leave.md); `approved_by` and `rejected_by`, not the overview's `decided_by`).
+No new tables. Every approvable table has one column shape ([D-025](../technical-reference.md#decision-log)): `status`, `created_by`, `approved_by`, `approved_at`, `rejected_by`, `rejected_at`, `rejection_reason`, with the database checks. That covers `payment_void`, `adjustment`, `student_discount` ([finance](../brainstorming/data-model-finance.md#model)), `wallet_refund` and `wallet_topup_cancellation` ([59-wallets.md](59-wallets.md); no self-approval CHECK, [D-378](../technical-reference.md#decision-log)), and later `stock_count` ([inventory](../brainstorming/data-model-inventory.md); its counter is `created_by`) and `staff_leave` ([22-staff-leave.md](22-staff-leave.md); `approved_by` and `rejected_by`, not the overview's `decided_by`).
 
 `school_setting` approval switches: [Settings](../brainstorming/data-model-finance.md#settings).
 
@@ -169,12 +178,12 @@ New or changed, not in the data-model docs (flagged):
 
 ## API
 
-Module `approvals` (read side only). Approve and decline stay with each owning module: [53](53-payments.md#api) (`/finance/payment-voids/:id/approve|decline`), [55](55-discounts-and-refunds.md#api) (`/finance/adjustments/...`, `/finance/discounts/...`), [61-store.md](61-store.md) (stock counts), [22-staff-leave.md](22-staff-leave.md) (leave). Each owning module registers its waiting items, under its own scope rules, with the approvals registry in `common/approvals` (`registerApprovals`), and the approvals module assembles the queue from what is registered ([D-036](../technical-reference.md#decision-log), [D-265](../technical-reference.md#decision-log)). The money kinds ship with M3.5; the `pillar` tabs, `includeOthers`, the store nav count and the leave kind ship with M3.6 and M4.5. With `includeOthers=true` the queue also lists rows the viewer cannot decide, as `decide: 'other'` (shown as "Someone else"), counted in `othersCount`. A money row of that kind reaches such a viewer only when they hold the read permission of its own kind (`adjustment:read`, or `store:read` for a store write-off, [D-339](../technical-reference.md#decision-log)); leave rows reach any approver ([D-312](../technical-reference.md#decision-log)), and a viewer holding neither approve permission gets an empty queue.
+Module `approvals` (read side only). Approve and decline stay with each owning module: [53](53-payments.md#api) (`/finance/payment-voids/:id/approve|decline`), [59](59-wallets.md#api) (`/finance/wallet-refunds/:id/approve|decline`, `/finance/wallet-topup-cancellations/:id/approve|decline`), [55](55-discounts-and-refunds.md#api) (`/finance/adjustments/...`, `/finance/discounts/...`), [61-store.md](61-store.md) (stock counts), [22-staff-leave.md](22-staff-leave.md) (leave). Each owning module registers its waiting items, under its own scope rules, with the approvals registry in `common/approvals` (`registerApprovals`), and the approvals module assembles the queue from what is registered ([D-036](../technical-reference.md#decision-log), [D-265](../technical-reference.md#decision-log)). The money kinds ship with M3.5; the `pillar` tabs, `includeOthers`, the store nav count and the leave kind ship with M3.6 and M4.5. With `includeOthers=true` the queue also lists rows the viewer cannot decide, as `decide: 'other'` (shown as "Someone else"), counted in `othersCount`. A money row of that kind reaches such a viewer only when they hold the read permission of its own kind (`adjustment:read`, or `store:read` for a store write-off, [D-339](../technical-reference.md#decision-log)); leave rows reach any approver ([D-312](../technical-reference.md#decision-log)), and a viewer holding neither approve permission gets an empty queue.
 
 | Method | Path                 | Permission                     | Request                                             | Response                                                                                                                                                                                                                                                                                                                                            | Errors |
 | ------ | -------------------- | ------------------------------ | --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
 | GET    | `/approvals`         | signed-in member of the school | query `page`, `includeOthers`, `pillar`, `campusId` | `{ currency, items: [{ kind, id, label, details, amountMinor \| null, amountText \| null, createdBy: { id, name }, createdAt, campusId \| null, decide: 'yes' \| 'own' \| 'other' }], total, othersCount, pillars }`, oldest first, 10 per page; empty unless the caller holds `adjustment:approve` or `leave:approve` (or is a super admin acting) | 401    |
-| GET    | `/approvals/summary` | signed-in member               | —                                                   | `{ currency, waitingForMe, byNav: { approvals, payments }, preview: [first 5 items] }`, own items excluded                                                                                                                                                                                                                                          | 401    |
+| GET    | `/approvals/summary` | signed-in member               | —                                                   | `{ currency, waitingForMe, byNav: { approvals, payments, store, wallets }, preview: [first 5 items] }`, own items excluded                                                                                                                                                                                                                          | 401    |
 
 Approval rules are read through `GET /school-settings` (`approvalRules`, and `approvers` for "Who can approve") and changed through `PATCH /school-settings/approval-rules` ([33](33-school-settings.md#api), [D-267](../technical-reference.md#decision-log)). The approve and decline routes all answer 200 on success, 404 (out of scope), 403 (no permission), 409 (own request, or no longer waiting) and 400 for a blank decline reason.
 
@@ -241,3 +250,7 @@ Approval rules are read through `GET /school-settings` (`approvalRules`, and `ap
 - M3.5 money kinds ([53](53-payments.md), [55](55-discounts-and-refunds.md)); payment-cancellation requests ship here with their approval ([D-032](../technical-reference.md#decision-log)), on M3.4's payments.
 - M3.6 leave ([22-staff-leave.md](22-staff-leave.md)) and M4.5 stock counts add their kinds later through the same provider shape ([D-036](../technical-reference.md#decision-log)).
 - M2.6 dashboard shows the waiting-for-you task.
+
+18. Given a bursar's waiting wallet refund and a waiting cancelled top-up, when the principal opens Approvals, then both rows show with Approve and Decline, the bell shows 2, the **Wallets** menu item shows 2 and **Payments** shows none; choosing a row in the bell opens the Requests tab of Wallets.
+19. Given the principal approves the refund, then the dialog asks for the payout reference before it sends anything, the toast reads "Approved. The refund is recorded and the wallet is reduced." and the row leaves the queue; approving the cancelled top-up asks for nothing more than the confirmation.
+20. Given a bursar who asked for a wallet refund, when she opens Approvals, then her own request shows "Your own" with no buttons and approving through the API answers 409; an owner may decide their own.

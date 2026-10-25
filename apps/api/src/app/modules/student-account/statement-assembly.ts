@@ -92,6 +92,8 @@ const DESCRIBERS: Record<
   store_count: memoOrReference,
   wallet_topup: () => 'Wallet top-up',
   wallet_spend: () => 'Paid from wallet',
+  wallet_refund: () => 'Wallet refund',
+  wallet_topup_void: () => 'Wallet top-up cancelled',
 };
 
 export const describeMovement = (

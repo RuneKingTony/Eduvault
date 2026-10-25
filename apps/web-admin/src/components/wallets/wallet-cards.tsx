@@ -1,11 +1,16 @@
 import type { Wallet } from '@eduvault/api-contract';
 import { walletMoney } from '@eduvault/shared';
-import { WalletFigure } from '@eduvault/ui';
+import { WalletFigure, cn } from '@eduvault/ui';
 
 export function BalanceCards({ wallet }: { wallet: Wallet }) {
   const { currency } = wallet;
   return (
-    <div className="grid gap-4 sm:grid-cols-3">
+    <div
+      className={cn(
+        'grid gap-4',
+        wallet.heldMinor > 0 ? 'sm:grid-cols-4' : 'sm:grid-cols-3'
+      )}
+    >
       <WalletFigure
         title="Balance"
         hint="Everything the family has paid in and not yet used."
@@ -16,6 +21,13 @@ export function BalanceCards({ wallet }: { wallet: Wallet }) {
         hint="Kept for a named child’s charges."
         value={walletMoney(wallet.setAsideMinor, currency)}
       />
+      {wallet.heldMinor > 0 ? (
+        <WalletFigure
+          title="Held for requests"
+          hint="Waiting for a second person to approve a refund or a cancelled top-up."
+          value={walletMoney(wallet.heldMinor, currency)}
+        />
+      ) : null}
       <WalletFigure
         title="Free to use"
         hint="Can pay any of the children’s charges."

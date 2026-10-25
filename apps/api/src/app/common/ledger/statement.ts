@@ -34,6 +34,8 @@ const STATUS_BY_KIND: Record<
   store_count: CHARGE_SIDES,
   wallet_topup: { debit: 'cancelled', credit: 'paid' },
   wallet_spend: { debit: 'cancelled', credit: 'paid' },
+  wallet_refund: { debit: 'cancelled', credit: 'paid' },
+  wallet_topup_void: { debit: 'cancelled', credit: 'paid' },
 };
 
 export const movementStatus = (

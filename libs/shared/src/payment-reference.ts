@@ -47,6 +47,8 @@ export const WALLET_REFERENCE_PREFIXES = {
   setAside: 'WSA',
   release: 'WRL',
   autoPay: 'WAP',
+  refund: 'WRQ',
+  cancelTopUp: 'WTQ',
 } as const;
 
 export type WalletReferenceKind = keyof typeof WALLET_REFERENCE_PREFIXES;

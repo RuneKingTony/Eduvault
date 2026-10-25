@@ -14,6 +14,8 @@ describe('journal kind labels', () => {
   it('name the wallet movements for the journal and cash book', () => {
     expect(JOURNAL_KIND_LABELS.wallet_topup).toBe('Wallet top-up');
     expect(JOURNAL_KIND_LABELS.wallet_spend).toBe('Paid from wallet');
+    expect(JOURNAL_KIND_LABELS.wallet_refund).toBe('Wallet refund');
+    expect(JOURNAL_KIND_LABELS.wallet_topup_void).toBe('Top-up cancelled');
   });
 
   it('cover every kind the books can hold', () => {

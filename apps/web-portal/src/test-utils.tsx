@@ -304,6 +304,7 @@ export const portalWallet = (over: Partial<Wallet> = {}): Wallet => ({
   autoPay: false,
   balanceMinor: 5_000_000,
   setAsideMinor: 0,
+  heldMinor: 0,
   freeMinor: 5_000_000,
   children: [walletChild()],
   ...over,

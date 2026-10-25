@@ -13,6 +13,8 @@ import {
   storeWriteOffApproval,
   voidApproval,
   voidRow,
+  walletCancellationApproval,
+  walletRefundApproval,
   COUNT_APPROVAL_ID,
 } from '../test-approvals';
 import { leaveDto, myLeave } from '../test-leave';
@@ -240,6 +242,115 @@ describe('ApprovalsPage', () => {
           action: expect.objectContaining({ label: 'Store' }),
         })
       );
+    });
+  });
+
+  it('asks for the bank’s payout reference before approving a wallet refund, then toasts with a Wallets action', async () => {
+    const api = setup({ list: approvalList([walletRefundApproval()]) });
+
+    const row = await screen.findByRole('row', { name: /Wallet refund/ });
+    expect(
+      within(row).getByText('Refund to Ngozi Okeke: Paid twice by mistake')
+    ).toBeVisible();
+    expect(within(row).getByText('₦15,000')).toBeVisible();
+    await user.click(within(row).getByRole('button', { name: /^Approve/ }));
+    const dialog = await screen.findByRole('dialog');
+    expect(
+      within(dialog).getByText(
+        /Pays the money back: it leaves the family’s wallet/
+      )
+    ).toBeVisible();
+
+    await user.click(within(dialog).getByRole('button', { name: 'Approve' }));
+    expect(
+      await within(dialog).findByText(
+        'Enter the bank’s reference for the payout.'
+      )
+    ).toBeVisible();
+    expect(api.walletRefunds.approve).not.toHaveBeenCalled();
+
+    await user.type(
+      within(dialog).getByLabelText('Payout reference'),
+      'NIP-8841'
+    );
+    await user.click(within(dialog).getByRole('button', { name: 'Approve' }));
+    await waitFor(() => {
+      expect(api.walletRefunds.approve).toHaveBeenCalledWith({
+        params: { id: walletRefundApproval().id },
+        body: { payoutReference: 'NIP-8841' },
+      });
+    });
+    await waitFor(() => {
+      expect(toast.success).toHaveBeenCalledWith(
+        'Approved. The refund is recorded and the wallet is reduced.',
+        expect.objectContaining({
+          action: expect.objectContaining({ label: 'Wallets' }),
+        })
+      );
+    });
+  });
+
+  it('approves a cancelled top-up without asking for anything but the confirmation', async () => {
+    const api = setup({ list: approvalList([walletCancellationApproval()]) });
+
+    await user.click(await screen.findByRole('button', { name: /^Approve/ }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).queryByLabelText('Payout reference')).toBeNull();
+    expect(
+      within(dialog).getByText(
+        'Takes the top-up back out of the wallet with a new entry. The original top-up stays on record.'
+      )
+    ).toBeVisible();
+    await user.click(within(dialog).getByRole('button', { name: 'Approve' }));
+
+    await waitFor(() => {
+      expect(api.walletTopUpCancellations.approve).toHaveBeenCalledWith({
+        params: { id: walletCancellationApproval().id },
+      });
+    });
+    await waitFor(() => {
+      expect(toast.success).toHaveBeenCalledWith(
+        'Approved. The top-up is cancelled and the wallet is reduced.',
+        expect.objectContaining({
+          action: expect.objectContaining({ label: 'Wallets' }),
+        })
+      );
+    });
+  });
+
+  it('declines a wallet refund and a cancelled top-up through their own routes with the reason', async () => {
+    const api = setup({
+      list: approvalList([
+        walletRefundApproval(),
+        walletCancellationApproval(),
+      ]),
+    });
+    const buttons = await screen.findAllByRole('button', { name: /^Decline/ });
+    await user.click(buttons[0]!);
+    let dialog = await screen.findByRole('dialog');
+    await user.type(within(dialog).getByLabelText('Reason'), 'Not a mistake');
+    await user.click(within(dialog).getByRole('button', { name: 'Decline' }));
+    await waitFor(() => {
+      expect(api.walletRefunds.decline).toHaveBeenCalledWith({
+        params: { id: walletRefundApproval().id },
+        body: { reason: 'Not a mistake' },
+      });
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+    await user.click(
+      (await screen.findAllByRole('button', { name: /^Decline/ }))[1]!
+    );
+    dialog = await screen.findByRole('dialog');
+    await user.type(within(dialog).getByLabelText('Reason'), 'Already spent');
+    await user.click(within(dialog).getByRole('button', { name: 'Decline' }));
+    await waitFor(() => {
+      expect(api.walletTopUpCancellations.decline).toHaveBeenCalledWith({
+        params: { id: walletCancellationApproval().id },
+        body: { reason: 'Already spent' },
+      });
     });
   });
 

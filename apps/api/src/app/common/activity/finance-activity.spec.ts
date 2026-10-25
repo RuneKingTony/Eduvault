@@ -33,7 +33,13 @@ import {
   type StoreWriteOffFacts,
   walletSpentActivity,
   walletGatewayToppedUpActivity,
+  walletRefundDeclinedActivity,
+  walletRefundRequestedActivity,
+  walletRefundedActivity,
   walletToppedUpActivity,
+  walletTopUpCancelDeclinedActivity,
+  walletTopUpCancelRequestedActivity,
+  walletTopUpCancelledActivity,
   gatewayActor,
   GATEWAY_ACTOR_ID,
 } from './finance-activity';
@@ -1218,5 +1224,95 @@ describe('walletSpentActivity', () => {
     expect(rows[1]?.text).toBe(
       `Mrs Ojo paid ${money(600_000, 'NGN')} of their children’s charges on this campus from the wallet.`
     );
+  });
+});
+
+describe('wallet refund and top-up cancellation activity', () => {
+  const request = {
+    id: 'request-1',
+    walletId: 'wallet-1',
+    guardianName: 'Mrs Ojo',
+    amountMinor: 1_500_000,
+    campusIds: [LEKKI, IKEJA],
+  };
+  const data = {
+    requestId: 'request-1',
+    walletId: 'wallet-1',
+    amountMinor: 1_500_000,
+  };
+
+  it('writes the request on each campus the family has a child on', () => {
+    expect(walletRefundRequestedActivity(actor, request)).toEqual(
+      [LEKKI, IKEJA].map((campusId) => ({
+        organizationId: 'org-1',
+        campusId,
+        pillar: 'finance',
+        kind: 'wallet.refund_requested',
+        actorUserId: 'user-1',
+        subjectType: 'wallet_refund',
+        subjectId: 'request-1',
+        text: `Tunde Bakare asked for ${money(1_500_000, 'NGN')} to be refunded from Mrs Ojo’s wallet.`,
+        data,
+      }))
+    );
+  });
+
+  it('names the approver on a refund and notes an owner deciding their own request', () => {
+    const [row] = walletRefundedActivity(actor, request, {});
+    expect(row).toMatchObject({
+      kind: 'wallet.refunded',
+      subjectType: 'wallet_refund',
+      text: `${money(1_500_000, 'NGN')} was refunded from Mrs Ojo’s wallet, approved by Tunde Bakare.`,
+      data: { ...data, ownRequest: false },
+    });
+    const [own] = walletRefundedActivity(actor, request, { ownRequest: true });
+    expect(own?.text).toContain(
+      'approved by Tunde Bakare (their own request).'
+    );
+    expect(own?.data).toEqual({ ...data, ownRequest: true });
+  });
+
+  it('keeps the reason in the text of a declined refund, not in the data', () => {
+    const [row] = walletRefundDeclinedActivity(actor, request, {
+      reason: 'No such payment',
+    });
+    expect(row).toMatchObject({
+      kind: 'wallet.refund_declined',
+      text: `The ${money(1_500_000, 'NGN')} refund from Mrs Ojo’s wallet was declined: No such payment`,
+      data,
+    });
+  });
+
+  it('writes the three top-up cancellation events against the cancellation', () => {
+    const [asked] = walletTopUpCancelRequestedActivity(actor, request);
+    const [done] = walletTopUpCancelledActivity(actor, request, {});
+    const [declined] = walletTopUpCancelDeclinedActivity(actor, request, {
+      reason: 'Spent already',
+    });
+    expect([asked, done, declined].map((row) => row?.kind)).toEqual([
+      'wallet.topup_cancel_requested',
+      'wallet.topup_cancelled',
+      'wallet.topup_cancel_declined',
+    ]);
+    for (const row of [asked, done, declined]) {
+      expect(row?.subjectType).toBe('wallet_topup_cancellation');
+      expect(row?.subjectId).toBe('request-1');
+      expect(row?.pillar).toBe('finance');
+    }
+    expect(asked?.text).toBe(
+      `Tunde Bakare asked to cancel a ${money(1_500_000, 'NGN')} top-up of Mrs Ojo’s wallet.`
+    );
+    expect(done?.text).toBe(
+      `A ${money(1_500_000, 'NGN')} top-up of Mrs Ojo’s wallet was cancelled, approved by Tunde Bakare.`
+    );
+    expect(declined?.text).toBe(
+      `Cancelling the ${money(1_500_000, 'NGN')} top-up of Mrs Ojo’s wallet was declined: Spent already`
+    );
+  });
+
+  it('writes nothing for a family with no child on a campus', () => {
+    expect(
+      walletRefundRequestedActivity(actor, { ...request, campusIds: [] })
+    ).toEqual([]);
   });
 });

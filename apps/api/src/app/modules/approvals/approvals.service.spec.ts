@@ -525,11 +525,16 @@ describe('ApprovalsService.summary', () => {
 
     expect(await service.summary(org('grace'))).toMatchObject({
       waitingForMe: 3,
-      byNav: { approvals: 3, payments: 3, store: 0 },
+      byNav: { approvals: 3, payments: 3, store: 0, wallets: 0 },
     });
     const summary = await withOwn.summary(org('grace'));
     expect(summary.waitingForMe).toBe(3);
-    expect(summary.byNav).toEqual({ approvals: 3, payments: 3, store: 0 });
+    expect(summary.byNav).toEqual({
+      approvals: 3,
+      payments: 3,
+      store: 0,
+      wallets: 0,
+    });
     expect(summary.preview.map((item) => item.id)).not.toContain('mine');
   });
 
@@ -549,7 +554,37 @@ describe('ApprovalsService.summary', () => {
       provider(voidItem, writeOff, own)
     ).summary(org('grace'));
     expect(summary.waitingForMe).toBe(2);
-    expect(summary.byNav).toEqual({ approvals: 2, payments: 1, store: 1 });
+    expect(summary.byNav).toEqual({
+      approvals: 2,
+      payments: 1,
+      store: 1,
+      wallets: 0,
+    });
+  });
+
+  it('counts a wallet refund and a top-up cancellation on Wallets, not on Payments', async () => {
+    const refund = waiting({
+      kind: 'wallet_refund',
+      id: 'refund-1',
+      details: 'Refund to Mrs Ojo: Paid twice',
+      amountMinor: 1_500_000,
+    });
+    const cancellation = waiting({
+      kind: 'wallet_topup_cancellation',
+      id: 'cancel-1',
+      details: 'Top-up CSH-1 of Mrs Ojo: Wrong family',
+      amountMinor: 3_000_000,
+    });
+    const summary = await serviceOver(
+      provider(voidItem, refund, cancellation)
+    ).summary(org('grace', { permissions: ['wallet:approveRefund'] }));
+    expect(summary.waitingForMe).toBe(2);
+    expect(summary.byNav).toEqual({
+      approvals: 2,
+      payments: 0,
+      store: 0,
+      wallets: 2,
+    });
   });
 
   it('previews the first five, oldest first', async () => {
@@ -577,7 +612,7 @@ describe('ApprovalsService.summary', () => {
     expect(summary).toEqual({
       currency: 'NGN',
       waitingForMe: 0,
-      byNav: { approvals: 0, payments: 0, store: 0 },
+      byNav: { approvals: 0, payments: 0, store: 0, wallets: 0 },
       preview: [],
     });
   });
@@ -588,5 +623,75 @@ describe('ApprovalsService.summary', () => {
     );
     expect(summary.waitingForMe).toBe(0);
     expect(summary.preview).toEqual([]);
+  });
+});
+
+describe('ApprovalsService wallet requests', () => {
+  const refund = waiting({
+    kind: 'wallet_refund',
+    id: 'refund-1',
+    details: 'Refund to Mrs Ojo: Paid twice',
+    amountMinor: 1_500_000,
+  });
+  const cancellation = waiting({
+    kind: 'wallet_topup_cancellation',
+    id: 'cancel-1',
+    details: 'Top-up CSH-1 of Mrs Ojo: Wrong family',
+    amountMinor: 3_000_000,
+    createdAt: '2026-10-17T08:00:00.000Z',
+  });
+
+  it('labels both kinds and lets the wallet approver decide them', async () => {
+    const list = await serviceOver(provider(refund, cancellation)).list(
+      org('grace', { permissions: ['wallet:approveRefund'] }),
+      page1
+    );
+    expect(
+      list.items.map((item) => [item.id, item.label, item.decide])
+    ).toEqual([
+      ['refund-1', 'Wallet refund', 'yes'],
+      ['cancel-1', 'Cancel a top-up', 'yes'],
+    ]);
+  });
+
+  it('does not let a payment approver decide them', async () => {
+    const list = await serviceOver(provider(refund, cancellation)).list(
+      org('grace', {
+        permissions: ['adjustment:approve', 'adjustment:read'],
+      }),
+      { page: 1, includeOthers: true }
+    );
+    expect(list.items).toEqual([]);
+  });
+
+  it('shows the others’ wallet requests only to someone who may read wallets', async () => {
+    const reader = org('grace', {
+      permissions: ['adjustment:approve', 'wallet:read'],
+    });
+    const list = await serviceOver(provider(refund)).list(reader, {
+      page: 1,
+      includeOthers: true,
+    });
+    expect(list.items.map((item) => [item.id, item.decide])).toEqual([
+      ['refund-1', 'other'],
+    ]);
+  });
+
+  it('marks the requester’s own request as theirs, except for an owner', async () => {
+    const own = waiting({
+      kind: 'wallet_refund',
+      id: 'own-1',
+      createdById: 'grace',
+    });
+    const asBursar = await serviceOver(provider(own)).list(
+      org('grace', { permissions: ['wallet:approveRefund'] }),
+      { page: 1, includeOthers: true }
+    );
+    expect(asBursar.items.map((item) => item.decide)).toEqual(['own']);
+    const asOwner = await serviceOver(provider(own)).list(
+      org('grace', { owner: true, permissions: ['wallet:approveRefund'] }),
+      page1
+    );
+    expect(asOwner.items.map((item) => item.decide)).toEqual(['yes']);
   });
 });

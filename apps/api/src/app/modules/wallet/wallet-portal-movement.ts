@@ -30,6 +30,15 @@ function portalSourceOf(
         ),
       };
     }
+    case 'refund': {
+      return { type: 'refund', payoutReference: source.payoutReference };
+    }
+    case 'topup_cancellation': {
+      return {
+        type: 'topup_cancellation',
+        topUpReference: source.topUpReference,
+      };
+    }
   }
 }
 

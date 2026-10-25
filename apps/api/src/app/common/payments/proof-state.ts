@@ -7,8 +7,8 @@ export async function fileProofState(
   db: Kysely<DB>,
   proof: { organizationId: string; userId: string; fileId: string },
   attachment: {
-    kind: 'payment_proof' | 'wallet_proof';
-    table: 'payment' | 'wallet_topup';
+    kind: 'payment_proof' | 'wallet_proof' | 'wallet_refund_request';
+    table: 'payment' | 'wallet_topup' | 'wallet_refund';
   }
 ): Promise<ProofState> {
   const { organizationId, userId, fileId } = proof;

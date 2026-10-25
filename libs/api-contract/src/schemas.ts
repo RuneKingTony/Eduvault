@@ -348,6 +348,7 @@ export const FILE_KINDS = [
   'guardian_photo',
   'payment_proof',
   'wallet_proof',
+  'wallet_refund_request',
 ] as const;
 export const fileKindSchema = z.enum(FILE_KINDS);
 export type FileKind = z.infer<typeof fileKindSchema>;

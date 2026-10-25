@@ -20,6 +20,7 @@ export * from './student-accounts';
 export * from './students';
 export * from './subjects';
 export * from './wallets';
+export * from './wallet-requests';
 export * from './contract';
 export * from './client';
 export * from './checked-fake';

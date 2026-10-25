@@ -20,6 +20,7 @@ import {
   type TopUpOptions,
   type TopUpWallet,
   type ToppedUpWallet,
+  type RefundOptions,
   type Wallet,
   type WalletList,
   type WalletListQuery,
@@ -50,6 +51,17 @@ export class WalletService {
       this.moneyAccounts.listForRecording(ctx),
     ]);
     return { currency, today: this.clock.today(), accounts, methods };
+  }
+
+  async refundOptions(ctx: OrgContext): Promise<RefundOptions> {
+    const [currency, accounts] = await Promise.all([
+      this.wallets.currency(ctx.organizationId),
+      this.moneyAccounts.listForRecording(ctx),
+    ]);
+    return {
+      currency,
+      accounts: accounts.filter((account) => account.kind === 'bank'),
+    };
   }
 
   async list(ctx: OrgContext, query: WalletListQuery): Promise<WalletList> {

@@ -14,13 +14,14 @@ const BUILT = new Set([
   '/finance/payments',
   '/finance/money-accounts',
   '/finance/store',
+  '/finance/wallets',
 ]);
 
 function setup(
   slug: string,
   summary = approvalSummary({
     waitingForMe: 3,
-    byNav: { approvals: 3, payments: 3, store: 0 },
+    byNav: { approvals: 3, payments: 3, store: 0, wallets: 0 },
   })
 ) {
   const access = starterAccess(slug);
@@ -69,7 +70,7 @@ describe('SidebarNav counts', () => {
       'principal',
       approvalSummary({
         waitingForMe: 3,
-        byNav: { approvals: 3, payments: 2, store: 1 },
+        byNav: { approvals: 3, payments: 2, store: 1, wallets: 0 },
       })
     );
 
@@ -79,12 +80,27 @@ describe('SidebarNav counts', () => {
     expect(countOn('Approvals').getByText('3')).toBeVisible();
   });
 
+  it('shows wallet refunds and cancelled top-ups on Wallets, and not on Payments', async () => {
+    setup(
+      'principal',
+      approvalSummary({
+        waitingForMe: 3,
+        byNav: { approvals: 3, payments: 1, store: 0, wallets: 2 },
+      })
+    );
+
+    expect(await screen.findByLabelText('2 waiting for you')).toBeVisible();
+    expect(countOn('Wallets').getByText('2')).toBeVisible();
+    expect(countOn('Payments').getByText('1')).toBeVisible();
+    expect(countOn('Approvals').getByText('3')).toBeVisible();
+  });
+
   it('shows no count when nothing waits', async () => {
     const api = setup(
       'principal',
       approvalSummary({
         waitingForMe: 0,
-        byNav: { approvals: 0, payments: 0, store: 0 },
+        byNav: { approvals: 0, payments: 0, store: 0, wallets: 0 },
         preview: [],
       })
     );

@@ -210,6 +210,19 @@ import {
   walletSchema,
 } from './wallets';
 import {
+  approveWalletRefundSchema,
+  refundOptionsSchema,
+  requestWalletCancellationSchema,
+  requestWalletRefundSchema,
+  requestedWalletCancellationSchema,
+  requestedWalletRefundSchema,
+  walletCancellationRequestSchema,
+  walletRefundRequestSchema,
+  walletRequestListQuerySchema,
+  walletRequestListSchema,
+  walletTopUpParamsSchema,
+} from './wallet-requests';
+import {
   balanceListQuerySchema,
   balanceListSchema,
   familyStatementQuerySchema,
@@ -1155,6 +1168,64 @@ export const contract = defineContract({
       path: '/finance/wallets/:walletId/reserved-account',
       params: walletParamsSchema,
       response: walletSchema,
+    }),
+    refundOptions: defineRoute({
+      method: 'GET',
+      path: '/finance/wallets/refund-options',
+      response: refundOptionsSchema,
+    }),
+    requestRefund: defineRoute({
+      method: 'POST',
+      path: '/finance/wallets/:walletId/refunds',
+      params: walletParamsSchema,
+      body: requestWalletRefundSchema,
+      response: requestedWalletRefundSchema,
+    }),
+    requestCancellation: defineRoute({
+      method: 'POST',
+      path: '/finance/wallets/:walletId/top-ups/:topUpId/cancellations',
+      params: walletTopUpParamsSchema,
+      body: requestWalletCancellationSchema,
+      response: requestedWalletCancellationSchema,
+    }),
+  },
+  walletRequests: {
+    list: defineRoute({
+      method: 'GET',
+      path: '/finance/wallet-requests',
+      query: walletRequestListQuerySchema,
+      response: walletRequestListSchema,
+    }),
+  },
+  walletRefunds: {
+    approve: defineRoute({
+      method: 'POST',
+      path: '/finance/wallet-refunds/:id/approve',
+      params: idParamsSchema,
+      body: approveWalletRefundSchema,
+      response: walletRefundRequestSchema,
+    }),
+    decline: defineRoute({
+      method: 'POST',
+      path: '/finance/wallet-refunds/:id/decline',
+      params: idParamsSchema,
+      body: declineSchema,
+      response: walletRefundRequestSchema,
+    }),
+  },
+  walletTopUpCancellations: {
+    approve: defineRoute({
+      method: 'POST',
+      path: '/finance/wallet-topup-cancellations/:id/approve',
+      params: idParamsSchema,
+      response: walletCancellationRequestSchema,
+    }),
+    decline: defineRoute({
+      method: 'POST',
+      path: '/finance/wallet-topup-cancellations/:id/decline',
+      params: idParamsSchema,
+      body: declineSchema,
+      response: walletCancellationRequestSchema,
     }),
   },
   gateway: {

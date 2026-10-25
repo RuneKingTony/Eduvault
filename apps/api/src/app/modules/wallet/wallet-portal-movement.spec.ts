@@ -45,6 +45,7 @@ describe('portalMovementOf', () => {
           method: 'transfer',
           depositorName: 'Uncle Bode',
           proofFileId: OTHER,
+          cancellation: null,
         },
       })
     );
@@ -86,6 +87,31 @@ describe('portalMovementOf', () => {
       automatic: true,
     });
     expect(spendSource('WSP-1')).toEqual({ type: 'spend', automatic: false });
+  });
+
+  it('shows a guardian a refund’s bank reference and a cancelled top-up’s reference, never the reason or the ids', () => {
+    expect(
+      portalMovementOf(
+        movement({
+          source: { type: 'refund', id: OTHER, payoutReference: 'NIP-8841' },
+        })
+      ).source
+    ).toEqual({ type: 'refund', payoutReference: 'NIP-8841' });
+    expect(
+      portalMovementOf(
+        movement({
+          source: {
+            type: 'topup_cancellation',
+            id: OTHER,
+            topUpReference: 'CSH-20261023-K3Q7ZA',
+            reason: 'Keyed against the wrong family',
+          },
+        })
+      ).source
+    ).toEqual({
+      type: 'topup_cancellation',
+      topUpReference: 'CSH-20261023-K3Q7ZA',
+    });
   });
 
   it('answers what the portal contract parses', () => {

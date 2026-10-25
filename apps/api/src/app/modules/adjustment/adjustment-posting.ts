@@ -2,7 +2,7 @@ import {
   ADJUSTMENT_KIND_LABELS,
   type AdjustmentKind,
 } from '@eduvault/api-contract';
-import type { LedgerLine } from '../../common/ledger';
+import { clampMemo, type LedgerLine } from '../../common/ledger';
 
 export interface PostingFacts {
   kind: AdjustmentKind;
@@ -15,10 +15,8 @@ export interface PostingFacts {
   money: { ledgerAccountId: string; campusId: string | null } | null;
 }
 
-const MEMO_MAX = 500;
-
 export const adjustmentMemo = (kind: AdjustmentKind, reason: string): string =>
-  `${ADJUSTMENT_KIND_LABELS[kind]}: ${reason}`.slice(0, MEMO_MAX);
+  clampMemo(`${ADJUSTMENT_KIND_LABELS[kind]}: ${reason}`);
 
 function studentLine(
   facts: PostingFacts,

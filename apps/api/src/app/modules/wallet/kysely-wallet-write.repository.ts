@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { sql, type Kysely } from 'kysely';
 import { STUDENT_WALLETS_SYSTEM_KEY } from '@eduvault/api-contract';
-import { walletFigures } from '@eduvault/shared';
 import type { DB } from '../../../db/db-types';
 import {
   ActivityWriter,
@@ -16,12 +15,11 @@ import {
 import { claimReference } from '../../common/references/apply-once';
 import { currentCampusSql } from '../../common/students';
 import {
-  earmarksByChild,
   findReferenceRow,
   journalReferenceTaken,
   lockWallet,
   topUpPostingLines,
-  walletBalance,
+  walletFreeMoney,
   WalletAutoPayService,
   type LockedWallet,
   type WalletWriteDeps,
@@ -35,7 +33,7 @@ import type {
   TopUpOutcome,
 } from './wallet.repository';
 
-async function familyCampuses(
+export async function familyCampuses(
   trx: Kysely<DB>,
   family: { organizationId: string; guardianId: string }
 ): Promise<string[]> {
@@ -226,13 +224,13 @@ export async function writeEarmark(
     return { status: 'reference_used' };
   }
   const wallet = await lockWallet(trx, input);
-  const [balance, marked] = await Promise.all([
-    walletBalance(trx, { organizationId, guardianId: wallet.guardianId }),
-    earmarksByChild(trx, { organizationId, walletId: input.walletId }),
-  ]);
-  const { freeMinor } = walletFigures(balance, [...marked.values()]);
-  const held = marked.get(input.studentId) ?? 0;
-  const limitMinor = input.kind === 'set' ? Math.max(0, freeMinor) : held;
+  const { freeMinor, marked } = await walletFreeMoney(trx, {
+    organizationId,
+    walletId: input.walletId,
+    guardianId: wallet.guardianId,
+  });
+  const setAside = marked.get(input.studentId) ?? 0;
+  const limitMinor = input.kind === 'set' ? Math.max(0, freeMinor) : setAside;
   if (input.amountMinor > limitMinor) {
     return { status: 'over', limitMinor };
   }

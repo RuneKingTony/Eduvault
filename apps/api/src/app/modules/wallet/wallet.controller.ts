@@ -48,6 +48,14 @@ export class WalletController {
     return this.wallets.topUpOptions(org);
   }
 
+  @Get('refund-options')
+  @OrganizationAuth('wallet', 'requestRefund')
+  refundOptions(
+    @Org() org: OrgContext
+  ): Promise<RouteOutput<typeof routes.refundOptions>> {
+    return this.wallets.refundOptions(org);
+  }
+
   @Get(':walletId')
   @OrganizationAuth('wallet', 'read')
   get(

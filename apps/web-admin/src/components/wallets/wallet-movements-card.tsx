@@ -1,13 +1,17 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { FileTextIcon, HistoryIcon } from 'lucide-react';
+import { BanIcon, FileTextIcon, HistoryIcon } from 'lucide-react';
 import {
   FINANCE_PAGE_SIZE,
   movementTitle,
   type WalletMovement,
   type WalletMovementList,
 } from '@eduvault/api-contract';
+import { useCan } from '@eduvault/auth-client';
 import { fmtDate, walletMoney } from '@eduvault/shared';
 import {
+  Badge,
+  Button,
   Card,
   CardContent,
   CardDescription,
@@ -30,6 +34,7 @@ import { useApi } from '../../api';
 import { walletMovementsQueryOptions } from '../../queries';
 import { ProofLink } from '../money/proof-link';
 import { QueryState } from '../money/query-state';
+import { CancelTopUpDialog } from './cancel-topup-dialog';
 import { TraceButton } from './wallet-trace';
 
 function Receipt({ movement }: { movement: WalletMovement }) {
@@ -47,12 +52,52 @@ function Receipt({ movement }: { movement: WalletMovement }) {
   );
 }
 
+function CancelTopUp({
+  movement,
+  canRequest,
+  onCancel,
+}: {
+  movement: WalletMovement;
+  canRequest: boolean;
+  onCancel: (movement: WalletMovement) => void;
+}) {
+  if (movement.source?.type !== 'topup') {
+    return null;
+  }
+  const { cancellation } = movement.source;
+  if (cancellation !== null) {
+    return (
+      <Badge variant={cancellation === 'approved' ? 'outline' : 'warning'}>
+        {cancellation === 'approved' ? 'Cancelled' : 'Cancellation waiting'}
+      </Badge>
+    );
+  }
+  return canRequest ? (
+    <Button
+      type="button"
+      size="xs"
+      variant="ghost"
+      aria-label={`Cancel top-up ${movement.reference}`}
+      onClick={() => {
+        onCancel(movement);
+      }}
+    >
+      <BanIcon />
+      Cancel top-up
+    </Button>
+  ) : null;
+}
+
 function MovementRow({
   movement,
   currency,
+  canRequest,
+  onCancel,
 }: {
   movement: WalletMovement;
   currency: string;
+  canRequest: boolean;
+  onCancel: (movement: WalletMovement) => void;
 }) {
   const incoming = movement.amountMinor > 0;
   return (
@@ -71,6 +116,13 @@ function MovementRow({
         </span>
       </TableCell>
       <TableCell>{movement.madeBy ?? ''}</TableCell>
+      <TableCell>
+        <CancelTopUp
+          movement={movement}
+          canRequest={canRequest}
+          onCancel={onCancel}
+        />
+      </TableCell>
       <TableCell
         className={cn(
           'text-right font-medium tabular-nums',
@@ -83,26 +135,34 @@ function MovementRow({
   );
 }
 
+function NoMovements() {
+  return (
+    <Empty>
+      <EmptyHeader>
+        <EmptyMedia variant="icon">
+          <HistoryIcon />
+        </EmptyMedia>
+        <EmptyTitle>No movements yet</EmptyTitle>
+      </EmptyHeader>
+    </Empty>
+  );
+}
+
 function MovementsBody({
   data,
   page,
+  canRequest,
   onPage,
+  onCancel,
 }: {
   data: WalletMovementList;
   page: number;
+  canRequest: boolean;
   onPage: (page: number) => void;
+  onCancel: (movement: WalletMovement) => void;
 }) {
   if (data.items.length === 0) {
-    return (
-      <Empty>
-        <EmptyHeader>
-          <EmptyMedia variant="icon">
-            <HistoryIcon />
-          </EmptyMedia>
-          <EmptyTitle>No movements yet</EmptyTitle>
-        </EmptyHeader>
-      </Empty>
-    );
+    return <NoMovements />;
   }
   return (
     <>
@@ -112,6 +172,9 @@ function MovementsBody({
             <TableHead>Date</TableHead>
             <TableHead>Movement</TableHead>
             <TableHead>By</TableHead>
+            <TableHead>
+              <span className="sr-only">Actions</span>
+            </TableHead>
             <TableHead className="text-right">Amount</TableHead>
           </TableRow>
         </TableHeader>
@@ -121,6 +184,8 @@ function MovementsBody({
               key={movement.lineId}
               movement={movement}
               currency={data.currency}
+              canRequest={canRequest}
+              onCancel={onCancel}
             />
           ))}
         </TableBody>
@@ -149,6 +214,8 @@ export function MovementsCard({
   const movements = useQuery(
     walletMovementsQueryOptions(useApi(), walletId, page)
   );
+  const canRequest = useCan('wallet', 'requestRefund');
+  const [cancelling, setCancelling] = useState<WalletMovement | null>(null);
   return (
     <Card>
       <CardHeader>
@@ -159,7 +226,25 @@ export function MovementsCard({
       </CardHeader>
       <CardContent className="px-0">
         <QueryState query={movements} skeletonClassName="h-32">
-          {(data) => <MovementsBody data={data} page={page} onPage={onPage} />}
+          {(data) => (
+            <>
+              <MovementsBody
+                data={data}
+                page={page}
+                canRequest={canRequest}
+                onPage={onPage}
+                onCancel={setCancelling}
+              />
+              <CancelTopUpDialog
+                walletId={walletId}
+                movement={cancelling}
+                currency={data.currency}
+                onClose={() => {
+                  setCancelling(null);
+                }}
+              />
+            </>
+          )}
         </QueryState>
       </CardContent>
     </Card>

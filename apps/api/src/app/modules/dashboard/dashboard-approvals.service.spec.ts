@@ -23,7 +23,12 @@ const summaryOf = (
 ): ApprovalSummary => ({
   currency: 'NGN',
   waitingForMe,
-  byNav: { approvals: waitingForMe, payments: waitingForMe, store: 0 },
+  byNav: {
+    approvals: waitingForMe,
+    payments: waitingForMe,
+    store: 0,
+    wallets: 0,
+  },
   preview,
 });
 

@@ -112,6 +112,15 @@ describe('describeMovement', () => {
     );
   });
 
+  it('names a wallet refund and a cancelled top-up', () => {
+    expect(describeMovement({ ...base, kind: 'wallet_refund' }, 'paid')).toBe(
+      'Wallet refund'
+    );
+    expect(
+      describeMovement({ ...base, kind: 'wallet_topup_void' }, 'paid')
+    ).toBe('Wallet top-up cancelled');
+  });
+
   it('writes opening balances and adjustments from their memo', () => {
     expect(
       describeMovement(

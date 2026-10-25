@@ -18,6 +18,12 @@ describe('isReservedReference', () => {
     expect(isReservedReference(' mnfy|20|20261024120000|000001')).toBe(true);
   });
 
+  it('refuses the references a wallet refund and a top-up cancellation post under', () => {
+    expect(isReservedReference('WRF-WRQ-20261026-ABCDEF')).toBe(true);
+    expect(isReservedReference('wtc-WTQ-20261026-ABCDEF')).toBe(true);
+    expect(isReservedReference('WRQ-20261026-ABCDEF')).toBe(false);
+  });
+
   it('ignores case and surrounding spaces', () => {
     expect(isReservedReference('  adj-2026-0001 ')).toBe(true);
     expect(isReservedReference('Void-CSH-20261007-ABCDEF')).toBe(true);

@@ -11,6 +11,8 @@ export const SYSTEM_REFERENCE_PREFIXES = {
   opening: 'OPEN',
   monnify: 'MNFY',
   autopay: 'AUTOPAY',
+  wallet_refund: 'WRF',
+  wallet_cancellation: 'WTC',
 } as const;
 
 export type SystemReferenceKind = keyof typeof SYSTEM_REFERENCE_PREFIXES;

@@ -938,7 +938,7 @@ CREATE TABLE public.file_object (
     uploaded_by text,
     uploaded_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT file_object_byte_size_check CHECK ((byte_size > 0)),
-    CONSTRAINT file_object_kind_check CHECK ((kind = ANY (ARRAY['school_logo'::text, 'guardian_photo'::text, 'payment_proof'::text, 'wallet_proof'::text])))
+    CONSTRAINT file_object_kind_check CHECK ((kind = ANY (ARRAY['school_logo'::text, 'guardian_photo'::text, 'payment_proof'::text, 'wallet_proof'::text, 'wallet_refund_request'::text])))
 );
 
 --
@@ -1158,7 +1158,7 @@ CREATE TABLE public.journal_entry (
     posted_by text,
     memo text,
     reverses_entry_id uuid,
-    CONSTRAINT journal_entry_kind_check CHECK ((kind = ANY (ARRAY['invoice'::text, 'adhoc'::text, 'payment'::text, 'payment_void'::text, 'adjustment'::text, 'opening'::text, 'store'::text, 'store_receive'::text, 'store_cost'::text, 'store_count'::text, 'wallet_topup'::text, 'wallet_spend'::text]))),
+    CONSTRAINT journal_entry_kind_check CHECK ((kind = ANY (ARRAY['invoice'::text, 'adhoc'::text, 'payment'::text, 'payment_void'::text, 'adjustment'::text, 'opening'::text, 'store'::text, 'store_receive'::text, 'store_cost'::text, 'store_count'::text, 'wallet_topup'::text, 'wallet_spend'::text, 'wallet_refund'::text, 'wallet_topup_void'::text]))),
     CONSTRAINT journal_entry_memo_check CHECK ((char_length(memo) <= 500)),
     CONSTRAINT journal_entry_reference_check CHECK ((char_length(btrim(reference)) > 0))
 );
@@ -1960,6 +1960,42 @@ CREATE TABLE public.wallet_earmark (
 );
 
 --
+-- Name: wallet_refund; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.wallet_refund (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id text NOT NULL,
+    wallet_id uuid NOT NULL,
+    money_account_id uuid NOT NULL,
+    amount_minor bigint NOT NULL,
+    parent_email text NOT NULL,
+    reason text NOT NULL,
+    proof_file_id uuid NOT NULL,
+    reference text NOT NULL,
+    request_hash text NOT NULL,
+    payout_reference text,
+    status text DEFAULT 'submitted'::text NOT NULL,
+    created_by text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    approved_by text,
+    approved_at timestamp with time zone,
+    rejected_by text,
+    rejected_at timestamp with time zone,
+    rejection_reason text,
+    journal_entry_id uuid,
+    CONSTRAINT wallet_refund_amount_minor_check CHECK ((amount_minor > 0)),
+    CONSTRAINT wallet_refund_approved_columns CHECK (((status = 'approved'::text) = ((approved_at IS NOT NULL) AND (payout_reference IS NOT NULL) AND (journal_entry_id IS NOT NULL)))),
+    CONSTRAINT wallet_refund_parent_email_check CHECK (((char_length(btrim(parent_email)) >= 3) AND (char_length(btrim(parent_email)) <= 200))),
+    CONSTRAINT wallet_refund_payout_reference_check CHECK (((char_length(btrim(payout_reference)) >= 1) AND (char_length(btrim(payout_reference)) <= 80))),
+    CONSTRAINT wallet_refund_reason_check CHECK (((char_length(btrim(reason)) >= 1) AND (char_length(btrim(reason)) <= 500))),
+    CONSTRAINT wallet_refund_reference_check CHECK (((char_length(btrim(reference)) >= 1) AND (char_length(btrim(reference)) <= 80))),
+    CONSTRAINT wallet_refund_rejected_columns CHECK (((status = 'rejected'::text) = ((rejected_at IS NOT NULL) AND (rejected_by IS NOT NULL) AND (rejection_reason IS NOT NULL)))),
+    CONSTRAINT wallet_refund_rejection_reason_check CHECK (((char_length(btrim(rejection_reason)) >= 1) AND (char_length(btrim(rejection_reason)) <= 500))),
+    CONSTRAINT wallet_refund_status_check CHECK ((status = ANY (ARRAY['submitted'::text, 'approved'::text, 'rejected'::text])))
+);
+
+--
 -- Name: wallet_reserved_account; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2017,6 +2053,34 @@ CREATE TABLE public.wallet_topup (
     CONSTRAINT wallet_topup_depositor_name_check CHECK (((char_length(btrim(depositor_name)) >= 1) AND (char_length(btrim(depositor_name)) <= 120))),
     CONSTRAINT wallet_topup_method_check CHECK ((method = ANY (ARRAY['cash'::text, 'transfer'::text, 'pos'::text]))),
     CONSTRAINT wallet_topup_reference_check CHECK (((char_length(btrim(reference)) >= 1) AND (char_length(btrim(reference)) <= 80)))
+);
+
+--
+-- Name: wallet_topup_cancellation; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.wallet_topup_cancellation (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id text NOT NULL,
+    wallet_topup_id uuid NOT NULL,
+    reason text NOT NULL,
+    reference text NOT NULL,
+    request_hash text NOT NULL,
+    status text DEFAULT 'submitted'::text NOT NULL,
+    created_by text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    approved_by text,
+    approved_at timestamp with time zone,
+    rejected_by text,
+    rejected_at timestamp with time zone,
+    rejection_reason text,
+    journal_entry_id uuid,
+    CONSTRAINT wallet_topup_cancellation_approved_columns CHECK (((status = 'approved'::text) = ((approved_at IS NOT NULL) AND (journal_entry_id IS NOT NULL)))),
+    CONSTRAINT wallet_topup_cancellation_reason_check CHECK (((char_length(btrim(reason)) >= 1) AND (char_length(btrim(reason)) <= 500))),
+    CONSTRAINT wallet_topup_cancellation_reference_check CHECK (((char_length(btrim(reference)) >= 1) AND (char_length(btrim(reference)) <= 80))),
+    CONSTRAINT wallet_topup_cancellation_rejected_columns CHECK (((status = 'rejected'::text) = ((rejected_at IS NOT NULL) AND (rejected_by IS NOT NULL) AND (rejection_reason IS NOT NULL)))),
+    CONSTRAINT wallet_topup_cancellation_rejection_reason_check CHECK (((char_length(btrim(rejection_reason)) >= 1) AND (char_length(btrim(rejection_reason)) <= 500))),
+    CONSTRAINT wallet_topup_cancellation_status_check CHECK ((status = ANY (ARRAY['submitted'::text, 'approved'::text, 'rejected'::text])))
 );
 
 --
@@ -3133,6 +3197,34 @@ ALTER TABLE ONLY public.wallet
     ADD CONSTRAINT wallet_pkey PRIMARY KEY (id);
 
 --
+-- Name: wallet_refund wallet_refund_id_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wallet_refund
+    ADD CONSTRAINT wallet_refund_id_organization_id_key UNIQUE (id, organization_id);
+
+--
+-- Name: wallet_refund wallet_refund_organization_id_reference_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wallet_refund
+    ADD CONSTRAINT wallet_refund_organization_id_reference_key UNIQUE (organization_id, reference);
+
+--
+-- Name: wallet_refund wallet_refund_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wallet_refund
+    ADD CONSTRAINT wallet_refund_pkey PRIMARY KEY (id);
+
+--
+-- Name: wallet_refund wallet_refund_proof_file_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wallet_refund
+    ADD CONSTRAINT wallet_refund_proof_file_id_key UNIQUE (proof_file_id);
+
+--
 -- Name: wallet_reserved_account wallet_reserved_account_id_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3194,6 +3286,27 @@ ALTER TABLE ONLY public.wallet_spend
 
 ALTER TABLE ONLY public.wallet_spend
     ADD CONSTRAINT wallet_spend_pkey PRIMARY KEY (id);
+
+--
+-- Name: wallet_topup_cancellation wallet_topup_cancellation_id_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wallet_topup_cancellation
+    ADD CONSTRAINT wallet_topup_cancellation_id_organization_id_key UNIQUE (id, organization_id);
+
+--
+-- Name: wallet_topup_cancellation wallet_topup_cancellation_organization_id_reference_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wallet_topup_cancellation
+    ADD CONSTRAINT wallet_topup_cancellation_organization_id_reference_key UNIQUE (organization_id, reference);
+
+--
+-- Name: wallet_topup_cancellation wallet_topup_cancellation_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wallet_topup_cancellation
+    ADD CONSTRAINT wallet_topup_cancellation_pkey PRIMARY KEY (id);
 
 --
 -- Name: wallet_topup wallet_topup_id_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
@@ -3855,10 +3968,64 @@ CREATE INDEX wallet_auto_pay_setting_latest_idx ON public.wallet_auto_pay_settin
 CREATE INDEX wallet_earmark_wallet_idx ON public.wallet_earmark USING btree (organization_id, wallet_id, student_id);
 
 --
+-- Name: wallet_refund_journal_entry_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX wallet_refund_journal_entry_key ON public.wallet_refund USING btree (journal_entry_id) WHERE (journal_entry_id IS NOT NULL);
+
+--
+-- Name: wallet_refund_listing_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX wallet_refund_listing_idx ON public.wallet_refund USING btree (organization_id, created_at DESC);
+
+--
+-- Name: wallet_refund_payout_reference_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX wallet_refund_payout_reference_key ON public.wallet_refund USING btree (organization_id, payout_reference) WHERE (payout_reference IS NOT NULL);
+
+--
+-- Name: wallet_refund_waiting_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX wallet_refund_waiting_idx ON public.wallet_refund USING btree (organization_id, status) WHERE (status = 'submitted'::text);
+
+--
+-- Name: wallet_refund_wallet_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX wallet_refund_wallet_idx ON public.wallet_refund USING btree (organization_id, wallet_id, status);
+
+--
 -- Name: wallet_spend_wallet_idx; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX wallet_spend_wallet_idx ON public.wallet_spend USING btree (organization_id, wallet_id, created_at DESC);
+
+--
+-- Name: wallet_topup_cancellation_journal_entry_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX wallet_topup_cancellation_journal_entry_key ON public.wallet_topup_cancellation USING btree (journal_entry_id) WHERE (journal_entry_id IS NOT NULL);
+
+--
+-- Name: wallet_topup_cancellation_listing_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX wallet_topup_cancellation_listing_idx ON public.wallet_topup_cancellation USING btree (organization_id, created_at DESC);
+
+--
+-- Name: wallet_topup_cancellation_open_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX wallet_topup_cancellation_open_key ON public.wallet_topup_cancellation USING btree (wallet_topup_id) WHERE (status = ANY (ARRAY['submitted'::text, 'approved'::text]));
+
+--
+-- Name: wallet_topup_cancellation_waiting_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX wallet_topup_cancellation_waiting_idx ON public.wallet_topup_cancellation USING btree (organization_id, status) WHERE (status = 'submitted'::text);
 
 --
 -- Name: wallet_topup_wallet_idx; Type: INDEX; Schema: public; Owner: -
@@ -4077,6 +4244,12 @@ CREATE TRIGGER wallet_auto_pay_setting_append_only BEFORE DELETE OR UPDATE ON pu
 CREATE TRIGGER wallet_earmark_append_only BEFORE DELETE OR UPDATE ON public.wallet_earmark FOR EACH ROW EXECUTE FUNCTION public.wallet_append_only();
 
 --
+-- Name: wallet_refund wallet_refund_immutable; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER wallet_refund_immutable BEFORE DELETE OR UPDATE ON public.wallet_refund FOR EACH ROW EXECUTE FUNCTION public.approval_record_immutable();
+
+--
 -- Name: wallet_reserved_account wallet_reserved_account_append_only; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -4093,6 +4266,12 @@ CREATE TRIGGER wallet_spend_append_only BEFORE DELETE OR UPDATE ON public.wallet
 --
 
 CREATE TRIGGER wallet_topup_append_only BEFORE DELETE OR UPDATE ON public.wallet_topup FOR EACH ROW EXECUTE FUNCTION public.wallet_append_only();
+
+--
+-- Name: wallet_topup_cancellation wallet_topup_cancellation_immutable; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER wallet_topup_cancellation_immutable BEFORE DELETE OR UPDATE ON public.wallet_topup_cancellation FOR EACH ROW EXECUTE FUNCTION public.approval_record_immutable();
 
 --
 -- Name: academic_session academic_session_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -5635,6 +5814,62 @@ ALTER TABLE ONLY public.wallet
     ADD CONSTRAINT wallet_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE RESTRICT;
 
 --
+-- Name: wallet_refund wallet_refund_approved_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wallet_refund
+    ADD CONSTRAINT wallet_refund_approved_by_fkey FOREIGN KEY (approved_by) REFERENCES public."user"(id) ON DELETE SET NULL;
+
+--
+-- Name: wallet_refund wallet_refund_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wallet_refund
+    ADD CONSTRAINT wallet_refund_created_by_fkey FOREIGN KEY (created_by) REFERENCES public."user"(id) ON DELETE SET NULL;
+
+--
+-- Name: wallet_refund wallet_refund_journal_entry_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wallet_refund
+    ADD CONSTRAINT wallet_refund_journal_entry_id_organization_id_fkey FOREIGN KEY (journal_entry_id, organization_id) REFERENCES public.journal_entry(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: wallet_refund wallet_refund_money_account_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wallet_refund
+    ADD CONSTRAINT wallet_refund_money_account_id_organization_id_fkey FOREIGN KEY (money_account_id, organization_id) REFERENCES public.money_account(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: wallet_refund wallet_refund_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wallet_refund
+    ADD CONSTRAINT wallet_refund_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE RESTRICT;
+
+--
+-- Name: wallet_refund wallet_refund_proof_file_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wallet_refund
+    ADD CONSTRAINT wallet_refund_proof_file_id_organization_id_fkey FOREIGN KEY (proof_file_id, organization_id) REFERENCES public.file_object(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: wallet_refund wallet_refund_rejected_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wallet_refund
+    ADD CONSTRAINT wallet_refund_rejected_by_fkey FOREIGN KEY (rejected_by) REFERENCES public."user"(id) ON DELETE SET NULL;
+
+--
+-- Name: wallet_refund wallet_refund_wallet_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wallet_refund
+    ADD CONSTRAINT wallet_refund_wallet_id_organization_id_fkey FOREIGN KEY (wallet_id, organization_id) REFERENCES public.wallet(id, organization_id) ON DELETE RESTRICT;
+
+--
 -- Name: wallet_reserved_account wallet_reserved_account_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -5675,6 +5910,48 @@ ALTER TABLE ONLY public.wallet_spend
 
 ALTER TABLE ONLY public.wallet_spend
     ADD CONSTRAINT wallet_spend_wallet_id_organization_id_fkey FOREIGN KEY (wallet_id, organization_id) REFERENCES public.wallet(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: wallet_topup_cancellation wallet_topup_cancellation_approved_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wallet_topup_cancellation
+    ADD CONSTRAINT wallet_topup_cancellation_approved_by_fkey FOREIGN KEY (approved_by) REFERENCES public."user"(id) ON DELETE SET NULL;
+
+--
+-- Name: wallet_topup_cancellation wallet_topup_cancellation_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wallet_topup_cancellation
+    ADD CONSTRAINT wallet_topup_cancellation_created_by_fkey FOREIGN KEY (created_by) REFERENCES public."user"(id) ON DELETE SET NULL;
+
+--
+-- Name: wallet_topup_cancellation wallet_topup_cancellation_journal_entry_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wallet_topup_cancellation
+    ADD CONSTRAINT wallet_topup_cancellation_journal_entry_id_organization_id_fkey FOREIGN KEY (journal_entry_id, organization_id) REFERENCES public.journal_entry(id, organization_id) ON DELETE RESTRICT;
+
+--
+-- Name: wallet_topup_cancellation wallet_topup_cancellation_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wallet_topup_cancellation
+    ADD CONSTRAINT wallet_topup_cancellation_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id) ON DELETE RESTRICT;
+
+--
+-- Name: wallet_topup_cancellation wallet_topup_cancellation_rejected_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wallet_topup_cancellation
+    ADD CONSTRAINT wallet_topup_cancellation_rejected_by_fkey FOREIGN KEY (rejected_by) REFERENCES public."user"(id) ON DELETE SET NULL;
+
+--
+-- Name: wallet_topup_cancellation wallet_topup_cancellation_wallet_topup_id_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wallet_topup_cancellation
+    ADD CONSTRAINT wallet_topup_cancellation_wallet_topup_id_organization_id_fkey FOREIGN KEY (wallet_topup_id, organization_id) REFERENCES public.wallet_topup(id, organization_id) ON DELETE RESTRICT;
 
 --
 -- Name: wallet_topup wallet_topup_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -5764,4 +6041,5 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20261022130000'),
     ('20261023090000'),
     ('20261024120000'),
-    ('20261025090000');
+    ('20261025090000'),
+    ('20261026090000');

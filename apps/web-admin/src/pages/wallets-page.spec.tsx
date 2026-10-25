@@ -4,7 +4,11 @@ import { starterAccess } from '../test-utils';
 import {
   OTHER_GUARDIAN_ID,
   OTHER_WALLET_ID,
+  WALLET_ID,
+  cancellationRequest,
+  refundRequest,
   renderWallets,
+  requestList,
   walletList,
   walletSummary,
 } from '../test-wallets';
@@ -13,12 +17,16 @@ import { WalletsPage } from './wallets-page';
 function setup(
   options: {
     list?: ReturnType<typeof walletList>;
+    requests?: ReturnType<typeof requestList>;
     search?: Parameters<typeof WalletsPage>[0]['search'];
     access?: ReturnType<typeof starterAccess>;
   } = {}
 ) {
   const api = {
     wallets: { list: vi.fn().mockResolvedValue(options.list ?? walletList()) },
+    walletRequests: {
+      list: vi.fn().mockResolvedValue(options.requests ?? requestList()),
+    },
   };
   const onSearchChange = vi.fn();
   renderWallets(
@@ -133,5 +141,113 @@ describe('WalletsPage', () => {
   it('shows a bursar the same list', async () => {
     setup({ access: starterAccess('bursar') });
     expect(await screen.findByText('Ngozi Okeke')).toBeInTheDocument();
+  });
+
+  it('shows held money in the summary line only when some is held', async () => {
+    setup({
+      list: walletList([
+        walletSummary({ heldMinor: 1_500_000, freeMinor: 2_500_000 }),
+      ]),
+    });
+    expect(
+      await screen.findByText(
+        '1 wallet · ₦50,000.00 held · ₦10,000.00 set aside · ₦15,000.00 held for requests · ₦25,000.00 free to use'
+      )
+    ).toBeInTheDocument();
+  });
+});
+
+describe('WalletsPage requests', () => {
+  it('badges the Requests tab with the requests waiting for a decision', async () => {
+    setup();
+    expect(
+      await screen.findByRole('tab', { name: /^Requests\s*2$/ })
+    ).toBeVisible();
+    expect(screen.getByRole('tab', { name: 'Wallets' })).toBeVisible();
+  });
+
+  it('shows no badge when nothing waits', async () => {
+    setup({
+      requests: requestList([refundRequest({ status: 'approved' })], {
+        waitingCount: 0,
+      }),
+    });
+    expect(await screen.findByRole('tab', { name: 'Requests' })).toBeVisible();
+  });
+
+  it('opens on the Requests tab and lists both kinds with who asked and where they stand', async () => {
+    setup({ search: { tab: 'requests' } });
+    const cancel = await screen.findByRole('row', { name: /Cancel a top-up/ });
+    expect(
+      within(cancel).getByText('Top-up CSH-20261007-K3Q7ZA')
+    ).toBeVisible();
+    expect(within(cancel).getByText('₦50,000')).toBeVisible();
+    expect(within(cancel).getByText('Chika Eze')).toBeVisible();
+    expect(within(cancel).getByText('Waiting')).toBeVisible();
+    const refund = screen.getByRole('row', { name: /Wallet refund/ });
+    expect(within(refund).getByText('To ngozi@example.com')).toBeVisible();
+    expect(within(refund).getByText('₦15,000')).toBeVisible();
+    expect(
+      within(refund).getByRole('link', { name: 'Ngozi Okeke' })
+    ).toHaveAttribute('href', `/finance/wallets/${WALLET_ID}`);
+    expect(
+      within(refund).getByRole('link', { name: 'See in Approvals' })
+    ).toHaveAttribute('href', '/approvals');
+  });
+
+  it('shows a decided request with its decision and no link to Approvals', async () => {
+    setup({
+      search: { tab: 'requests' },
+      requests: requestList(
+        [
+          refundRequest({
+            status: 'approved',
+            decidedBy: 'Adaeze Obi',
+            payoutReference: 'NIP-8841',
+          }),
+          cancellationRequest({
+            status: 'rejected',
+            rejectionReason: 'Spent already',
+          }),
+        ],
+        { waitingCount: 0 }
+      ),
+    });
+    const cancel = await screen.findByRole('row', { name: /Cancel a top-up/ });
+    expect(within(cancel).getByText('Declined: Spent already')).toBeVisible();
+    expect(
+      within(cancel).queryByRole('link', { name: 'See in Approvals' })
+    ).toBeNull();
+    expect(
+      within(screen.getByRole('row', { name: /Wallet refund/ })).getByText(
+        'Approved'
+      )
+    ).toBeVisible();
+  });
+
+  it('says there are no requests yet', async () => {
+    setup({
+      search: { tab: 'requests' },
+      requests: requestList([], { waitingCount: 0 }),
+    });
+    expect(await screen.findByText('No requests yet')).toBeVisible();
+  });
+
+  it('switches tabs through the search and back', async () => {
+    const { onSearchChange } = setup();
+    await user.click(await screen.findByRole('tab', { name: /^Requests/ }));
+    expect(onSearchChange).toHaveBeenCalledWith({
+      tab: 'requests',
+      q: undefined,
+    });
+  });
+
+  it('pages the requests', async () => {
+    const { onSearchChange } = setup({
+      search: { tab: 'requests' },
+      requests: requestList([refundRequest()], { total: 25 }),
+    });
+    await user.click(await screen.findByRole('button', { name: 'Page 2' }));
+    expect(onSearchChange).toHaveBeenCalledWith({ tab: 'requests', page: 2 });
   });
 });

@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { PlusIcon } from 'lucide-react';
+import { PlusIcon, Undo2Icon } from 'lucide-react';
 import type { Wallet } from '@eduvault/api-contract';
 import { useCan } from '@eduvault/auth-client';
 import { Button } from '@eduvault/ui';
@@ -14,6 +14,7 @@ import { ReservedAccountCard } from '../components/wallets/reserved-account-card
 import { ChildrenCard } from '../components/wallets/wallet-children-card';
 import { WalletsLink } from '../components/wallets/wallet-links';
 import { MovementsCard } from '../components/wallets/wallet-movements-card';
+import { RefundSheet } from '../components/wallets/refund-sheet';
 import { TopUpSheet } from '../components/wallets/top-up-sheet';
 import { walletQueryOptions } from '../queries';
 import type { WalletSearch } from '../wallets-search';
@@ -42,23 +43,34 @@ function WalletNotFound() {
 function WalletHeader({
   wallet,
   onTopUp,
+  onRefund,
 }: {
   wallet: Wallet;
   onTopUp: () => void;
+  onRefund: () => void;
 }) {
   const canTopUp = useCan('wallet', 'topUp');
+  const canRefund = useCan('wallet', 'requestRefund');
   return (
     <header className="flex flex-wrap items-start justify-between gap-3">
       <div className="flex flex-col gap-1">
         <h1>{wallet.guardian.name}</h1>
         <p className="text-sm text-muted-foreground">{wallet.guardian.phone}</p>
       </div>
-      {canTopUp ? (
-        <Button type="button" onClick={onTopUp}>
-          <PlusIcon />
-          Record top-up
-        </Button>
-      ) : null}
+      <div className="flex flex-wrap gap-2">
+        {canRefund ? (
+          <Button type="button" variant="outline" onClick={onRefund}>
+            <Undo2Icon />
+            Request refund
+          </Button>
+        ) : null}
+        {canTopUp ? (
+          <Button type="button" onClick={onTopUp}>
+            <PlusIcon />
+            Record top-up
+          </Button>
+        ) : null}
+      </div>
     </header>
   );
 }
@@ -73,8 +85,12 @@ function WalletBody({
   onSearchChange: (next: WalletSearch) => void;
 }) {
   const canTopUp = useCan('wallet', 'topUp');
+  const canRefund = useCan('wallet', 'requestRefund');
   const setTopUp = (open: boolean) => {
     onSearchChange({ ...search, topup: open ? 1 : undefined });
+  };
+  const setRefund = (open: boolean) => {
+    onSearchChange({ ...search, refund: open ? 1 : undefined });
   };
   return (
     <section className="flex flex-col gap-4">
@@ -83,6 +99,9 @@ function WalletBody({
         wallet={wallet}
         onTopUp={() => {
           setTopUp(true);
+        }}
+        onRefund={() => {
+          setRefund(true);
         }}
       />
       <BalanceCards wallet={wallet} />
@@ -100,6 +119,13 @@ function WalletBody({
           wallet={wallet}
           open={search.topup === 1}
           onOpenChange={setTopUp}
+        />
+      ) : null}
+      {canRefund ? (
+        <RefundSheet
+          wallet={wallet}
+          open={search.refund === 1}
+          onOpenChange={setRefund}
         />
       ) : null}
     </section>
