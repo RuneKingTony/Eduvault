@@ -21,6 +21,15 @@ import {
   openStock,
   submitCount,
 } from './support/factories/store';
+import {
+  approveCancellationRequest,
+  approveRefundRequest,
+  cashAccount,
+  requestCancellation,
+  requestRefund,
+  topUpWallet,
+  walletIdOf,
+} from './support/factories/wallets';
 import { schoolsTest as test } from './support/two-schools';
 
 const OWED = 1_200_000;
@@ -133,7 +142,7 @@ test.describe('the approvals queue', () => {
 
     expect(asApprover).toMatchObject({
       waitingForMe: 2,
-      byNav: { approvals: 2, payments: 2, store: 0 },
+      byNav: { approvals: 2, payments: 2, store: 0, wallets: 0 },
     });
     expect(asApprover.preview).toHaveLength(2);
     expect(asOwner.waitingForMe).toBe(3);
@@ -198,11 +207,11 @@ test.describe('the approvals queue', () => {
     expect(forChika.items[0]).toMatchObject({ decide: 'own' });
     expect(ownerSummary).toMatchObject({
       waitingForMe: 1,
-      byNav: { approvals: 1, payments: 0, store: 1 },
+      byNav: { approvals: 1, payments: 0, store: 1, wallets: 0 },
     });
     expect(chikaSummary).toMatchObject({
       waitingForMe: 0,
-      byNav: { approvals: 0, payments: 0, store: 0 },
+      byNav: { approvals: 0, payments: 0, store: 0, wallets: 0 },
     });
     expect((await summary(api, lekkiOnly)).waitingForMe).toBe(0);
     expect(
@@ -224,6 +233,7 @@ test.describe('the approvals queue', () => {
       approvals: 0,
       payments: 0,
       store: 0,
+      wallets: 0,
     });
   });
 
@@ -923,7 +933,7 @@ test.describe('the campus picker', () => {
     ]);
     expect(await summary(api, owner)).toMatchObject({
       waitingForMe: 2,
-      byNav: { approvals: 2, payments: 2, store: 0 },
+      byNav: { approvals: 2, payments: 2, store: 0, wallets: 0 },
     });
   });
 
@@ -992,5 +1002,129 @@ test.describe('the campus picker', () => {
       items: [],
       total: 0,
     });
+  });
+});
+
+test.describe('wallet requests in the queue', () => {
+  test('wait for the wallet approver on every campus the family has a child on, count on Wallets and leave the payment approvers alone', async ({
+    api,
+    app,
+    pool,
+    withPermissions,
+    schools: { owner, orgA, studentLekki, studentIkeja, lekkiOnly },
+  }) => {
+    const guardian = (student: typeof studentLekki) =>
+      student.logins.find((login) => login.who === 'guardian')?.guardianId ??
+      '';
+    const lekkiWallet = await walletIdOf(pool, guardian(studentLekki));
+    const ikejaWallet = await walletIdOf(pool, guardian(studentIkeja));
+    const cash = await cashAccount(app, owner);
+    const bank = await bankAccount(app, owner);
+    const topUp = await topUpWallet(api, owner, {
+      walletId: lekkiWallet,
+      accountId: cash.id,
+    });
+    await topUpWallet(api, owner, {
+      walletId: ikejaWallet,
+      accountId: cash.id,
+    });
+    const wallets = await withPermissions(orgA, [
+      'wallet:read',
+      'wallet:approveRefund',
+      'campus:readAll',
+    ]);
+    const paymentApprover = await withPermissions(orgA, [
+      'adjustment:read',
+      'adjustment:approve',
+      'campus:readAll',
+    ]);
+    await requestCancellation(api, owner, {
+      walletId: lekkiWallet,
+      topUpId: topUp.id,
+    });
+    const refund = await requestRefund(api, owner, {
+      walletId: ikejaWallet,
+      accountId: bank.id,
+      amountMinor: 1_000_000,
+    });
+
+    const asWallets = await queue(api, wallets);
+    expect(
+      asWallets.items.map((item) => [item.kind, item.label, item.decide])
+    ).toEqual([
+      ['wallet_topup_cancellation', 'Cancel a top-up', 'yes'],
+      ['wallet_refund', 'Wallet refund', 'yes'],
+    ]);
+    expect(asWallets.items[1]).toMatchObject({
+      id: refund.request.id,
+      amountMinor: 1_000_000,
+      details: expect.stringContaining('Refund to') as string,
+      campusId: expect.any(String) as string,
+    });
+    expect((await summary(api, wallets)).byNav).toEqual({
+      approvals: 2,
+      payments: 0,
+      store: 0,
+      wallets: 2,
+    });
+    expect((await queue(api, paymentApprover)).total).toBe(0);
+    expect((await summary(api, paymentApprover)).waitingForMe).toBe(0);
+    const onLekki = (await queue(api, lekkiOnly)).items;
+    expect(onLekki).toEqual([]);
+
+    await approveRefundRequest(api, wallets, { id: refund.request.id });
+    expect((await queue(api, wallets)).total).toBe(1);
+    expect((await summary(api, wallets)).byNav.wallets).toBe(1);
+  });
+
+  test('show the others’ requests to a reader of wallets who cannot decide them, and their own as theirs', async ({
+    api,
+    app,
+    pool,
+    withPermissions,
+    schools: { owner, orgA, studentLekki },
+  }) => {
+    const walletId = await walletIdOf(
+      pool,
+      studentLekki.logins.find((login) => login.who === 'guardian')
+        ?.guardianId ?? ''
+    );
+    const cash = await cashAccount(app, owner);
+    const topUp = await topUpWallet(api, owner, {
+      walletId,
+      accountId: cash.id,
+    });
+    const reader = await withPermissions(orgA, [
+      'wallet:read',
+      'leave:approve',
+      'campus:readAll',
+    ]);
+    const approver = await withPermissions(orgA, [
+      'wallet:read',
+      'wallet:requestRefund',
+      'wallet:approveRefund',
+      'campus:readAll',
+    ]);
+    await requestCancellation(api, approver, { walletId, topUpId: topUp.id });
+
+    const others = await api(reader)
+      .get('/approvals?includeOthers=true')
+      .expect(200);
+    expect(
+      (others.body as ApprovalList).items.map((item) => [
+        item.kind,
+        item.decide,
+      ])
+    ).toEqual([['wallet_topup_cancellation', 'other']]);
+    expect((await queue(api, reader)).total).toBe(0);
+    const own = await queue(api, approver);
+    expect(own.items.map((item) => [item.kind, item.decide])).toEqual([
+      ['wallet_topup_cancellation', 'own'],
+    ]);
+    expect(own.othersCount).toBe(0);
+
+    await approveCancellationRequest(api, owner, own.items[0]?.id ?? '');
+    expect((await queue(api, approver)).total).toBe(0);
+    expect((await queue(api, reader)).total).toBe(0);
   });
 });

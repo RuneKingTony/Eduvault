@@ -26,7 +26,9 @@ type FinanceSubject =
   | 'invoice'
   | 'wallet_topup'
   | 'gateway_topup'
-  | 'wallet_spend';
+  | 'wallet_spend'
+  | 'wallet_refund'
+  | 'wallet_topup_cancellation';
 
 export interface FinanceActor {
   organizationId: string;
@@ -127,6 +129,14 @@ interface WalletSpendFacts {
   id: string;
   walletId: string;
   guardianName: string;
+}
+
+export interface WalletRequestFacts {
+  id: string;
+  walletId: string;
+  guardianName: string;
+  amountMinor: number;
+  campusIds: readonly string[];
 }
 
 export const financeActor = (
@@ -811,3 +821,96 @@ export function walletSpentActivity(
     })
   );
 }
+
+interface WalletRequestRow {
+  kind: string;
+  subject: 'wallet_refund' | 'wallet_topup_cancellation';
+  text: string;
+  data?: Record<string, unknown>;
+}
+
+const walletRequestActivity = (
+  actor: FinanceActor,
+  request: WalletRequestFacts,
+  row: WalletRequestRow
+): ActivityInput[] =>
+  request.campusIds.map((campusId) =>
+    finance(actor, {
+      campusId,
+      kind: row.kind,
+      subject: { type: row.subject, id: request.id },
+      text: row.text,
+      data: {
+        requestId: request.id,
+        walletId: request.walletId,
+        amountMinor: request.amountMinor,
+        ...row.data,
+      },
+    })
+  );
+
+export const walletRefundRequestedActivity = (
+  actor: FinanceActor,
+  refund: WalletRequestFacts
+): ActivityInput[] =>
+  walletRequestActivity(actor, refund, {
+    kind: 'wallet.refund_requested',
+    subject: 'wallet_refund',
+    text: `${actor.name} asked for ${money(refund.amountMinor, actor.currency)} to be refunded from ${refund.guardianName}’s wallet.`,
+  });
+
+export const walletRefundedActivity = (
+  actor: FinanceActor,
+  refund: WalletRequestFacts,
+  { ownRequest = false }: { ownRequest?: boolean }
+): ActivityInput[] =>
+  walletRequestActivity(actor, refund, {
+    kind: 'wallet.refunded',
+    subject: 'wallet_refund',
+    text: `${money(refund.amountMinor, actor.currency)} was refunded from ${refund.guardianName}’s wallet, approved by ${actor.name}${ownNote(ownRequest)}.`,
+    data: { ownRequest },
+  });
+
+export const walletRefundDeclinedActivity = (
+  actor: FinanceActor,
+  refund: WalletRequestFacts,
+  declined: { reason: string }
+): ActivityInput[] =>
+  walletRequestActivity(actor, refund, {
+    kind: 'wallet.refund_declined',
+    subject: 'wallet_refund',
+    text: `The ${money(refund.amountMinor, actor.currency)} refund from ${refund.guardianName}’s wallet was declined: ${declined.reason}`,
+  });
+
+export const walletTopUpCancelRequestedActivity = (
+  actor: FinanceActor,
+  cancellation: WalletRequestFacts
+): ActivityInput[] =>
+  walletRequestActivity(actor, cancellation, {
+    kind: 'wallet.topup_cancel_requested',
+    subject: 'wallet_topup_cancellation',
+    text: `${actor.name} asked to cancel a ${money(cancellation.amountMinor, actor.currency)} top-up of ${cancellation.guardianName}’s wallet.`,
+  });
+
+export const walletTopUpCancelledActivity = (
+  actor: FinanceActor,
+  cancellation: WalletRequestFacts,
+  { ownRequest = false }: { ownRequest?: boolean }
+): ActivityInput[] =>
+  walletRequestActivity(actor, cancellation, {
+    kind: 'wallet.topup_cancelled',
+    subject: 'wallet_topup_cancellation',
+    text: `A ${money(cancellation.amountMinor, actor.currency)} top-up of ${cancellation.guardianName}’s wallet was cancelled, approved by ${actor.name}${ownNote(ownRequest)}.`,
+    data: { ownRequest },
+  });
+
+export const walletTopUpCancelDeclinedActivity = (
+  actor: FinanceActor,
+  cancellation: WalletRequestFacts,
+  declined: { reason: string }
+): ActivityInput[] =>
+  walletRequestActivity(actor, cancellation, {
+    kind: 'wallet.topup_cancel_declined',
+    subject: 'wallet_topup_cancellation',
+    text: `Cancelling the ${money(cancellation.amountMinor, actor.currency)} top-up of ${cancellation.guardianName}’s wallet was declined: ${declined.reason}`,
+  });

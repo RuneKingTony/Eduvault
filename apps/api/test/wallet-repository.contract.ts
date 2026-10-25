@@ -1,5 +1,7 @@
 import type {
+  NewCancellationRequest,
   NewEarmark,
+  NewRefundRequest,
   NewSpend,
   NewTopUp,
   WalletRepository,
@@ -19,6 +21,9 @@ export interface WalletHarness {
   walletId: string;
   children: readonly [string, string];
   newTopUp: (overrides?: Partial<NewTopUp>) => Promise<NewTopUp>;
+  newRefund: (
+    overrides?: Partial<NewRefundRequest>
+  ) => Promise<NewRefundRequest>;
 }
 
 type TestFn = (
@@ -338,5 +343,295 @@ export function describeWalletRepositoryContract(test: TestFn): void {
     await expect(
       harness.repository.spend(spendBody(harness, [[0, 1_000_000]]))
     ).resolves.toMatchObject({ status: 'spent' });
+  });
+
+  test('holds a refund request out of the free money: the balance stays, and a spend, a set-aside and a second request can only use the rest', async (harness) => {
+    await fund(harness);
+    const made = await harness.repository.requestRefund(
+      await harness.newRefund({ amountMinor: 2_000_000 })
+    );
+    expect(made.status).toBe('requested');
+    expect(await view(harness)).toMatchObject({
+      balanceMinor: TOP_UP,
+      heldMinor: 2_000_000,
+      freeMinor: 1_000_000,
+    });
+    await expect(
+      harness.repository.spend(spendBody(harness, [[0, 1_000_001]]))
+    ).resolves.toMatchObject({ status: 'over', spendableMinor: 1_000_000 });
+    await expect(
+      harness.repository.earmark(
+        markBody(harness, { kind: 'set', index: 0, amountMinor: 1_000_001 })
+      )
+    ).resolves.toEqual({ status: 'over', limitMinor: 1_000_000 });
+    await expect(
+      harness.repository.requestRefund(
+        await harness.newRefund({ amountMinor: 1_000_001 })
+      )
+    ).resolves.toEqual({ status: 'over', limitMinor: 1_000_000 });
+    await expect(
+      harness.repository.spend(spendBody(harness, [[0, 1_000_000]]))
+    ).resolves.toMatchObject({ status: 'spent' });
+  });
+
+  test('replays a refund request by reference, clashes on another body and refuses a used email file', async (harness) => {
+    await fund(harness);
+    const input = await harness.newRefund({ amountMinor: 500_000 });
+    const first = await harness.repository.requestRefund(input);
+    await expect(harness.repository.requestRefund(input)).resolves.toEqual({
+      status: 'replayed',
+      id: 'id' in first ? first.id : '',
+    });
+    await expect(
+      harness.repository.requestRefund({ ...input, requestHash: 'another' })
+    ).resolves.toEqual({ status: 'reference_used' });
+    await expect(
+      harness.repository.requestRefund(
+        await harness.newRefund({ proofFileId: input.proofFileId })
+      )
+    ).resolves.toEqual({ status: 'proof_taken' });
+    await expect(
+      harness.repository.findRefundRequest(
+        harness.organizationId,
+        input.reference
+      )
+    ).resolves.toEqual({
+      id: 'id' in first ? first.id : '',
+      walletId: harness.walletId,
+      requestHash: input.requestHash,
+    });
+    expect((await view(harness)).heldMinor).toBe(500_000);
+  });
+
+  test('releases the hold when a refund is declined, and decides a request once', async (harness) => {
+    await fund(harness);
+    const made = await harness.repository.requestRefund(
+      await harness.newRefund({ amountMinor: 2_000_000 })
+    );
+    const id = 'id' in made ? made.id : '';
+    await expect(
+      harness.repository.declineRequest('wallet_refund', {
+        organizationId: harness.organizationId,
+        userId: harness.userId,
+        userName: harness.userName,
+        id,
+        reason: 'No such overpayment',
+      })
+    ).resolves.toEqual({ status: 'declined' });
+    expect(await view(harness)).toMatchObject({
+      balanceMinor: TOP_UP,
+      heldMinor: 0,
+      freeMinor: TOP_UP,
+    });
+    await expect(
+      harness.repository.declineRequest('wallet_refund', {
+        organizationId: harness.organizationId,
+        userId: harness.userId,
+        userName: harness.userName,
+        id,
+        reason: 'Again',
+      })
+    ).resolves.toEqual({ status: 'decided' });
+    await expect(
+      harness.repository.findRequest(harness.scope, 'wallet_refund', id)
+    ).resolves.toMatchObject({
+      status: 'rejected',
+      rejectionReason: 'No such overpayment',
+    });
+  });
+
+  test('takes the refund out of the balance on approval, keeps the payout reference and approves once', async (harness) => {
+    await fund(harness);
+    const made = await harness.repository.requestRefund(
+      await harness.newRefund({ amountMinor: 2_000_000 })
+    );
+    const decision = {
+      organizationId: harness.organizationId,
+      userId: harness.userId,
+      userName: harness.userName,
+      id: 'id' in made ? made.id : '',
+      decidedOn: '2026-10-26',
+      ownRequest: false,
+      payoutReference: nextReference('NIP'),
+    };
+    await expect(harness.repository.approveRefund(decision)).resolves.toEqual({
+      status: 'approved',
+    });
+    expect(await view(harness)).toMatchObject({
+      balanceMinor: TOP_UP - 2_000_000,
+      heldMinor: 0,
+      freeMinor: TOP_UP - 2_000_000,
+    });
+    await expect(
+      harness.repository.findRequest(
+        harness.scope,
+        'wallet_refund',
+        decision.id
+      )
+    ).resolves.toMatchObject({
+      status: 'approved',
+      payoutReference: decision.payoutReference,
+    });
+    await expect(
+      harness.repository.approveRefund({
+        ...decision,
+        payoutReference: nextReference('NIP'),
+      })
+    ).resolves.toEqual({ status: 'decided' });
+    expect((await view(harness)).balanceMinor).toBe(TOP_UP - 2_000_000);
+  });
+
+  test('refuses a payout reference another refund already holds', async (harness) => {
+    await fund(harness);
+    const payoutReference = nextReference('NIP');
+    const decide = async (amountMinor: number) => {
+      const made = await harness.repository.requestRefund(
+        await harness.newRefund({ amountMinor })
+      );
+      return harness.repository.approveRefund({
+        organizationId: harness.organizationId,
+        userId: harness.userId,
+        userName: harness.userName,
+        id: 'id' in made ? made.id : '',
+        decidedOn: '2026-10-26',
+        ownRequest: false,
+        payoutReference,
+      });
+    };
+    await expect(decide(500_000)).resolves.toEqual({ status: 'approved' });
+    await expect(decide(400_000)).resolves.toEqual({
+      status: 'payout_reference_used',
+    });
+  });
+
+  test('holds a top-up’s amount while its cancellation waits and takes it out of the balance on approval, once per top-up', async (harness) => {
+    const recorded = await fund(harness);
+    const topUpId = 'id' in recorded ? recorded.id : '';
+    const request: NewCancellationRequest = {
+      organizationId: harness.organizationId,
+      userId: harness.userId,
+      userName: harness.userName,
+      walletId: harness.walletId,
+      topUpId,
+      reference: nextReference('WTQ'),
+      requestHash: 'cancel-hash',
+      reason: 'Wrong family',
+    };
+    const made = await harness.repository.requestCancellation(request);
+    expect(made.status).toBe('requested');
+    expect(await view(harness)).toMatchObject({
+      balanceMinor: TOP_UP,
+      heldMinor: TOP_UP,
+      freeMinor: 0,
+    });
+    await expect(
+      harness.repository.requestCancellation(request)
+    ).resolves.toEqual({
+      status: 'replayed',
+      id: 'id' in made ? made.id : '',
+    });
+    await expect(
+      harness.repository.requestCancellation({
+        ...request,
+        reference: nextReference('WTQ'),
+        requestHash: 'other',
+      })
+    ).resolves.toEqual({ status: 'exists' });
+
+    await expect(
+      harness.repository.approveCancellation({
+        organizationId: harness.organizationId,
+        userId: harness.userId,
+        userName: harness.userName,
+        id: 'id' in made ? made.id : '',
+        decidedOn: '2026-10-26',
+        ownRequest: false,
+      })
+    ).resolves.toEqual({ status: 'approved' });
+    expect(await view(harness)).toMatchObject({
+      balanceMinor: 0,
+      heldMinor: 0,
+      freeMinor: 0,
+    });
+    await expect(
+      harness.repository.requestCancellation({
+        ...request,
+        reference: nextReference('WTQ'),
+        requestHash: 'again',
+      })
+    ).resolves.toEqual({ status: 'exists' });
+  });
+
+  test('refuses to cancel a top-up when less than its amount is still free', async (harness) => {
+    const recorded = await fund(harness);
+    await harness.repository.spend(spendBody(harness, [[0, 500_000]]));
+    await expect(
+      harness.repository.requestCancellation({
+        organizationId: harness.organizationId,
+        userId: harness.userId,
+        userName: harness.userName,
+        walletId: harness.walletId,
+        topUpId: 'id' in recorded ? recorded.id : '',
+        reference: nextReference('WTQ'),
+        requestHash: 'cancel-hash',
+        reason: 'Wrong family',
+      })
+    ).resolves.toEqual({
+      status: 'over',
+      topUpMinor: TOP_UP,
+      freeMinor: TOP_UP - 500_000,
+    });
+    expect((await view(harness)).heldMinor).toBe(0);
+  });
+
+  test('lists the requests of both kinds, newest first, and counts the waiting ones', async (harness) => {
+    const first = await fund(harness, 3_000_000);
+    await fund(harness, 3_000_000);
+    const cancellation = await harness.repository.requestCancellation({
+      organizationId: harness.organizationId,
+      userId: harness.userId,
+      userName: harness.userName,
+      walletId: harness.walletId,
+      topUpId: 'id' in first ? first.id : '',
+      reference: nextReference('WTQ'),
+      requestHash: 'cancel-hash',
+      reason: 'Wrong family',
+    });
+    expect(cancellation.status).toBe('requested');
+    const refund = await harness.repository.requestRefund(
+      await harness.newRefund({ amountMinor: 1_000_000 })
+    );
+    expect(refund.status).toBe('requested');
+
+    const all = await harness.repository.listRequests(harness.scope, {
+      page: 1,
+      pageSize: 10,
+    });
+    expect(all.items.map((item) => item.kind)).toEqual([
+      'wallet_refund',
+      'wallet_topup_cancellation',
+    ]);
+    expect(all).toMatchObject({ total: 2, waitingCount: 2 });
+
+    await harness.repository.declineRequest('wallet_refund', {
+      organizationId: harness.organizationId,
+      userId: harness.userId,
+      userName: harness.userName,
+      id: 'id' in refund ? refund.id : '',
+      reason: 'Not now',
+    });
+    const declined = await harness.repository.listRequests(harness.scope, {
+      page: 1,
+      pageSize: 10,
+      status: 'rejected',
+    });
+    expect(declined.items.map((item) => item.kind)).toEqual(['wallet_refund']);
+    expect(declined.waitingCount).toBe(1);
+    const cancellations = await harness.repository.listRequests(harness.scope, {
+      page: 1,
+      pageSize: 10,
+      kind: 'wallet_topup_cancellation',
+    });
+    expect(cancellations).toMatchObject({ total: 1, waitingCount: 1 });
   });
 }

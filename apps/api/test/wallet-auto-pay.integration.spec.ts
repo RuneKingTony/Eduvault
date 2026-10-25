@@ -10,8 +10,10 @@ import { reservedAccountReference } from '../src/app/modules/gateway/reserved-ac
 import { expect, type Fixtures } from './support/base-test';
 import { importOpening } from './support/factories/finance';
 import { receivableBalance } from './support/factories/billing';
+import { bankAccount } from './support/factories/payments';
 import {
   cashAccount,
+  requestRefund,
   topUpBody,
   topUpWallet,
   walletIdOf,
@@ -119,6 +121,49 @@ test.describe('auto-pay', () => {
       `SELECT kind FROM activity_event WHERE kind = 'wallet.spent'`
     );
     expect(activity.rows.length).toBeGreaterThan(0);
+  });
+
+  test('pays only from the free money while a refund request holds some of the wallet', async ({
+    api,
+    app,
+    pool,
+    schools,
+  }) => {
+    const { owner, orgA } = schools;
+    const account = await cashAccount(app, owner);
+    const bank = await bankAccount(app, owner);
+    const { ada, guardianLogin } = await family(app, schools);
+    await owing(app, owner, [
+      { studentId: ada.id, amountMinor: OWED, effectiveOn: '2026-09-01' },
+    ]);
+    const walletId = await walletIdOf(pool, guardianLogin?.guardianId ?? '');
+    const guardian = await signInAs(api, guardianLogin);
+    await topUpWallet(api, owner, {
+      walletId,
+      accountId: account.id,
+      amountMinor: 1_500_000,
+    });
+    await requestRefund(api, owner, {
+      walletId,
+      accountId: bank.id,
+      amountMinor: 1_200_000,
+    });
+    await autoPay(api, guardian, { reference: 'APY-ON-HELD' }).expect(200);
+
+    const topUp = await topUpWallet(api, owner, {
+      walletId,
+      accountId: account.id,
+      amountMinor: 1_000_000,
+    });
+
+    expect(await receivableBalance(pool, orgA.id, ada.id)).toBe(
+      OWED - 1_300_000
+    );
+    expect(topUp.wallet).toMatchObject({
+      balanceMinor: 1_200_000,
+      heldMinor: 1_200_000,
+      freeMinor: 0,
+    });
   });
 
   test('posts once when the same top-up is sent again', async ({

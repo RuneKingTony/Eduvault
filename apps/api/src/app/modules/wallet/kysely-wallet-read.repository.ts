@@ -1,6 +1,7 @@
 import { sql, type Kysely, type RawBuilder } from 'kysely';
 import { z } from 'zod';
 import {
+  approvalStatusSchema,
   journalKindSchema,
   paymentMethodSchema,
   type WalletChild,
@@ -18,6 +19,8 @@ import { receivableBalanceSql } from '../../common/ledger';
 import type { OrgScope } from '../../common/scope';
 import {
   earmarksByChild,
+  heldMoney,
+  heldMoneySql,
   latestAutoPay,
   oldestUnpaidByChild,
   walletBalance,
@@ -32,6 +35,7 @@ import { portalMovementOf } from './wallet-portal-movement';
 import type {
   MovementPage,
   PortalMovementPage,
+  TopUpToCancel,
   WalletPage,
   WalletView,
 } from './wallet.repository';
@@ -138,25 +142,36 @@ async function viewOf(
     organizationId: wallet.organization_id,
     guardianId: wallet.guardian_id,
   };
-  const [rows, balanceMinor, marked, reservedAccount, connected, autoPay] =
-    await Promise.all([
-      childRows(db, wallet, scope),
-      walletBalance(db, family),
-      earmarksByChild(db, {
-        organizationId: wallet.organization_id,
-        walletId: wallet.id,
-      }),
-      reservedAccountOf(db, wallet),
-      gatewayConnected(db, wallet.organization_id),
-      latestAutoPay(db, family),
-    ]);
+  const [
+    rows,
+    balanceMinor,
+    marked,
+    held,
+    reservedAccount,
+    connected,
+    autoPay,
+  ] = await Promise.all([
+    childRows(db, wallet, scope),
+    walletBalance(db, family),
+    earmarksByChild(db, {
+      organizationId: wallet.organization_id,
+      walletId: wallet.id,
+    }),
+    heldMoney(db, {
+      organizationId: wallet.organization_id,
+      walletId: wallet.id,
+    }),
+    reservedAccountOf(db, wallet),
+    gatewayConnected(db, wallet.organization_id),
+    latestAutoPay(db, family),
+  ]);
   const oldest = await oldestUnpaidByChild(db, {
     organizationId: wallet.organization_id,
     studentIds: rows
       .filter((row) => Number(row.owed) > 0)
       .map((row) => row.student_id),
   });
-  const figures = walletFigures(balanceMinor, [...marked.values()]);
+  const figures = walletFigures(balanceMinor, [...marked.values()], held);
   const context = { freeMinor: figures.freeMinor, oldest };
   return {
     id: wallet.id,
@@ -220,6 +235,7 @@ interface SummaryRow {
   child_count: string;
   balance: string;
   set_aside: string;
+  held: string;
 }
 
 const searchSql = (query: string | undefined): RawBuilder<boolean> => {
@@ -247,7 +263,8 @@ function visibleWallets(scope: OrgScope, query: WalletListQuery) {
       COALESCE((
         SELECT SUM(e.delta_minor) FROM wallet_earmark e
         WHERE e.organization_id = w.organization_id AND e.wallet_id = w.id
-      ), 0) AS set_aside
+      ), 0) AS set_aside,
+      ${heldMoneySql(sql.ref('w.organization_id'), sql.ref('w.id'))} AS held
     FROM wallet w
     JOIN guardian g ON g.id = w.guardian_id AND g.organization_id = w.organization_id
     WHERE w.organization_id = ${scope.organizationId}
@@ -256,7 +273,11 @@ function visibleWallets(scope: OrgScope, query: WalletListQuery) {
 }
 
 const toSummary = (row: SummaryRow): WalletSummary => {
-  const figures = walletFigures(Number(row.balance), [Number(row.set_aside)]);
+  const figures = walletFigures(
+    Number(row.balance),
+    [Number(row.set_aside)],
+    Number(row.held)
+  );
   return {
     id: row.id,
     guardianId: row.guardian_id,
@@ -277,22 +298,26 @@ export async function listWallets(
   const [page, totals] = await Promise.all([
     sql<SummaryRow>`
       WITH visible AS (${visible})
-      SELECT id, guardian_id, full_name, phone, child_count::text, balance::text, set_aside::text
+      SELECT id, guardian_id, full_name, phone, child_count::text, balance::text, set_aside::text,
+        held::text
       FROM visible
       ORDER BY lower(full_name), id
       LIMIT ${query.pageSize} OFFSET ${offset}`.execute(db),
-    sql<{ count: string; balance: string; set_aside: string }>`
+    sql<{ count: string; balance: string; set_aside: string; held: string }>`
       WITH visible AS (${visible})
       SELECT count(*)::text AS count,
         COALESCE(SUM(balance), 0)::text AS balance,
-        COALESCE(SUM(set_aside), 0)::text AS set_aside
+        COALESCE(SUM(set_aside), 0)::text AS set_aside,
+        COALESCE(SUM(held), 0)::text AS held
       FROM visible`.execute(db),
   ]);
   const sums = totals.rows[0];
   const count = Number(sums?.count ?? 0);
-  const figures = walletFigures(Number(sums?.balance ?? 0), [
-    Number(sums?.set_aside ?? 0),
-  ]);
+  const figures = walletFigures(
+    Number(sums?.balance ?? 0),
+    [Number(sums?.set_aside ?? 0)],
+    Number(sums?.held ?? 0)
+  );
   return {
     items: page.rows.map((row) => toSummary(row)),
     total: count,
@@ -317,6 +342,12 @@ interface MovementRow {
   proof_file_id: string | null;
   spend_id: string | null;
   gateway: unknown;
+  cancellation: string | null;
+  refund_id: string | null;
+  payout_reference: string | null;
+  cancel_id: string | null;
+  cancel_reason: string | null;
+  cancelled_reference: string | null;
   made_by: string | null;
 }
 
@@ -332,6 +363,31 @@ const gatewayFactsSchema = z
     netMinor: z.number(),
   })
   .nullable();
+
+const openCancellation = approvalStatusSchema.exclude(['rejected']);
+
+function requestSourceOf(row: MovementRow): WalletMovementSource | null {
+  if (row.refund_id !== null && row.payout_reference !== null) {
+    return {
+      type: 'refund',
+      id: row.refund_id,
+      payoutReference: row.payout_reference,
+    };
+  }
+  if (
+    row.cancel_id !== null &&
+    row.cancel_reason !== null &&
+    row.cancelled_reference !== null
+  ) {
+    return {
+      type: 'topup_cancellation',
+      id: row.cancel_id,
+      topUpReference: row.cancelled_reference,
+      reason: row.cancel_reason,
+    };
+  }
+  return row.spend_id === null ? null : { type: 'spend', id: row.spend_id };
+}
 
 function sourceOf(row: MovementRow): WalletMovementSource | null {
   const gateway = gatewayFactsSchema.parse(row.gateway);
@@ -360,9 +416,13 @@ function sourceOf(row: MovementRow): WalletMovementSource | null {
       method: paymentMethodSchema.parse(row.method),
       depositorName: row.depositor_name,
       proofFileId: row.proof_file_id,
+      cancellation:
+        row.cancellation === null
+          ? null
+          : openCancellation.parse(row.cancellation),
     };
   }
-  return row.spend_id === null ? null : { type: 'spend', id: row.spend_id };
+  return requestSourceOf(row);
 }
 
 const toMovement = (row: MovementRow): WalletMovement => ({
@@ -402,6 +462,14 @@ export async function walletMovements(
         (jl.credit_minor - jl.debit_minor)::text AS amount,
         t.id AS topup_id, t.method, t.depositor_name, t.proof_file_id,
         s.id AS spend_id,
+        (
+          SELECT c.status FROM wallet_topup_cancellation c
+          WHERE c.wallet_topup_id = t.id AND c.organization_id = t.organization_id
+            AND c.status IN ('submitted', 'approved')
+        ) AS cancellation,
+        wr.id AS refund_id, wr.payout_reference,
+        wc.id AS cancel_id, wc.reason AS cancel_reason,
+        ot.reference AS cancelled_reference,
         CASE WHEN gt.id IS NULL THEN NULL ELSE jsonb_build_object(
           'id', gt.id, 'transactionReference', gt.reference,
           'paymentReference', gt.payment_reference,
@@ -415,7 +483,10 @@ export async function walletMovements(
       LEFT JOIN wallet_topup t ON t.journal_entry_id = e.id AND t.organization_id = e.organization_id
       LEFT JOIN wallet_spend s ON s.journal_entry_id = e.id AND s.organization_id = e.organization_id
       LEFT JOIN gateway_topup gt ON gt.journal_entry_id = e.id AND gt.organization_id = e.organization_id
-      LEFT JOIN "user" u ON u.id = COALESCE(t.created_by, s.created_by)
+      LEFT JOIN wallet_refund wr ON wr.journal_entry_id = e.id AND wr.organization_id = e.organization_id
+      LEFT JOIN wallet_topup_cancellation wc ON wc.journal_entry_id = e.id AND wc.organization_id = e.organization_id
+      LEFT JOIN wallet_topup ot ON ot.id = wc.wallet_topup_id AND ot.organization_id = wc.organization_id
+      LEFT JOIN "user" u ON u.id = COALESCE(t.created_by, s.created_by, wr.approved_by, wc.approved_by)
       WHERE ${mine}
       ORDER BY e.sequence DESC, lower(st.first_name), jl.id
       LIMIT ${paging.pageSize} OFFSET ${offset}`.execute(db),
@@ -466,3 +537,50 @@ export const walletProofState = (
   proof: { organizationId: string; userId: string; fileId: string }
 ): Promise<ProofState> =>
   fileProofState(db, proof, { kind: 'wallet_proof', table: 'wallet_topup' });
+
+export const refundProofState = (
+  db: Kysely<DB>,
+  proof: { organizationId: string; userId: string; fileId: string }
+): Promise<ProofState> =>
+  fileProofState(db, proof, {
+    kind: 'wallet_refund_request',
+    table: 'wallet_refund',
+  });
+
+export async function findTopUpToCancel(
+  db: Kysely<DB>,
+  scope: OrgScope,
+  target: { walletId: string; topUpId: string }
+): Promise<TopUpToCancel | undefined> {
+  const { rows } = await sql<{
+    id: string;
+    reference: string;
+    amount_minor: string;
+    online: boolean;
+  }>`
+    SELECT t.id, t.reference, t.amount_minor::text AS amount_minor, FALSE AS online
+    FROM wallet_topup t
+    JOIN wallet w ON w.id = t.wallet_id AND w.organization_id = t.organization_id
+    WHERE t.organization_id = ${scope.organizationId}
+      AND t.wallet_id = ${target.walletId} AND t.id = ${target.topUpId}
+      AND ${anyChildInScopeSql('w', scope.campusScope)}
+    UNION ALL
+    SELECT gt.id, gt.reference, gt.net_minor::text, TRUE
+    FROM gateway_topup gt
+    JOIN wallet w ON w.id = gt.wallet_id AND w.organization_id = gt.organization_id
+    WHERE gt.organization_id = ${scope.organizationId}
+      AND gt.wallet_id = ${target.walletId} AND gt.id = ${target.topUpId}
+      AND ${anyChildInScopeSql('w', scope.campusScope)}`.execute(db);
+  const [row] = rows;
+  if (row === undefined) {
+    return undefined;
+  }
+  return row.online
+    ? { kind: 'online' }
+    : {
+        kind: 'staff',
+        id: row.id,
+        reference: row.reference,
+        amountMinor: Number(row.amount_minor),
+      };
+}

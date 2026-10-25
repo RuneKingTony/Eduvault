@@ -1,4 +1,8 @@
-import { topUpRequestHash } from './wallet-request-hash';
+import {
+  cancellationRequestHash,
+  refundRequestHash,
+  topUpRequestHash,
+} from './wallet-request-hash';
 
 const wallet = '0b0c8a8e-8a3e-4c6c-a8c4-0e2f0f6b1f11';
 const otherWallet = '5d7e0f2a-3c1b-4e0a-9d7c-2f6a1b8c9d10';
@@ -46,5 +50,72 @@ describe('topUpRequestHash', () => {
     ],
   ])('changes when the %s changes', (_field, changed) => {
     expect(changed()).not.toBe(topUpRequestHash(wallet, topUp));
+  });
+});
+
+const refund = {
+  moneyAccountId: account,
+  amountMinor: 1_500_000,
+  parentEmail: 'ada.parent@example.com',
+  reason: 'Paid twice',
+};
+
+describe('refundRequestHash', () => {
+  it('is the same for the same request, whatever the attached email file', () => {
+    expect(refundRequestHash(wallet, refund)).toBe(
+      refundRequestHash(wallet, { ...refund })
+    );
+  });
+
+  it.each([
+    ['wallet', () => refundRequestHash(otherWallet, refund)],
+    [
+      'amount',
+      () => refundRequestHash(wallet, { ...refund, amountMinor: 1_500_001 }),
+    ],
+    [
+      'bank account',
+      () => refundRequestHash(wallet, { ...refund, moneyAccountId: wallet }),
+    ],
+    [
+      'parent email',
+      () =>
+        refundRequestHash(wallet, {
+          ...refund,
+          parentEmail: 'other@example.com',
+        }),
+    ],
+    [
+      'reason',
+      () => refundRequestHash(wallet, { ...refund, reason: 'Wrong family' }),
+    ],
+  ])('changes when the %s changes', (_field, changed) => {
+    expect(changed()).not.toBe(refundRequestHash(wallet, refund));
+  });
+});
+
+describe('cancellationRequestHash', () => {
+  const request = { walletId: wallet, topUpId: account };
+
+  it('changes with the wallet, the top-up and the reason', () => {
+    const base = cancellationRequestHash(request, { reason: 'Wrong family' });
+    expect(
+      cancellationRequestHash(
+        { ...request, walletId: otherWallet },
+        { reason: 'Wrong family' }
+      )
+    ).not.toBe(base);
+    expect(
+      cancellationRequestHash(
+        { ...request, topUpId: wallet },
+        { reason: 'Wrong family' }
+      )
+    ).not.toBe(base);
+    expect(cancellationRequestHash(request, { reason: 'Mistake' })).not.toBe(
+      base
+    );
+    expect(cancellationRequestHash(request, { reason: 'Wrong family' })).toBe(
+      base
+    );
   });
 });

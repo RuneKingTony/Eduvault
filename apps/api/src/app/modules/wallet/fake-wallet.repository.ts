@@ -1,7 +1,11 @@
 import type {
+  ApprovalStatus,
   PaymentMethods,
+  WalletApprovalKind,
   WalletChild,
   WalletListQuery,
+  WalletRequest,
+  WalletRequestListQuery,
   WalletSummary,
 } from '@eduvault/api-contract';
 import {
@@ -10,23 +14,36 @@ import {
   walletFigures,
   type SpendSplit,
 } from '@eduvault/shared';
+import type { WaitingApproval } from '../../common/approvals';
 import { canSeeCampus } from '../../common/campus-scope';
 import type { UsableMoneyAccount } from '../../common/money-accounts';
 import type { ProofState } from '../../common/payments';
 import type { OrgScope } from '../../common/scope';
 import {
   WalletRepository,
+  type ApprovalOutcome,
   type AutoPayOutcome,
+  type CancellationRequestOutcome,
+  type Declining,
+  type DeclineOutcome,
+  type Decision,
   type EarmarkOutcome,
   type ExistingEntry,
   type MovementPage,
   type NewAutoPay,
+  type NewCancellationRequest,
   type NewEarmark,
+  type NewRefundRequest,
   type NewSpend,
   type NewTopUp,
   type PortalMovementPage,
+  type RefundApproval,
+  type RefundRequestOutcome,
+  type RequestPage,
+  type RequestRecord,
   type SpendOutcome,
   type TopUpOutcome,
+  type TopUpToCancel,
   type WalletPage,
   type WalletView,
 } from './wallet.repository';
@@ -61,11 +78,36 @@ interface Earmark {
   key: string;
 }
 
+export interface FakeRequest {
+  kind: WalletApprovalKind;
+  id: string;
+  organizationId: string;
+  walletId: string;
+  reference: string;
+  requestHash: string;
+  reason: string;
+  amountMinor: number;
+  createdBy: string;
+  createdByName: string;
+  createdAt: string;
+  status: ApprovalStatus;
+  decidedBy: string | null;
+  rejectionReason: string | null;
+  moneyAccountId?: string;
+  parentEmail?: string;
+  proofFileId?: string;
+  payoutReference?: string;
+  topUpId?: string;
+  topUpReference?: string;
+}
+
 export class FakeWalletRepository extends WalletRepository {
   wallets: FakeWallet[] = [];
   topUps: (NewTopUp & { id: string })[] = [];
   spends: (NewSpend & { id: string; split: SpendSplit[] })[] = [];
   earmarks: Earmark[] = [];
+  onlineTopUps: { id: string; walletId: string }[] = [];
+  requests: FakeRequest[] = [];
   autoPays: (NewAutoPay & { guardianId: string })[] = [];
   accounts = new Map<string, UsableMoneyAccount>();
   proofs = new Map<string, ProofState>();
@@ -102,12 +144,19 @@ export class FakeWalletRepository extends WalletRepository {
       .reduce((total, row) => total + row.deltaMinor, 0);
   }
 
+  private held(walletId: string): number {
+    return this.requests
+      .filter((row) => row.walletId === walletId && row.status === 'submitted')
+      .reduce((total, row) => total + row.amountMinor, 0);
+  }
+
   private figures(wallet: FakeWallet) {
     return walletFigures(
       wallet.balanceMinor,
       [...new Set(wallet.children.map((child) => child.studentId))].map(
         (studentId) => this.marked(wallet.id, studentId)
-      )
+      ),
+      this.held(wallet.id)
     );
   }
 
@@ -182,6 +231,7 @@ export class FakeWalletRepository extends WalletRepository {
         walletCount: summaries.length,
         balanceMinor: sum((row) => row.balanceMinor),
         setAsideMinor: sum((row) => row.setAsideMinor),
+        heldMinor: sum((row) => row.heldMinor),
         freeMinor: sum((row) => row.freeMinor),
       },
     });
@@ -423,5 +473,369 @@ export class FakeWalletRepository extends WalletRepository {
     this.autoPays.push({ ...input, guardianId: wallet.guardianId });
     wallet.autoPay = input.enabled;
     return Promise.resolve({ status: 'applied' });
+  }
+
+  refundProof(
+    _organizationId: string,
+    _userId: string,
+    fileId: string
+  ): Promise<ProofState> {
+    return Promise.resolve(this.proofs.get(fileId) ?? 'missing');
+  }
+
+  private requestByReference(
+    kind: WalletApprovalKind,
+    organizationId: string,
+    reference: string
+  ): ExistingEntry | undefined {
+    const row = this.requests.find(
+      (request) =>
+        request.kind === kind &&
+        request.organizationId === organizationId &&
+        request.reference === reference
+    );
+    return (
+      row && {
+        id: row.id,
+        walletId: row.walletId,
+        requestHash: row.requestHash,
+      }
+    );
+  }
+
+  findRefundRequest(
+    organizationId: string,
+    reference: string
+  ): Promise<ExistingEntry | undefined> {
+    return Promise.resolve(
+      this.requestByReference('wallet_refund', organizationId, reference)
+    );
+  }
+
+  findCancellationRequest(
+    organizationId: string,
+    reference: string
+  ): Promise<ExistingEntry | undefined> {
+    return Promise.resolve(
+      this.requestByReference(
+        'wallet_topup_cancellation',
+        organizationId,
+        reference
+      )
+    );
+  }
+
+  findTopUpToCancel(
+    scope: OrgScope,
+    walletId: string,
+    topUpId: string
+  ): Promise<TopUpToCancel | undefined> {
+    if (!this.visible(scope).some((wallet) => wallet.id === walletId)) {
+      return Promise.resolve(undefined);
+    }
+    const topUp = this.topUps.find(
+      (row) => row.id === topUpId && row.walletId === walletId
+    );
+    if (topUp !== undefined) {
+      return Promise.resolve({
+        kind: 'staff',
+        id: topUp.id,
+        reference: topUp.reference,
+        amountMinor: topUp.amountMinor,
+      });
+    }
+    return Promise.resolve(
+      this.onlineTopUps.some(
+        (row) => row.id === topUpId && row.walletId === walletId
+      )
+        ? { kind: 'online' }
+        : undefined
+    );
+  }
+
+  private createdAt(): string {
+    this.next += 1;
+    return new Date(Date.UTC(2026, 9, 26, 8, 0, this.next)).toISOString();
+  }
+
+  requestRefund(input: NewRefundRequest): Promise<RefundRequestOutcome> {
+    const existing = this.requestByReference(
+      'wallet_refund',
+      input.organizationId,
+      input.reference
+    );
+    if (existing !== undefined) {
+      return Promise.resolve(
+        existing.requestHash === input.requestHash
+          ? { status: 'replayed', id: existing.id }
+          : { status: 'reference_used' }
+      );
+    }
+    const limitMinor = Math.max(
+      0,
+      this.figures(this.walletOf(input.walletId)).freeMinor
+    );
+    if (input.amountMinor > limitMinor) {
+      return Promise.resolve({ status: 'over', limitMinor });
+    }
+    if (this.requests.some((row) => row.proofFileId === input.proofFileId)) {
+      return Promise.resolve({ status: 'proof_taken' });
+    }
+    const id = this.id('refund');
+    this.requests.push({
+      kind: 'wallet_refund',
+      id,
+      organizationId: input.organizationId,
+      walletId: input.walletId,
+      reference: input.reference,
+      requestHash: input.requestHash,
+      reason: input.reason,
+      amountMinor: input.amountMinor,
+      createdBy: input.userId,
+      createdByName: input.userName,
+      createdAt: this.createdAt(),
+      status: 'submitted',
+      decidedBy: null,
+      rejectionReason: null,
+      moneyAccountId: input.moneyAccountId,
+      parentEmail: input.parentEmail,
+      proofFileId: input.proofFileId,
+    });
+    this.proofs.set(input.proofFileId, 'taken');
+    return Promise.resolve({ status: 'requested', id });
+  }
+
+  requestCancellation(
+    input: NewCancellationRequest
+  ): Promise<CancellationRequestOutcome> {
+    const existing = this.requestByReference(
+      'wallet_topup_cancellation',
+      input.organizationId,
+      input.reference
+    );
+    if (existing !== undefined) {
+      return Promise.resolve(
+        existing.requestHash === input.requestHash
+          ? { status: 'replayed', id: existing.id }
+          : { status: 'reference_used' }
+      );
+    }
+    if (
+      this.requests.some(
+        (row) =>
+          row.topUpId === input.topUpId &&
+          row.kind === 'wallet_topup_cancellation' &&
+          row.status !== 'rejected'
+      )
+    ) {
+      return Promise.resolve({ status: 'exists' });
+    }
+    const topUp = this.topUps.find((row) => row.id === input.topUpId);
+    if (topUp === undefined) {
+      throw new Error(`No top-up ${input.topUpId}`);
+    }
+    const { freeMinor } = this.figures(this.walletOf(input.walletId));
+    if (freeMinor < topUp.amountMinor) {
+      return Promise.resolve({
+        status: 'over',
+        topUpMinor: topUp.amountMinor,
+        freeMinor: Math.max(0, freeMinor),
+      });
+    }
+    const id = this.id('cancel');
+    this.requests.push({
+      kind: 'wallet_topup_cancellation',
+      id,
+      organizationId: input.organizationId,
+      walletId: input.walletId,
+      reference: input.reference,
+      requestHash: input.requestHash,
+      reason: input.reason,
+      amountMinor: topUp.amountMinor,
+      createdBy: input.userId,
+      createdByName: input.userName,
+      createdAt: this.createdAt(),
+      status: 'submitted',
+      decidedBy: null,
+      rejectionReason: null,
+      topUpId: input.topUpId,
+      topUpReference: topUp.reference,
+    });
+    return Promise.resolve({ status: 'requested', id });
+  }
+
+  private requestView(row: FakeRequest): WalletRequest {
+    const base = {
+      id: row.id,
+      status: row.status,
+      reference: row.reference,
+      reason: row.reason,
+      amountMinor: row.amountMinor,
+      wallet: {
+        id: row.walletId,
+        guardianName: this.walletOf(row.walletId).name,
+      },
+      createdBy: row.createdByName,
+      createdAt: row.createdAt,
+      decidedBy: row.decidedBy,
+      decidedAt: row.status === 'submitted' ? null : row.createdAt,
+      rejectionReason: row.rejectionReason,
+    };
+    return row.kind === 'wallet_refund'
+      ? {
+          ...base,
+          kind: 'wallet_refund',
+          parentEmail: row.parentEmail ?? '',
+          moneyAccountName: row.moneyAccountId ?? '',
+          payoutReference: row.payoutReference ?? null,
+          proofFileId: row.proofFileId ?? '',
+        }
+      : {
+          ...base,
+          kind: 'wallet_topup_cancellation',
+          topUp: {
+            id: row.topUpId ?? '',
+            reference: row.topUpReference ?? '',
+          },
+        };
+  }
+
+  private visibleRequests(scope: OrgScope): FakeRequest[] {
+    const ids = new Set(this.visible(scope).map((wallet) => wallet.id));
+    return this.requests.filter((row) => ids.has(row.walletId));
+  }
+
+  findRequest(
+    scope: OrgScope,
+    kind: WalletApprovalKind,
+    id: string
+  ): Promise<WalletRequest | undefined> {
+    const row = this.visibleRequests(scope).find(
+      (request) => request.kind === kind && request.id === id
+    );
+    return Promise.resolve(row && this.requestView(row));
+  }
+
+  requestRecord(
+    scope: OrgScope,
+    kind: WalletApprovalKind,
+    id: string
+  ): Promise<RequestRecord | undefined> {
+    const row = this.visibleRequests(scope).find(
+      (request) => request.kind === kind && request.id === id
+    );
+    return Promise.resolve(
+      row && { status: row.status, createdBy: row.createdBy }
+    );
+  }
+
+  listRequests(
+    scope: OrgScope,
+    query: WalletRequestListQuery
+  ): Promise<RequestPage> {
+    const visible = this.visibleRequests(scope);
+    const matching = visible
+      .filter(
+        (row) =>
+          (query.kind === undefined || row.kind === query.kind) &&
+          (query.status === undefined || row.status === query.status)
+      )
+      .toSorted((a, b) => b.createdAt.localeCompare(a.createdAt));
+    const offset = (query.page - 1) * query.pageSize;
+    return Promise.resolve({
+      items: matching
+        .slice(offset, offset + query.pageSize)
+        .map((row) => this.requestView(row)),
+      total: matching.length,
+      waitingCount: visible.filter((row) => row.status === 'submitted').length,
+    });
+  }
+
+  private waitingRow(
+    kind: WalletApprovalKind,
+    id: string
+  ): FakeRequest | undefined {
+    return this.requests.find(
+      (row) => row.kind === kind && row.id === id && row.status === 'submitted'
+    );
+  }
+
+  approveRefund(input: RefundApproval): Promise<ApprovalOutcome> {
+    const row = this.waitingRow('wallet_refund', input.id);
+    if (row === undefined) {
+      return Promise.resolve({ status: 'decided' });
+    }
+    const wallet = this.walletOf(row.walletId);
+    if (this.figures(wallet).freeMinor < 0) {
+      return Promise.resolve({ status: 'money_gone' });
+    }
+    const account = this.accounts.get(row.moneyAccountId ?? '');
+    if (account?.status !== 'ok' || account.kind !== 'bank') {
+      return Promise.resolve({ status: 'account_unusable' });
+    }
+    if (
+      this.requests.some(
+        (other) =>
+          other.payoutReference === input.payoutReference &&
+          other.organizationId === row.organizationId
+      )
+    ) {
+      return Promise.resolve({ status: 'payout_reference_used' });
+    }
+    row.status = 'approved';
+    row.payoutReference = input.payoutReference;
+    row.decidedBy = input.userName;
+    wallet.balanceMinor -= row.amountMinor;
+    return Promise.resolve({ status: 'approved' });
+  }
+
+  approveCancellation(input: Decision): Promise<ApprovalOutcome> {
+    const row = this.waitingRow('wallet_topup_cancellation', input.id);
+    if (row === undefined) {
+      return Promise.resolve({ status: 'decided' });
+    }
+    const wallet = this.walletOf(row.walletId);
+    if (this.figures(wallet).freeMinor < 0) {
+      return Promise.resolve({ status: 'money_gone' });
+    }
+    row.status = 'approved';
+    row.decidedBy = input.userName;
+    wallet.balanceMinor -= row.amountMinor;
+    return Promise.resolve({ status: 'approved' });
+  }
+
+  declineRequest(
+    kind: WalletApprovalKind,
+    input: Declining
+  ): Promise<DeclineOutcome> {
+    const row = this.waitingRow(kind, input.id);
+    if (row === undefined) {
+      return Promise.resolve({ status: 'decided' });
+    }
+    row.status = 'rejected';
+    row.decidedBy = input.userName;
+    row.rejectionReason = input.reason;
+    return Promise.resolve({ status: 'declined' });
+  }
+
+  waiting(scope: OrgScope): Promise<WaitingApproval[]> {
+    return Promise.resolve(
+      this.visibleRequests(scope)
+        .filter((row) => row.status === 'submitted')
+        .map((row) => ({
+          kind: row.kind,
+          id: row.id,
+          details:
+            row.kind === 'wallet_refund'
+              ? `Refund to ${this.walletOf(row.walletId).name}: ${row.reason}`
+              : `Top-up ${row.topUpReference ?? ''} of ${this.walletOf(row.walletId).name}: ${row.reason}`,
+          amountMinor: row.amountMinor,
+          amountText: null,
+          createdById: row.createdBy,
+          createdByName: row.createdByName,
+          createdAt: row.createdAt,
+          campusId: null,
+        }))
+    );
   }
 }

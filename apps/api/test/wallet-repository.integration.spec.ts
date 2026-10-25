@@ -7,9 +7,10 @@ import {
   type WalletHarness,
 } from './wallet-repository.contract';
 import { expect, type Fixtures } from './support/base-test';
-import { owes } from './support/factories/payments';
+import { bankAccount, owes } from './support/factories/payments';
 import {
   cashAccount,
+  uploadRefundEmail,
   uploadWalletProof,
   walletIdOf,
 } from './support/factories/wallets';
@@ -41,6 +42,12 @@ const fakeHarness = (): WalletHarness => {
     campusId: null,
     kind: 'cash',
   });
+  repository.accounts.set('bank', {
+    status: 'ok',
+    ledgerAccountId: 'ledger-bank',
+    campusId: null,
+    kind: 'bank',
+  });
   return {
     repository,
     scope: { organizationId: 'school-a', campusScope: 'all' },
@@ -69,6 +76,21 @@ const fakeHarness = (): WalletHarness => {
         ...overrides,
       });
     },
+    newRefund: (overrides = {}) =>
+      Promise.resolve({
+        organizationId: 'school-a',
+        userId: 'user-staff',
+        userName: 'Tunde Bakare',
+        walletId: 'wallet-1',
+        reference: randomUUID(),
+        requestHash: randomUUID(),
+        moneyAccountId: 'bank',
+        amountMinor: 1000,
+        parentEmail: 'parent@example.com',
+        reason: 'Paid twice',
+        proofFileId: randomUUID(),
+        ...overrides,
+      }),
   };
 };
 
@@ -103,6 +125,7 @@ const postgresHarness = async ({
   await owes(app, owner, { studentId: ada.id, amountMinor: OWED });
   await owes(app, owner, { studentId: tobi.id, amountMinor: OWED });
   const account = await cashAccount(app, owner);
+  const bank = await bankAccount(app, owner);
   const { rows } = await pool.query<{ ledger_account_id: string }>(
     'SELECT ledger_account_id FROM money_account WHERE id = $1',
     [account.id]
@@ -131,6 +154,20 @@ const postgresHarness = async ({
       receivedOn: '2026-10-07',
       depositorName: null,
       proofFileId: (await uploadWalletProof(api, owner)).id,
+      ...overrides,
+    }),
+    newRefund: async (overrides = {}) => ({
+      organizationId: orgA.id,
+      userId: owner.id,
+      userName: 'Owner',
+      walletId: await walletIdOf(pool, guardianLogin?.guardianId ?? ''),
+      reference: randomUUID(),
+      requestHash: randomUUID(),
+      moneyAccountId: bank.id,
+      amountMinor: 1000,
+      parentEmail: 'parent@example.com',
+      reason: 'Paid twice',
+      proofFileId: (await uploadRefundEmail(api, owner)).id,
       ...overrides,
     }),
   };

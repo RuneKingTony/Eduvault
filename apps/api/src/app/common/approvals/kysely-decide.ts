@@ -6,7 +6,9 @@ type DecidableTable =
   | 'payment_void'
   | 'staff_leave'
   | 'stock_count'
-  | 'student_discount';
+  | 'student_discount'
+  | 'wallet_refund'
+  | 'wallet_topup_cancellation';
 
 interface DecisionTarget {
   table: DecidableTable;
@@ -20,15 +22,14 @@ const touched = (table: DecidableTable): RawBuilder<unknown> =>
 async function approveWaiting(
   db: Kysely<DB>,
   target: DecisionTarget,
-  approval: { userId: string; journalEntryId?: string }
+  approval: { userId: string; columns: Record<string, string | undefined> }
 ): Promise<boolean> {
-  const entry =
-    approval.journalEntryId === undefined
-      ? sql``
-      : sql`, journal_entry_id = ${approval.journalEntryId}`;
+  const extra = Object.entries(approval.columns)
+    .filter((column): column is [string, string] => column[1] !== undefined)
+    .map(([column, value]) => sql`, ${sql.ref(column)} = ${value}`);
   const result = await sql`
     UPDATE ${sql.table(target.table)}
-    SET status = 'approved', approved_by = ${approval.userId}, approved_at = ${new Date()}${entry}${touched(target.table)}
+    SET status = 'approved', approved_by = ${approval.userId}, approved_at = ${new Date()}${sql.join(extra, sql``)}${touched(target.table)}
     WHERE organization_id = ${target.organizationId} AND id = ${target.id}
       AND status = 'submitted'`.execute(db);
   return (result.numAffectedRows ?? 0n) > 0n;
@@ -67,8 +68,14 @@ export function decisionsFor(
     id,
   });
   return {
-    approve: (id: string, journalEntryId?: string) =>
-      approveWaiting(db, target(id), { userId: owner.userId, journalEntryId }),
+    approve: (id: string, journalEntryId?: string, payoutReference?: string) =>
+      approveWaiting(db, target(id), {
+        userId: owner.userId,
+        columns: {
+          journal_entry_id: journalEntryId,
+          payout_reference: payoutReference,
+        },
+      }),
     reject: (id: string, reason: string) =>
       rejectWaiting(db, target(id), { userId: owner.userId, reason }),
   };

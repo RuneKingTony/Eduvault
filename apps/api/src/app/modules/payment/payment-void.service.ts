@@ -27,7 +27,8 @@ import {
 import { assertDeclineReason, decide } from '../../common/approvals';
 import type { OrgContext } from '../../common/auth';
 import { Clock } from '../../common/clock';
-import { mirrorLines, voidMemo, voidReference } from './payment-void-posting';
+import { mirrorLines } from '../../common/ledger';
+import { voidMemo, voidReference } from './payment-void-posting';
 import {
   PaymentVoidRepository,
   type PaymentVoidTx,

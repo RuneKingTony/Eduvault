@@ -24,12 +24,19 @@ import { acting, expect } from './support/base-test';
 import { receivableBalance } from './support/factories/billing';
 import { gatewayAccountId } from './support/factories/store';
 import { ledgerAccountId } from './support/factories/finance';
-import { PDF_BYTES, nextReference, owes } from './support/factories/payments';
+import {
+  PDF_BYTES,
+  bankAccount,
+  nextReference,
+  owes,
+} from './support/factories/payments';
 import {
   cashAccount,
   postTopUp,
+  requestRefund,
   topUpBody,
   topUpWallet,
+  uploadRefundEmail,
   uploadWalletProof,
   walletIdOf,
 } from './support/factories/wallets';
@@ -352,6 +359,98 @@ test.describe('topping up a wallet', () => {
   });
 });
 
+test.describe('money held for a request', () => {
+  test('refuses a set-aside beyond the free money, naming the limit, and shows held money on the wallet a guardian reads', async ({
+    api,
+    app,
+    pool,
+    schools,
+  }) => {
+    const { owner } = schools;
+    const account = await cashAccount(app, owner);
+    const bank = await bankAccount(app, owner);
+    const { ada, guardianLogin } = await family(app, schools);
+    const walletId = await walletIdOf(pool, guardianLogin?.guardianId ?? '');
+    const guardian = await signInAs(api, guardianLogin);
+    await owes(app, owner, { studentId: ada.id, amountMinor: OWED });
+    await topUpWallet(api, owner, { walletId, accountId: account.id });
+    await requestRefund(api, owner, {
+      walletId,
+      accountId: bank.id,
+      amountMinor: 4_000_000,
+    });
+
+    const refused = await api(guardian)
+      .post('/portal/wallet/earmarks')
+      .send({
+        reference: nextReference('WSA'),
+        studentId: ada.id,
+        amountMinor: 1_000_001,
+      })
+      .expect(422);
+    expect(refused.body.message).toBe(walletEarmarkSetOverMessage(1_000_000));
+    const own = (await api(guardian).get('/portal/wallet').expect(200))
+      .body as Wallet;
+    expect(own).toMatchObject({
+      balanceMinor: TOP_UP,
+      heldMinor: 4_000_000,
+      freeMinor: 1_000_000,
+    });
+    expect(
+      own.children.find((child) => child.studentId === ada.id)
+    ).toMatchObject({ spendableMinor: 1_000_000 });
+    await api(guardian)
+      .post('/portal/wallet/earmarks')
+      .send({
+        reference: nextReference('WSA'),
+        studentId: ada.id,
+        amountMinor: 1_000_000,
+      })
+      .expect(201);
+  });
+
+  test('keeps the parent’s email locked once it is attached to a request, and readable only on the campuses the family is on', async ({
+    api,
+    app,
+    pool,
+    schools,
+  }) => {
+    const { owner, lekkiOnly, studentIkeja } = schools;
+    const account = await cashAccount(app, owner);
+    const bank = await bankAccount(app, owner);
+    const { guardianLogin } = await family(app, schools);
+    const walletId = await walletIdOf(pool, guardianLogin?.guardianId ?? '');
+    const ikejaWallet = await walletIdOf(
+      pool,
+      guardianIdOf(studentIkeja.logins)
+    );
+    const email = await uploadRefundEmail(api, owner);
+    const other = await uploadRefundEmail(api, owner);
+    await topUpWallet(api, owner, { walletId, accountId: account.id });
+    await topUpWallet(api, owner, {
+      walletId: ikejaWallet,
+      accountId: account.id,
+    });
+    await requestRefund(api, owner, {
+      walletId,
+      accountId: bank.id,
+      amountMinor: 500_000,
+      proofFileId: email.id,
+    });
+    await requestRefund(api, owner, {
+      walletId: ikejaWallet,
+      accountId: bank.id,
+      amountMinor: 500_000,
+      proofFileId: other.id,
+    });
+
+    await api(owner).delete(`/files/${email.id}`).expect(409);
+    await api(owner).get(`/files/${email.id}`).expect(200);
+    await api(lekkiOnly).get(`/files/${email.id}`).expect(200);
+    await api(lekkiOnly).get(`/files/${other.id}`).expect(404);
+  });
+});
+
 test.describe('the staff wallet screens', () => {
   test('list the wallets with search and totals, and show a wallet with its children', async ({
     api,
@@ -373,6 +472,7 @@ test.describe('the staff wallet screens', () => {
       walletCount: 2,
       balanceMinor: TOP_UP,
       setAsideMinor: 0,
+      heldMinor: 0,
       freeMinor: TOP_UP,
     });
     const funded = list.items.find((item) => item.id === lekki);

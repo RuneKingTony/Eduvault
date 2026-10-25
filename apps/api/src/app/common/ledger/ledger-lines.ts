@@ -77,3 +77,5 @@ export function assertBalancedLines(lines: readonly LedgerLine[]): void {
     throw new UnbalancedEntryError('Debits and credits must be equal.');
   }
 }
+
+export const clampMemo = (text: string): string => text.slice(0, 500);

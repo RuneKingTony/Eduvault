@@ -1,5 +1,9 @@
 import { assertBalancedLines } from '../ledger';
-import { spendPostingLines, topUpPostingLines } from './wallet-posting';
+import {
+  refundPostingLines,
+  spendPostingLines,
+  topUpPostingLines,
+} from './wallet-posting';
 
 const wallets = 'wallets-2200';
 const receivable = 'receivable-1100';
@@ -113,5 +117,39 @@ describe('spendPostingLines', () => {
         line.ledgerAccountId === wallets ? family : undefined
       );
     }
+  });
+});
+
+describe('refundPostingLines', () => {
+  const lines = refundPostingLines({
+    moneyLedgerAccountId: 'bank',
+    moneyCampusId: 'lekki',
+    walletsAccountId: wallets,
+    familyId: family,
+    amountMinor: 1_500_000,
+  });
+
+  it('takes the money out of the family’s wallet and out of the bank account', () => {
+    expect(lines).toEqual([
+      {
+        ledgerAccountId: wallets,
+        familyId: family,
+        debitMinor: 1_500_000,
+        creditMinor: 0,
+      },
+      {
+        ledgerAccountId: 'bank',
+        campusId: 'lekki',
+        debitMinor: 0,
+        creditMinor: 1_500_000,
+      },
+    ]);
+  });
+
+  it('balances and tags the family only on the wallet line', () => {
+    expect(() => {
+      assertBalancedLines(lines);
+    }).not.toThrow();
+    expect(lines.filter((line) => line.familyId !== undefined)).toHaveLength(1);
   });
 });

@@ -391,6 +391,7 @@ describe('PaymentVoidService.approve', () => {
           {
             ledgerAccountId: 'cash',
             studentId: null,
+            familyId: null,
             campusId: 'lekki',
             debitMinor: 0,
             creditMinor: 2_000_000,
@@ -398,6 +399,7 @@ describe('PaymentVoidService.approve', () => {
           {
             ledgerAccountId: 'receivable',
             studentId: 'ada',
+            familyId: null,
             campusId: 'lekki',
             debitMinor: 2_000_000,
             creditMinor: 0,

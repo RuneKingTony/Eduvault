@@ -1,5 +1,6 @@
 export * from './spend-request-hash';
 export * from './wallet-balance';
+export * from './wallet-held';
 export * from './wallet-posting';
 export * from './wallet-spend';
 export * from './auto-pay-plan';

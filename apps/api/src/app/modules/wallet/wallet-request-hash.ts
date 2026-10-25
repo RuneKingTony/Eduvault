@@ -1,4 +1,8 @@
-import type { TopUpWallet } from '@eduvault/api-contract';
+import type {
+  RequestWalletCancellation,
+  RequestWalletRefund,
+  TopUpWallet,
+} from '@eduvault/api-contract';
 import { hashCanonical } from '../../common/references/request-hash';
 
 /** The receipt file is left out so a retry that re-uploads it still replays. */
@@ -13,5 +17,30 @@ export function topUpRequestHash(
     amountMinor: input.amountMinor,
     receivedOn: input.receivedOn,
     depositorName: input.depositorName?.trim() ?? null,
+  });
+}
+
+/** The parent's email file is left out so a retry that uploads it again still replays. */
+export function refundRequestHash(
+  walletId: string,
+  input: Omit<RequestWalletRefund, 'reference' | 'proofFileId'>
+): string {
+  return hashCanonical({
+    walletId,
+    moneyAccountId: input.moneyAccountId,
+    amountMinor: input.amountMinor,
+    parentEmail: input.parentEmail,
+    reason: input.reason,
+  });
+}
+
+export function cancellationRequestHash(
+  request: { walletId: string; topUpId: string },
+  input: Omit<RequestWalletCancellation, 'reference'>
+): string {
+  return hashCanonical({
+    walletId: request.walletId,
+    topUpId: request.topUpId,
+    reason: input.reason,
   });
 }

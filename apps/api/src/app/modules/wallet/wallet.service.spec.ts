@@ -141,6 +141,7 @@ describe('WalletService.topUp', () => {
     expect(recorded.wallet).toMatchObject({
       balanceMinor: 5_000_000,
       setAsideMinor: 0,
+      heldMinor: 0,
       freeMinor: 5_000_000,
     });
     expect(repository.topUps).toHaveLength(1);
@@ -306,6 +307,7 @@ describe('WalletService reads', () => {
       walletCount: 2,
       balanceMinor: 5_000_000,
       setAsideMinor: 0,
+      heldMinor: 0,
       freeMinor: 5_000_000,
     });
     const byName = await service.list(everyone, {
@@ -356,5 +358,44 @@ describe('WalletService reads', () => {
     await expect(service.get(foreign, ojo.id)).rejects.toBeInstanceOf(
       NotFoundException
     );
+  });
+});
+
+describe('WalletService reads with held money', () => {
+  it('shows held money on the wallet and the list, and takes it out of free money', async () => {
+    const { repository, service } = setup(
+      { ...ojo, balanceMinor: 5_000_000 },
+      { ...bello, balanceMinor: 1_000_000 }
+    );
+    repository.requests.push({
+      kind: 'wallet_refund',
+      id: 'refund-1',
+      organizationId: ORG,
+      walletId: ojo.id,
+      reference: 'WRQ-1',
+      requestHash: 'hash',
+      reason: 'Paid twice',
+      amountMinor: 1_500_000,
+      createdBy: 'bursar',
+      createdByName: 'Bursar',
+      createdAt: '2026-10-26T08:00:00.000Z',
+      status: 'submitted',
+      decidedBy: null,
+      rejectionReason: null,
+    });
+    expect(await service.get(everyone, ojo.id)).toMatchObject({
+      balanceMinor: 5_000_000,
+      heldMinor: 1_500_000,
+      freeMinor: 3_500_000,
+    });
+    const list = await service.list(everyone, {
+      page: 1,
+      pageSize: 10,
+    });
+    expect(list.totals).toMatchObject({
+      balanceMinor: 6_000_000,
+      heldMinor: 1_500_000,
+      freeMinor: 4_500_000,
+    });
   });
 });
