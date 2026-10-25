@@ -884,6 +884,29 @@ export interface WalletEarmark {
   wallet_id: string;
 }
 
+export interface WalletRefund {
+  amount_minor: Int8;
+  approved_at: Timestamp | null;
+  approved_by: string | null;
+  created_at: Generated<Timestamp>;
+  created_by: string | null;
+  id: Generated<string>;
+  journal_entry_id: string | null;
+  money_account_id: string;
+  organization_id: string;
+  parent_email: string;
+  payout_reference: string | null;
+  proof_file_id: string;
+  reason: string;
+  reference: string;
+  rejected_at: Timestamp | null;
+  rejected_by: string | null;
+  rejection_reason: string | null;
+  request_hash: string;
+  status: Generated<string>;
+  wallet_id: string;
+}
+
 export interface WalletReservedAccount {
   account_name: string;
   account_number: string;
@@ -921,6 +944,24 @@ export interface WalletTopup {
   reference: string;
   request_hash: string;
   wallet_id: string;
+}
+
+export interface WalletTopupCancellation {
+  approved_at: Timestamp | null;
+  approved_by: string | null;
+  created_at: Generated<Timestamp>;
+  created_by: string | null;
+  id: Generated<string>;
+  journal_entry_id: string | null;
+  organization_id: string;
+  reason: string;
+  reference: string;
+  rejected_at: Timestamp | null;
+  rejected_by: string | null;
+  rejection_reason: string | null;
+  request_hash: string;
+  status: Generated<string>;
+  wallet_topup_id: string;
 }
 
 export interface DB {
@@ -989,8 +1030,10 @@ export interface DB {
   wallet: Wallet;
   wallet_auto_pay_setting: WalletAutoPaySetting;
   wallet_earmark: WalletEarmark;
+  wallet_refund: WalletRefund;
   wallet_reserved_account: WalletReservedAccount;
   wallet_spend: WalletSpend;
   wallet_topup: WalletTopup;
+  wallet_topup_cancellation: WalletTopupCancellation;
 }
 
