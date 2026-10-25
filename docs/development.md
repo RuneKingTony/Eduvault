@@ -55,6 +55,7 @@ Cutover is copy, verify, switch the driver, then copy and verify once more. Roll
 | Apply migrations        | `nx run api:db-migrate-up`                                                                     |
 | Wipe and recreate       | `nx run api:db-reset` (wipes the volume, restarts Postgres, migrates; re-seed afterwards)      |
 | Seed                    | `nx run api:db-seed` (idempotent)                                                              |
+| Demo school (opt-in)    | `pnpm db:seed:demo` / `nx run api:db-seed-demo` (idempotent; 600 students, about 2 to 3 min)   |
 | New migration           | add `apps/api/db/migrations/<timestamp>_<name>.sql` with `-- migrate:up` and `-- migrate:down` |
 | Refresh generated files | `pnpm drift:fix`                                                                               |
 

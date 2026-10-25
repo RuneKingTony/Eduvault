@@ -69,6 +69,29 @@
         "cwd": "apps/api"
       }
     },
+    "seed-demo-build": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["production", "^production"],
+      "outputs": [
+        "{projectRoot}/dist/seed-demo.cjs",
+        "{projectRoot}/dist/seed-demo.cjs.map"
+      ],
+      "description": "Bundle the opt-in demo seed with SWC so Nest keeps its decorator metadata",
+      "options": {
+        "command": "vite build --config vite.seed.config.mts --mode seed-demo",
+        "cwd": "apps/api"
+      }
+    },
+    "db-seed-demo": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["env-init", "seed-demo-build"],
+      "description": "Seed the Riverside demo school (600 students, 30 teachers, a billed term, wallets) through the API's services (idempotent)",
+      "options": {
+        "command": "node --env-file=.env.local dist/seed-demo.cjs",
+        "cwd": "apps/api"
+      }
+    },
     "bootstrap-admin-build": {
       "executor": "nx:run-commands",
       "cache": true,

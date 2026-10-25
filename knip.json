@@ -19,6 +19,7 @@
         "src/main.ts",
         "auth.ts",
         "scripts/seed.ts",
+        "scripts/seed-demo.ts",
         "test/**/*.integration.spec.ts",
         "test/setup/global-setup.ts",
         "vite.config.mts",

@@ -15,6 +15,7 @@
     "db:up": "nx run api:db-start && nx run api:db-migrate-up",
     "db:reset": "nx run api:db-reset",
     "db:seed": "nx run api:db-seed",
+    "db:seed:demo": "nx run api:db-seed-demo",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "nx run-many -t lint",

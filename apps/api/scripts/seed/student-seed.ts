@@ -346,7 +346,7 @@ async function recordLifecycle(
   }
 }
 
-async function openPortalLogins(
+export async function openPortalLogins(
   app: INestApplicationContext,
   db: Database,
   organizationId: string
