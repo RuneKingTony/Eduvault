@@ -138,7 +138,7 @@ interface RefundInput {
   proofFileId?: string;
 }
 
-export async function refundBody(
+async function refundBody(
   api: Api,
   actor: Pick<TestUser, 'cookie'>,
   input: RefundInput

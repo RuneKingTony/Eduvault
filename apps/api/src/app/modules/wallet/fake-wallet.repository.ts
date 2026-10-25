@@ -78,7 +78,7 @@ interface Earmark {
   key: string;
 }
 
-export interface FakeRequest {
+interface FakeRequest {
   kind: WalletApprovalKind;
   id: string;
   organizationId: string;
