@@ -8,7 +8,7 @@ import {
 import type { Random } from './prng';
 
 /** A naira is 100 minor units; every planned amount is a whole ₦1,000. */
-const AMOUNT_STEP_MINOR = 100_000;
+export const AMOUNT_STEP_MINOR = 100_000;
 
 const FEE_TYPE_CODES = {
   tuition: 4010,
@@ -154,7 +154,7 @@ export interface FamilyPayment {
 const TRANSFER_SHARE = 0.15;
 const PAYMENT_WINDOW_DAYS = { newest: 2, oldest: 30 };
 
-const roundDown = (minor: number): number =>
+export const roundDown = (minor: number): number =>
   Math.floor(minor / AMOUNT_STEP_MINOR) * AMOUNT_STEP_MINOR;
 
 export function splitByWeight(

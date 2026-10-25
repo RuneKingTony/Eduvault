@@ -7,6 +7,7 @@ import { DEMO_ARM_COUNT } from '../scripts/seed/demo/config';
 import { COUNTED_TABLES } from '../scripts/seed/demo/demo-check';
 import { buildDemoPlan } from '../scripts/seed/demo/plan';
 import { runDemoSeed } from '../scripts/seed/demo/run-demo-seed';
+import { STORE_ITEMS } from '../scripts/seed/demo/store-plan';
 import { runSeed } from '../scripts/seed/run-seed';
 import { baseTest as test, expect } from './support/base-test';
 
@@ -45,7 +46,17 @@ test.describe('demo seed', () => {
                   (SELECT count(*) FROM invoice WHERE organization_id = o.id) AS invoice,
                   (SELECT count(*) FROM payment WHERE organization_id = o.id) AS payment,
                   (SELECT count(*) FROM wallet WHERE organization_id = o.id) AS wallet,
-                  (SELECT count(*) FROM journal_line WHERE organization_id = o.id) AS journal_line
+                  (SELECT count(*) FROM journal_line WHERE organization_id = o.id) AS journal_line,
+                  (SELECT count(*) FROM item WHERE organization_id = o.id) AS item,
+                  (SELECT count(*) FROM stock_delivery WHERE organization_id = o.id) AS stock_delivery,
+                  (SELECT count(*) FROM stock_count WHERE organization_id = o.id) AS stock_count,
+                  (SELECT count(*) FROM store_sale WHERE organization_id = o.id) AS store_sale,
+                  (SELECT count(*) FROM adjustment WHERE organization_id = o.id) AS adjustment,
+                  (SELECT count(*) FROM student_discount WHERE organization_id = o.id) AS student_discount,
+                  (SELECT count(*) FROM payment_void WHERE organization_id = o.id) AS payment_void,
+                  (SELECT count(*) FROM announcement WHERE organization_id = o.id) AS announcement,
+                  (SELECT count(*) FROM staff_leave WHERE organization_id = o.id) AS staff_leave,
+                  (SELECT count(*) FROM student WHERE organization_id = o.id AND exit_kind IS NOT NULL) AS student_gone
            FROM organization o WHERE o.slug <> 'riverside' ORDER BY o.slug`
         );
         return rows;
@@ -91,9 +102,10 @@ test.describe('demo seed', () => {
       );
 
       const paying = plan.payments.filter((payment) => payment.amountMinor > 0);
+      const sales = plan.store.sales;
       expect(
         await scalar(`SELECT count(*) AS n FROM payment WHERE ${inRiverside}`)
-      ).toBe(paying.length);
+      ).toBe(paying.length + sales.length);
       expect(
         await scalar(
           `SELECT count(*) AS n FROM payment WHERE ${inRiverside} AND reference LIKE 'DEMO-PAY-%'`
@@ -103,7 +115,10 @@ test.describe('demo seed', () => {
         await scalar(
           `SELECT count(*) AS n FROM payment WHERE ${inRiverside} AND proof_file_id IS NOT NULL`
         )
-      ).toBe(paying.filter((payment) => payment.method === 'transfer').length);
+      ).toBe(
+        paying.filter((payment) => payment.method === 'transfer').length +
+          sales.filter((sale) => sale.method === 'transfer').length
+      );
 
       const autoPay = plan.wallets.filter((wallet) => wallet.autoPay !== null);
       expect(plan.wallets.length).toBeGreaterThan(0);
@@ -123,6 +138,44 @@ test.describe('demo seed', () => {
           `SELECT count(*) AS n FROM journal_entry WHERE ${inRiverside} AND reference LIKE 'AUTOPAY-%'`
         )
       ).toBeGreaterThanOrEqual(autoPay.length);
+
+      const inRiversideCount = (table: string, extra = '') =>
+        scalar(
+          `SELECT count(*) AS n FROM ${table} WHERE ${inRiverside}${extra}`
+        );
+      const { store, approvals, studentLife } = plan;
+      expect(await inRiversideCount('item')).toBe(STORE_ITEMS.length);
+      expect(await inRiversideCount('stock_delivery')).toBe(4);
+      expect(await inRiversideCount('store_sale')).toBe(store.sales.length);
+      expect(await inRiversideCount('stock_count')).toBe(store.counts.length);
+      expect(
+        await inRiversideCount('stock_count', ` AND status = 'submitted'`)
+      ).toBe(
+        store.counts.filter((count) => count.decision === 'waiting').length
+      );
+      expect(await inRiversideCount('adjustment')).toBe(
+        approvals.adjustments.length
+      );
+      expect(await inRiversideCount('student_discount')).toBe(
+        approvals.discounts.length
+      );
+      expect(await inRiversideCount('payment_void')).toBe(
+        approvals.voids.length
+      );
+      expect(await inRiversideCount('payment', ` AND status = 'voided'`)).toBe(
+        approvals.voids.filter((row) => row.state === 'approved').length
+      );
+      expect(await inRiversideCount('announcement')).toBe(
+        plan.announcements.length
+      );
+      expect(await inRiversideCount('staff_leave')).toBe(plan.leave.length);
+      expect(await inRiversideCount('student', ` AND exit_kind = 'left'`)).toBe(
+        studentLife.left.length
+      );
+      expect(
+        await inRiversideCount('student', ` AND exit_kind = 'graduated'`)
+      ).toBe(studentLife.graduated.length);
+      expect(lines.join('\n')).toContain('Store: 24 items');
 
       const before = await counts();
       const again: string[] = [];

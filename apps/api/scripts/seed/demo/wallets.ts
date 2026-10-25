@@ -12,8 +12,9 @@ import {
   type PeopleFacts,
   type SchoolFacts,
 } from './demo-run';
-import { accountFor, proofOf, type MoneyFacts } from './money';
+import { accountFor, bursarOf, proofOf, type MoneyFacts } from './money';
 import type { WalletPlan } from './money-plan';
+import { oldestFirst } from './ordering';
 import {
   familyOf,
   payerEmailOf,
@@ -38,7 +39,7 @@ async function topUp(
 ): Promise<void> {
   const { run, money, walletIds, people } = context;
   const family = familyOf(run.plan.families, wallet.family);
-  const bursar = found(money.bursars.get(family.campus), family.campus);
+  const bursar = bursarOf(money, family.campus);
   const guardianId = found(people.payerIds.get(wallet.family), 'payer');
   const day = moveClock(run, top.daysAgo);
   const proof = await run.app
@@ -137,9 +138,7 @@ export async function runWallets(
     ...facts,
     walletIds: new Map(rows.map((row) => [row.guardian_id, row.id])),
   };
-  const ordered = run.plan.wallets.toSorted(
-    (left, right) => right.daysAgo - left.daysAgo
-  );
+  const ordered = oldestFirst(run.plan.wallets, (wallet) => wallet.daysAgo);
   const logProgress = progressLogger(run, ordered.length, {
     every: PROGRESS_EVERY,
     line: (done) => `  ${done} of ${ordered.length} wallets done`,
