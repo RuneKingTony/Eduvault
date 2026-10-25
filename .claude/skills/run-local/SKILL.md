@@ -44,6 +44,24 @@ Seed data (password for all: `password123`; every member holds the starter role 
 | `principal@stbrendans.test`    | St Brendan's Schools owner, Main, Annex and Junior          | paused (403 `SchoolSuspended`) |
 | `admin@eduvault.test`          | Super admin, no school: web-admin opens `/platform/schools` | n/a                            |
 
+### Optional: the demo school
+
+```sh
+pnpm db:seed:demo    # nx run api:db-seed-demo; prints "Demo school already seeded; nothing to do." on re-run
+```
+
+Adds one more school to an empty or an already seeded database (`pnpm db:seed` is not needed first): Riverside International School (slug `riverside`) with Main and Annex campuses, 24 classes, 600 students and their guardians, 30 teachers, a billed first term with payments (some part-paid, some owing, some in credit) and 60 family wallets with top-ups, spends, set-asides and auto-pay. `SEED_DEMO_STUDENTS` (default 600, at least 24) and `SEED_DEMO_TEACHERS` (default 30) set the size. It takes about two to three minutes at full size (1m 36s to 3m 14s measured) and prints progress, then its own check (which also runs the seed a second time and expects nothing to change) and a summary of sign-ins. The normal seed and its Greenfield data are untouched; a run that stopped part way is not resumed, so `pnpm db:reset` and seed again.
+
+Sign in with the password `password123` (the same for every demo account):
+
+| Email                                                   | Who                                                            |
+| ------------------------------------------------------- | -------------------------------------------------------------- |
+| `owner@riverside.test`                                  | School owner, both campuses, sees all 600 students             |
+| `principal@riverside.test`                              | Principal                                                      |
+| `bursar.main@riverside.test`                            | Bursar, Main (`bursar.annex@riverside.test`, Annex)            |
+| `teacher01@riverside.test` … `teacher30@riverside.test` | Teachers, each on one campus                                   |
+| the guardian emails the seed prints                     | Paying guardians with a wallet; the first few have auto-pay on |
+
 ## Super admin without the seed
 
 The super admin is the one account no HTTP route creates. On an empty database, or to add another:
