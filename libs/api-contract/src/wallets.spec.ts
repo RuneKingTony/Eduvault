@@ -302,10 +302,17 @@ describe('the wallet routes', () => {
     }
   });
 
-  it('know the wallet journal kinds and the proof file kind', () => {
+  it('know the wallet journal kinds and the proof file kinds', () => {
     expect(JOURNAL_KINDS).toEqual(
-      expect.arrayContaining(['wallet_topup', 'wallet_spend'])
+      expect.arrayContaining([
+        'wallet_topup',
+        'wallet_spend',
+        'wallet_refund',
+        'wallet_topup_void',
+      ])
     );
-    expect(FILE_KINDS).toContain('wallet_proof');
+    expect(FILE_KINDS).toEqual(
+      expect.arrayContaining(['wallet_proof', 'wallet_refund_request'])
+    );
   });
 });

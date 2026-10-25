@@ -54,15 +54,20 @@ describe('generateWalletReference', () => {
     ['setAside', 'WSA'],
     ['release', 'WRL'],
     ['autoPay', 'WAP'],
+    ['refund', 'WRQ'],
+    ['cancelTopUp', 'WTQ'],
   ] as const)('prefixes %s with %s and the Lagos date', (kind, prefix) => {
     expect(
       generateWalletReference(kind, '2026-10-25', fixed(0, 1, 2, 3, 4, 5))
     ).toBe(`${prefix}-20261025-ABCDEF`);
   });
 
-  it('never starts like a number the system issues', () => {
-    expect(
-      isReservedReference(generateWalletReference('spend', '2026-10-25'))
-    ).toBe(false);
-  });
+  it.each(['spend', 'refund', 'cancelTopUp'] as const)(
+    'never starts like a number the system issues (%s)',
+    (kind) => {
+      expect(
+        isReservedReference(generateWalletReference(kind, '2026-10-25'))
+      ).toBe(false);
+    }
+  );
 });

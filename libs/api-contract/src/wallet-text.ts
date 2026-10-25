@@ -10,8 +10,18 @@ interface TitledMovement {
     | { type: 'topup'; method: PaymentMethod; depositorName: string | null }
     | { type: 'monnify' }
     | { type: 'spend'; automatic?: boolean }
+    | { type: 'refund' }
+    | { type: 'topup_cancellation' }
     | null;
 }
+
+const FIXED_TITLES: Partial<
+  Record<NonNullable<TitledMovement['source']>['type'], string>
+> = {
+  monnify: 'Online top-up · Monnify',
+  refund: 'Refund paid out',
+  topup_cancellation: 'Top-up cancelled',
+};
 
 export function movementTitle({ source, studentName }: TitledMovement): string {
   if (source?.type === 'topup') {
@@ -19,8 +29,9 @@ export function movementTitle({ source, studentName }: TitledMovement): string {
       source.depositorName === null ? '' : ` from ${source.depositorName}`;
     return `Top-up${from} · ${PAYMENT_METHOD_LABELS[source.method]}`;
   }
-  if (source?.type === 'monnify') {
-    return 'Online top-up · Monnify';
+  const fixed = source === null ? undefined : FIXED_TITLES[source.type];
+  if (fixed !== undefined) {
+    return fixed;
   }
   const verb =
     source?.type === 'spend' && source.automatic === true

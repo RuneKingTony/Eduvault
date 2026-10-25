@@ -2,33 +2,54 @@ import { allocateSpend, childSpendable, walletFigures } from './wallet-math';
 
 describe('walletFigures', () => {
   it('sets aside the sum of the earmarks and leaves the rest free', () => {
-    expect(walletFigures(5_000_000, [1_000_000, 500_000])).toEqual({
+    expect(walletFigures(5_000_000, [1_000_000, 500_000], 0)).toEqual({
       balanceMinor: 5_000_000,
       setAsideMinor: 1_500_000,
+      heldMinor: 0,
       freeMinor: 3_500_000,
     });
   });
 
   it('is all free with no earmarks and all zero for an empty wallet', () => {
-    expect(walletFigures(700_000, [])).toEqual({
+    expect(walletFigures(700_000, [], 0)).toEqual({
       balanceMinor: 700_000,
       setAsideMinor: 0,
+      heldMinor: 0,
       freeMinor: 700_000,
     });
-    expect(walletFigures(0, [])).toEqual({
+    expect(walletFigures(0, [], 0)).toEqual({
       balanceMinor: 0,
       setAsideMinor: 0,
+      heldMinor: 0,
       freeMinor: 0,
     });
   });
 
   it('keeps every figure an integer number of kobo', () => {
-    const figures = walletFigures(10_001, [3333, 3333, 3333]);
+    const figures = walletFigures(10_001, [3333, 3333, 3333], 0);
     expect(figures).toEqual({
       balanceMinor: 10_001,
       setAsideMinor: 9999,
+      heldMinor: 0,
       freeMinor: 2,
     });
+  });
+
+  it('takes held money out of the free money and leaves the balance alone', () => {
+    expect(walletFigures(5_000_000, [1_000_000], 1_500_000)).toEqual({
+      balanceMinor: 5_000_000,
+      setAsideMinor: 1_000_000,
+      heldMinor: 1_500_000,
+      freeMinor: 2_500_000,
+    });
+  });
+
+  it('leaves nothing free when everything not set aside is held', () => {
+    expect(walletFigures(2_000_000, [500_000], 1_500_000).freeMinor).toBe(0);
+  });
+
+  it('shows a negative free figure when the hold is more than what is free', () => {
+    expect(walletFigures(1_000_000, [], 1_200_000).freeMinor).toBe(-200_000);
   });
 });
 

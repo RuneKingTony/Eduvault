@@ -7,6 +7,7 @@ import {
   APPROVAL_KINDS,
   APPROVAL_RULE_BY_KIND,
   DECLINE_REASON_MESSAGE,
+  WALLET_APPROVAL_KINDS,
   SELF_APPROVAL_MESSAGE,
   approvalItemSchema,
   approvalDecideSchema,
@@ -16,6 +17,7 @@ import {
   approvalSummarySchema,
   declineSchema,
   isMoneyApproval,
+  isRuledApproval,
 } from './approvals';
 import { apiErrorCodeSchema, errorSchema } from './schemas';
 
@@ -60,8 +62,27 @@ describe('approval copy', () => {
     expect(APPROVAL_KIND_LABELS.credit_note).toBe('Reduce a fee');
     expect(APPROVAL_KIND_LABELS.write_off).toBe('Cancel a balance');
     expect(APPROVAL_KIND_LABELS.store_write_off).toBe('Store write-off');
+    expect(APPROVAL_KIND_LABELS.wallet_refund).toBe('Wallet refund');
+    expect(APPROVAL_KIND_LABELS.wallet_topup_cancellation).toBe(
+      'Cancel a top-up'
+    );
     expect(APPROVAL_RULE_BY_KIND.store_write_off).toBe('writeOff');
     expect(new Set(Object.values(APPROVAL_RULE_BY_KIND)).size).toBe(5);
+  });
+
+  it('gives the wallet kinds no approval switch, because they always need a second person', () => {
+    expect(WALLET_APPROVAL_KINDS).toEqual([
+      'wallet_refund',
+      'wallet_topup_cancellation',
+    ]);
+    expect(Object.keys(APPROVAL_RULE_BY_KIND)).not.toEqual(
+      expect.arrayContaining([...WALLET_APPROVAL_KINDS])
+    );
+    expect(isMoneyApproval('wallet_refund')).toBe(true);
+    expect(isRuledApproval('wallet_refund')).toBe(false);
+    expect(isRuledApproval('wallet_topup_cancellation')).toBe(false);
+    expect(isRuledApproval('leave')).toBe(false);
+    expect(isRuledApproval('payment_void')).toBe(true);
   });
 
   it('labels leave and gives it no approval switch', () => {
@@ -75,6 +96,10 @@ describe('approval copy', () => {
     expect(Object.keys(APPROVAL_KIND_PERMISSION)).toEqual([...APPROVAL_KINDS]);
     expect(APPROVAL_KIND_PERMISSION.leave).toBe('leave:approve');
     expect(APPROVAL_KIND_PERMISSION.discount).toBe('adjustment:approve');
+    expect(APPROVAL_KIND_PERMISSION.wallet_refund).toBe('wallet:approveRefund');
+    expect(APPROVAL_KIND_PERMISSION.wallet_topup_cancellation).toBe(
+      'wallet:approveRefund'
+    );
   });
 
   it('names the read permission that lets a viewer see each money kind', () => {
@@ -86,6 +111,10 @@ describe('approval copy', () => {
     }
     expect(APPROVAL_KIND_READ_PERMISSION.payment_void).toBe('adjustment:read');
     expect(APPROVAL_KIND_READ_PERMISSION.store_write_off).toBe('store:read');
+    expect(APPROVAL_KIND_READ_PERMISSION.wallet_refund).toBe('wallet:read');
+    expect(APPROVAL_KIND_READ_PERMISSION.wallet_topup_cancellation).toBe(
+      'wallet:read'
+    );
     expect(Object.keys(APPROVAL_KIND_READ_PERMISSION)).not.toContain('leave');
   });
 });
@@ -132,7 +161,7 @@ describe('approvalSummarySchema', () => {
   it('previews at most five items', () => {
     const summary = {
       waitingForMe: 6,
-      byNav: { approvals: 6, payments: 6, store: 0 },
+      byNav: { approvals: 6, payments: 6, store: 0, wallets: 0 },
       currency: 'NGN',
       preview: [item, item, item, item, item],
     };

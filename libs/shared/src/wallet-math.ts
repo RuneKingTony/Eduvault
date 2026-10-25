@@ -1,18 +1,21 @@
 export interface WalletFigures {
   balanceMinor: number;
   setAsideMinor: number;
+  heldMinor: number;
   freeMinor: number;
 }
 
 export function walletFigures(
   balanceMinor: number,
-  earmarksMinor: readonly number[]
+  earmarksMinor: readonly number[],
+  heldMinor: number
 ): WalletFigures {
   const setAsideMinor = earmarksMinor.reduce((sum, mark) => sum + mark, 0);
   return {
     balanceMinor,
     setAsideMinor,
-    freeMinor: balanceMinor - setAsideMinor,
+    heldMinor,
+    freeMinor: balanceMinor - setAsideMinor - heldMinor,
   };
 }
 

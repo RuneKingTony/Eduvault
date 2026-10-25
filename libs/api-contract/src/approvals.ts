@@ -20,6 +20,8 @@ export const APPROVAL_KINDS = [
   'discount',
   'leave',
   'store_write_off',
+  'wallet_refund',
+  'wallet_topup_cancellation',
 ] as const;
 export const approvalKindSchema = z.enum(APPROVAL_KINDS);
 export type ApprovalKind = z.infer<typeof approvalKindSchema>;
@@ -30,6 +32,8 @@ export const APPROVAL_KIND_LABELS = {
   discount: 'Discount',
   leave: 'Leave',
   store_write_off: 'Store write-off',
+  wallet_refund: 'Wallet refund',
+  wallet_topup_cancellation: 'Cancel a top-up',
 } as const satisfies Record<ApprovalKind, string>;
 
 export type MoneyApprovalKind = Exclude<ApprovalKind, 'leave'>;
@@ -42,6 +46,21 @@ export const isMoneyApproval = (
   kind: ApprovalKind
 ): kind is MoneyApprovalKind => kind !== 'leave';
 
+/** Always need a second person: no Approval-rules switch can turn them off. */
+export const WALLET_APPROVAL_KINDS = [
+  'wallet_refund',
+  'wallet_topup_cancellation',
+] as const satisfies readonly MoneyApprovalKind[];
+export const walletApprovalKindSchema = z.enum(WALLET_APPROVAL_KINDS);
+export type WalletApprovalKind = z.infer<typeof walletApprovalKindSchema>;
+
+export type RuledApprovalKind = Exclude<MoneyApprovalKind, WalletApprovalKind>;
+
+export const isRuledApproval = (
+  kind: ApprovalKind
+): kind is RuledApprovalKind =>
+  isMoneyApproval(kind) && !walletApprovalKindSchema.safeParse(kind).success;
+
 export const APPROVAL_KIND_PERMISSION = {
   payment_void: 'adjustment:approve',
   credit_note: 'adjustment:approve',
@@ -50,6 +69,8 @@ export const APPROVAL_KIND_PERMISSION = {
   discount: 'adjustment:approve',
   leave: 'leave:approve',
   store_write_off: 'adjustment:approve',
+  wallet_refund: 'wallet:approveRefund',
+  wallet_topup_cancellation: 'wallet:approveRefund',
 } as const satisfies Record<ApprovalKind, Permission>;
 
 export const APPROVAL_KIND_READ_PERMISSION = {
@@ -59,6 +80,8 @@ export const APPROVAL_KIND_READ_PERMISSION = {
   refund: 'adjustment:read',
   discount: 'adjustment:read',
   store_write_off: 'store:read',
+  wallet_refund: 'wallet:read',
+  wallet_topup_cancellation: 'wallet:read',
 } as const satisfies Record<MoneyApprovalKind, Permission>;
 
 export const APPROVAL_PAGE_SIZE = 10;
@@ -126,6 +149,7 @@ export const approvalSummarySchema = z.object({
     approvals: z.number().int().nonnegative(),
     payments: z.number().int().nonnegative(),
     store: z.number().int().nonnegative(),
+    wallets: z.number().int().nonnegative(),
   }),
   currency: currencySchema,
   preview: z.array(approvalItemSchema).max(APPROVAL_PREVIEW_SIZE),
@@ -147,7 +171,7 @@ export const APPROVAL_RULE_BY_KIND = {
   discount: 'discount',
   payment_void: 'paymentVoid',
   store_write_off: 'writeOff',
-} as const satisfies Record<MoneyApprovalKind, keyof ApprovalRules>;
+} as const satisfies Record<RuledApprovalKind, keyof ApprovalRules>;
 
 export const APPROVAL_RULES_ON_MESSAGE =
   'These requests now wait for a boss to approve.';

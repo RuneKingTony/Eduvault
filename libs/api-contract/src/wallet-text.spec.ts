@@ -46,6 +46,18 @@ describe('movementTitle', () => {
       })
     ).toBe('Auto-paid from wallet');
   });
+
+  it('names a refund and a cancelled top-up', () => {
+    expect(
+      movementTitle({ studentName: null, source: { type: 'refund' } })
+    ).toBe('Refund paid out');
+    expect(
+      movementTitle({
+        studentName: null,
+        source: { type: 'topup_cancellation' },
+      })
+    ).toBe('Top-up cancelled');
+  });
 });
 
 describe('traceFacts', () => {
