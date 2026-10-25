@@ -36,7 +36,7 @@ export interface RefundEmail {
   uploaded: boolean;
 }
 
-export const amountOf = (state: Pick<RefundState, 'amount'>): number =>
+const amountOf = (state: Pick<RefundState, 'amount'>): number =>
   parseNaira(state.amount) ?? 0;
 
 export function initialState(
