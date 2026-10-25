@@ -31,6 +31,7 @@ function useNavCounts(): Readonly<Record<string, number>> {
     approvals: summary?.byNav.approvals ?? 0,
     payments: summary?.byNav.payments ?? 0,
     store: summary?.byNav.store ?? 0,
+    wallets: summary?.byNav.wallets ?? 0,
   };
 }
 

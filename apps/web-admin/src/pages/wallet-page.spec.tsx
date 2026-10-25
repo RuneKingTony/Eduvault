@@ -2,7 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ApiError } from '@eduvault/api-contract';
 import { toast } from '@eduvault/ui';
-import { starterAccess } from '../test-utils';
+import { actingAccess, starterAccess } from '../test-utils';
 import {
   OTHER_WALLET_ID,
   RECEIPT_FILE_ID,
@@ -11,7 +11,10 @@ import {
   movementList,
   monnifyMovement,
   movement,
+  refundMovement,
+  refundOptions,
   renderWallets,
+  requestedCancellation,
   spendMovement,
   topUpOptions,
   wallet,
@@ -21,7 +24,11 @@ import { WalletPage } from './wallet-page';
 
 vi.mock('@eduvault/ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@eduvault/ui')>()),
-  toast: { success: vi.fn(), error: vi.fn() },
+  toast: Object.assign(vi.fn(), {
+    success: vi.fn(),
+    error: vi.fn(),
+    warning: vi.fn(),
+  }),
 }));
 
 function setup(
@@ -50,6 +57,8 @@ function setup(
           options.movements ?? movementList([spendMovement(), movement()])
         ),
       topUpOptions: vi.fn().mockResolvedValue(topUpOptions()),
+      refundOptions: vi.fn().mockResolvedValue(refundOptions()),
+      requestCancellation: vi.fn().mockResolvedValue(requestedCancellation()),
       reservedAccount: vi.fn().mockResolvedValue(wallet()),
     },
   };
@@ -330,5 +339,157 @@ describe('WalletPage Trace', () => {
     expect(within(trace).getByText('₦50,000.00')).toBeVisible();
     expect(within(trace).getByText('₦500.00')).toBeVisible();
     expect(within(trace).getByText('₦49,500.00')).toBeVisible();
+  });
+});
+
+describe('WalletPage held money', () => {
+  it('shows what waiting requests hold only when something is held', async () => {
+    setup({
+      wallet: wallet({ heldMinor: 1_500_000, freeMinor: 2_500_000 }),
+    });
+    expect(
+      within(
+        await screen.findByRole('group', { name: 'Held for requests' })
+      ).getByText('₦15,000.00')
+    ).toBeVisible();
+    expect(
+      within(screen.getByRole('group', { name: 'Free to use' })).getByText(
+        '₦25,000.00'
+      )
+    ).toBeVisible();
+  });
+
+  it('leaves the card out when nothing is held', async () => {
+    setup();
+    await screen.findByRole('group', { name: 'Balance' });
+    expect(
+      screen.queryByRole('group', { name: 'Held for requests' })
+    ).toBeNull();
+  });
+});
+
+describe('WalletPage Request refund', () => {
+  it('shows Request refund to someone who may ask, and opens the sheet from it', async () => {
+    const { onSearchChange } = setup({ access: starterAccess('bursar') });
+    await user.click(
+      await screen.findByRole('button', { name: 'Request refund' })
+    );
+    expect(onSearchChange).toHaveBeenCalledWith({ refund: 1 });
+  });
+
+  it('hides Request refund from someone who may only look or only approve', async () => {
+    setup({ access: starterAccess('principal') });
+    await screen.findByRole('heading', { name: 'Ngozi Okeke' });
+    expect(screen.queryByRole('button', { name: 'Request refund' })).toBeNull();
+  });
+
+  it('hides Request refund from a super admin acting without a reason, and shows it with one', async () => {
+    setup({ access: actingAccess(false) });
+    await screen.findByRole('heading', { name: 'Ngozi Okeke' });
+    expect(screen.queryByRole('button', { name: 'Request refund' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Record top-up' })).toBeNull();
+  });
+
+  it('shows Request refund to a super admin acting with a reason', async () => {
+    setup({ access: actingAccess(true) });
+    expect(
+      await screen.findByRole('button', { name: 'Request refund' })
+    ).toBeVisible();
+  });
+
+  it('opens the sheet when the address asks for it, only for someone who may ask', async () => {
+    setup({ search: { refund: 1 }, access: starterAccess('bursar') });
+    expect(
+      await screen.findByRole('dialog', { name: 'Request a refund' })
+    ).toBeVisible();
+  });
+
+  it('keeps the sheet shut for a reader even if the address asks for it', async () => {
+    setup({ search: { refund: 1 }, access: starterAccess('principal') });
+    await screen.findByRole('heading', { name: 'Ngozi Okeke' });
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+});
+
+const topUpWith = (cancellation: 'submitted' | 'approved') =>
+  movement({
+    reference: `CSH-${cancellation}`,
+    source: {
+      type: 'topup',
+      id: WALLET_ID,
+      method: 'cash',
+      depositorName: null,
+      proofFileId: RECEIPT_FILE_ID,
+      cancellation,
+    },
+  });
+
+describe('WalletPage Cancel top-up', () => {
+  it('offers Cancel top-up on a staff top-up to someone who may ask, and opens the dialog', async () => {
+    const { api } = setup({ access: starterAccess('bursar') });
+    const topUp = await screen.findByRole('row', {
+      name: /Top-up from Uncle Bode/,
+    });
+    await user.click(
+      within(topUp).getByRole('button', {
+        name: 'Cancel top-up CSH-20261007-K3Q7ZA',
+      })
+    );
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Cancel this top-up?',
+    });
+    await user.type(
+      within(dialog).getByLabelText('Reason'),
+      'Keyed against the wrong family'
+    );
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Request cancellation' })
+    );
+    await waitFor(() => {
+      expect(api.wallets.requestCancellation).toHaveBeenCalledTimes(1);
+    });
+    expect(api.wallets.requestCancellation.mock.calls[0]?.[0]).toMatchObject({
+      params: { walletId: WALLET_ID },
+    });
+  });
+
+  it('does not offer it on a Monnify credit, a spend or a refund', async () => {
+    setup({
+      access: starterAccess('bursar'),
+      movements: movementList([
+        monnifyMovement(),
+        spendMovement(),
+        refundMovement(),
+      ]),
+    });
+    await screen.findByRole('row', { name: /Online top-up · Monnify/ });
+    expect(screen.queryByRole('button', { name: /^Cancel top-up/ })).toBeNull();
+    expect(
+      within(screen.getByRole('row', { name: /Refund paid out/ })).getByText(
+        '−₦15,000.00'
+      )
+    ).toBeVisible();
+  });
+
+  it('shows a waiting or done cancellation as a badge instead of the button', async () => {
+    setup({
+      access: starterAccess('bursar'),
+      movements: movementList([topUpWith('submitted'), topUpWith('approved')]),
+    });
+    expect(await screen.findByText('Cancellation waiting')).toBeVisible();
+    expect(screen.getByText('Cancelled')).toBeVisible();
+    expect(screen.queryByRole('button', { name: /^Cancel top-up/ })).toBeNull();
+  });
+
+  it('hides the button from someone who may only look', async () => {
+    setup({ access: starterAccess('principal') });
+    await screen.findByRole('row', { name: /Top-up from Uncle Bode/ });
+    expect(screen.queryByRole('button', { name: /^Cancel top-up/ })).toBeNull();
+  });
+
+  it('hides the button while acting without a reason', async () => {
+    setup({ access: actingAccess(false) });
+    await screen.findByRole('row', { name: /Top-up from Uncle Bode/ });
+    expect(screen.queryByRole('button', { name: /^Cancel top-up/ })).toBeNull();
   });
 });

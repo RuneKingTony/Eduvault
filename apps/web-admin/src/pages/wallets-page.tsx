@@ -7,6 +7,7 @@ import {
 } from '@eduvault/api-contract';
 import { countOf, walletMoney } from '@eduvault/shared';
 import {
+  Badge,
   Card,
   CardContent,
   Empty,
@@ -16,6 +17,10 @@ import {
   EmptyTitle,
   NumberedPager,
   SearchInput,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
   Tooltip,
   TooltipContent,
   TooltipTrigger,
@@ -23,9 +28,15 @@ import {
 import { useApi } from '../api';
 import { QueryState } from '../components/money/query-state';
 import { useSearchText } from '../components/use-search-text';
+import { RequestsTab } from '../components/wallets/requests-tab';
 import { WalletsTable } from '../components/wallets/wallets-table';
-import { walletsQueryOptions } from '../queries';
-import type { WalletsSearch } from '../wallets-search';
+import { walletRequestsQueryOptions, walletsQueryOptions } from '../queries';
+import {
+  WALLETS_TABS,
+  walletsTabOf,
+  type WalletsSearch,
+  type WalletsTab,
+} from '../wallets-search';
 
 function Header() {
   return (
@@ -49,7 +60,8 @@ function Header() {
         </Tooltip>
       </h1>
       <p className="text-sm text-muted-foreground">
-        One wallet for each paying guardian. Open one to record a top-up.
+        One wallet for each paying guardian. Open one to record a top-up or ask
+        for a refund.
       </p>
     </header>
   );
@@ -67,6 +79,9 @@ function SummaryLine({
       {countOf(totals.walletCount, 'wallet', 'wallets')} ·{' '}
       {walletMoney(totals.balanceMinor, currency)} held ·{' '}
       {walletMoney(totals.setAsideMinor, currency)} set aside ·{' '}
+      {totals.heldMinor > 0
+        ? `${walletMoney(totals.heldMinor, currency)} held for requests · `
+        : ''}
       {walletMoney(totals.freeMinor, currency)} free to use
     </p>
   );
@@ -165,6 +180,68 @@ function WalletsCard({
   );
 }
 
+const TAB_LABELS: Record<WalletsTab, string> = {
+  wallets: 'Wallets',
+  requests: 'Requests',
+};
+
+function TabLabel({ tab, waiting }: { tab: WalletsTab; waiting: number }) {
+  return (
+    <>
+      {TAB_LABELS[tab]}
+      {tab === 'requests' && waiting > 0 ? (
+        <Badge variant="warning">{waiting}</Badge>
+      ) : null}
+    </>
+  );
+}
+
+function RequestsPanel({
+  requests,
+  page,
+  onPage,
+}: {
+  requests: ReturnType<typeof useRequestsQuery>;
+  page: number;
+  onPage: (page: number) => void;
+}) {
+  return (
+    <Card className="mt-3">
+      <CardContent className="px-0">
+        <QueryState query={requests} skeletonClassName="h-48">
+          {(list) => <RequestsTab list={list} page={page} onPage={onPage} />}
+        </QueryState>
+      </CardContent>
+    </Card>
+  );
+}
+
+function WalletsPanel({
+  wallets,
+  search,
+  onSearchChange,
+}: {
+  wallets: Parameters<typeof QueryState<WalletList>>[0]['query'];
+  search: WalletsSearch;
+  onSearchChange: (next: WalletsSearch) => void;
+}) {
+  return (
+    <QueryState query={wallets} skeletonClassName="h-48">
+      {(data) => (
+        <WalletsCard
+          data={data}
+          search={search}
+          onSearchChange={onSearchChange}
+        />
+      )}
+    </QueryState>
+  );
+}
+
+function useRequestsQuery(page: number) {
+  return useQuery(walletRequestsQueryOptions(useApi(), page));
+}
+
 export function WalletsPage({
   search,
   onSearchChange,
@@ -172,19 +249,54 @@ export function WalletsPage({
   search: WalletsSearch;
   onSearchChange: (next: WalletsSearch) => void;
 }) {
-  const wallets = useQuery(walletsQueryOptions(useApi(), search));
+  const tab = walletsTabOf(search);
+  const page = search.page ?? 1;
+  const wallets = useQuery(
+    walletsQueryOptions(useApi(), tab === 'wallets' ? search : { q: search.q })
+  );
+  const requests = useRequestsQuery(tab === 'requests' ? page : 1);
   return (
     <section className="flex flex-col gap-4">
       <Header />
-      <QueryState query={wallets} skeletonClassName="h-48">
-        {(data) => (
-          <WalletsCard
-            data={data}
+      <Tabs
+        value={tab}
+        onValueChange={(next) => {
+          onSearchChange({
+            tab: next === 'requests' ? 'requests' : undefined,
+            q: search.q,
+          });
+        }}
+      >
+        <TabsList>
+          {WALLETS_TABS.map((value) => (
+            <TabsTrigger key={value} value={value}>
+              <TabLabel
+                tab={value}
+                waiting={requests.data?.waitingCount ?? 0}
+              />
+            </TabsTrigger>
+          ))}
+        </TabsList>
+        <TabsContent value="wallets" className="mt-3 flex flex-col gap-4">
+          <WalletsPanel
+            wallets={wallets}
             search={search}
             onSearchChange={onSearchChange}
           />
-        )}
-      </QueryState>
+        </TabsContent>
+        <TabsContent value="requests">
+          <RequestsPanel
+            requests={requests}
+            page={page}
+            onPage={(next) => {
+              onSearchChange({
+                tab: 'requests',
+                page: next > 1 ? next : undefined,
+              });
+            }}
+          />
+        </TabsContent>
+      </Tabs>
     </section>
   );
 }

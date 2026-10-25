@@ -1,4 +1,5 @@
 import type { FileKind } from '@eduvault/api-contract';
+import { walletMoney } from '@eduvault/shared';
 import { toast } from '@eduvault/ui';
 import type { Api } from '../api';
 
@@ -48,4 +49,26 @@ export function announceReplay<T extends { replayed: boolean }>(
   }
   toast.warning(message(result));
   return true;
+}
+
+export function announceWalletRequest(
+  made: {
+    replayed: boolean;
+    request: { reference: string; amountMinor: number };
+    wallet: { currency: string };
+  },
+  label: string
+): void {
+  if (
+    announceReplay(
+      made,
+      (again) =>
+        `Reference ${again.request.reference} was already recorded. Nothing was requested twice.`
+    )
+  ) {
+    return;
+  }
+  toast.success(
+    `${label} of ${walletMoney(made.request.amountMinor, made.wallet.currency)} requested. A second person has to approve it.`
+  );
 }

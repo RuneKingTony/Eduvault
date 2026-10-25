@@ -38,8 +38,12 @@ export const SEARCH_DEFAULTS = {
     page: undefined,
     record: undefined,
   },
-  '/finance/wallets': { q: undefined, page: undefined },
-  '/finance/wallets/$walletId': { page: undefined, topup: undefined },
+  '/finance/wallets': { tab: undefined, q: undefined, page: undefined },
+  '/finance/wallets/$walletId': {
+    page: undefined,
+    topup: undefined,
+    refund: undefined,
+  },
   '/finance/accounts': { filter: undefined, q: undefined, page: undefined },
   '/finance/accounts/$studentId': {
     view: undefined,

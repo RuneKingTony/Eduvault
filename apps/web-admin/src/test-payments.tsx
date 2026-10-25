@@ -21,6 +21,7 @@ import { parseBillingSearch } from './billing-search';
 import { parseFeesSearch } from './fees-search';
 import { parseInvoicesSearch } from './invoices-search';
 import { parsePaymentsSearch, parseReceiptSearch } from './payments-search';
+import { parseWalletsSearch } from './wallets-search';
 import { ownerAccess, renderRoutes } from './test-utils';
 
 export const PAYMENT_ID = testId(0x1_60_01);
@@ -309,6 +310,7 @@ export function renderPayments(
     ['/finance/school-fees', parseFeesSearch],
     ['/finance/store', parseStoreSearch],
     ['/finance/other-fees', parseFeesSearch],
+    ['/finance/wallets', parseWalletsSearch],
   ] as const;
   return renderRoutes(page, api, { routes, access, path });
 }

@@ -139,6 +139,13 @@ export function ApprovalsBell() {
       void router.navigate({ to: '/finance/store', search: { tab } });
       return;
     }
+    if (tab === 'requests') {
+      void router.navigate({
+        to: '/finance/wallets',
+        search: searchFor('/finance/wallets', { tab }),
+      });
+      return;
+    }
     void router.navigate({
       to: '/finance/adjustments',
       search: searchFor('/finance/adjustments', { tab }),

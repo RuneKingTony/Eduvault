@@ -853,6 +853,20 @@ export const walletMovementsQueryOptions = (
     placeholderData: keepPreviousData,
   });
 
+export const refundOptionsQueryOptions = (api: Api) =>
+  queryOptions({
+    queryKey: [...WALLETS_KEY, 'refund-options'],
+    queryFn: () => api.wallets.refundOptions({}),
+    gcTime: 0,
+  });
+
+export const walletRequestsQueryOptions = (api: Api, page = 1) =>
+  queryOptions({
+    queryKey: [...WALLETS_KEY, 'requests', page],
+    queryFn: () => api.walletRequests.list({ query: { page } }),
+    placeholderData: keepPreviousData,
+  });
+
 export const gatewayConnectionQueryOptions = (api: Api) =>
   queryOptions({
     queryKey: [...GATEWAY_KEY, 'monnify'],
@@ -1218,6 +1232,7 @@ export async function invalidateStore(queryClient: QueryClient): Promise<void> {
 export const invalidateApprovals = (queryClient: QueryClient): Promise<void> =>
   invalidateAll(queryClient, [
     ...MONEY_VIEW_KEYS,
+    WALLETS_KEY,
     FEES_KEY,
     LEAVE_KEY,
     MEMBERS_KEY,
@@ -1246,6 +1261,11 @@ export const invalidateWallets = (queryClient: QueryClient): Promise<void> =>
 
 export const invalidateTopUp = (queryClient: QueryClient): Promise<void> =>
   invalidateAll(queryClient, [WALLETS_KEY, ...MONEY_VIEW_KEYS]);
+
+export const invalidateWalletRequest = (
+  queryClient: QueryClient
+): Promise<void> =>
+  invalidateAll(queryClient, [WALLETS_KEY, APPROVALS_KEY, ACTIVITY_KEY]);
 
 export async function invalidateSale(queryClient: QueryClient): Promise<void> {
   await Promise.all([

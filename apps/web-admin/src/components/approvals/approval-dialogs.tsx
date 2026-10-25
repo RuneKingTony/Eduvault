@@ -4,6 +4,7 @@ import { XIcon } from 'lucide-react';
 import {
   ApiError,
   DECLINE_REASON_MESSAGE,
+  WALLET_PAYOUT_REFERENCE_MESSAGE,
   type ApprovalItem,
 } from '@eduvault/api-contract';
 import { ConfirmDialog, toast } from '@eduvault/ui';
@@ -17,10 +18,21 @@ import {
   approvedMessage,
 } from './approval-copy';
 
-function approveRequest(api: Api, item: ApprovalItem): Promise<unknown> {
-  return api[APPROVAL_KIND_UI[item.kind].resource].approve({
-    params: { id: item.id },
-  });
+interface Approval {
+  item: ApprovalItem;
+  payoutReference: string;
+}
+
+function approveRequest(api: Api, approval: Approval): Promise<unknown> {
+  const { item, payoutReference } = approval;
+  const { resource } = APPROVAL_KIND_UI[item.kind];
+  if (resource === 'walletRefunds') {
+    return api.walletRefunds.approve({
+      params: { id: item.id },
+      body: { payoutReference },
+    });
+  }
+  return api[resource].approve({ params: { id: item.id } });
 }
 
 function declineRequest(
@@ -60,12 +72,12 @@ function useApprove(onClose: () => void) {
   const navigate = useNavigate();
   const decision = useDecision(onClose);
   return useMutation({
-    mutationFn: (target: ApprovalItem) => approveRequest(api, target),
-    onSuccess: async (_result, target) => {
+    mutationFn: (approval: Approval) => approveRequest(api, approval),
+    onSuccess: async (_result, { item }) => {
       await decision.done();
-      const { action } = APPROVAL_KIND_UI[target.kind].approvedToast;
+      const { action } = APPROVAL_KIND_UI[item.kind].approvedToast;
       toast.success(
-        approvedMessage(target),
+        approvedMessage(item),
         action === null
           ? undefined
           : {
@@ -106,12 +118,21 @@ export function ApproveDialog({ item, currency, onClose }: DialogProps) {
       note={
         item === null ? undefined : APPROVAL_KIND_UI[item.kind].approveEffect
       }
+      reason={
+        item?.kind === 'wallet_refund'
+          ? {
+              label: 'Payout reference',
+              placeholder: 'The bank’s own reference for the transfer',
+              missing: WALLET_PAYOUT_REFERENCE_MESSAGE,
+            }
+          : undefined
+      }
       confirmLabel="Approve"
       pending={approve.isPending}
       error={approve.error}
-      onConfirm={() => {
+      onConfirm={(payoutReference) => {
         if (item !== null) {
-          approve.mutate(item);
+          approve.mutate({ item, payoutReference });
         }
       }}
       onCancel={() => {

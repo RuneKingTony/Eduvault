@@ -12,6 +12,7 @@ import type {
 } from '@eduvault/api-contract';
 import { approvedLeave, declinedLeave } from './test-leave';
 import { stockCount } from './test-store';
+import { cancellationRequest, refundRequest } from './test-wallets';
 
 const id = (n: number) =>
   `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
@@ -98,7 +99,7 @@ export const approvalSummary = (
 ): ApprovalSummary => ({
   currency: 'NGN',
   waitingForMe: 7,
-  byNav: { approvals: 3, payments: 4, store: 0 },
+  byNav: { approvals: 3, payments: 4, store: 0, wallets: 0 },
   preview: [voidApproval(), approvalItem()],
   ...over,
 });
@@ -243,7 +244,46 @@ export const storeWriteOffApproval = (
     ...over,
   });
 
+export const walletRefundApproval = (
+  over: Partial<ApprovalItem> = {}
+): ApprovalItem =>
+  approvalItem({
+    kind: 'wallet_refund',
+    id: id(705),
+    label: 'Wallet refund',
+    details: 'Refund to Ngozi Okeke: Paid twice by mistake',
+    amountMinor: 1_500_000,
+    createdAt: '2026-10-26T08:00:00.000Z',
+    ...over,
+  });
+
+export const walletCancellationApproval = (
+  over: Partial<ApprovalItem> = {}
+): ApprovalItem =>
+  approvalItem({
+    kind: 'wallet_topup_cancellation',
+    id: id(706),
+    label: 'Cancel a top-up',
+    details:
+      'Top-up CSH-20261007-K3Q7ZA of Ngozi Okeke: Keyed against the wrong family',
+    amountMinor: 5_000_000,
+    createdAt: '2026-10-26T09:00:00.000Z',
+    ...over,
+  });
+
 export const decisionApi = () => ({
+  walletRefunds: {
+    approve: vi.fn().mockResolvedValue(refundRequest({ status: 'approved' })),
+    decline: vi.fn().mockResolvedValue(refundRequest({ status: 'rejected' })),
+  },
+  walletTopUpCancellations: {
+    approve: vi
+      .fn()
+      .mockResolvedValue(cancellationRequest({ status: 'approved' })),
+    decline: vi
+      .fn()
+      .mockResolvedValue(cancellationRequest({ status: 'rejected' })),
+  },
   paymentVoids: {
     approve: vi.fn().mockResolvedValue(voidRow({ status: 'approved' })),
     decline: vi.fn().mockResolvedValue(voidRow({ status: 'rejected' })),
