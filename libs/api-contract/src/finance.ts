@@ -38,6 +38,7 @@ export const JOURNAL_KINDS = [
   'wallet_spend',
   'wallet_refund',
   'wallet_topup_void',
+  'wallet_credit_migration',
 ] as const;
 export const FINANCE_PAGE_SIZE = 10;
 export const FINANCE_PAGE_SIZE_MAX = 50;

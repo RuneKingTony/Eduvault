@@ -146,12 +146,14 @@ Every line carries `campus_id`: for a student line, the student's placement camp
 | Store sale: payment             | Money account                         | Fees receivable (student)         | payment reference            |
 | Store delivery                  | Store stock                           | Money account                     | `DEL-…`                      |
 | Opening store stock             | Store stock                           | Opening balance                   | `OPEN-STORE-<campus>`        |
+| Credit moved to family wallet   | Fees receivable (each child)          | Student wallets (the family)      | `WMIG-<guardian_id>`         |
 | Stock count shortage (approved) | Store stock losses                    | Store stock                       | `CNT-…`                      |
 | Stock count surplus (approved)  | Store stock                           | Store stock losses                | `CNT-…`                      |
 | Expense (F1b, approved)         | Expense category                      | Money account                     | expense reference            |
 
 - A payment cancellation mirrors the payment's own lines (same accounts, students and campuses, debit and credit swapped), with `reverses_entry_id` set; it is not recomputed from today's placements.
 - Store cost and count differences are valued at the moving weighted average cost (D-031; see [inventory](data-model-inventory.md#cost)).
+- A credit migration (journal kind `wallet_credit_migration`) is one entry per family: a debit on Fees receivable for each child's credit and a single credit on Student wallets for the family total. It runs once per family and changes neither what is owed nor total credit.
 - The opening entries use journal kind `opening`. Each reference is unique per school, so a student or money account has at most one opening entry and re-running an import posts nothing twice.
 
 ## Invariants

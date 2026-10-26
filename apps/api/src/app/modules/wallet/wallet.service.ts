@@ -1,10 +1,13 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import {
+  CREDIT_MIGRATION_CHANGED_MESSAGE,
+  CREDIT_MIGRATION_EVERY_CAMPUS_MESSAGE,
   WALLET_ACCOUNT_GATEWAY_MESSAGE,
   WALLET_ACCOUNT_METHOD_MESSAGE,
   WALLET_ACCOUNT_NOT_FOUND_MESSAGE,
@@ -17,6 +20,9 @@ import {
   WALLET_PROOF_TAKEN_MESSAGE,
   WALLET_REFERENCE_TAKEN_MESSAGE,
   accountTakesMethod,
+  type CreditMigrationReport,
+  type CreditMigrationResult,
+  type MigrateCredit,
   type TopUpOptions,
   type TopUpWallet,
   type ToppedUpWallet,
@@ -35,6 +41,12 @@ import { topUpRequestHash } from './wallet-request-hash';
 import { WalletRepository } from './wallet.repository';
 
 const notFound = () => new NotFoundException(WALLET_NOT_FOUND_MESSAGE);
+
+function assertEveryCampus(ctx: OrgContext): void {
+  if (ctx.campusScope !== 'all') {
+    throw new ForbiddenException(CREDIT_MIGRATION_EVERY_CAMPUS_MESSAGE);
+  }
+}
 
 @Injectable()
 export class WalletService {
@@ -62,6 +74,48 @@ export class WalletService {
       currency,
       accounts: accounts.filter((account) => account.kind === 'bank'),
     };
+  }
+
+  async creditMigration(ctx: OrgContext): Promise<CreditMigrationReport> {
+    assertEveryCampus(ctx);
+    const [currency, view] = await Promise.all([
+      this.wallets.currency(ctx.organizationId),
+      this.wallets.creditMigration(ctx.organizationId),
+    ]);
+    return { currency, ...view };
+  }
+
+  async migrateCredit(
+    ctx: OrgContext,
+    input: MigrateCredit
+  ): Promise<CreditMigrationResult> {
+    assertEveryCampus(ctx);
+    const [currency, outcome] = await Promise.all([
+      this.wallets.currency(ctx.organizationId),
+      this.wallets.migrateCredit({
+        organizationId: ctx.organizationId,
+        userId: ctx.user.id,
+        userName: ctx.user.name,
+        today: this.clock.today(),
+        ...input,
+      }),
+    ]);
+    if (outcome.status === 'changed') {
+      throw new ConflictException({
+        code: 'CreditMigrationChanged',
+        message: CREDIT_MIGRATION_CHANGED_MESSAGE,
+        report: { currency, ...outcome.report },
+      });
+    }
+    const replayed = outcome.status === 'replayed';
+    const figures = replayed
+      ? { familyCount: 0, childCount: 0, movedMinor: 0 }
+      : {
+          familyCount: outcome.familyCount,
+          childCount: outcome.childCount,
+          movedMinor: outcome.movedMinor,
+        };
+    return { currency, replayed, ...figures };
   }
 
   async list(ctx: OrgContext, query: WalletListQuery): Promise<WalletList> {

@@ -1,6 +1,7 @@
 import {
   ALL_PERMISSIONS,
   STARTER_ROLES,
+  canAny,
   toPermissionMap,
   type PermissionMap,
 } from '@eduvault/policy';
@@ -349,6 +350,17 @@ describe('nav gates', () => {
       '/finance/wallets'
     );
     expect(routeGate('/finance/wallets')).toEqual(['wallet:read']);
+  });
+
+  it('gates the credit migration on wallet:migrateCredit, which only the owner holds', () => {
+    expect(routeGate('/finance/wallets/credit-migration')).toEqual([
+      'wallet:migrateCredit',
+    ]);
+    const gate = routeGate('/finance/wallets/credit-migration') ?? [];
+    for (const slug of ['bursar', 'principal', 'administrator']) {
+      expect(canAny(starter(slug), gate)).toBe(false);
+    }
+    expect(canAny(everything, gate)).toBe(true);
   });
 
   it('shows Store only with store:read', () => {

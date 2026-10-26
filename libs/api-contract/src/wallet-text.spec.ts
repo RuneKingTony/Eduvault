@@ -32,6 +32,21 @@ describe('movementTitle', () => {
     );
   });
 
+  it('counts the children whose credit moved into the wallet', () => {
+    expect(
+      movementTitle({
+        studentName: null,
+        source: { type: 'credit_migration', childCount: 3 },
+      })
+    ).toBe('Credit moved from 3 children’s accounts');
+    expect(
+      movementTitle({
+        studentName: null,
+        source: { type: 'credit_migration', childCount: 1 },
+      })
+    ).toBe('Credit moved from 1 child’s account');
+  });
+
   it('says Auto-paid for a spend auto-pay made', () => {
     expect(
       movementTitle({

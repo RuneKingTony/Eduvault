@@ -56,6 +56,17 @@ describe('portalMovementOf', () => {
     });
   });
 
+  it('tells a family how many children’s accounts its moved credit came from', () => {
+    const portal = portalMovementOf(
+      movement({
+        kind: 'wallet_credit_migration',
+        reference: 'WMIG-guardian-1',
+        source: { type: 'credit_migration', childCount: 2 },
+      })
+    );
+    expect(portal.source).toEqual({ type: 'credit_migration', childCount: 2 });
+  });
+
   it('keeps the Monnify facts Trace shows but not the top-up row id', () => {
     const portal = portalMovementOf(
       movement({

@@ -25,6 +25,7 @@ export const statements = {
     'requestRefund',
     'approveRefund',
     'manageGateway',
+    'migrateCredit',
   ],
   subject: ['create', 'read', 'update'],
   member: ['create', 'read', 'update', 'delete'],
@@ -152,6 +153,8 @@ export const PERM_HELP: Partial<Record<Permission, string>> = {
     'Approves or declines wallet refund and top-up cancellation requests from other people, never their own.',
   'wallet:manageGateway':
     'Connects and changes the online payment gateway. Owner-only by default.',
+  'wallet:migrateCredit':
+    'Reviews and moves the credit left on student fee accounts into family wallets, once per family. Owner-only by default.',
 };
 
 const RESOURCE_LABELS: Record<Resource, string> = {

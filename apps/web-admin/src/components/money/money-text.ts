@@ -37,6 +37,7 @@ export const JOURNAL_KIND_LABELS: Record<JournalKind, string> = {
   wallet_spend: 'Paid from wallet',
   wallet_refund: 'Wallet refund',
   wallet_topup_void: 'Top-up cancelled',
+  wallet_credit_migration: 'Credit moved to wallet',
 };
 
 export const BUILT_IN_TIP =

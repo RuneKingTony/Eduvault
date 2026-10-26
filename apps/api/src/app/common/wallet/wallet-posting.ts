@@ -1,4 +1,4 @@
-import type { LedgerLine } from '../ledger';
+import { sumMinor, type LedgerLine } from '../ledger';
 
 interface TopUpPosting {
   moneyLedgerAccountId: string;
@@ -75,4 +75,36 @@ export function spendPostingLines(input: SpendPosting): LedgerLine[] {
       creditMinor: line.amountMinor,
     },
   ]);
+}
+
+interface CreditMigrationPosting {
+  walletsAccountId: string;
+  receivableId: string;
+  familyId: string;
+  children: readonly {
+    studentId: string;
+    campusId: string | null;
+    amountMinor: number;
+  }[];
+}
+
+export function creditMigrationPostingLines(
+  input: CreditMigrationPosting
+): LedgerLine[] {
+  const totalMinor = sumMinor(input.children.map((child) => child.amountMinor));
+  return [
+    ...input.children.map((child) => ({
+      ledgerAccountId: input.receivableId,
+      studentId: child.studentId,
+      campusId: child.campusId,
+      debitMinor: child.amountMinor,
+      creditMinor: 0,
+    })),
+    {
+      ledgerAccountId: input.walletsAccountId,
+      familyId: input.familyId,
+      debitMinor: 0,
+      creditMinor: totalMinor,
+    },
+  ];
 }

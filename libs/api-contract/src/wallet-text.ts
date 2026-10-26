@@ -12,6 +12,7 @@ interface TitledMovement {
     | { type: 'spend'; automatic?: boolean }
     | { type: 'refund' }
     | { type: 'topup_cancellation' }
+    | { type: 'credit_migration'; childCount: number }
     | null;
 }
 
@@ -23,15 +24,24 @@ const FIXED_TITLES: Partial<
   topup_cancellation: 'Top-up cancelled',
 };
 
-export function movementTitle({ source, studentName }: TitledMovement): string {
+function ownTitle(source: TitledMovement['source']): string | undefined {
   if (source?.type === 'topup') {
     const from =
       source.depositorName === null ? '' : ` from ${source.depositorName}`;
     return `Top-up${from} · ${PAYMENT_METHOD_LABELS[source.method]}`;
   }
-  const fixed = source === null ? undefined : FIXED_TITLES[source.type];
-  if (fixed !== undefined) {
-    return fixed;
+  if (source?.type === 'credit_migration') {
+    return source.childCount === 1
+      ? 'Credit moved from 1 child’s account'
+      : `Credit moved from ${source.childCount} children’s accounts`;
+  }
+  return source === null ? undefined : FIXED_TITLES[source.type];
+}
+
+export function movementTitle({ source, studentName }: TitledMovement): string {
+  const own = ownTitle(source);
+  if (own !== undefined) {
+    return own;
   }
   const verb =
     source?.type === 'spend' && source.automatic === true

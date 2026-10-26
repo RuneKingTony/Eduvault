@@ -28,7 +28,8 @@ type FinanceSubject =
   | 'gateway_topup'
   | 'wallet_spend'
   | 'wallet_refund'
-  | 'wallet_topup_cancellation';
+  | 'wallet_topup_cancellation'
+  | 'wallet_credit_migration';
 
 export interface FinanceActor {
   organizationId: string;
@@ -127,6 +128,12 @@ interface GatewayTopUpFacts extends WalletTopUpFacts {
 
 interface WalletSpendFacts {
   id: string;
+  walletId: string;
+  guardianName: string;
+}
+
+interface CreditMigrationFacts {
+  entryId: string;
   walletId: string;
   guardianName: string;
 }
@@ -817,6 +824,27 @@ export function walletSpentActivity(
         spendId: spend.id,
         walletId: spend.walletId,
         amountMinor,
+      },
+    })
+  );
+}
+
+export function walletCreditMigratedActivity(
+  actor: FinanceActor,
+  migration: CreditMigrationFacts,
+  children: readonly CampusAmount[]
+): ActivityInput[] {
+  return sumByCampus(children).map(({ campusId, amountMinor, count }) =>
+    finance(actor, {
+      campusId,
+      kind: 'wallet.credit_migrated',
+      subject: { type: 'wallet_credit_migration', id: migration.entryId },
+      text: `${actor.name} moved ${money(amountMinor, actor.currency)} of existing credit from ${countOf(count, 'child’s account', 'children’s accounts')} into ${migration.guardianName}’s wallet.`,
+      data: {
+        entryId: migration.entryId,
+        walletId: migration.walletId,
+        amountMinor,
+        childCount: count,
       },
     })
   );

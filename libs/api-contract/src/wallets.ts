@@ -197,6 +197,7 @@ export const walletMovementSourceSchema = z.discriminatedUnion('type', [
     topUpReference: z.string(),
     reason: z.string(),
   }),
+  z.object({ type: z.literal('credit_migration'), childCount: countSchema }),
 ]);
 export type WalletMovementSource = z.infer<typeof walletMovementSourceSchema>;
 
@@ -245,6 +246,7 @@ export const portalWalletMovementSourceSchema = z.discriminatedUnion('type', [
     type: z.literal('topup_cancellation'),
     topUpReference: z.string(),
   }),
+  z.object({ type: z.literal('credit_migration'), childCount: countSchema }),
 ]);
 export type PortalWalletMovementSource = z.infer<
   typeof portalWalletMovementSourceSchema
@@ -371,5 +373,85 @@ export const setAutoPaySchema = z.object({
 });
 export type SetAutoPayInput = z.input<typeof setAutoPaySchema>;
 export type SetAutoPay = z.output<typeof setAutoPaySchema>;
+
+export const CREDIT_MIGRATION_CHANGED_MESSAGE =
+  'The figures changed. Check them again.';
+export const CREDIT_MIGRATION_EVERY_CAMPUS_MESSAGE =
+  'Moving credit needs access to every campus.';
+export const CREDIT_MIGRATION_REASONS = [
+  'no_paying_guardian',
+  'family_already_migrated',
+] as const;
+export const creditMigrationReasonSchema = z.enum(CREDIT_MIGRATION_REASONS);
+export type CreditMigrationReason = z.infer<typeof creditMigrationReasonSchema>;
+export const CREDIT_MIGRATION_REASON_LABELS: Record<
+  CreditMigrationReason,
+  string
+> = {
+  no_paying_guardian: 'No guardian pays fees for this child',
+  family_already_migrated: 'Already moved',
+};
+
+export const creditMigrationChildSchema = z.object({
+  studentId: idSchema,
+  name: z.string(),
+  admissionNumber: z.string(),
+  amountMinor: minorSchema.positive(),
+  status: z.enum(['active', 'left', 'graduated']),
+  campusName: z.string(),
+});
+export type CreditMigrationChild = z.infer<typeof creditMigrationChildSchema>;
+
+export const creditMigrationFamilySchema = z.object({
+  walletId: idSchema,
+  guardianName: z.string(),
+  phone: z.string(),
+  totalMinor: minorSchema.positive(),
+  children: z.array(creditMigrationChildSchema).min(1),
+});
+export type CreditMigrationFamily = z.infer<typeof creditMigrationFamilySchema>;
+
+export const creditMigrationNotMovedSchema = z.object({
+  studentId: idSchema,
+  name: z.string(),
+  admissionNumber: z.string(),
+  amountMinor: minorSchema.positive(),
+  reason: creditMigrationReasonSchema,
+});
+export type CreditMigrationNotMoved = z.infer<
+  typeof creditMigrationNotMovedSchema
+>;
+
+export const creditMigrationTotalsSchema = z.object({
+  familyCount: countSchema,
+  childCount: countSchema,
+  movableMinor: minorSchema.nonnegative(),
+  notMovedMinor: minorSchema.nonnegative(),
+});
+export type CreditMigrationTotals = z.infer<typeof creditMigrationTotalsSchema>;
+
+export const creditMigrationReportSchema = z.object({
+  currency: currencySchema,
+  families: z.array(creditMigrationFamilySchema),
+  notMoved: z.array(creditMigrationNotMovedSchema),
+  totals: creditMigrationTotalsSchema,
+});
+export type CreditMigrationReport = z.infer<typeof creditMigrationReportSchema>;
+
+export const migrateCreditSchema = z.object({
+  expectedFamilies: countSchema,
+  expectedTotalMinor: minorSchema.nonnegative(),
+});
+export type MigrateCreditInput = z.input<typeof migrateCreditSchema>;
+export type MigrateCredit = z.output<typeof migrateCreditSchema>;
+
+export const creditMigrationResultSchema = z.object({
+  currency: currencySchema,
+  replayed: z.boolean(),
+  familyCount: countSchema,
+  childCount: countSchema,
+  movedMinor: minorSchema.nonnegative(),
+});
+export type CreditMigrationResult = z.infer<typeof creditMigrationResultSchema>;
 
 export { PAYMENT_PROOF as WALLET_PROOF } from './payments';

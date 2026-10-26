@@ -13,6 +13,7 @@ export const SYSTEM_REFERENCE_PREFIXES = {
   autopay: 'AUTOPAY',
   wallet_refund: 'WRF',
   wallet_cancellation: 'WTC',
+  wallet_credit_migration: 'WMIG',
 } as const;
 
 export type SystemReferenceKind = keyof typeof SYSTEM_REFERENCE_PREFIXES;

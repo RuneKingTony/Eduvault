@@ -94,6 +94,7 @@ const DESCRIBERS: Record<
   wallet_spend: () => 'Paid from wallet',
   wallet_refund: () => 'Wallet refund',
   wallet_topup_void: () => 'Wallet top-up cancelled',
+  wallet_credit_migration: () => 'Moved to family wallet',
 };
 
 export const describeMovement = (

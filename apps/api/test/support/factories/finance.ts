@@ -93,6 +93,19 @@ export async function postEntry(
   return db.transaction().execute((trx) => poster.post(trx, input));
 }
 
+export async function postEntryWhileOpen(
+  app: INestApplication,
+  input: PostInput,
+  whileOpen: () => Promise<void>
+): Promise<void> {
+  const db = app.get<Database>(KYSELY_TOKEN, { strict: false });
+  const poster = app.get(LedgerPoster, { strict: false });
+  await db.transaction().execute(async (trx) => {
+    await poster.post(trx, input);
+    await whileOpen();
+  });
+}
+
 export async function importOpening(
   app: INestApplication,
   actor: { cookie: string },

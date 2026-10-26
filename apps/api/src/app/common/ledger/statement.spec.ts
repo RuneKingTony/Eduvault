@@ -28,6 +28,7 @@ describe('movementStatus', () => {
     ['adjustment', 'debit', 'refunded'],
     ['wallet_spend', 'credit', 'paid'],
     ['wallet_spend', 'debit', 'cancelled'],
+    ['wallet_credit_migration', 'debit', 'moved'],
   ])('labels the %s %s as %s', (kind, side, status) => {
     expect(movementStatus(kind, side)).toBe(status);
   });
@@ -60,6 +61,24 @@ describe('statementTotals', () => {
       totalMinor: 26_000_000,
       reducedMinor: 1_100_000 + 2_000_000 + 300_000,
       paidMinor: 18_000_000 + 5_000_000 - 5_000_000 - 1_000_000,
+    });
+    expect(totals.balanceMinor).toBe(
+      totals.totalMinor - totals.reducedMinor - totals.paidMinor
+    );
+  });
+
+  it('takes moved credit out of Paid and keeps the identity', () => {
+    const totals = statementTotals([
+      move('invoice', 10_000_000, 0),
+      move('payment', 0, 15_000_000),
+      move('wallet_credit_migration', 5_000_000, 0),
+    ]);
+
+    expect(totals).toEqual({
+      balanceMinor: 0,
+      totalMinor: 10_000_000,
+      reducedMinor: 0,
+      paidMinor: 10_000_000,
     });
     expect(totals.balanceMinor).toBe(
       totals.totalMinor - totals.reducedMinor - totals.paidMinor

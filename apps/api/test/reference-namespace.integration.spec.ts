@@ -60,6 +60,7 @@ const RESERVED_REFERENCES = [
   'OPEN-STORE-1b2c',
   'OPEN-MA-1b2c',
   'OPEN-1b2c',
+  'WMIG-5d7e0f2a',
   'CHG-2026-00001-COST',
   'adj-2026-0001',
   '  Del-2026-0004  ',

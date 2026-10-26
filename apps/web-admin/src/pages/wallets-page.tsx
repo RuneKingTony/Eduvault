@@ -1,13 +1,16 @@
 import { useQuery } from '@tanstack/react-query';
+import { Link } from '@tanstack/react-router';
 import { InfoIcon, SearchIcon, WalletIcon } from 'lucide-react';
 import {
   FINANCE_PAGE_SIZE,
   type WalletList,
   type WalletListTotals,
 } from '@eduvault/api-contract';
+import { useCan } from '@eduvault/auth-client';
 import { countOf, walletMoney } from '@eduvault/shared';
 import {
   Badge,
+  Button,
   Card,
   CardContent,
   Empty,
@@ -39,30 +42,41 @@ import {
 } from '../wallets-search';
 
 function Header() {
+  const canMigrate = useCan('wallet', 'migrateCredit');
   return (
-    <header className="flex flex-col gap-1">
-      <h1 className="flex items-center gap-2">
-        Wallets
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              type="button"
-              aria-label="About wallets"
-              className="text-muted-foreground"
-            >
-              <InfoIcon className="size-4" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>
-            A wallet is money a family has paid in ahead. The guardian uses it
-            for their children’s charges, and can set some aside for one child.
-          </TooltipContent>
-        </Tooltip>
-      </h1>
-      <p className="text-sm text-muted-foreground">
-        One wallet for each paying guardian. Open one to record a top-up or ask
-        for a refund.
-      </p>
+    <header className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex flex-col gap-1">
+        <h1 className="flex items-center gap-2">
+          Wallets
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                aria-label="About wallets"
+                className="text-muted-foreground"
+              >
+                <InfoIcon className="size-4" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>
+              A wallet is money a family has paid in ahead. The guardian uses it
+              for their children’s charges, and can set some aside for one
+              child.
+            </TooltipContent>
+          </Tooltip>
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          One wallet for each paying guardian. Open one to record a top-up or
+          ask for a refund.
+        </p>
+      </div>
+      {canMigrate ? (
+        <Button asChild variant="outline">
+          <Link to="/finance/wallets/credit-migration">
+            Move existing credit
+          </Link>
+        </Button>
+      ) : null}
     </header>
   );
 }

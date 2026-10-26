@@ -308,6 +308,7 @@ const ROUTE_GATES = new Map<string, Gate>([
   ),
   ['/roles/new', ['ac:create']],
   ['/finance/adjustments', ['adjustment:read']],
+  ['/finance/wallets/credit-migration', ['wallet:migrateCredit']],
   ['/finance/ledger', ['ledger:read']],
   ['/finance/other-fees', ['feeLine:read']],
   ...FEES_ENTRIES,

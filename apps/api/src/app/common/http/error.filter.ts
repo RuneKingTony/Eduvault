@@ -135,6 +135,9 @@ export class ErrorFilter implements ExceptionFilter {
         ...(typeof payload['creditMinor'] === 'number'
           ? { creditMinor: payload['creditMinor'] }
           : {}),
+        ...(payload['report'] === undefined
+          ? {}
+          : { report: payload['report'] }),
         ...(Array.isArray(payload['issues'])
           ? { issues: payload['issues'] as ApiErrorBody['issues'] }
           : {}),

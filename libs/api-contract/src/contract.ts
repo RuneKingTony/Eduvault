@@ -193,8 +193,11 @@ import {
   saveGatewayConnectionSchema,
 } from './gateway';
 import {
+  creditMigrationReportSchema,
+  creditMigrationResultSchema,
   earmarkSchema,
   earmarkedWalletSchema,
+  migrateCreditSchema,
   portalWalletMovementListSchema,
   setAutoPaySchema,
   spendWalletSchema,
@@ -1142,6 +1145,17 @@ export const contract = defineContract({
       method: 'GET',
       path: '/finance/wallets/top-up-options',
       response: topUpOptionsSchema,
+    }),
+    creditMigration: defineRoute({
+      method: 'GET',
+      path: '/finance/wallets/credit-migration',
+      response: creditMigrationReportSchema,
+    }),
+    migrateCredit: defineRoute({
+      method: 'POST',
+      path: '/finance/wallets/credit-migration',
+      body: migrateCreditSchema,
+      response: creditMigrationResultSchema,
     }),
     get: defineRoute({
       method: 'GET',

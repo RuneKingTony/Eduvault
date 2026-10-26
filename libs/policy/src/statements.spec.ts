@@ -48,6 +48,7 @@ describe('statements', () => {
       'wallet:requestRefund',
       'wallet:approveRefund',
       'wallet:manageGateway',
+      'wallet:migrateCredit',
     ]);
     for (const permission of wallet) {
       expect(PERM_HELP[permission]).toMatch(/\S/);

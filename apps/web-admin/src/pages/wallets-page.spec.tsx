@@ -47,6 +47,24 @@ beforeEach(() => {
 });
 
 describe('WalletsPage', () => {
+  it('offers Move existing credit to the owner, who holds wallet:migrateCredit', async () => {
+    setup();
+    expect(
+      await screen.findByRole('link', { name: 'Move existing credit' })
+    ).toHaveAttribute('href', '/finance/wallets/credit-migration');
+  });
+
+  it.each(['bursar', 'principal', 'administrator'])(
+    'does not offer Move existing credit to a %s',
+    async (slug) => {
+      setup({ access: starterAccess(slug) });
+      await screen.findByText(/wallets? ·/);
+      expect(
+        screen.queryByRole('link', { name: 'Move existing credit' })
+      ).not.toBeInTheDocument();
+    }
+  );
+
   it('shows the summary line with the money held, set aside and free', async () => {
     setup({
       list: walletList([

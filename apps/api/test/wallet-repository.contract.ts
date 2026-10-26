@@ -1,5 +1,6 @@
 import type {
   NewCancellationRequest,
+  NewCreditMigration,
   NewEarmark,
   NewRefundRequest,
   NewSpend,
@@ -24,6 +25,7 @@ export interface WalletHarness {
   newRefund: (
     overrides?: Partial<NewRefundRequest>
   ) => Promise<NewRefundRequest>;
+  giveCredit: (index: 0 | 1, amountMinor: number) => Promise<void>;
 }
 
 type TestFn = (
@@ -102,6 +104,17 @@ const markBody = (
   reference: mark.reference ?? nextReference('ERM'),
   studentId: harness.children[mark.index],
   amountMinor: mark.amountMinor,
+});
+
+const migrationBody = (
+  harness: WalletHarness,
+  reviewed: { expectedFamilies: number; expectedTotalMinor: number }
+): NewCreditMigration => ({
+  organizationId: harness.organizationId,
+  userId: harness.userId,
+  userName: harness.userName,
+  today: '2026-10-07',
+  ...reviewed,
 });
 
 export function describeWalletRepositoryContract(test: TestFn): void {
@@ -633,5 +646,62 @@ export function describeWalletRepositoryContract(test: TestFn): void {
       kind: 'wallet_topup_cancellation',
     });
     expect(cancellations).toMatchObject({ total: 1, waitingCount: 1 });
+  });
+
+  test('moves a child’s credit onto the wallet once and answers a second run as a replay', async (harness) => {
+    await harness.giveCredit(0, 500_000);
+    const { repository, organizationId } = harness;
+    const report = await repository.creditMigration(organizationId);
+    expect(report.totals).toEqual({
+      familyCount: 1,
+      childCount: 1,
+      movableMinor: 500_000,
+      notMovedMinor: 0,
+    });
+
+    const reviewed = { expectedFamilies: 1, expectedTotalMinor: 500_000 };
+    await expect(
+      repository.migrateCredit(migrationBody(harness, reviewed))
+    ).resolves.toEqual({
+      status: 'moved',
+      familyCount: 1,
+      childCount: 1,
+      movedMinor: 500_000,
+    });
+    expect((await view(harness)).balanceMinor).toBe(500_000);
+
+    await expect(
+      repository.migrateCredit(migrationBody(harness, reviewed))
+    ).resolves.toEqual({ status: 'replayed' });
+    expect((await view(harness)).balanceMinor).toBe(500_000);
+    expect((await repository.creditMigration(organizationId)).families).toEqual(
+      []
+    );
+  });
+
+  test('refuses credit figures that differ from the report, answering the fresh report and moving nothing', async (harness) => {
+    await harness.giveCredit(0, 500_000);
+
+    const refused = await harness.repository.migrateCredit(
+      migrationBody(harness, {
+        expectedFamilies: 1,
+        expectedTotalMinor: 499_999,
+      })
+    );
+
+    expect(refused).toMatchObject({
+      status: 'changed',
+      report: { totals: { familyCount: 1, movableMinor: 500_000 } },
+    });
+    expect((await view(harness)).balanceMinor).toBe(0);
+  });
+
+  test('answers a replay when no credit is left to move, even for figures of zero', async (harness) => {
+    await expect(
+      harness.repository.migrateCredit(
+        migrationBody(harness, { expectedFamilies: 0, expectedTotalMinor: 0 })
+      )
+    ).resolves.toEqual({ status: 'replayed' });
+    expect((await view(harness)).balanceMinor).toBe(0);
   });
 }

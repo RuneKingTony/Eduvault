@@ -174,6 +174,7 @@ describe('the statement row statuses', () => {
     expect(Object.keys(ROW_STATUS_LABELS)).toEqual([...STATEMENT_ROW_STATUSES]);
     expect(ROW_STATUS_LABELS.cancelled).toBe('Payment cancelled');
     expect(ROW_STATUS_LABELS.refunded).toBe('Refunded');
+    expect(ROW_STATUS_LABELS.moved).toBe('Moved to wallet');
   });
 
   it('read a voided receipt as voided, and leave other rows alone', () => {
@@ -188,9 +189,10 @@ describe('the statement row statuses', () => {
     expect(rowTone({ status: 'paid', voided: true })).toBe('neutral');
     expect(rowTone({ status: 'paid', voided: false })).toBe('paid');
     expect(rowTone({ status: 'charged' })).toBe('owe');
+    expect(rowTone({ status: 'moved' })).toBe('neutral');
   });
 
-  it('count charged, cancelled and refunded rows as owing and paid and reduced as not', () => {
+  it('count charged, cancelled and refunded rows as owing and paid, reduced and moved as not', () => {
     expect(
       STATEMENT_ROW_STATUSES.filter((status) => isOwingStatus(status))
     ).toEqual(['charged', 'cancelled', 'refunded']);

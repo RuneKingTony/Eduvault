@@ -5,6 +5,7 @@ import {
   approvalsSummaryQueryOptions,
   balancesQueryOptions,
   billingRunsQueryOptions,
+  creditMigrationQueryOptions,
   dashboardChargedQueryOptions,
   dashboardFinanceQueryOptions,
   dashboardMoneyQueryOptions,
@@ -14,6 +15,7 @@ import {
   feePreviewQueryOptions,
   invalidateApprovals,
   invalidateCharges,
+  invalidateCreditMigration,
   invalidateLeave,
   invalidatePayments,
   invalidateSale,
@@ -52,6 +54,7 @@ const VIEWS = {
   leave: memberLeaveQueryOptions(api, 'u1').queryKey,
   levels: classLevelsQueryOptions(api).queryKey,
   wallets: walletsQueryOptions(api).queryKey,
+  creditMigration: creditMigrationQueryOptions(api).queryKey,
 } as const;
 
 type View = keyof typeof VIEWS;
@@ -128,6 +131,11 @@ describe('what each mutation helper refreshes', () => {
       helper: 'invalidateTopUp',
       run: invalidateTopUp,
       covers: [...MONEY_VIEWS, 'wallets'],
+    },
+    {
+      helper: 'invalidateCreditMigration',
+      run: invalidateCreditMigration,
+      covers: [...MONEY_VIEWS, 'wallets', 'creditMigration'],
     },
     {
       helper: 'invalidateLeave',

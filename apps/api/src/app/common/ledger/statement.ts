@@ -36,6 +36,7 @@ const STATUS_BY_KIND: Record<
   wallet_spend: { debit: 'cancelled', credit: 'paid' },
   wallet_refund: { debit: 'cancelled', credit: 'paid' },
   wallet_topup_void: { debit: 'cancelled', credit: 'paid' },
+  wallet_credit_migration: { debit: 'moved', credit: 'paid' },
 };
 
 export const movementStatus = (
@@ -55,6 +56,7 @@ const PAID_DELTA: Record<StatementRowStatus, number> = {
   paid: 1,
   cancelled: -1,
   refunded: -1,
+  moved: -1,
 };
 
 export function statementTotals(

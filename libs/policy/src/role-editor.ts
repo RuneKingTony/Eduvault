@@ -256,6 +256,7 @@ export const ACTION_WORDS: Record<Action, string> = {
   requestRefund: 'ask for refunds',
   approveRefund: 'approve refunds',
   manageGateway: 'manage the payment gateway',
+  migrateCredit: 'move existing credit into wallets',
 };
 
 export function capabilityLabel(permission: Permission): string {

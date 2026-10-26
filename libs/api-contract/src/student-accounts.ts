@@ -16,6 +16,7 @@ export const STATEMENT_ROW_STATUSES = [
   'reduced',
   'cancelled',
   'refunded',
+  'moved',
 ] as const;
 export const BALANCE_SEARCH_MAX = 120;
 
@@ -34,6 +35,7 @@ export const ROW_STATUS_LABELS: Record<StatementRowStatus, string> = {
   reduced: 'Reduced',
   cancelled: 'Payment cancelled',
   refunded: 'Refunded',
+  moved: 'Moved to wallet',
 };
 
 export const VOIDED_LABEL = 'Voided';
@@ -53,7 +55,7 @@ export const rowTone = (row: {
   status: StatementRowStatus;
   voided?: boolean;
 }): 'owe' | 'paid' | 'neutral' => {
-  if (row.voided === true) {
+  if (row.voided === true || row.status === 'moved') {
     return 'neutral';
   }
   return isOwingStatus(row.status) ? 'owe' : 'paid';
