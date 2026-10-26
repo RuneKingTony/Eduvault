@@ -11,7 +11,7 @@ import { latestAutoPay } from './auto-pay-setting';
 import { oldestUnpaidByChild } from './oldest-unpaid';
 import { spendRequestHash } from './spend-request-hash';
 import { walletFreeMoney } from './wallet-held';
-import { writeSpend } from './wallet-spend';
+import { writeSpend, type SpendOutcome } from './wallet-spend';
 
 interface AutoPayCredit {
   organizationId: string;
@@ -118,34 +118,54 @@ export class WalletAutoPayService {
     if (wallet === undefined) {
       return;
     }
+    let outcome = await this.planAndSpend(trx, credit, {
+      userId: setting.createdBy,
+      wallet,
+    });
+    // A payment that landed after the plan can make a line too big; plan again from what is owed now.
+    if (outcome?.status === 'over') {
+      outcome = await this.planAndSpend(trx, credit, {
+        userId: setting.createdBy,
+        wallet,
+      });
+    }
+    if (outcome?.status === 'reference_used' || outcome?.status === 'over') {
+      throw new Error(`Auto-pay was refused: ${outcome.status}`);
+    }
+  }
+
+  private async planAndSpend(
+    trx: Kysely<DB>,
+    credit: AutoPayCredit,
+    payer: { userId: string; wallet: FamilyWallet }
+  ): Promise<SpendOutcome | undefined> {
+    const { organizationId, guardianId } = credit;
+    const { walletId, userName } = payer.wallet;
     const { freeMinor, marked } = await walletFreeMoney(trx, {
       organizationId,
-      walletId: wallet.walletId,
+      walletId,
       guardianId,
     });
     if (freeMinor <= 0) {
-      return;
+      return undefined;
     }
     const lines = planAutoPay(await childrenOf(trx, credit, marked), freeMinor);
     if (lines.length === 0) {
-      return;
+      return undefined;
     }
-    const outcome = await writeSpend(
+    return writeSpend(
       trx,
       { poster: this.poster, activity: this.activity },
       {
         organizationId,
-        userId: setting.createdBy,
-        userName: wallet.userName,
-        walletId: wallet.walletId,
+        userId: payer.userId,
+        userName,
+        walletId,
         reference: autoPayReference(credit.reference),
-        requestHash: spendRequestHash(wallet.walletId, { lines }),
+        requestHash: spendRequestHash(walletId, { lines }),
         lines,
         spentOn: this.clock.today(),
       }
     );
-    if (outcome.status === 'reference_used' || outcome.status === 'over') {
-      throw new Error(`Auto-pay was refused: ${outcome.status}`);
-    }
   }
 }
