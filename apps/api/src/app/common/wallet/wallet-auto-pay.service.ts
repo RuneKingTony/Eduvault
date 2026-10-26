@@ -3,6 +3,7 @@ import { sql, type Kysely } from 'kysely';
 import type { PayTableChild } from '@eduvault/shared';
 import type { DB } from '../../../db/db-types';
 import { ActivityWriter } from '../activity';
+import { memberHolds } from '../auth/role-permissions';
 import { Clock } from '../clock';
 import { LedgerPoster, receivableBalanceSql } from '../ledger';
 import { autoPayReference, planAutoPay } from './auto-pay-plan';
@@ -102,6 +103,15 @@ export class WalletAutoPayService {
     const { organizationId, guardianId } = credit;
     const setting = await latestAutoPay(trx, { organizationId, guardianId });
     if (setting?.enabled !== true) {
+      return;
+    }
+    if (
+      !(await memberHolds(
+        trx,
+        { organizationId, userId: setting.createdBy },
+        'wallet:spend'
+      ))
+    ) {
       return;
     }
     const wallet = await lockFamilyWallet(trx, credit, setting.createdBy);

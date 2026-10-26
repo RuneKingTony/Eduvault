@@ -123,6 +123,46 @@ test.describe('auto-pay', () => {
     expect(activity.rows.length).toBeGreaterThan(0);
   });
 
+  for (const [name, revoke] of [
+    [
+      'has lost wallet:spend',
+      `UPDATE "member" SET role = '' WHERE "userId" = $1`,
+    ],
+    ['is no longer a member', `DELETE FROM "member" WHERE "userId" = $1`],
+  ] as const) {
+    test(`pays nothing when the guardian who switched it on ${name}`, async ({
+      api,
+      app,
+      pool,
+      schools,
+    }) => {
+      const { owner, orgA } = schools;
+      const account = await cashAccount(app, owner);
+      const { ada, guardianLogin } = await family(app, schools);
+      await owing(app, owner, [
+        { studentId: ada.id, amountMinor: OWED, effectiveOn: '2026-09-01' },
+      ]);
+      const walletId = await walletIdOf(pool, guardianLogin?.guardianId ?? '');
+      const guardian = await signInAs(api, guardianLogin);
+      await autoPay(api, guardian, { reference: 'APY-ON-REVOKED' }).expect(200);
+      const setting = await pool.query<{ created_by: string }>(
+        'SELECT created_by FROM wallet_auto_pay_setting WHERE organization_id = $1',
+        [orgA.id]
+      );
+      await pool.query(revoke, [setting.rows[0]?.created_by]);
+
+      const topUp = await topUpWallet(api, owner, {
+        walletId,
+        accountId: account.id,
+        amountMinor: TOP_UP,
+      });
+
+      expect(topUp.wallet.balanceMinor).toBe(TOP_UP);
+      expect(await spendCount(pool)).toBe(0);
+      expect(await receivableBalance(pool, orgA.id, ada.id)).toBe(OWED);
+    });
+  }
+
   test('pays only from the free money while a refund request holds some of the wallet', async ({
     api,
     app,

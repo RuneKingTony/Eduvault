@@ -1,6 +1,9 @@
 import {
+  holds,
   parsePermissionMap,
   resolvePermissions,
+  splitRoles,
+  type Permission,
   type PermissionMap,
 } from '@eduvault/policy';
 import type { Pool } from 'pg';
@@ -44,4 +47,26 @@ export async function loadPermissions(
     [organizationId, roles]
   );
   return resolvePermissions(roles, customRolePermissions(rows));
+}
+
+/** Whether the user is a member of the school now and holds the permission, for work that runs without their session. */
+export async function memberHolds(
+  db: Database,
+  { organizationId, userId }: { organizationId: string; userId: string },
+  permission: Permission
+): Promise<boolean> {
+  const member = await db
+    .selectFrom('member')
+    .where('organizationId', '=', organizationId)
+    .where('userId', '=', userId)
+    .select('role')
+    .executeTakeFirst();
+  if (member === undefined) {
+    return false;
+  }
+  const permissions = resolvePermissions(
+    splitRoles(member.role),
+    await schoolRolePermissions(db, organizationId)
+  );
+  return holds(permissions, permission);
 }
