@@ -31,7 +31,8 @@ function CancelForm({
   const [reference] = useState(() =>
     generateWalletReference('cancelTopUp', lagosDateOf(new Date()))
   );
-  const topUpId = movement.source?.id ?? '';
+  const { source } = movement;
+  const topUpId = source !== null && 'id' in source ? source.id : '';
   const request = useMutation({
     mutationFn: (reason: string) =>
       api.wallets.requestCancellation({

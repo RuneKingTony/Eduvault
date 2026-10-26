@@ -121,6 +121,14 @@ describe('describeMovement', () => {
     ).toBe('Wallet top-up cancelled');
   });
 
+  it('says credit taken off the child went to the family wallet, for staff and family alike', () => {
+    const migration = { ...base, kind: 'wallet_credit_migration' } as const;
+    expect(describeMovement(migration, 'moved')).toBe('Moved to family wallet');
+    expect(describeForFamily(migration, 'moved')).toBe(
+      'Moved to family wallet'
+    );
+  });
+
   it('writes opening balances and adjustments from their memo', () => {
     expect(
       describeMovement(

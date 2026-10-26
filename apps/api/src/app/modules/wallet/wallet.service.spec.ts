@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
 import {
@@ -15,6 +16,8 @@ import {
   WALLET_PROOF_NOT_FOUND_MESSAGE,
   WALLET_PROOF_TAKEN_MESSAGE,
   WALLET_REFERENCE_TAKEN_MESSAGE,
+  CREDIT_MIGRATION_CHANGED_MESSAGE,
+  CREDIT_MIGRATION_EVERY_CAMPUS_MESSAGE,
   type TopUpWallet,
 } from '@eduvault/api-contract';
 import type { OrgContext } from '../../common/auth';
@@ -397,5 +400,162 @@ describe('WalletService reads with held money', () => {
       heldMinor: 1_500_000,
       freeMinor: 4_500_000,
     });
+  });
+});
+
+const withCredit = () => {
+  const made = setup();
+  made.repository.creditFacts = {
+    students: [
+      {
+        studentId: 'ada',
+        name: 'Ada Ojo',
+        admissionNumber: 'EDU/001',
+        creditMinor: 500_000,
+        status: 'active',
+        campusId: LEKKI,
+        campusName: 'Lekki',
+      },
+      {
+        studentId: 'tobi',
+        name: 'Tobi Ojo',
+        admissionNumber: 'EDU/002',
+        creditMinor: 300_000,
+        status: 'left',
+        campusId: IKEJA,
+        campusName: 'Ikeja',
+      },
+    ],
+    payers: [
+      {
+        studentId: 'ada',
+        guardianId: ojo.guardianId,
+        linkedAt: '2026-01-01T00:00:00.000000',
+      },
+      {
+        studentId: 'tobi',
+        guardianId: ojo.guardianId,
+        linkedAt: '2026-01-01T00:00:00.000000',
+      },
+    ],
+    owners: [
+      {
+        guardianId: ojo.guardianId,
+        walletId: ojo.id,
+        guardianName: ojo.name,
+        phone: ojo.phone,
+      },
+    ],
+  };
+  return made;
+};
+
+describe('WalletService credit migration', () => {
+  it('reports the families to move with the school currency', async () => {
+    const { service } = withCredit();
+    const report = await service.creditMigration(everyone);
+    expect(report.currency).toBe('NGN');
+    expect(report.totals).toEqual({
+      familyCount: 1,
+      childCount: 2,
+      movableMinor: 800_000,
+      notMovedMinor: 0,
+    });
+    expect(report.families[0]).toMatchObject({
+      walletId: ojo.id,
+      guardianName: 'Mrs Ojo',
+      totalMinor: 800_000,
+    });
+  });
+
+  it('posts what was reviewed once, as the person who asked, dated today', async () => {
+    const { repository, service } = withCredit();
+    const result = await service.migrateCredit(everyone, {
+      expectedFamilies: 1,
+      expectedTotalMinor: 800_000,
+    });
+    expect(result).toEqual({
+      currency: 'NGN',
+      replayed: false,
+      familyCount: 1,
+      childCount: 2,
+      movedMinor: 800_000,
+    });
+    expect(repository.migrations).toEqual([
+      expect.objectContaining({
+        organizationId: ORG,
+        userId: 'clerk',
+        userName: 'Tunde Bakare',
+        today: '2026-10-23',
+      }),
+    ]);
+  });
+
+  it('answers a second run with zeros and posts nothing new', async () => {
+    const { repository, service } = withCredit();
+    const reviewed = { expectedFamilies: 1, expectedTotalMinor: 800_000 };
+    await service.migrateCredit(everyone, reviewed);
+    const again = await service.migrateCredit(everyone, reviewed);
+    expect(again).toEqual({
+      currency: 'NGN',
+      replayed: true,
+      familyCount: 0,
+      childCount: 0,
+      movedMinor: 0,
+    });
+    expect(repository.migrations).toHaveLength(1);
+    expect((await service.creditMigration(everyone)).families).toEqual([]);
+  });
+
+  it('answers a run with nothing to move as a replay, even when the person read zeros', async () => {
+    const { repository, service } = setup();
+    const result = await service.migrateCredit(everyone, {
+      expectedFamilies: 0,
+      expectedTotalMinor: 0,
+    });
+    expect(result).toMatchObject({ replayed: true, movedMinor: 0 });
+    expect(repository.migrations).toEqual([]);
+  });
+
+  it('refuses figures the person did not read, with a conflict, and posts nothing', async () => {
+    const { repository, service } = withCredit();
+    const attempt = service.migrateCredit(everyone, {
+      expectedFamilies: 1,
+      expectedTotalMinor: 700_000,
+    });
+    await expect(attempt).rejects.toBeInstanceOf(ConflictException);
+    await expect(attempt).rejects.toMatchObject({
+      response: {
+        code: 'CreditMigrationChanged',
+        message: CREDIT_MIGRATION_CHANGED_MESSAGE,
+        report: expect.objectContaining({
+          currency: 'NGN',
+          totals: expect.objectContaining({ movableMinor: 800_000 }),
+        }),
+      },
+    });
+    expect(repository.migrations).toEqual([]);
+  });
+
+  it('puts the moved credit on the wallet and takes it off the children', async () => {
+    const { repository, service } = withCredit();
+    await service.migrateCredit(everyone, {
+      expectedFamilies: 1,
+      expectedTotalMinor: 800_000,
+    });
+    expect(repository.wallets[0]?.balanceMinor).toBe(800_000);
+    expect(repository.creditFacts.students).toEqual([]);
+  });
+
+  it('refuses the report and the move to a campus-scoped member', async () => {
+    const { repository, service } = withCredit();
+    const reviewed = { expectedFamilies: 1, expectedTotalMinor: 800_000 };
+    const report = service.creditMigration(lekkiOnly);
+    await expect(report).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(report).rejects.toThrow(CREDIT_MIGRATION_EVERY_CAMPUS_MESSAGE);
+    await expect(
+      service.migrateCredit(lekkiOnly, reviewed)
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(repository.migrations).toEqual([]);
   });
 });

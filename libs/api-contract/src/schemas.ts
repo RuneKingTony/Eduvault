@@ -67,6 +67,7 @@ export const apiErrorCodeSchema = z.enum([
   'Conflict',
   'SelfApproval',
   'AlreadyDecided',
+  'CreditMigrationChanged',
   'LAST_OWNER',
   'OWNER_BY_HANDOVER',
   'ROLE_COMBINATION',
@@ -89,6 +90,8 @@ export const errorSchema = z.object({
   code: apiErrorCodeSchema,
   message: z.string(),
   creditMinor: z.number().int().nonnegative().optional(),
+  // Typed where it is sent: wallets.ts imports this file, so it cannot be named here.
+  report: z.unknown().optional(),
   issues: z
     .array(z.object({ path: z.string(), message: z.string() }))
     .optional(),

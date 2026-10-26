@@ -1158,7 +1158,7 @@ CREATE TABLE public.journal_entry (
     posted_by text,
     memo text,
     reverses_entry_id uuid,
-    CONSTRAINT journal_entry_kind_check CHECK ((kind = ANY (ARRAY['invoice'::text, 'adhoc'::text, 'payment'::text, 'payment_void'::text, 'adjustment'::text, 'opening'::text, 'store'::text, 'store_receive'::text, 'store_cost'::text, 'store_count'::text, 'wallet_topup'::text, 'wallet_spend'::text, 'wallet_refund'::text, 'wallet_topup_void'::text]))),
+    CONSTRAINT journal_entry_kind_check CHECK ((kind = ANY (ARRAY['invoice'::text, 'adhoc'::text, 'payment'::text, 'payment_void'::text, 'adjustment'::text, 'opening'::text, 'store'::text, 'store_receive'::text, 'store_cost'::text, 'store_count'::text, 'wallet_topup'::text, 'wallet_spend'::text, 'wallet_refund'::text, 'wallet_topup_void'::text, 'wallet_credit_migration'::text]))),
     CONSTRAINT journal_entry_memo_check CHECK ((char_length(memo) <= 500)),
     CONSTRAINT journal_entry_reference_check CHECK ((char_length(btrim(reference)) > 0))
 );
@@ -6042,4 +6042,5 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20261023090000'),
     ('20261024120000'),
     ('20261025090000'),
-    ('20261026090000');
+    ('20261026090000'),
+    ('20261027090000');

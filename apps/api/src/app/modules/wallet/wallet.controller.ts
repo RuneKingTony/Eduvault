@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import {
   contract,
+  type MigrateCredit,
   type RouteOutput,
   type TopUpWallet,
   type WalletListQuery,
@@ -54,6 +55,24 @@ export class WalletController {
     @Org() org: OrgContext
   ): Promise<RouteOutput<typeof routes.refundOptions>> {
     return this.wallets.refundOptions(org);
+  }
+
+  @Get('credit-migration')
+  @OrganizationAuth('wallet', 'migrateCredit')
+  creditMigration(
+    @Org() org: OrgContext
+  ): Promise<RouteOutput<typeof routes.creditMigration>> {
+    return this.wallets.creditMigration(org);
+  }
+
+  @Post('credit-migration')
+  @OrganizationAuth('wallet', 'migrateCredit')
+  @UseInterceptors(ReplayStatusInterceptor)
+  migrateCredit(
+    @Org() org: OrgContext,
+    @Body(zod(routes.migrateCredit.body)) body: MigrateCredit
+  ): Promise<RouteOutput<typeof routes.migrateCredit>> {
+    return this.wallets.migrateCredit(org, body);
   }
 
   @Get(':walletId')

@@ -263,6 +263,7 @@ describe('capSummary', () => {
       'Asks for wallet refunds',
       'Approves wallet refunds',
       'Manages the payment gateway',
+      'Moves existing credit into family wallets',
       'Money categories: change the accountant’s categories',
       'Own records: can see',
       'Sees fees',
@@ -662,7 +663,7 @@ describe('the Portal area', () => {
 describe('the Wallets area', () => {
   const wallets = area('wallets');
 
-  it('sits in Money, splitting seeing from topping up, with the refund and gateway grants as extras', () => {
+  it('sits in Money, splitting seeing from topping up, with the refund, gateway and credit migration grants as extras', () => {
     expect(wallets.group).toBe('Money');
     expect(wallets.label).toBe('Wallets');
     expect(wallets.see).toEqual(['wallet:read']);
@@ -671,6 +672,7 @@ describe('the Wallets area', () => {
       ['wallet:requestRefund'],
       ['wallet:approveRefund'],
       ['wallet:manageGateway'],
+      ['wallet:migrateCredit'],
     ]);
   });
 

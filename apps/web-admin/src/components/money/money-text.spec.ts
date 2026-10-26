@@ -16,6 +16,9 @@ describe('journal kind labels', () => {
     expect(JOURNAL_KIND_LABELS.wallet_spend).toBe('Paid from wallet');
     expect(JOURNAL_KIND_LABELS.wallet_refund).toBe('Wallet refund');
     expect(JOURNAL_KIND_LABELS.wallet_topup_void).toBe('Top-up cancelled');
+    expect(JOURNAL_KIND_LABELS.wallet_credit_migration).toBe(
+      'Credit moved to wallet'
+    );
   });
 
   it('cover every kind the books can hold', () => {

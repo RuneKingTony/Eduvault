@@ -79,3 +79,6 @@ export function assertBalancedLines(lines: readonly LedgerLine[]): void {
 }
 
 export const clampMemo = (text: string): string => text.slice(0, 500);
+
+export const sumMinor = (amounts: readonly number[]): number =>
+  amounts.reduce((total, amount) => total + amount, 0);

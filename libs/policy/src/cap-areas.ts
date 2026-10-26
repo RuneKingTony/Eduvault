@@ -287,6 +287,13 @@ export const CAP_AREAS: readonly CapArea[] = [
         permissions: ['wallet:manageGateway'],
         important: true,
       },
+      {
+        label: 'Moves existing credit into family wallets',
+        description:
+          'Reviews and moves the credit left on student fee accounts into family wallets, once per family. Only an owner can do it.',
+        permissions: ['wallet:migrateCredit'],
+        important: true,
+      },
     ],
   },
   {

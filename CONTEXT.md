@@ -124,6 +124,8 @@ Terms the code and the people using it share. Adapted from the earlier school-ma
 
 **Top-up cancellation** — a request to undo a staff top-up recorded by mistake (`wallet_topup_cancellation`). Once approved it posts a new `wallet_topup_void` entry that mirrors the top-up's lines, family tag included, and reverses the original; the original entry stays. A Monnify credit cannot be cancelled.
 
+**Credit migration** — the one-time move of credit a family paid ahead on a child's fee account (`1100`, balance below zero) into the family's wallet (`2200`), done by the owner after reviewing a report. One `wallet_credit_migration` entry per family under the reference `WMIG-<guardian id>`; the credit goes to the earliest-linked paying guardian. Debts and history are untouched, a child nobody pays for stays where it is, and a family already moved is never swept again.
+
 **Void** — undoing a payment. "Cancel a payment" on screen. The row is kept and marked, and the reversal is a new movement once approved. Money records are never deleted. A store sale's payment can't be cancelled on its own.
 
 **Adjustment** — a correction to a student's account: a credit note ("Reduce a fee"), a write-off ("Cancel a balance") or a refund of credit. Needs a second person's approval unless the school has switched that approval off. "Discounts and refunds" on screen.

@@ -5,7 +5,10 @@ import {
   WALLET_AMOUNT_MESSAGE,
   WALLET_SPEND_NO_LINES_MESSAGE,
   WALLET_SPEND_TWICE_MESSAGE,
+  creditMigrationReportSchema,
+  creditMigrationResultSchema,
   earmarkSchema,
+  migrateCreditSchema,
   portalWalletMovementSchema,
   setAutoPaySchema,
   spendWalletSchema,
@@ -309,10 +312,113 @@ describe('the wallet routes', () => {
         'wallet_spend',
         'wallet_refund',
         'wallet_topup_void',
+        'wallet_credit_migration',
       ])
     );
     expect(FILE_KINDS).toEqual(
       expect.arrayContaining(['wallet_proof', 'wallet_refund_request'])
     );
+  });
+});
+
+describe('credit migration', () => {
+  const child = {
+    studentId: id,
+    name: 'Ada Okeke',
+    admissionNumber: 'ADM-0001',
+    amountMinor: 250_000,
+    status: 'left',
+    campusName: 'Lekki',
+  };
+  const report = {
+    currency: 'NGN',
+    families: [
+      {
+        walletId: other,
+        guardianName: 'Mrs Okeke',
+        phone: '08012345678',
+        totalMinor: 250_000,
+        children: [child],
+      },
+    ],
+    notMoved: [
+      {
+        studentId: other,
+        name: 'Bola Ade',
+        admissionNumber: 'ADM-0002',
+        amountMinor: 10_000,
+        reason: 'no_paying_guardian',
+      },
+    ],
+    totals: {
+      familyCount: 1,
+      childCount: 1,
+      movableMinor: 250_000,
+      notMovedMinor: 10_000,
+    },
+  };
+
+  it('puts the report on a static path before the wallet id', () => {
+    expect(contract.wallets.creditMigration.method).toBe('GET');
+    expect(contract.wallets.creditMigration.path).toBe(
+      '/finance/wallets/credit-migration'
+    );
+    expect(contract.wallets.migrateCredit.method).toBe('POST');
+    expect(contract.wallets.migrateCredit.path).toBe(
+      '/finance/wallets/credit-migration'
+    );
+  });
+
+  it('accepts a report with families and a not-moved list', () => {
+    expect(creditMigrationReportSchema.parse(report)).toEqual(report);
+  });
+
+  it.each([0, -1, 12.5])('refuses a child amount of %s', (amountMinor) => {
+    const families = [
+      {
+        ...report.families[0],
+        children: [{ ...child, amountMinor }],
+      },
+    ];
+    expect(
+      creditMigrationReportSchema.safeParse({ ...report, families }).success
+    ).toBe(false);
+  });
+
+  it('refuses a family with no children and a reason it does not know', () => {
+    const empty = [{ ...report.families[0], children: [] }];
+    expect(
+      creditMigrationReportSchema.safeParse({ ...report, families: empty })
+        .success
+    ).toBe(false);
+    const notMoved = [{ ...report.notMoved[0], reason: 'other' }];
+    expect(
+      creditMigrationReportSchema.safeParse({ ...report, notMoved }).success
+    ).toBe(false);
+  });
+
+  it('takes the figures the person read, and nothing else', () => {
+    expect(
+      migrateCreditSchema.parse({ expectedFamilies: 2, expectedTotalMinor: 0 })
+    ).toEqual({ expectedFamilies: 2, expectedTotalMinor: 0 });
+    for (const bad of [
+      { expectedFamilies: -1, expectedTotalMinor: 10 },
+      { expectedFamilies: 1, expectedTotalMinor: -10 },
+      { expectedFamilies: 1.5, expectedTotalMinor: 10 },
+      { expectedFamilies: 1 },
+    ]) {
+      expect(migrateCreditSchema.safeParse(bad).success).toBe(false);
+    }
+  });
+
+  it('answers with what moved and whether it was a repeat', () => {
+    const result = {
+      currency: 'NGN',
+      replayed: true,
+      familyCount: 0,
+      childCount: 0,
+      movedMinor: 0,
+    };
+    expect(creditMigrationResultSchema.parse(result)).toEqual(result);
   });
 });

@@ -348,6 +348,7 @@ interface MovementRow {
   cancel_id: string | null;
   cancel_reason: string | null;
   cancelled_reference: string | null;
+  migrated_children: number | null;
   made_by: string | null;
 }
 
@@ -390,6 +391,9 @@ function requestSourceOf(row: MovementRow): WalletMovementSource | null {
 }
 
 function sourceOf(row: MovementRow): WalletMovementSource | null {
+  if (row.migrated_children !== null) {
+    return { type: 'credit_migration', childCount: row.migrated_children };
+  }
   const gateway = gatewayFactsSchema.parse(row.gateway);
   if (gateway !== null) {
     return {
@@ -442,19 +446,13 @@ const toMovement = (row: MovementRow): WalletMovement => ({
   madeBy: row.made_by,
 });
 
-export async function walletMovements(
+function movementRows(
   db: Kysely<DB>,
-  wallet: { organizationId: string; guardianId: string },
+  mine: RawBuilder<unknown>,
   paging: { page: number; pageSize: number }
-): Promise<MovementPage> {
-  const { organizationId, guardianId } = wallet;
+) {
   const offset = (paging.page - 1) * paging.pageSize;
-  const mine = sql`
-    jl.organization_id = ${organizationId}
-    AND jl.family_id = ${guardianId}
-    AND jl.ledger_account_id = ${walletsAccountIdSql(organizationId)}`;
-  const [page, count] = await Promise.all([
-    sql<MovementRow>`
+  return sql<MovementRow>`
       SELECT jl.id AS line_id, e.id AS entry_id,
         to_char(e.effective_on, 'YYYY-MM-DD') AS effective_on,
         e.posted_at, e.kind, e.reference, jl.student_id,
@@ -470,6 +468,11 @@ export async function walletMovements(
         wr.id AS refund_id, wr.payout_reference,
         wc.id AS cancel_id, wc.reason AS cancel_reason,
         ot.reference AS cancelled_reference,
+        CASE WHEN e.kind = 'wallet_credit_migration' THEN (
+          SELECT count(*)::int FROM journal_line mc
+          WHERE mc.entry_id = e.id AND mc.organization_id = e.organization_id
+            AND mc.student_id IS NOT NULL
+        ) END AS migrated_children,
         CASE WHEN gt.id IS NULL THEN NULL ELSE jsonb_build_object(
           'id', gt.id, 'transactionReference', gt.reference,
           'paymentReference', gt.payment_reference,
@@ -486,10 +489,26 @@ export async function walletMovements(
       LEFT JOIN wallet_refund wr ON wr.journal_entry_id = e.id AND wr.organization_id = e.organization_id
       LEFT JOIN wallet_topup_cancellation wc ON wc.journal_entry_id = e.id AND wc.organization_id = e.organization_id
       LEFT JOIN wallet_topup ot ON ot.id = wc.wallet_topup_id AND ot.organization_id = wc.organization_id
-      LEFT JOIN "user" u ON u.id = COALESCE(t.created_by, s.created_by, wr.approved_by, wc.approved_by)
+      LEFT JOIN "user" u ON u.id = COALESCE(
+        t.created_by, s.created_by, wr.approved_by, wc.approved_by,
+        CASE WHEN e.kind = 'wallet_credit_migration' THEN e.posted_by END)
       WHERE ${mine}
       ORDER BY e.sequence DESC, lower(st.first_name), jl.id
-      LIMIT ${paging.pageSize} OFFSET ${offset}`.execute(db),
+      LIMIT ${paging.pageSize} OFFSET ${offset}`.execute(db);
+}
+
+export async function walletMovements(
+  db: Kysely<DB>,
+  wallet: { organizationId: string; guardianId: string },
+  paging: { page: number; pageSize: number }
+): Promise<MovementPage> {
+  const { organizationId, guardianId } = wallet;
+  const mine = sql`
+    jl.organization_id = ${organizationId}
+    AND jl.family_id = ${guardianId}
+    AND jl.ledger_account_id = ${walletsAccountIdSql(organizationId)}`;
+  const [page, count] = await Promise.all([
+    movementRows(db, mine, paging),
     sql<{ count: string }>`
       SELECT count(*)::text AS count FROM journal_line jl WHERE ${mine}`.execute(
       db

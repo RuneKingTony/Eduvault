@@ -1,6 +1,10 @@
 import type { ReactElement } from 'react';
 
 import type {
+  CreditMigrationChild,
+  CreditMigrationFamily,
+  CreditMigrationReport,
+  CreditMigrationResult,
   MePermissions,
   RefundOptions,
   RequestedWalletCancellation,
@@ -29,6 +33,7 @@ const GUARDIAN_ID = testId(0x1_70_11);
 export const OTHER_GUARDIAN_ID = testId(0x1_70_12);
 const ADA = testId(0x1_70_21);
 export const TOBI = testId(0x1_70_22);
+export const NO_PAYER_CHILD = testId(0x1_70_23);
 export const TILL = testId(0x1_70_31);
 export const BANK = testId(0x1_70_32);
 const TOP_UP_ID = testId(0x1_70_41);
@@ -305,6 +310,65 @@ export const toppedUp = (
   ...over,
 });
 
+const creditChild = (
+  over: Partial<CreditMigrationChild> = {}
+): CreditMigrationChild => ({
+  studentId: ADA,
+  name: 'Ada Okeke',
+  admissionNumber: 'GF-0001',
+  amountMinor: 5_000_000,
+  status: 'active',
+  campusName: 'Lekki',
+  ...over,
+});
+
+export const creditFamily = (
+  over: Partial<CreditMigrationFamily> = {}
+): CreditMigrationFamily => ({
+  walletId: WALLET_ID,
+  guardianName: 'Ngozi Okeke',
+  phone: '08012345678',
+  totalMinor: 8_000_000,
+  children: [
+    creditChild(),
+    creditChild({
+      studentId: TOBI,
+      name: 'Tobi Okeke',
+      admissionNumber: 'GF-0002',
+      amountMinor: 3_000_000,
+      status: 'left',
+      campusName: 'Ikeja',
+    }),
+  ],
+  ...over,
+});
+
+export const creditReport = (
+  over: Partial<CreditMigrationReport> = {}
+): CreditMigrationReport => ({
+  currency: 'NGN',
+  families: [creditFamily()],
+  notMoved: [],
+  totals: {
+    familyCount: 1,
+    childCount: 2,
+    movableMinor: 8_000_000,
+    notMovedMinor: 0,
+  },
+  ...over,
+});
+
+export const creditResult = (
+  over: Partial<CreditMigrationResult> = {}
+): CreditMigrationResult => ({
+  currency: 'NGN',
+  replayed: false,
+  familyCount: 1,
+  childCount: 2,
+  movedMinor: 8_000_000,
+  ...over,
+});
+
 interface RenderOptions {
   access?: MePermissions;
   path?: string;
@@ -318,6 +382,7 @@ export function renderWallets(
   const routes = [
     ['/finance/wallets', parseWalletsSearch],
     ['/finance/wallets/$walletId', parseWalletSearch],
+    ['/finance/wallets/credit-migration', undefined],
     ['/finance/accounts', parseAccountsSearch],
     ['/finance/accounts/$studentId', parseStatementSearch],
     ['/approvals', undefined],

@@ -1009,7 +1009,7 @@ test.describe('cancelling a top-up', () => {
 
     const refused = await postCancellation(api, bursar, {
       walletId,
-      topUpId: online?.source?.id ?? '',
+      topUpId: online?.source?.type === 'monnify' ? online.source.id : '',
       status: 409,
     });
 

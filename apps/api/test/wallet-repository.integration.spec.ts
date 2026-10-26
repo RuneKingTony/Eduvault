@@ -7,6 +7,7 @@ import {
   type WalletHarness,
 } from './wallet-repository.contract';
 import { expect, type Fixtures } from './support/base-test';
+import { ledgerAccountId, postEntry } from './support/factories/finance';
 import { bankAccount, owes } from './support/factories/payments';
 import {
   cashAccount,
@@ -91,6 +92,40 @@ const fakeHarness = (): WalletHarness => {
         proofFileId: randomUUID(),
         ...overrides,
       }),
+    giveCredit: (index, amountMinor) => {
+      const studentId = ['ada', 'tobi'][index] ?? '';
+      repository.creditFacts = {
+        students: [
+          ...repository.creditFacts.students,
+          {
+            studentId,
+            name: studentId,
+            admissionNumber: studentId,
+            creditMinor: amountMinor,
+            status: 'active',
+            campusId: 'lekki',
+            campusName: 'Lekki',
+          },
+        ],
+        payers: [
+          ...repository.creditFacts.payers,
+          {
+            studentId,
+            guardianId: 'guardian-1',
+            linkedAt: '2026-01-01T00:00:00.000000',
+          },
+        ],
+        owners: [
+          {
+            guardianId: 'guardian-1',
+            walletId: 'wallet-1',
+            guardianName: 'Mrs Okeke',
+            phone: '08012345678',
+          },
+        ],
+      };
+      return Promise.resolve();
+    },
   };
 };
 
@@ -170,6 +205,33 @@ const postgresHarness = async ({
       proofFileId: (await uploadRefundEmail(api, owner)).id,
       ...overrides,
     }),
+    giveCredit: async (index, amountMinor) => {
+      const [till, receivable] = await Promise.all([
+        ledgerAccountId(pool, orgA.id, 1200),
+        ledgerAccountId(pool, orgA.id, 1100),
+      ]);
+      const studentId = [ada.id, tobi.id][index] ?? '';
+      await postEntry(app, {
+        organizationId: orgA.id,
+        reference: `CONTRACT-CREDIT-${studentId}`,
+        kind: 'adhoc',
+        effectiveOn: '2026-10-06',
+        postedBy: null,
+        lines: [
+          {
+            ledgerAccountId: till,
+            debitMinor: OWED + amountMinor,
+            creditMinor: 0,
+          },
+          {
+            ledgerAccountId: receivable,
+            studentId,
+            debitMinor: 0,
+            creditMinor: OWED + amountMinor,
+          },
+        ],
+      });
+    },
   };
 };
 

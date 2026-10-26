@@ -22,6 +22,11 @@ import {
   findReferenceRow,
   writeSpend,
 } from '../../common/wallet';
+import type { CreditMigrationView } from './credit-migration-plan';
+import {
+  readCreditMigration,
+  writeCreditMigration,
+} from './kysely-credit-migration.repository';
 import {
   findOwnWallet,
   findTopUpToCancel,
@@ -56,6 +61,7 @@ import {
   type ApprovalOutcome,
   type AutoPayOutcome,
   type CancellationRequestOutcome,
+  type CreditMigrationOutcome,
   type Declining,
   type DeclineOutcome,
   type Decision,
@@ -64,6 +70,7 @@ import {
   type MovementPage,
   type NewAutoPay,
   type NewCancellationRequest,
+  type NewCreditMigration,
   type NewEarmark,
   type NewRefundRequest,
   type NewSpend,
@@ -95,6 +102,16 @@ export class KyselyWalletRepository extends WalletRepository {
 
   currency(organizationId: string): Promise<string> {
     return schoolCurrency(this.db, organizationId);
+  }
+
+  creditMigration(organizationId: string): Promise<CreditMigrationView> {
+    return readCreditMigration(this.db, organizationId);
+  }
+
+  migrateCredit(input: NewCreditMigration): Promise<CreditMigrationOutcome> {
+    return this.db
+      .transaction()
+      .execute((trx) => writeCreditMigration(trx, this.writers, input));
   }
 
   list(scope: OrgScope, query: WalletListQuery): Promise<WalletPage> {

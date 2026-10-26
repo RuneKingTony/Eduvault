@@ -31,6 +31,7 @@ import {
   type StoreDeliveryFacts,
   type StoreSaleFacts,
   type StoreWriteOffFacts,
+  walletCreditMigratedActivity,
   walletSpentActivity,
   walletGatewayToppedUpActivity,
   walletRefundDeclinedActivity,
@@ -1223,6 +1224,54 @@ describe('walletSpentActivity', () => {
     ]);
     expect(rows[1]?.text).toBe(
       `Mrs Ojo paid ${money(600_000, 'NGN')} of their children’s charges on this campus from the wallet.`
+    );
+  });
+});
+
+describe('walletCreditMigratedActivity', () => {
+  const migration = {
+    entryId: 'entry-1',
+    walletId: 'wallet-1',
+    guardianName: 'Mrs Ojo',
+  };
+
+  it('writes one row for a family whose children are on one campus', () => {
+    const [row, ...rest] = walletCreditMigratedActivity(actor, migration, [
+      { campusId: LEKKI, amountMinor: 500_000 },
+      { campusId: LEKKI, amountMinor: 300_000 },
+    ]);
+    expect(rest).toEqual([]);
+    expect(row).toEqual({
+      organizationId: 'org-1',
+      campusId: LEKKI,
+      pillar: 'finance',
+      kind: 'wallet.credit_migrated',
+      actorUserId: 'user-1',
+      subjectType: 'wallet_credit_migration',
+      subjectId: 'entry-1',
+      text: `Tunde Bakare moved ${money(800_000, 'NGN')} of existing credit from 2 children’s accounts into Mrs Ojo’s wallet.`,
+      data: {
+        entryId: 'entry-1',
+        walletId: 'wallet-1',
+        amountMinor: 800_000,
+        childCount: 2,
+      },
+    });
+  });
+
+  it('writes a row on each campus the moved children are on, each with its own share', () => {
+    const rows = walletCreditMigratedActivity(actor, migration, [
+      { campusId: LEKKI, amountMinor: 500_000 },
+      { campusId: IKEJA, amountMinor: 300_000 },
+    ]);
+    expect(
+      rows.map((row) => [row.campusId, row.data?.['amountMinor']])
+    ).toEqual([
+      [LEKKI, 500_000],
+      [IKEJA, 300_000],
+    ]);
+    expect(rows[0]?.text).toBe(
+      `Tunde Bakare moved ${money(500_000, 'NGN')} of existing credit from 1 child’s account into Mrs Ojo’s wallet.`
     );
   });
 });

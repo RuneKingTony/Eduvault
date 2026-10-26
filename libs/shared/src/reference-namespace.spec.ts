@@ -24,6 +24,11 @@ describe('isReservedReference', () => {
     expect(isReservedReference('WRQ-20261026-ABCDEF')).toBe(false);
   });
 
+  it('refuses the reference a credit migration posts under', () => {
+    expect(isReservedReference('WMIG-5d7e0f2a')).toBe(true);
+    expect(isReservedReference('wmig-5d7e0f2a')).toBe(true);
+  });
+
   it('ignores case and surrounding spaces', () => {
     expect(isReservedReference('  adj-2026-0001 ')).toBe(true);
     expect(isReservedReference('Void-CSH-20261007-ABCDEF')).toBe(true);

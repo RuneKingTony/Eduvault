@@ -16,6 +16,7 @@ import type { WaitingApproval } from '../../common/approvals';
 import type { UsableMoneyAccount } from '../../common/money-accounts';
 import type { ProofState } from '../../common/payments';
 import type { OrgScope } from '../../common/scope';
+import type { CreditMigrationView } from './credit-migration-plan';
 import type {
   ExistingEntry,
   NewSpend,
@@ -169,8 +170,32 @@ export interface Declining extends Actor {
 
 export type DeclineOutcome = { status: 'declined' } | { status: 'decided' };
 
+export interface NewCreditMigration extends Actor {
+  expectedFamilies: number;
+  expectedTotalMinor: number;
+  today: string;
+}
+
+export type CreditMigrationOutcome =
+  | {
+      status: 'moved';
+      familyCount: number;
+      childCount: number;
+      movedMinor: number;
+    }
+  | { status: 'replayed' }
+  | { status: 'changed'; report: CreditMigrationView };
+
 export abstract class WalletRepository {
   abstract currency(organizationId: string): Promise<string>;
+
+  abstract creditMigration(
+    organizationId: string
+  ): Promise<CreditMigrationView>;
+
+  abstract migrateCredit(
+    input: NewCreditMigration
+  ): Promise<CreditMigrationOutcome>;
 
   abstract list(scope: OrgScope, query: WalletListQuery): Promise<WalletPage>;
 

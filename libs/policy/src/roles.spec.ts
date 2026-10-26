@@ -251,7 +251,7 @@ describe('roles', () => {
     expect(READ_PERMS).not.toContain('store:count');
   });
 
-  it('grants wallet permissions by least privilege and keeps the gateway owner-only', () => {
+  it('grants wallet permissions by least privilege and keeps the gateway and credit migration owner-only', () => {
     expect(starter('bursar').wallet).toEqual([
       'read',
       'topUp',
@@ -265,6 +265,7 @@ describe('roles', () => {
     }
     for (const role of STARTER_ROLES) {
       expect(role.permissions).not.toContain('wallet:manageGateway');
+      expect(role.permissions).not.toContain('wallet:migrateCredit');
     }
     expect(READ_PERMS).toContain('wallet:read');
     expect(READ_PERMS).not.toContain('wallet:readOwn');

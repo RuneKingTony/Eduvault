@@ -873,6 +873,12 @@ export const gatewayConnectionQueryOptions = (api: Api) =>
     queryFn: () => api.gateway.get({}),
   });
 
+export const creditMigrationQueryOptions = (api: Api) =>
+  queryOptions({
+    queryKey: [...WALLETS_KEY, 'credit-migration'],
+    queryFn: () => api.wallets.creditMigration({}),
+  });
+
 export const topUpOptionsQueryOptions = (api: Api) =>
   queryOptions({
     queryKey: [...WALLETS_KEY, 'top-up-options'],
@@ -1261,6 +1267,11 @@ export const invalidateWallets = (queryClient: QueryClient): Promise<void> =>
 
 export const invalidateTopUp = (queryClient: QueryClient): Promise<void> =>
   invalidateAll(queryClient, [WALLETS_KEY, ...MONEY_VIEW_KEYS]);
+
+export const invalidateCreditMigration = (
+  queryClient: QueryClient
+): Promise<void> =>
+  invalidateAll(queryClient, [WALLETS_KEY, ACTIVITY_KEY, ...MONEY_VIEW_KEYS]);
 
 export const invalidateWalletRequest = (
   queryClient: QueryClient

@@ -1,5 +1,6 @@
 import { assertBalancedLines } from '../ledger';
 import {
+  creditMigrationPostingLines,
   refundPostingLines,
   spendPostingLines,
   topUpPostingLines,
@@ -142,6 +143,50 @@ describe('refundPostingLines', () => {
         campusId: 'lekki',
         debitMinor: 0,
         creditMinor: 1_500_000,
+      },
+    ]);
+  });
+
+  it('balances and tags the family only on the wallet line', () => {
+    expect(() => {
+      assertBalancedLines(lines);
+    }).not.toThrow();
+    expect(lines.filter((line) => line.familyId !== undefined)).toHaveLength(1);
+  });
+});
+
+describe('creditMigrationPostingLines', () => {
+  const lines = creditMigrationPostingLines({
+    walletsAccountId: wallets,
+    receivableId: receivable,
+    familyId: family,
+    children: [
+      { studentId: 'ada', campusId: 'lekki', amountMinor: 500_000 },
+      { studentId: 'uche', campusId: 'ikeja', amountMinor: 300_000 },
+    ],
+  });
+
+  it('takes each child’s credit off their fee account and puts the total on the wallet', () => {
+    expect(lines).toEqual([
+      {
+        ledgerAccountId: receivable,
+        studentId: 'ada',
+        campusId: 'lekki',
+        debitMinor: 500_000,
+        creditMinor: 0,
+      },
+      {
+        ledgerAccountId: receivable,
+        studentId: 'uche',
+        campusId: 'ikeja',
+        debitMinor: 300_000,
+        creditMinor: 0,
+      },
+      {
+        ledgerAccountId: wallets,
+        familyId: family,
+        debitMinor: 0,
+        creditMinor: 800_000,
       },
     ]);
   });

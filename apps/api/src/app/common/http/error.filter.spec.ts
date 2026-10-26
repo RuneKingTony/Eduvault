@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Logger,
   type ArgumentsHost,
@@ -116,6 +117,22 @@ describe('ErrorFilter', () => {
       code: 'BadRequest',
       message: 'A refund pays back credit held.',
       creditMinor: 500_000,
+    });
+  });
+
+  it('keeps a report from the exception in the body', () => {
+    expect(
+      run(
+        new ConflictException({
+          code: 'CreditMigrationChanged',
+          message: 'The figures changed. Check them again.',
+          report: { totals: { familyCount: 1 } },
+        })
+      ).body
+    ).toEqual({
+      code: 'CreditMigrationChanged',
+      message: 'The figures changed. Check them again.',
+      report: { totals: { familyCount: 1 } },
     });
   });
 

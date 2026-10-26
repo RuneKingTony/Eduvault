@@ -20,10 +20,19 @@ import type { UsableMoneyAccount } from '../../common/money-accounts';
 import type { ProofState } from '../../common/payments';
 import type { OrgScope } from '../../common/scope';
 import {
+  matchesReviewed,
+  movedFigures,
+  planCreditMigration,
+  reportOf,
+  type CreditMigrationView,
+  type PlanFacts,
+} from './credit-migration-plan';
+import {
   WalletRepository,
   type ApprovalOutcome,
   type AutoPayOutcome,
   type CancellationRequestOutcome,
+  type CreditMigrationOutcome,
   type Declining,
   type DeclineOutcome,
   type Decision,
@@ -32,6 +41,7 @@ import {
   type MovementPage,
   type NewAutoPay,
   type NewCancellationRequest,
+  type NewCreditMigration,
   type NewEarmark,
   type NewRefundRequest,
   type NewSpend,
@@ -109,6 +119,13 @@ export class FakeWalletRepository extends WalletRepository {
   onlineTopUps: { id: string; walletId: string }[] = [];
   requests: FakeRequest[] = [];
   autoPays: (NewAutoPay & { guardianId: string })[] = [];
+  creditFacts: Omit<PlanFacts, 'migratedGuardianIds'> = {
+    students: [],
+    payers: [],
+    owners: [],
+  };
+  migratedGuardianIds = new Set<string>();
+  migrations: NewCreditMigration[] = [];
   accounts = new Map<string, UsableMoneyAccount>();
   proofs = new Map<string, ProofState>();
   methods: PaymentMethods = { cash: true, transfer: true, pos: true };
@@ -116,6 +133,13 @@ export class FakeWalletRepository extends WalletRepository {
 
   seed(wallet: FakeWallet): void {
     this.wallets.push(wallet);
+  }
+
+  private creditPlan() {
+    return planCreditMigration({
+      ...this.creditFacts,
+      migratedGuardianIds: this.migratedGuardianIds,
+    });
   }
 
   private id(prefix: string): string {
@@ -198,6 +222,40 @@ export class FakeWalletRepository extends WalletRepository {
 
   currency(): Promise<string> {
     return Promise.resolve('NGN');
+  }
+
+  creditMigration(): Promise<CreditMigrationView> {
+    return Promise.resolve(reportOf(this.creditPlan()));
+  }
+
+  migrateCredit(input: NewCreditMigration): Promise<CreditMigrationOutcome> {
+    const plan = this.creditPlan();
+    if (plan.families.length === 0) {
+      return Promise.resolve({ status: 'replayed' });
+    }
+    if (!matchesReviewed(plan, input)) {
+      return Promise.resolve({ status: 'changed', report: reportOf(plan) });
+    }
+    this.migrations.push(input);
+    const moved = new Set(
+      plan.families.flatMap((family) =>
+        family.children.map((child) => child.studentId)
+      )
+    );
+    this.creditFacts.students = this.creditFacts.students.filter(
+      (student) => !moved.has(student.studentId)
+    );
+    for (const family of plan.families) {
+      this.migratedGuardianIds.add(family.guardianId);
+      const wallet = this.wallets.find((row) => row.id === family.walletId);
+      if (wallet !== undefined) {
+        wallet.balanceMinor += family.totalMinor;
+      }
+    }
+    return Promise.resolve({
+      status: 'moved',
+      ...movedFigures(plan.families),
+    });
   }
 
   list(scope: OrgScope, query: WalletListQuery): Promise<WalletPage> {

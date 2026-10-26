@@ -39,6 +39,9 @@ function portalSourceOf(
         topUpReference: source.topUpReference,
       };
     }
+    case 'credit_migration': {
+      return { type: 'credit_migration', childCount: source.childCount };
+    }
   }
 }
 

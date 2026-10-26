@@ -53,6 +53,7 @@ import { Route as FinanceBillingRunIdRouteImport } from './routes/finance/billin
 import { Route as FinanceInvoicesInvoiceIdRouteImport } from './routes/finance/invoices_.$invoiceId'
 import { Route as FinancePaymentsPaymentIdRouteImport } from './routes/finance/payments_.$paymentId'
 import { Route as FinanceWalletsWalletIdRouteImport } from './routes/finance/wallets_.$walletId'
+import { Route as FinanceWalletsCreditMigrationRouteImport } from './routes/finance/wallets_.credit-migration'
 import { Route as PlatformSchoolsIndexRouteImport } from './routes/platform.schools.index'
 import { Route as PlatformSchoolsSchoolIdRouteImport } from './routes/platform.schools.$schoolId'
 import { Route as FinancePaymentsPaymentIdPrintRouteImport } from './routes/finance/payments_.$paymentId_.print'
@@ -280,6 +281,12 @@ const FinanceWalletsWalletIdRoute = FinanceWalletsWalletIdRouteImport.update({
   path: '/finance/wallets/$walletId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FinanceWalletsCreditMigrationRoute =
+  FinanceWalletsCreditMigrationRouteImport.update({
+    id: '/finance/wallets_/credit-migration',
+    path: '/finance/wallets/credit-migration',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const PlatformSchoolsIndexRoute = PlatformSchoolsIndexRouteImport.update({
   id: '/schools/',
   path: '/schools/',
@@ -342,6 +349,7 @@ export interface FileRoutesByFullPath {
   '/finance/invoices/$invoiceId': typeof FinanceInvoicesInvoiceIdRoute
   '/finance/payments/$paymentId': typeof FinancePaymentsPaymentIdRoute
   '/finance/wallets/$walletId': typeof FinanceWalletsWalletIdRoute
+  '/finance/wallets/credit-migration': typeof FinanceWalletsCreditMigrationRoute
   '/platform/schools/$schoolId': typeof PlatformSchoolsSchoolIdRoute
   '/platform/schools/': typeof PlatformSchoolsIndexRoute
   '/finance/payments/$paymentId/print': typeof FinancePaymentsPaymentIdPrintRoute
@@ -389,6 +397,7 @@ export interface FileRoutesByTo {
   '/finance/invoices/$invoiceId': typeof FinanceInvoicesInvoiceIdRoute
   '/finance/payments/$paymentId': typeof FinancePaymentsPaymentIdRoute
   '/finance/wallets/$walletId': typeof FinanceWalletsWalletIdRoute
+  '/finance/wallets/credit-migration': typeof FinanceWalletsCreditMigrationRoute
   '/platform/schools/$schoolId': typeof PlatformSchoolsSchoolIdRoute
   '/platform/schools': typeof PlatformSchoolsIndexRoute
   '/finance/payments/$paymentId/print': typeof FinancePaymentsPaymentIdPrintRoute
@@ -439,6 +448,7 @@ export interface FileRoutesById {
   '/finance/invoices_/$invoiceId': typeof FinanceInvoicesInvoiceIdRoute
   '/finance/payments_/$paymentId': typeof FinancePaymentsPaymentIdRoute
   '/finance/wallets_/$walletId': typeof FinanceWalletsWalletIdRoute
+  '/finance/wallets_/credit-migration': typeof FinanceWalletsCreditMigrationRoute
   '/platform/schools/$schoolId': typeof PlatformSchoolsSchoolIdRoute
   '/platform/schools/': typeof PlatformSchoolsIndexRoute
   '/finance/payments_/$paymentId_/print': typeof FinancePaymentsPaymentIdPrintRoute
@@ -490,6 +500,7 @@ export interface FileRouteTypes {
     | '/finance/invoices/$invoiceId'
     | '/finance/payments/$paymentId'
     | '/finance/wallets/$walletId'
+    | '/finance/wallets/credit-migration'
     | '/platform/schools/$schoolId'
     | '/platform/schools/'
     | '/finance/payments/$paymentId/print'
@@ -537,6 +548,7 @@ export interface FileRouteTypes {
     | '/finance/invoices/$invoiceId'
     | '/finance/payments/$paymentId'
     | '/finance/wallets/$walletId'
+    | '/finance/wallets/credit-migration'
     | '/platform/schools/$schoolId'
     | '/platform/schools'
     | '/finance/payments/$paymentId/print'
@@ -586,6 +598,7 @@ export interface FileRouteTypes {
     | '/finance/invoices_/$invoiceId'
     | '/finance/payments_/$paymentId'
     | '/finance/wallets_/$walletId'
+    | '/finance/wallets_/credit-migration'
     | '/platform/schools/$schoolId'
     | '/platform/schools/'
     | '/finance/payments_/$paymentId_/print'
@@ -626,6 +639,7 @@ export interface RootRouteChildren {
   FinanceInvoicesInvoiceIdRoute: typeof FinanceInvoicesInvoiceIdRoute
   FinancePaymentsPaymentIdRoute: typeof FinancePaymentsPaymentIdRoute
   FinanceWalletsWalletIdRoute: typeof FinanceWalletsWalletIdRoute
+  FinanceWalletsCreditMigrationRoute: typeof FinanceWalletsCreditMigrationRoute
   FinancePaymentsPaymentIdPrintRoute: typeof FinancePaymentsPaymentIdPrintRoute
 }
 
@@ -939,6 +953,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FinanceWalletsWalletIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/finance/wallets_/credit-migration': {
+      id: '/finance/wallets_/credit-migration'
+      path: '/finance/wallets/credit-migration'
+      fullPath: '/finance/wallets/credit-migration'
+      preLoaderRoute: typeof FinanceWalletsCreditMigrationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/platform/schools/': {
       id: '/platform/schools/'
       path: '/schools'
@@ -1042,6 +1063,7 @@ const rootRouteChildren: RootRouteChildren = {
   FinanceInvoicesInvoiceIdRoute: FinanceInvoicesInvoiceIdRoute,
   FinancePaymentsPaymentIdRoute: FinancePaymentsPaymentIdRoute,
   FinanceWalletsWalletIdRoute: FinanceWalletsWalletIdRoute,
+  FinanceWalletsCreditMigrationRoute: FinanceWalletsCreditMigrationRoute,
   FinancePaymentsPaymentIdPrintRoute: FinancePaymentsPaymentIdPrintRoute,
 }
 export const routeTree = rootRouteImport
