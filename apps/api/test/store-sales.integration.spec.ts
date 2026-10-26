@@ -573,7 +573,10 @@ test.describe('refusals leave nothing behind', () => {
     const graduate = await createStudent(app, owner, { campusId: lekki.id });
     await pool.query(
       `UPDATE student SET exit_kind = 'graduated', exit_reason = 'completed',
-         archived_at = now(), archived_term_id = (SELECT id FROM term WHERE is_current LIMIT 1)
+         archived_at = now(), archived_term_id = (
+           SELECT t.id FROM term t
+           WHERE t.is_current AND t.organization_id = student.organization_id
+         )
        WHERE id = $1`,
       [graduate.id]
     );
