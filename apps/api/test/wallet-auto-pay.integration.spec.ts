@@ -3,14 +3,16 @@ import {
   WALLET_NOT_FOUND_MESSAGE,
   WALLET_REFERENCE_TAKEN_MESSAGE,
   type PortalWalletMovementList,
+  type ToppedUpWallet,
   type Wallet,
 } from '@eduvault/api-contract';
 import type { Pool } from 'pg';
+import { autoPayReference } from '../src/app/common/wallet';
 import { reservedAccountReference } from '../src/app/modules/gateway/reserved-account.service';
 import { expect, type Fixtures } from './support/base-test';
 import { importOpening } from './support/factories/finance';
 import { receivableBalance } from './support/factories/billing';
-import { bankAccount } from './support/factories/payments';
+import { bankAccount, recordCash } from './support/factories/payments';
 import {
   cashAccount,
   requestRefund,
@@ -45,6 +47,19 @@ const autoPay = (
   api(guardian)
     .put('/portal/wallet/auto-pay')
     .send({ enabled: change.enabled ?? true, reference: change.reference });
+
+const waitForLockWait = async (pool: Pool) => {
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const { rows } = await pool.query(
+      `SELECT 1 FROM pg_locks WHERE locktype = 'advisory' AND NOT granted`
+    );
+    if (rows.length > 0) {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  throw new Error('The spend never waited on the reference lock');
+};
 
 const spendCount = async (pool: Pool) =>
   Number(
@@ -164,6 +179,59 @@ test.describe('auto-pay', () => {
       heldMinor: 1_200_000,
       freeMinor: 0,
     });
+  });
+
+  test('plans again when a staff payment clears a child between the plan and the spend', async ({
+    api,
+    app,
+    pool,
+    schools,
+  }) => {
+    const { owner, orgA } = schools;
+    const account = await cashAccount(app, owner);
+    const { ada, tobi, guardianLogin } = await family(app, schools);
+    await owing(app, owner, [
+      { studentId: ada.id, amountMinor: OWED, effectiveOn: '2026-09-01' },
+      { studentId: tobi.id, amountMinor: 1_000_000, effectiveOn: '2026-03-01' },
+    ]);
+    const walletId = await walletIdOf(pool, guardianLogin?.guardianId ?? '');
+    const guardian = await signInAs(api, guardianLogin);
+    await autoPay(api, guardian, { reference: 'APY-ON-RACE' }).expect(200);
+    const reference = 'CSH-20261025-RACE01';
+    const body = await topUpBody(api, owner, {
+      accountId: account.id,
+      amountMinor: 2_500_000,
+      reference,
+    });
+    const holder = await pool.connect();
+    try {
+      await holder.query('BEGIN');
+      await holder.query(
+        'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
+        [`wallet-spend:${orgA.id}:${autoPayReference(reference)}`]
+      );
+      const pending = api(owner)
+        .post(`/finance/wallets/${walletId}/top-ups`)
+        .send(body)
+        .expect(201)
+        .then((res) => res.body as ToppedUpWallet);
+      await waitForLockWait(pool);
+
+      await recordCash(api, owner, {
+        accountId: account.id,
+        allocations: [{ studentId: tobi.id, amountMinor: 1_000_000 }],
+      });
+      await holder.query('COMMIT');
+      const topUp = await pending;
+
+      expect(await spendCount(pool)).toBe(1);
+      expect(await receivableBalance(pool, orgA.id, ada.id)).toBe(0);
+      expect(await receivableBalance(pool, orgA.id, tobi.id)).toBe(0);
+      expect(topUp.wallet.balanceMinor).toBe(500_000);
+    } finally {
+      await holder.query('ROLLBACK');
+      holder.release();
+    }
   });
 
   test('posts once when the same top-up is sent again', async ({
