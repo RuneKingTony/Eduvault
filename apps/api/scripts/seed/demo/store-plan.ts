@@ -4,7 +4,7 @@ import { oldestFirst } from './ordering';
 import type { StudentNumber } from './people-plan';
 import type { Random } from './prng';
 
-export interface StoreItemPlan {
+interface StoreItemPlan {
   key: string;
   kind: 'uniform' | 'book';
   name: string;
@@ -152,7 +152,7 @@ const DELIVERY_QUANTITY: Readonly<Record<DemoCampus, number>> = {
   Annex: 10,
 };
 
-export interface DeliveryLinePlan {
+interface DeliveryLinePlan {
   item: string;
   quantity: number;
 }

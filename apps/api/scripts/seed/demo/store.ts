@@ -30,7 +30,7 @@ import {
   type StockCountPlan,
 } from './store-plan';
 
-export interface StoreFacts {
+interface StoreFacts {
   itemIds: ReadonlyMap<string, string>;
 }
 

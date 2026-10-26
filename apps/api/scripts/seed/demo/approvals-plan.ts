@@ -247,7 +247,7 @@ function planVoids(
     }));
 }
 
-export interface MoneyApprovals {
+interface MoneyApprovals {
   adjustments: AdjustmentPlan[];
   voids: VoidPlan[];
 }
