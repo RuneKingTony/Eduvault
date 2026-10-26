@@ -99,19 +99,27 @@ export class WalletAutoPayService {
     }
   }
 
-  private async pay(trx: Kysely<DB>, credit: AutoPayCredit): Promise<void> {
+  /** The guardian's switch, when it is on and they may still spend from the wallet. */
+  private async spendingSetting(
+    trx: Kysely<DB>,
+    credit: AutoPayCredit
+  ): Promise<{ createdBy: string } | undefined> {
     const { organizationId, guardianId } = credit;
     const setting = await latestAutoPay(trx, { organizationId, guardianId });
     if (setting?.enabled !== true) {
-      return;
+      return undefined;
     }
-    if (
-      !(await memberHolds(
-        trx,
-        { organizationId, userId: setting.createdBy },
-        'wallet:spend'
-      ))
-    ) {
+    const allowed = await memberHolds(
+      trx,
+      { organizationId, userId: setting.createdBy },
+      'wallet:spend'
+    );
+    return allowed ? setting : undefined;
+  }
+
+  private async pay(trx: Kysely<DB>, credit: AutoPayCredit): Promise<void> {
+    const setting = await this.spendingSetting(trx, credit);
+    if (setting === undefined) {
       return;
     }
     const wallet = await lockFamilyWallet(trx, credit, setting.createdBy);
