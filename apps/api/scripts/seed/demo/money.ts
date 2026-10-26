@@ -9,6 +9,7 @@ import { ClassLevelService } from '../../../src/app/modules/class/class-level.se
 import { orgContextFor } from '../actors';
 import { DEMO_CAMPUSES, type DemoCampus } from './config';
 import {
+  campusIdOf,
   dayAt,
   found,
   moveClock,
@@ -19,6 +20,7 @@ import {
   type SchoolFacts,
 } from './demo-run';
 import { feeLinesFor, type FamilyPayment } from './money-plan';
+import { oldestFirst } from './ordering';
 import { DEMO_LEVELS, familyOf } from './people-plan';
 
 const BILLING_DAYS_AGO = 33;
@@ -29,6 +31,9 @@ export interface MoneyFacts {
   bankAccounts: ReadonlyMap<DemoCampus, string>;
   bursars: ReadonlyMap<DemoCampus, OrgContext>;
 }
+
+export const bursarOf = (money: MoneyFacts, campus: DemoCampus): OrgContext =>
+  found(money.bursars.get(campus), `bursar for ${campus}`);
 
 const BANK_LAST4: Readonly<Record<DemoCampus, string>> = {
   Main: '2208',
@@ -49,7 +54,7 @@ export async function setUpMoney(
   const bankAccounts = new Map<DemoCampus, string>();
   const bursars = new Map<DemoCampus, OrgContext>();
   for (const campus of DEMO_CAMPUSES) {
-    const campusId = found(school.campusIds.get(campus), campus);
+    const campusId = campusIdOf(school, campus);
     const cash = await accounts.create(school.owner, {
       name: `${campus} cash box`,
       kind: 'cash',
@@ -139,16 +144,17 @@ export async function recordPayments(
   const { plan, app } = run;
   const payments = app.get(PaymentService, { strict: false });
   const files = app.get(FilesService, { strict: false });
-  const paying = plan.payments
-    .filter((payment) => payment.amountMinor > 0)
-    .toSorted((left, right) => right.daysAgo - left.daysAgo);
+  const paying = oldestFirst(
+    plan.payments.filter((payment) => payment.amountMinor > 0),
+    (payment) => payment.daysAgo
+  );
   const logProgress = progressLogger(run, paying.length, {
     every: PROGRESS_EVERY,
     line: (done) => `  recorded ${done} of ${paying.length} payments`,
   });
   for (const payment of paying) {
     const family = familyOf(plan.families, payment.family);
-    const bursar = found(facts.money.bursars.get(family.campus), family.campus);
+    const bursar = bursarOf(facts.money, family.campus);
     const day = moveClock(run, payment.daysAgo);
     const proof =
       payment.method === 'transfer'

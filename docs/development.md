@@ -55,9 +55,11 @@ Cutover is copy, verify, switch the driver, then copy and verify once more. Roll
 | Apply migrations        | `nx run api:db-migrate-up`                                                                     |
 | Wipe and recreate       | `nx run api:db-reset` (wipes the volume, restarts Postgres, migrates; re-seed afterwards)      |
 | Seed                    | `nx run api:db-seed` (idempotent)                                                              |
-| Demo school (opt-in)    | `pnpm db:seed:demo` / `nx run api:db-seed-demo` (idempotent; 600 students, about 2 to 3 min)   |
+| Demo school (opt-in)    | `pnpm db:seed:demo` / `nx run api:db-seed-demo` (idempotent; 600 students, about 2 to 8 min)   |
 | New migration           | add `apps/api/db/migrations/<timestamp>_<name>.sql` with `-- migrate:up` and `-- migrate:down` |
 | Refresh generated files | `pnpm drift:fix`                                                                               |
+
+The demo school has people, a billed term, payments and wallets, and also fills the Store, Approvals, Announcements, Leave and student list; `.claude/skills/run-local/SKILL.md` lists what it holds.
 
 After any schema change run `pnpm drift:fix` and commit `schema.sql` and `db-types.ts` with the migration.
 

@@ -1,4 +1,10 @@
-import type { DemoSize } from './config';
+import type { DemoCampus, DemoSize } from './config';
+import {
+  emptyApprovalsPlan,
+  planDiscounts,
+  planMoneyApprovals,
+  type ApprovalsPlan,
+} from './approvals-plan';
 import {
   planPayments,
   planWallets,
@@ -17,11 +23,29 @@ import {
   type DemoFamily,
   type DemoStaff,
   type DemoTeacher,
+  type FamilyNumber,
+  type StudentNumber,
   type SubjectAssignment,
 } from './people-plan';
-import { createRandom } from './prng';
+import { createRandom, type Random } from './prng';
+import {
+  DEMO_ANNOUNCEMENTS,
+  emptyStudentLife,
+  planLeave,
+  planStudentLife,
+  type AnnouncementPlan,
+  type LeavePlan,
+  type StudentLifePlan,
+} from './school-life-plan';
+import {
+  emptyStorePlan,
+  planStore,
+  type Buyer,
+  type StorePlan,
+} from './store-plan';
 
-const DEMO_SEED = 0x52_56_53_44;
+export const DEMO_SEED = 0x52_56_53_44;
+const FINAL_YEAR_LEVEL = 'SS3';
 
 export interface DemoPlan {
   size: DemoSize;
@@ -33,7 +57,21 @@ export interface DemoPlan {
   families: DemoFamily[];
   payments: FamilyPayment[];
   wallets: WalletPlan[];
+  store: StorePlan;
+  approvals: ApprovalsPlan;
+  announcements: AnnouncementPlan[];
+  leave: LeavePlan[];
+  studentLife: StudentLifePlan;
 }
+
+export const withoutSchoolActivity = (plan: DemoPlan): DemoPlan => ({
+  ...plan,
+  store: emptyStorePlan(),
+  approvals: emptyApprovalsPlan(),
+  announcements: [],
+  leave: [],
+  studentLife: emptyStudentLife(),
+});
 
 const slug = (name: string): string =>
   name.toLowerCase().replaceAll(/[^a-z]+/g, '.');
@@ -64,6 +102,87 @@ function withSampleEmails(
   });
 }
 
+interface PlannedChild {
+  number: StudentNumber;
+  family: FamilyNumber;
+  campus: DemoCampus;
+  levelCode: string;
+}
+
+const childrenOf = (families: readonly DemoFamily[]): PlannedChild[] =>
+  families.flatMap((family) =>
+    family.children.map((child) => ({
+      number: child.number,
+      family: family.number,
+      campus: family.campus,
+      levelCode: child.level.code,
+    }))
+  );
+
+interface SchoolActivity {
+  store: StorePlan;
+  approvals: ApprovalsPlan;
+  studentLife: StudentLifePlan;
+}
+
+/** All new draws come after the wallets, so the school itself never changes. */
+function planActivity(
+  families: readonly DemoFamily[],
+  options: {
+    payments: readonly FamilyPayment[];
+    wallets: readonly WalletPlan[];
+    random: Random;
+  }
+): SchoolActivity {
+  const { wallets, random } = options;
+  const children = childrenOf(families);
+  const walletFamilies = new Set(wallets.map((row) => row.family));
+  const money = planMoneyApprovals(families, options);
+  const adjusted = new Set(money.adjustments.map((row) => row.student));
+  const voided = new Set(money.voids.map((row) => row.family));
+  const free = children.filter(
+    (row) =>
+      !walletFamilies.has(row.family) &&
+      !voided.has(row.family) &&
+      !adjusted.has(row.number)
+  );
+  const studentLife = planStudentLife({
+    pool: free
+      .filter((row) => row.levelCode !== FINAL_YEAR_LEVEL)
+      .map((row) => row.number),
+    finalYear: free
+      .filter((row) => row.levelCode === FINAL_YEAR_LEVEL)
+      .map((row) => row.number),
+    random,
+  });
+  const away = new Set(
+    [...studentLife.inactive, ...studentLife.away, ...studentLife.left].map(
+      (row) => row.student
+    )
+  );
+  const resting = new Set([...away, ...studentLife.graduated]);
+  const discounts = planDiscounts(
+    children.filter((row) => !resting.has(row.number)).map((row) => row.number),
+    random
+  );
+  const buyers: Buyer[] = random.shuffle(
+    children
+      .filter(
+        (row) => !walletFamilies.has(row.family) && !resting.has(row.number)
+      )
+      .map((row) => ({
+        student: row.number,
+        campus: row.campus,
+        levelCode: row.levelCode,
+      }))
+  );
+  return {
+    store: planStore(buyers, random),
+    approvals: { ...money, discounts },
+    studentLife,
+  };
+}
+
 export function buildDemoPlan(size: DemoSize, today: string): DemoPlan {
   const random = createRandom(DEMO_SEED);
   const arms = buildArms();
@@ -74,6 +193,7 @@ export function buildDemoPlan(size: DemoSize, today: string): DemoPlan {
     students: size.students,
     random,
   });
+  const activity = planActivity(built, { payments, wallets, random });
   return {
     size,
     today,
@@ -84,5 +204,8 @@ export function buildDemoPlan(size: DemoSize, today: string): DemoPlan {
     families: withSampleEmails(built, wallets),
     payments,
     wallets,
+    ...activity,
+    announcements: [...DEMO_ANNOUNCEMENTS],
+    leave: planLeave(teachers, today),
   };
 }

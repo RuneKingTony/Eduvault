@@ -1,6 +1,7 @@
 import type { INestApplicationContext } from '@nestjs/common';
 import type { OrgContext } from '../../../src/app/common/auth';
 import { Clock } from '../../../src/app/common/clock';
+import { orgContextFor } from '../actors';
 import { shiftDate } from '../date-shift';
 import type { DemoCampus } from './config';
 import type { DemoPlan } from './plan';
@@ -29,15 +30,31 @@ export interface PeopleFacts {
   payerIds: ReadonlyMap<FamilyNumber, string>;
 }
 
-export const found = <T>(value: T | undefined, what: string): T => {
-  if (value === undefined) {
+export const found = <T>(value: T | null | undefined, what: string): T => {
+  if (value === undefined || value === null) {
     throw new Error(`The demo seed has no ${what}`);
   }
   return value;
 };
 
+export const campusIdOf = (
+  school: Pick<SchoolFacts, 'campusIds'>,
+  campus: DemoCampus
+): string => found(school.campusIds.get(campus), `campus ${campus}`);
+
 export const dayAt = (plan: DemoPlan, daysAgo: number): string =>
   shiftDate(plan.today, -daysAgo);
+
+export const staffContext = (run: DemoRun, key: string): Promise<OrgContext> =>
+  orgContextFor(
+    run.app,
+    found(
+      [...run.plan.leaders, ...run.plan.teachers].find(
+        (row) => row.key === key
+      ),
+      `staff member ${key}`
+    ).email
+  );
 
 export function moveClock(run: DemoRun, daysAgo: number): string {
   const day = dayAt(run.plan, daysAgo);

@@ -17,8 +17,14 @@ import { SubjectService } from '../../../src/app/modules/subject/subject.service
 import { orgContextFor } from '../actors';
 import { shiftDate } from '../date-shift';
 import { SEED_PASSWORD } from '../members';
-import { DEMO_CAMPUSES, type DemoCampus } from './config';
 import {
+  DEMO_CAMPUSES,
+  midTermDays,
+  TERM_STARTED_DAYS_AGO,
+  type DemoCampus,
+} from './config';
+import {
+  campusIdOf,
   dayAt,
   found,
   type AcademicFacts,
@@ -29,10 +35,7 @@ import { CAMPUS_ADDRESSES, DEMO_SUBJECTS, levelSubjects } from './lists';
 import { DEMO_OWNER, DEMO_SCHOOL, type DemoStaff } from './people-plan';
 
 const DAYS_SINCE_SCHOOL_JOINED = 120;
-export const TERM_STARTED_DAYS_AGO = 37;
 const SCHOOL_YEAR_DAYS = 319;
-const WEEKS_BEFORE_MID_TERM = 8;
-const MID_TERM_THURSDAY_OFFSET = 3;
 
 async function addStaff(
   run: DemoRun,
@@ -62,7 +65,7 @@ async function addStaff(
     for (const campus of member.campuses) {
       await api.addTeamMember({
         body: {
-          teamId: found(school.campusIds.get(campus), `campus ${campus}`),
+          teamId: campusIdOf(school, campus),
           userId: user.id,
         },
         headers: school.owner.headers,
@@ -140,11 +143,7 @@ async function createCalendar(
   if (!first.isCurrent) {
     await calendar.makeCurrent(school.owner, first.id);
   }
-  const midTerm = shiftDate(
-    startsOn,
-    WEEKS_BEFORE_MID_TERM * 7 + MID_TERM_THURSDAY_OFFSET
-  );
-  for (const date of [midTerm, shiftDate(midTerm, 1)]) {
+  for (const date of midTermDays(run.plan.today)) {
     await calendar.addHoliday(school.owner, first.id, {
       date,
       name: 'Mid-term break',
@@ -169,7 +168,7 @@ async function createClasses(
         levels.find((level) => level.code === arm.level.code),
         `level ${arm.level.code}`
       ).id,
-      campusId: found(school.campusIds.get(arm.campus), arm.campus),
+      campusId: campusIdOf(school, arm.campus),
       name: arm.name,
     });
     armIds[arm.index] = row.id;

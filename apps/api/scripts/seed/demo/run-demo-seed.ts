@@ -7,18 +7,20 @@ import { PROTOTYPE_TODAY, seedOffsetDays, shiftDate } from '../date-shift';
 import { SEED_PASSWORD } from '../members';
 import { ensureSuperAdmin } from '../super-admin';
 import { admitStudents } from './admissions';
-import { parseDemoSize, type DemoSize } from './config';
+import { runAnnouncements } from './announcements';
+import { runApprovals } from './approvals';
+import { parseDemoSize, TERM_STARTED_DAYS_AGO, type DemoSize } from './config';
 import { runDemoCheck } from './demo-check';
 import { found, moveClock, type DemoRun } from './demo-run';
+import { runLeave } from './leave';
 import { billTerm, recordPayments, setUpMoney } from './money';
 import { DEMO_OWNER, DEMO_SCHOOL, familyOf, payerEmailOf } from './people-plan';
 import type { WalletPlan } from './money-plan';
 import { buildDemoPlan, type DemoPlan } from './plan';
-import {
-  createAcademics,
-  createSchool,
-  TERM_STARTED_DAYS_AGO,
-} from './structure';
+import { STORE_ITEMS } from './store-plan';
+import { createAcademics, createSchool } from './structure';
+import { runStore } from './store';
+import { runStudentLife } from './student-life';
 import { runWallets } from './wallets';
 
 interface DemoSeedOptions {
@@ -65,6 +67,26 @@ function signInLines(plan: DemoPlan): string[] {
   return people.map(([email, label]) => `  ${email}  ${label}`);
 }
 
+function activityLines(plan: DemoPlan): string[] {
+  const { store, approvals, studentLife } = plan;
+  const asked = [
+    ...approvals.discounts,
+    ...approvals.adjustments,
+    ...approvals.voids,
+  ];
+  const waiting = asked.filter((row) => row.state === 'pending').length;
+  const unsettled = store.counts.filter((row) => row.decision === 'waiting');
+  const published = plan.announcements.filter(
+    (row) => row.status === 'published'
+  );
+  return [
+    `Store: ${STORE_ITEMS.length} items in two stores, ${store.sales.length} sales and ${store.counts.length} stock counts (${unsettled.length} waiting for approval).`,
+    `Approvals: ${asked.length} discounts, adjustments and cancellations asked for, ${waiting} still waiting.`,
+    `Announcements: ${plan.announcements.length} (${published.length} published); leave: ${plan.leave.length} requests.`,
+    `Students: ${studentLife.inactive.length} inactive, ${studentLife.away.length} not seen lately, ${studentLife.left.length} left and ${studentLife.graduated.length} graduated.`,
+  ];
+}
+
 function printSummary(run: DemoRun, startedAt: number): void {
   const { plan, log } = run;
   const students = plan.families.reduce(
@@ -75,6 +97,9 @@ function printSummary(run: DemoRun, startedAt: number): void {
   log(
     `Seeded ${DEMO_SCHOOL.name}: ${students} students in ${plan.families.length} families, ${plan.teachers.length} teachers, ${plan.arms.length} classes on 2 campuses, ${payments.length} payments and ${plan.wallets.length} family wallets; demo check passed in ${elapsed(startedAt)}.`
   );
+  for (const line of activityLines(plan)) {
+    log(line);
+  }
   log(`Sign in with any of these (password: ${SEED_PASSWORD}):`);
   for (const line of signInLines(plan)) {
     log(line);
@@ -101,6 +126,16 @@ async function seedDemo(
   await recordPayments(run, { people, money });
   log('Topping up and spending from family wallets.');
   await runWallets(run, { school, people, money });
+  log('Stocking the stores and recording store sales.');
+  const store = await runStore(run, { school, people, money });
+  log('Asking for and deciding discounts, adjustments and cancellations.');
+  await runApprovals(run, { school, academics, people, money });
+  log('Posting announcements.');
+  await runAnnouncements(run, school);
+  log('Recording staff leave.');
+  await runLeave(run, school);
+  log('Marking students not seen, left and graduated.');
+  await runStudentLife(run, { school, academics, people });
   moveClock(run, 0);
 
   log('Checking the seeded data.');
@@ -111,6 +146,8 @@ async function seedDemo(
     owner: school.owner,
     studentIds: people.studentIds,
     payerIds: people.payerIds,
+    campusIds: school.campusIds,
+    itemIds: store.itemIds,
     rerun,
   });
   if (failures.length > 0) {

@@ -1,10 +1,8 @@
-import type { INestApplicationContext } from '@nestjs/common';
 import { sql } from 'kysely';
 import {
   FEES_RECEIVABLE_SYSTEM_KEY,
   STUDENT_WALLETS_SYSTEM_KEY,
 } from '@eduvault/api-contract';
-import type { OrgContext } from '../../../src/app/common/auth';
 import { KYSELY_TOKEN, type Database } from '../../../src/app/common/db/tokens';
 import { StudentAccountService } from '../../../src/app/modules/student-account/student-account.service';
 import { WalletService } from '../../../src/app/modules/wallet/wallet.service';
@@ -14,24 +12,15 @@ import {
   expectedWalletBalance,
   owedAndCredit,
 } from './check-math';
-import { DEMO_ARM_COUNT, DEMO_CAMPUSES } from './config';
-import type { DemoPlan } from './plan';
 import {
-  DEMO_SCHOOL,
-  EMAIL_DOMAIN,
-  type FamilyNumber,
-  type StudentNumber,
-} from './people-plan';
-
-interface CheckInput {
-  app: INestApplicationContext;
-  plan: DemoPlan;
-  organizationId: string;
-  owner: OrgContext;
-  studentIds: ReadonlyMap<StudentNumber, string>;
-  payerIds: ReadonlyMap<FamilyNumber, string>;
-  rerun: () => Promise<boolean>;
-}
+  approvalsMatch,
+  isStoreEntry,
+  schoolLifeMatches,
+  storeMatches,
+} from './activity-check';
+import { matcher, type CheckInput } from './check-input';
+import { DEMO_ARM_COUNT, DEMO_CAMPUSES } from './config';
+import { DEMO_SCHOOL, EMAIL_DOMAIN, type StudentNumber } from './people-plan';
 
 export const COUNTED_TABLES = [
   'organization',
@@ -50,15 +39,17 @@ export const COUNTED_TABLES = [
   'journal_entry',
   'journal_line',
   'activity_event',
+  'item',
+  'stock_delivery',
+  'stock_movement',
+  'store_sale',
+  'stock_count',
+  'adjustment',
+  'student_discount',
+  'payment_void',
+  'announcement',
+  'staff_leave',
 ] as const;
-
-const matcher =
-  (failures: string[]) =>
-  (what: string, got: number, want: number): void => {
-    if (got !== want) {
-      failures.push(`${what}: expected ${want}, found ${got}`);
-    }
-  };
 
 async function countsMatch({ app, plan, organizationId }: CheckInput) {
   const db = app.get<Database>(KYSELY_TOKEN, { strict: false });
@@ -168,11 +159,13 @@ async function receivableTotals({ app, organizationId }: CheckInput) {
     SELECT COALESCE(SUM(jl.debit_minor), 0)::text AS debits,
            COALESCE(SUM(jl.credit_minor), 0)::text AS credits
     FROM journal_line jl
+    JOIN journal_entry e ON e.id = jl.entry_id
     WHERE jl.organization_id = ${organizationId}
       AND jl.ledger_account_id = (
         SELECT la.id FROM ledger_account la
         WHERE la.organization_id = ${organizationId}
-          AND la.system_key = ${FEES_RECEIVABLE_SYSTEM_KEY})`.execute(db);
+          AND la.system_key = ${FEES_RECEIVABLE_SYSTEM_KEY})
+      AND NOT ${isStoreEntry(organizationId)}`.execute(db);
   return {
     debitsMinor: Number(rows[0]?.debits ?? -1),
     creditsMinor: Number(rows[0]?.credits ?? -1),
@@ -198,9 +191,13 @@ async function receivableMatches(input: CheckInput) {
   );
   const failures: string[] = [];
   const same = matcher(failures);
-  same('charged', totals.debitsMinor, expected.chargedMinor);
   same(
-    'paid, spent and auto-paid',
+    'charged, refunded and reversed',
+    totals.debitsMinor,
+    expected.chargedMinor + expected.reversedMinor
+  );
+  same(
+    'paid, spent, auto-paid and written off',
     totals.creditsMinor,
     expected.plannedCreditsMinor + autoPaid
   );
@@ -211,8 +208,7 @@ async function receivableMatches(input: CheckInput) {
     ).length,
     0
   );
-  const { owedMinor, creditMinor } = owedAndCredit([...planned.values()]);
-  same('credit held for students', creditMinor, expected.overpaidMinor);
+  const { owedMinor } = owedAndCredit([...planned.values()]);
   failures.push(
     ...(await servicesAgree(
       { app, owner },
@@ -356,6 +352,9 @@ export async function runDemoCheck(input: CheckInput): Promise<string[]> {
     countsMatch,
     receivableMatches,
     walletsMatch,
+    storeMatches,
+    approvalsMatch,
+    schoolLifeMatches,
     nothingLeaksAcross,
     secondRunChangesNothing,
   ]) {
