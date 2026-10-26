@@ -15,6 +15,8 @@ import type {
   PortalPurchase,
   PortalPurchases,
   PortalStudent,
+  PortalWalletEarmarkMovement,
+  PortalWalletJournalMovement,
   PortalWalletMovement,
   PortalWalletMovementList,
   Wallet,
@@ -311,8 +313,9 @@ export const portalWallet = (over: Partial<Wallet> = {}): Wallet => ({
 });
 
 export const portalMovement = (
-  over: Partial<PortalWalletMovement> = {}
-): PortalWalletMovement => ({
+  over: Partial<PortalWalletJournalMovement> = {}
+): PortalWalletJournalMovement => ({
+  type: 'journal',
   id: testId(0x2_00_11),
   effectiveOn: '2026-10-07',
   postedAt: '2026-10-07T09:00:00.000Z',
@@ -322,6 +325,21 @@ export const portalMovement = (
   studentName: null,
   amountMinor: 5_000_000,
   source: { type: 'topup', method: 'cash', depositorName: 'Uncle Bode' },
+  ...over,
+});
+
+export const portalEarmark = (
+  over: Partial<PortalWalletEarmarkMovement> = {}
+): PortalWalletEarmarkMovement => ({
+  type: 'earmark',
+  id: testId(0x2_00_12),
+  effectiveOn: '2026-10-08',
+  postedAt: '2026-10-08T09:00:00.000Z',
+  kind: 'set',
+  reference: 'ERM-20261008-K3Q7ZA',
+  studentId: testId(0x2_00_13),
+  studentName: 'Ada Okeke',
+  amountMinor: 2_000_000,
   ...over,
 });
 

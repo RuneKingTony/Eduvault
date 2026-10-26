@@ -15,6 +15,8 @@ import type {
   WalletCancellationRequest,
   WalletChild,
   WalletList,
+  WalletEarmarkMovement,
+  WalletJournalMovement,
   WalletMovement,
   WalletMovementList,
   WalletRefundRequest,
@@ -50,6 +52,7 @@ const REFUND_ID = testId(0x1_70_81);
 const CANCELLATION_ID = testId(0x1_70_82);
 const REFUND_FILE_ID = testId(0x1_70_52);
 const LINE_D = testId(0x1_70_64);
+const LINE_E = testId(0x1_70_65);
 const ENTRY_D = testId(0x1_70_74);
 export const TOP_UP_MOVEMENT_ID = TOP_UP_ID;
 
@@ -122,8 +125,9 @@ export const walletList = (
 });
 
 export const movement = (
-  over: Partial<WalletMovement> = {}
-): WalletMovement => ({
+  over: Partial<WalletJournalMovement> = {}
+): WalletJournalMovement => ({
+  type: 'journal',
   lineId: LINE_A,
   entryId: ENTRY_A,
   effectiveOn: '2026-10-07',
@@ -146,8 +150,8 @@ export const movement = (
 });
 
 export const monnifyMovement = (
-  over: Partial<WalletMovement> = {}
-): WalletMovement =>
+  over: Partial<WalletJournalMovement> = {}
+): WalletJournalMovement =>
   movement({
     lineId: LINE_C,
     entryId: ENTRY_C,
@@ -170,7 +174,7 @@ export const monnifyMovement = (
     ...over,
   });
 
-export const spendMovement = (): WalletMovement =>
+export const spendMovement = (): WalletJournalMovement =>
   movement({
     lineId: LINE_B,
     entryId: ENTRY_B,
@@ -184,7 +188,23 @@ export const spendMovement = (): WalletMovement =>
     madeBy: 'Ngozi Okeke',
   });
 
-export const refundMovement = (): WalletMovement =>
+export const earmarkMovement = (
+  over: Partial<WalletEarmarkMovement> = {}
+): WalletEarmarkMovement => ({
+  type: 'earmark',
+  id: LINE_E,
+  effectiveOn: '2026-10-10',
+  postedAt: '2026-10-10T09:00:00.000Z',
+  kind: 'set',
+  reference: 'ERM-20261010-A1B2C3',
+  studentId: ADA,
+  studentName: 'Ada Okeke',
+  amountMinor: 2_000_000,
+  madeBy: 'Ngozi Okeke',
+  ...over,
+});
+
+export const refundMovement = (): WalletJournalMovement =>
   movement({
     lineId: LINE_D,
     entryId: ENTRY_D,

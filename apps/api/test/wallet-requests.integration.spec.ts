@@ -23,6 +23,7 @@ import type { Pool } from 'pg';
 import { reservedAccountReference } from '../src/app/modules/gateway/reserved-account.service';
 import { acting, expect, type Fixtures } from './support/base-test';
 import { receivableBalance } from './support/factories/billing';
+import { journalItems } from './support/wallet-movements';
 import {
   bankAccount,
   nextReference,
@@ -208,9 +209,9 @@ async function movementsAddUp(api: Api, actor: Signed, walletId: string) {
   ).body as WalletMovementList;
   const wallet = await walletOf(api, actor, walletId);
   expect(
-    movements.items.reduce((total, row) => total + row.amountMinor, 0)
+    journalItems(movements).reduce((total, row) => total + row.amountMinor, 0)
   ).toBe(wallet.balanceMinor);
-  return movements;
+  return { ...movements, items: journalItems(movements) };
 }
 
 test.describe('asking for a refund', () => {
@@ -1003,7 +1004,7 @@ test.describe('cancelling a top-up', () => {
         .get(`/finance/wallets/${walletId}/movements?pageSize=50`)
         .expect(200)
     ).body as WalletMovementList;
-    const online = movements.items.find(
+    const online = journalItems(movements).find(
       (row) => row.source?.type === 'monnify'
     );
 

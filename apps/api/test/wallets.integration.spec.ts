@@ -18,10 +18,12 @@ import {
   type TopUpOptions,
   type Wallet,
   type WalletList,
+  type PortalWalletMovementList,
   type WalletMovementList,
 } from '@eduvault/api-contract';
 import { acting, expect } from './support/base-test';
 import { receivableBalance } from './support/factories/billing';
+import { journalItems } from './support/wallet-movements';
 import { gatewayAccountId } from './support/factories/store';
 import { ledgerAccountId } from './support/factories/finance';
 import {
@@ -567,26 +569,22 @@ test.describe('the staff wallet screens', () => {
       await api(owner).get(`/finance/wallets/${walletId}/movements`).expect(200)
     ).body as WalletMovementList;
     expect(movements.total).toBe(3);
-    expect(
-      movements.items.map((item) => [item.kind, item.amountMinor])
-    ).toEqual([
+    const journal = journalItems(movements);
+    expect(journal.map((item) => [item.kind, item.amountMinor])).toEqual([
       ['wallet_spend', -1_500_000],
       ['wallet_topup', 1_000_000],
       ['wallet_topup', 3_000_000],
     ]);
-    expect(movements.items[0]).toMatchObject({
+    expect(journal[0]).toMatchObject({
       studentId: ada.id,
       source: { type: 'spend' },
     });
-    expect(movements.items[2]?.source).toMatchObject({
+    expect(journal[2]?.source).toMatchObject({
       type: 'topup',
       method: 'cash',
       depositorName: 'Uncle Bode',
     });
-    const total = movements.items.reduce(
-      (sum, item) => sum + item.amountMinor,
-      0
-    );
+    const total = journal.reduce((sum, item) => sum + item.amountMinor, 0);
     expect(total).toBe(
       await familyBalance(pool, orgA.id, guardianLogin?.guardianId ?? '')
     );
@@ -970,6 +968,91 @@ test.describe('the guardian’s wallet', () => {
       setAsideMinor: 0,
       freeMinor: 1_500_000,
     });
+  });
+
+  test('lists a set-aside and a release in the movements between the money movements, for staff and the guardian, without counting toward the balance', async ({
+    api,
+    app,
+    pool,
+    schools,
+  }) => {
+    const { owner, ownerB, orgA } = schools;
+    const account = await cashAccount(app, owner);
+    const { ada, tobi, guardianLogin } = await family(app, schools);
+    const walletId = await walletIdOf(pool, guardianLogin?.guardianId ?? '');
+    await owes(app, owner, { studentId: ada.id, amountMinor: OWED });
+    await owes(app, owner, { studentId: tobi.id, amountMinor: OWED });
+    await topUpWallet(api, owner, {
+      walletId,
+      accountId: account.id,
+      amountMinor: 3_000_000,
+    });
+    const guardian = await signInAs(api, guardianLogin);
+    await api(guardian)
+      .post('/portal/wallet/earmarks')
+      .send({ reference: 'ERM-H1', studentId: tobi.id, amountMinor: 2_000_000 })
+      .expect(201);
+    await api(guardian)
+      .post('/portal/wallet/spend')
+      .send({
+        reference: nextReference('WSP'),
+        lines: [{ studentId: tobi.id, amountMinor: 1_500_000 }],
+      })
+      .expect(201);
+    await api(guardian)
+      .post('/portal/wallet/earmarks/release')
+      .send({ reference: 'ERM-H2', studentId: tobi.id, amountMinor: 500_000 })
+      .expect(201);
+
+    const staff = async (query: string) =>
+      (
+        await api(owner)
+          .get(`/finance/wallets/${walletId}/movements${query}`)
+          .expect(200)
+      ).body as WalletMovementList;
+    const all = await staff('');
+    expect(all.total).toBe(4);
+    expect(
+      all.items.map((item) => [
+        item.type,
+        item.type === 'earmark' ? item.kind : item.source?.type,
+        item.amountMinor,
+      ])
+    ).toEqual([
+      ['earmark', 'release', -500_000],
+      ['journal', 'spend', -1_500_000],
+      ['earmark', 'set', 2_000_000],
+      ['journal', 'topup', 3_000_000],
+    ]);
+    expect(all.items[0]).toMatchObject({
+      studentId: tobi.id,
+      reference: 'ERM-H2',
+      madeBy: expect.any(String),
+    });
+    expect(
+      journalItems(all).reduce((sum, item) => sum + item.amountMinor, 0)
+    ).toBe(await familyBalance(pool, orgA.id, guardianLogin?.guardianId ?? ''));
+
+    const second = await staff('?pageSize=2&page=2');
+    expect(second.total).toBe(4);
+    expect(second.items.map((item) => item.type)).toEqual([
+      'earmark',
+      'journal',
+    ]);
+
+    const portal = (
+      await api(guardian).get('/portal/wallet/movements').expect(200)
+    ).body as PortalWalletMovementList;
+    expect(portal.total).toBe(4);
+    expect(portal.items.map((item) => item.type)).toEqual([
+      'earmark',
+      'journal',
+      'earmark',
+      'journal',
+    ]);
+    expect(JSON.stringify(portal)).not.toContain('madeBy');
+
+    await api(ownerB).get(`/finance/wallets/${walletId}/movements`).expect(404);
   });
 
   test('answers 404 to a staff member who is no guardian and 403 to someone without the wallet permissions', async ({

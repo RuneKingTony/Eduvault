@@ -2,10 +2,13 @@ import { sql, type Kysely, type RawBuilder } from 'kysely';
 import { z } from 'zod';
 import {
   approvalStatusSchema,
+  earmarkMovementKindSchema,
   journalKindSchema,
   paymentMethodSchema,
   type WalletChild,
   type WalletListQuery,
+  type WalletEarmarkMovement,
+  type WalletJournalMovement,
   type WalletMovement,
   type ReservedAccount,
   type WalletMovementSource,
@@ -429,7 +432,8 @@ function sourceOf(row: MovementRow): WalletMovementSource | null {
   return requestSourceOf(row);
 }
 
-const toMovement = (row: MovementRow): WalletMovement => ({
+const toMovement = (row: MovementRow): WalletJournalMovement => ({
+  type: 'journal',
   lineId: row.line_id,
   entryId: row.entry_id,
   effectiveOn: row.effective_on,
@@ -446,12 +450,7 @@ const toMovement = (row: MovementRow): WalletMovement => ({
   madeBy: row.made_by,
 });
 
-function movementRows(
-  db: Kysely<DB>,
-  mine: RawBuilder<unknown>,
-  paging: { page: number; pageSize: number }
-) {
-  const offset = (paging.page - 1) * paging.pageSize;
+function movementRows(db: Kysely<DB>, where: RawBuilder<unknown>) {
   return sql<MovementRow>`
       SELECT jl.id AS line_id, e.id AS entry_id,
         to_char(e.effective_on, 'YYYY-MM-DD') AS effective_on,
@@ -492,8 +491,85 @@ function movementRows(
       LEFT JOIN "user" u ON u.id = COALESCE(
         t.created_by, s.created_by, wr.approved_by, wc.approved_by,
         CASE WHEN e.kind = 'wallet_credit_migration' THEN e.posted_by END)
-      WHERE ${mine}
-      ORDER BY e.sequence DESC, lower(st.first_name), jl.id
+      WHERE ${where}`.execute(db);
+}
+
+interface EarmarkRow {
+  id: string;
+  kind: string;
+  amount: string;
+  reference: string;
+  created_at: Date;
+  effective_on: string;
+  student_id: string;
+  first_name: string;
+  last_name: string;
+  made_by: string | null;
+}
+
+const toEarmarkMovement = (row: EarmarkRow): WalletEarmarkMovement => ({
+  type: 'earmark',
+  id: row.id,
+  effectiveOn: row.effective_on,
+  postedAt: iso(row.created_at),
+  kind: earmarkMovementKindSchema.parse(row.kind),
+  reference: row.reference,
+  studentId: row.student_id,
+  studentName: `${row.first_name} ${row.last_name}`.trim(),
+  amountMinor: Number(row.amount),
+  madeBy: row.made_by,
+});
+
+function earmarkRows(
+  db: Kysely<DB>,
+  wallet: { organizationId: string; ids: readonly string[] }
+) {
+  return sql<EarmarkRow>`
+      SELECT em.id, em.kind, em.delta_minor::text AS amount, em.reference,
+        em.created_at,
+        to_char(em.created_at AT TIME ZONE 'Africa/Lagos', 'YYYY-MM-DD') AS effective_on,
+        em.student_id, st.first_name, st.last_name, u.name AS made_by
+      FROM wallet_earmark em
+      JOIN student st ON st.id = em.student_id AND st.organization_id = em.organization_id
+      LEFT JOIN "user" u ON u.id = em.created_by
+      WHERE em.organization_id = ${wallet.organizationId}
+        AND em.id = ANY(${[...wallet.ids]}::uuid[])`.execute(db);
+}
+
+interface FeedKey {
+  type: 'journal' | 'earmark';
+  id: string;
+}
+
+const SET_OR_RELEASE = sql`em.kind IN ('set', 'release')`;
+
+function feedKeys(
+  db: Kysely<DB>,
+  feed: {
+    organizationId: string;
+    mine: RawBuilder<unknown>;
+    walletId: RawBuilder<unknown>;
+    paging: { page: number; pageSize: number };
+  }
+) {
+  const { organizationId, paging } = feed;
+  const offset = (paging.page - 1) * paging.pageSize;
+  return sql<FeedKey>`
+      SELECT type, id FROM (
+        SELECT 'journal' AS type, jl.id::text AS id, e.posted_at AS at,
+          e.sequence AS seq, lower(st.first_name) AS name
+        FROM journal_line jl
+        JOIN journal_entry e ON e.id = jl.entry_id AND e.organization_id = jl.organization_id
+        LEFT JOIN student st ON st.id = jl.student_id AND st.organization_id = jl.organization_id
+        WHERE ${feed.mine}
+        UNION ALL
+        SELECT 'earmark', em.id::text, em.created_at, NULL::bigint, NULL
+        FROM wallet_earmark em
+        WHERE em.organization_id = ${organizationId}
+          AND em.wallet_id = ${feed.walletId}
+          AND ${SET_OR_RELEASE}
+      ) feed
+      ORDER BY at DESC, seq DESC NULLS LAST, name, id
       LIMIT ${paging.pageSize} OFFSET ${offset}`.execute(db);
 }
 
@@ -507,15 +583,37 @@ export async function walletMovements(
     jl.organization_id = ${organizationId}
     AND jl.family_id = ${guardianId}
     AND jl.ledger_account_id = ${walletsAccountIdSql(organizationId)}`;
-  const [page, count] = await Promise.all([
-    movementRows(db, mine, paging),
+  const walletId = sql`(
+    SELECT w.id FROM wallet w
+    WHERE w.organization_id = ${organizationId} AND w.guardian_id = ${guardianId})`;
+  const [keys, count] = await Promise.all([
+    feedKeys(db, { organizationId, mine, walletId, paging }),
     sql<{ count: string }>`
-      SELECT count(*)::text AS count FROM journal_line jl WHERE ${mine}`.execute(
-      db
-    ),
+      SELECT (
+        (SELECT count(*) FROM journal_line jl WHERE ${mine})
+        + (SELECT count(*) FROM wallet_earmark em
+           WHERE em.organization_id = ${organizationId}
+             AND em.wallet_id = ${walletId} AND ${SET_OR_RELEASE})
+      )::text AS count`.execute(db),
+  ]);
+  const idsOf = (type: FeedKey['type']) =>
+    keys.rows.filter((key) => key.type === type).map((key) => key.id);
+  const [journal, earmarks] = await Promise.all([
+    movementRows(db, sql`${mine} AND jl.id = ANY(${idsOf('journal')}::uuid[])`),
+    earmarkRows(db, { organizationId, ids: idsOf('earmark') }),
+  ]);
+  const byId = new Map<string, WalletMovement>([
+    ...journal.rows.map((row): [string, WalletMovement] => [
+      row.line_id,
+      toMovement(row),
+    ]),
+    ...earmarks.rows.map((row): [string, WalletMovement] => [
+      row.id,
+      toEarmarkMovement(row),
+    ]),
   ]);
   return {
-    items: page.rows.map((row) => toMovement(row)),
+    items: keys.rows.flatMap((key) => byId.get(key.id) ?? []),
     total: Number(count.rows[0]?.count ?? 0),
   };
 }

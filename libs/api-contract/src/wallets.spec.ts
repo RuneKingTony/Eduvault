@@ -18,6 +18,7 @@ import {
   walletListQuerySchema,
   walletMovementQuerySchema,
   walletSpendOverMessage,
+  type PortalWalletMovement,
 } from './wallets';
 
 const id = '0b0c8a8e-8a3e-4c6c-a8c4-0e2f0f6b1f11';
@@ -180,8 +181,16 @@ describe('setAutoPaySchema', () => {
   });
 });
 
+const journalOf = (movement: PortalWalletMovement) => {
+  if (movement.type !== 'journal') {
+    throw new Error('expected a journal movement');
+  }
+  return movement;
+};
+
 describe('portalWalletMovementSchema', () => {
   const movement = {
+    type: 'journal',
     id,
     effectiveOn: '2026-10-24',
     postedAt: '2026-10-24T09:00:00.000Z',
@@ -194,7 +203,9 @@ describe('portalWalletMovementSchema', () => {
   };
 
   it('accepts a staff top-up without who made it or the receipt file', () => {
-    expect(portalWalletMovementSchema.parse(movement).source).toEqual({
+    expect(
+      journalOf(portalWalletMovementSchema.parse(movement)).source
+    ).toEqual({
       type: 'topup',
       method: 'cash',
       depositorName: 'Uncle Bode',
@@ -202,19 +213,21 @@ describe('portalWalletMovementSchema', () => {
   });
 
   it('drops the fields only staff may see', () => {
-    const parsed = portalWalletMovementSchema.parse({
-      ...movement,
-      entryId: other,
-      lineId: other,
-      madeBy: 'Bursar',
-      source: {
-        type: 'topup',
-        method: 'cash',
-        depositorName: null,
-        id: other,
-        proofFileId: other,
-      },
-    });
+    const parsed = journalOf(
+      portalWalletMovementSchema.parse({
+        ...movement,
+        entryId: other,
+        lineId: other,
+        madeBy: 'Bursar',
+        source: {
+          type: 'topup',
+          method: 'cash',
+          depositorName: null,
+          id: other,
+          proofFileId: other,
+        },
+      })
+    );
     expect(parsed).not.toHaveProperty('madeBy');
     expect(parsed).not.toHaveProperty('entryId');
     expect(parsed.source).toEqual({
@@ -237,8 +250,35 @@ describe('portalWalletMovementSchema', () => {
       netMinor: 4_950_000,
     };
     expect(
-      portalWalletMovementSchema.parse({ ...movement, source }).source
+      journalOf(portalWalletMovementSchema.parse({ ...movement, source }))
+        .source
     ).toEqual(source);
+  });
+
+  it('accepts a set-aside or release for a child and drops who made it', () => {
+    const earmark = {
+      type: 'earmark',
+      id,
+      effectiveOn: '2026-10-24',
+      postedAt: '2026-10-24T09:00:00.000Z',
+      kind: 'set',
+      reference: 'ERM-20261024-K3Q7ZA',
+      studentId: other,
+      studentName: 'Ada Okeke',
+      amountMinor: 500_000,
+    };
+    expect(
+      portalWalletMovementSchema.parse({ ...earmark, madeBy: 'Bursar' })
+    ).toEqual(earmark);
+    expect(
+      portalWalletMovementSchema.safeParse({ ...earmark, kind: 'spend' })
+        .success
+    ).toBe(false);
+  });
+
+  it('refuses an item with no type', () => {
+    const { type: _type, ...untyped } = movement;
+    expect(portalWalletMovementSchema.safeParse(untyped).success).toBe(false);
   });
 });
 

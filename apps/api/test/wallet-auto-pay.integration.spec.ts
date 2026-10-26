@@ -11,6 +11,7 @@ import { autoPayReference } from '../src/app/common/wallet';
 import { reservedAccountReference } from '../src/app/modules/gateway/reserved-account.service';
 import { expect, type Fixtures } from './support/base-test';
 import { importOpening } from './support/factories/finance';
+import { portalJournalItems } from './support/wallet-movements';
 import { receivableBalance } from './support/factories/billing';
 import { bankAccount, recordCash } from './support/factories/payments';
 import {
@@ -616,7 +617,7 @@ test.describe('the guardian’s movements', () => {
     for (const hidden of ['madeBy', 'proofFileId', 'entryId', 'lineId']) {
       expect(text).not.toContain(hidden);
     }
-    expect(list.items[1]?.source).toEqual({
+    expect(portalJournalItems(list)[1]?.source).toEqual({
       type: 'topup',
       method: 'cash',
       depositorName: 'Uncle Bode',

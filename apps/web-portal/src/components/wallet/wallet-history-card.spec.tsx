@@ -1,6 +1,7 @@
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import {
+  portalEarmark,
   portalMovement,
   portalMovements,
   renderWithApi,
@@ -49,6 +50,36 @@ beforeEach(() => {
 });
 
 describe('WalletHistoryCard', () => {
+  it('shows money set aside or released for a child between the other movements, with its balance left unchanged', async () => {
+    renderWithApi(<WalletHistoryCard />, {
+      portalWallet: {
+        movements: vi.fn().mockResolvedValue(
+          portalMovements([
+            portalEarmark({
+              id: testId(0x2_00_15),
+              kind: 'release',
+              amountMinor: -500_000,
+            }),
+            portalEarmark(),
+            portalMovement(),
+          ])
+        ),
+      },
+    });
+    const history = await screen.findByRole('group', { name: 'History' });
+    const release = await within(history).findByRole('row', {
+      name: /Released from Ada Okeke/,
+    });
+    expect(within(release).getByText('−₦5,000.00')).toBeVisible();
+    expect(within(release).getByText('Balance unchanged')).toBeVisible();
+    const set = within(history).getByRole('row', {
+      name: /Set aside for Ada Okeke/,
+    });
+    expect(within(set).getByText('ERM-20261008-K3Q7ZA')).toBeVisible();
+    expect(within(set).getByText('₦20,000.00')).toBeVisible();
+    expect(within(history).getAllByText('Balance unchanged')).toHaveLength(2);
+  });
+
   it('lists each movement with a plain title, its reference and a signed amount', async () => {
     renderWithApi(<WalletHistoryCard />, {
       portalWallet: {

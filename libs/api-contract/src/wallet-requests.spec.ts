@@ -208,6 +208,7 @@ describe('movement sources', () => {
 
   it('shows a guardian the refund’s bank reference and no internal id', () => {
     const movement = portalWalletMovementSchema.parse({
+      type: 'journal',
       id,
       effectiveOn: '2026-10-26',
       postedAt: '2026-10-26T08:00:00.000Z',
@@ -218,9 +219,8 @@ describe('movement sources', () => {
       amountMinor: -1_500_000,
       source: { type: 'refund', payoutReference: 'NIP-8841' },
     });
-    expect(movement.source).toEqual({
-      type: 'refund',
-      payoutReference: 'NIP-8841',
+    expect(movement).toMatchObject({
+      source: { type: 'refund', payoutReference: 'NIP-8841' },
     });
   });
 });

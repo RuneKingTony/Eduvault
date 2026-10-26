@@ -4,7 +4,8 @@ import { HistoryIcon } from 'lucide-react';
 import {
   movementTitle,
   traceFacts,
-  type PortalWalletMovement,
+  type PortalWalletEarmarkMovement,
+  type PortalWalletJournalMovement,
   type PortalWalletMovementList,
 } from '@eduvault/api-contract';
 import { fmtDate, walletMoney } from '@eduvault/shared';
@@ -36,11 +37,41 @@ import {
   portalWalletMovementsQueryOptions,
 } from '../../queries';
 
+function EarmarkRow({
+  movement,
+  currency,
+}: {
+  movement: PortalWalletEarmarkMovement;
+  currency: string;
+}) {
+  return (
+    <TableRow>
+      <TableCell className="whitespace-nowrap">
+        {fmtDate(movement.effectiveOn)}
+      </TableCell>
+      <TableCell>
+        <span className="flex flex-col">
+          <span>{movementTitle(movement)}</span>
+          <span className="font-mono text-xs text-muted-foreground">
+            {movement.reference}
+          </span>
+        </span>
+      </TableCell>
+      <TableCell className="text-right text-muted-foreground tabular-nums">
+        <span className="flex flex-col">
+          <span>{walletMoney(movement.amountMinor, currency)}</span>
+          <span className="text-xs">Balance unchanged</span>
+        </span>
+      </TableCell>
+    </TableRow>
+  );
+}
+
 function MovementRow({
   movement,
   currency,
 }: {
-  movement: PortalWalletMovement;
+  movement: PortalWalletJournalMovement;
   currency: string;
 }) {
   const { source } = movement;
@@ -111,13 +142,21 @@ function HistoryBody({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {data.items.map((movement) => (
-            <MovementRow
-              key={movement.id}
-              movement={movement}
-              currency={data.currency}
-            />
-          ))}
+          {data.items.map((movement) =>
+            movement.type === 'earmark' ? (
+              <EarmarkRow
+                key={movement.id}
+                movement={movement}
+                currency={data.currency}
+              />
+            ) : (
+              <MovementRow
+                key={movement.id}
+                movement={movement}
+                currency={data.currency}
+              />
+            )
+          )}
         </TableBody>
       </Table>
       {data.total > WALLET_MOVEMENTS_PAGE_SIZE ? (
