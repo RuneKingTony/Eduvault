@@ -19,6 +19,7 @@ import {
   topUpOptions,
   wallet,
   walletChild,
+  earmarkMovement,
 } from '../test-wallets';
 import { WalletPage } from './wallet-page';
 
@@ -176,6 +177,21 @@ describe('WalletPage', () => {
       'href',
       expect.stringContaining(`/files/${RECEIPT_FILE_ID}`)
     );
+  });
+
+  it('lists a set-aside with who made it and no actions, and says the balance did not change', async () => {
+    setup({ movements: movementList([earmarkMovement(), movement()]) });
+
+    const row = await screen.findByRole('row', {
+      name: /Set aside for Ada Okeke/,
+    });
+    expect(within(row).getByText('ERM-20261010-A1B2C3')).toBeVisible();
+    expect(within(row).getByText('Ngozi Okeke')).toBeVisible();
+    expect(within(row).getByText('Balance unchanged')).toBeVisible();
+    expect(within(row).queryByRole('button')).toBeNull();
+    expect(
+      screen.getByRole('button', { name: /Cancel top-up CSH-/ })
+    ).toBeVisible();
   });
 
   it('says there are no movements yet', async () => {

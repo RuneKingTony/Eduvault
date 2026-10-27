@@ -1,13 +1,16 @@
 import {
   portalWalletMovementSchema,
-  type WalletMovement,
+  type WalletJournalMovement,
 } from '@eduvault/api-contract';
 import { portalMovementOf } from './wallet-portal-movement';
 
 const ID = '0b0c8a8e-8a3e-4c6c-a8c4-0e2f0f6b1f11';
 const OTHER = '5d7e0f2a-3c1b-4e0a-9d7c-2f6a1b8c9d10';
 
-const movement = (over: Partial<WalletMovement>): WalletMovement => ({
+const movement = (
+  over: Partial<WalletJournalMovement>
+): WalletJournalMovement => ({
+  type: 'journal',
   lineId: ID,
   entryId: OTHER,
   effectiveOn: '2026-10-24',
@@ -22,14 +25,21 @@ const movement = (over: Partial<WalletMovement>): WalletMovement => ({
   ...over,
 });
 
+const portalJournal = (journal: WalletJournalMovement) => {
+  const portal = portalMovementOf(journal);
+  if (portal.type !== 'journal') {
+    throw new Error('expected a journal movement');
+  }
+  return portal;
+};
+
 const spendSource = (reference: string) =>
-  portalMovementOf(
-    movement({ reference, source: { type: 'spend', id: OTHER } })
-  ).source;
+  portalJournal(movement({ reference, source: { type: 'spend', id: OTHER } }))
+    .source;
 
 describe('portalMovementOf', () => {
   it('leaves out who made the movement and the entry id', () => {
-    const portal = portalMovementOf(movement({}));
+    const portal = portalJournal(movement({}));
     expect(portal).not.toHaveProperty('madeBy');
     expect(portal).not.toHaveProperty('entryId');
     expect(portal).not.toHaveProperty('lineId');
@@ -37,7 +47,7 @@ describe('portalMovementOf', () => {
   });
 
   it('keeps a staff top-up’s depositor and method but not its receipt', () => {
-    const portal = portalMovementOf(
+    const portal = portalJournal(
       movement({
         source: {
           type: 'topup',
@@ -57,7 +67,7 @@ describe('portalMovementOf', () => {
   });
 
   it('tells a family how many children’s accounts its moved credit came from', () => {
-    const portal = portalMovementOf(
+    const portal = portalJournal(
       movement({
         kind: 'wallet_credit_migration',
         reference: 'WMIG-guardian-1',
@@ -68,7 +78,7 @@ describe('portalMovementOf', () => {
   });
 
   it('keeps the Monnify facts Trace shows but not the top-up row id', () => {
-    const portal = portalMovementOf(
+    const portal = portalJournal(
       movement({
         source: {
           type: 'monnify',
@@ -102,14 +112,14 @@ describe('portalMovementOf', () => {
 
   it('shows a guardian a refund’s bank reference and a cancelled top-up’s reference, never the reason or the ids', () => {
     expect(
-      portalMovementOf(
+      portalJournal(
         movement({
           source: { type: 'refund', id: OTHER, payoutReference: 'NIP-8841' },
         })
       ).source
     ).toEqual({ type: 'refund', payoutReference: 'NIP-8841' });
     expect(
-      portalMovementOf(
+      portalJournal(
         movement({
           source: {
             type: 'topup_cancellation',
@@ -127,8 +137,31 @@ describe('portalMovementOf', () => {
 
   it('answers what the portal contract parses', () => {
     for (const source of [null, { type: 'spend' as const, id: OTHER }]) {
-      const portal = portalMovementOf(movement({ source }));
+      const portal = portalJournal(movement({ source }));
       expect(portalWalletMovementSchema.parse(portal)).toEqual(portal);
     }
+  });
+
+  it('shows a guardian her set-aside without who made it', () => {
+    const portal = portalMovementOf({
+      type: 'earmark',
+      id: ID,
+      effectiveOn: '2026-10-24',
+      postedAt: '2026-10-24T09:00:00.000Z',
+      kind: 'set',
+      reference: 'ERM-1',
+      studentId: OTHER,
+      studentName: 'Ada Okeke',
+      amountMinor: 500_000,
+      madeBy: 'Bursar Bola',
+    });
+    expect(portal).not.toHaveProperty('madeBy');
+    expect(portal).toMatchObject({
+      type: 'earmark',
+      id: ID,
+      kind: 'set',
+      amountMinor: 500_000,
+    });
+    expect(portalWalletMovementSchema.safeParse(portal).success).toBe(true);
   });
 });

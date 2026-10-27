@@ -1,11 +1,11 @@
-import { traceFacts, type WalletMovement } from '@eduvault/api-contract';
+import { traceFacts, type WalletJournalMovement } from '@eduvault/api-contract';
 import { TraceDialog } from '@eduvault/ui';
 
 export function TraceButton({
   movement,
   currency,
 }: {
-  movement: WalletMovement;
+  movement: WalletJournalMovement;
   currency: string;
 }) {
   const { source } = movement;

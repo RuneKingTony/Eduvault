@@ -201,7 +201,11 @@ export const walletMovementSourceSchema = z.discriminatedUnion('type', [
 ]);
 export type WalletMovementSource = z.infer<typeof walletMovementSourceSchema>;
 
-export const walletMovementSchema = z.object({
+export const earmarkMovementKindSchema = z.enum(['set', 'release']);
+export type EarmarkMovementKind = z.infer<typeof earmarkMovementKindSchema>;
+
+export const walletJournalMovementSchema = z.object({
+  type: z.literal('journal'),
   lineId: idSchema,
   entryId: idSchema,
   effectiveOn: z.iso.date(),
@@ -214,6 +218,26 @@ export const walletMovementSchema = z.object({
   source: walletMovementSourceSchema.nullable(),
   madeBy: z.string().nullable(),
 });
+export type WalletJournalMovement = z.infer<typeof walletJournalMovementSchema>;
+
+export const walletEarmarkMovementSchema = z.object({
+  type: z.literal('earmark'),
+  id: idSchema,
+  effectiveOn: z.iso.date(),
+  postedAt: z.iso.datetime({ offset: true }),
+  kind: earmarkMovementKindSchema,
+  reference: z.string(),
+  studentId: idSchema,
+  studentName: z.string(),
+  amountMinor: minorSchema,
+  madeBy: z.string().nullable(),
+});
+export type WalletEarmarkMovement = z.infer<typeof walletEarmarkMovementSchema>;
+
+export const walletMovementSchema = z.discriminatedUnion('type', [
+  walletJournalMovementSchema,
+  walletEarmarkMovementSchema,
+]);
 export type WalletMovement = z.infer<typeof walletMovementSchema>;
 
 export const walletMovementListSchema = z.object({
@@ -252,7 +276,8 @@ export type PortalWalletMovementSource = z.infer<
   typeof portalWalletMovementSourceSchema
 >;
 
-export const portalWalletMovementSchema = z.object({
+export const portalWalletJournalMovementSchema = z.object({
+  type: z.literal('journal'),
   id: idSchema,
   effectiveOn: z.iso.date(),
   postedAt: z.iso.datetime({ offset: true }),
@@ -263,6 +288,29 @@ export const portalWalletMovementSchema = z.object({
   amountMinor: minorSchema,
   source: portalWalletMovementSourceSchema.nullable(),
 });
+export type PortalWalletJournalMovement = z.infer<
+  typeof portalWalletJournalMovementSchema
+>;
+
+export const portalWalletEarmarkMovementSchema = z.object({
+  type: z.literal('earmark'),
+  id: idSchema,
+  effectiveOn: z.iso.date(),
+  postedAt: z.iso.datetime({ offset: true }),
+  kind: earmarkMovementKindSchema,
+  reference: z.string(),
+  studentId: idSchema,
+  studentName: z.string(),
+  amountMinor: minorSchema,
+});
+export type PortalWalletEarmarkMovement = z.infer<
+  typeof portalWalletEarmarkMovementSchema
+>;
+
+export const portalWalletMovementSchema = z.discriminatedUnion('type', [
+  portalWalletJournalMovementSchema,
+  portalWalletEarmarkMovementSchema,
+]);
 export type PortalWalletMovement = z.infer<typeof portalWalletMovementSchema>;
 
 export const portalWalletMovementListSchema = z.object({

@@ -4,7 +4,8 @@ import type { PortalWalletMovementSource } from './wallets';
 
 type MonnifySource = Extract<PortalWalletMovementSource, { type: 'monnify' }>;
 
-interface TitledMovement {
+interface TitledJournalMovement {
+  type?: 'journal';
   studentName: string | null;
   source:
     | { type: 'topup'; method: PaymentMethod; depositorName: string | null }
@@ -16,15 +17,25 @@ interface TitledMovement {
     | null;
 }
 
+interface TitledEarmarkMovement {
+  type: 'earmark';
+  kind: 'set' | 'release';
+  studentName: string;
+}
+
+type TitledMovement = TitledJournalMovement | TitledEarmarkMovement;
+
+type JournalSource = TitledJournalMovement['source'];
+
 const FIXED_TITLES: Partial<
-  Record<NonNullable<TitledMovement['source']>['type'], string>
+  Record<NonNullable<JournalSource>['type'], string>
 > = {
   monnify: 'Online top-up · Monnify',
   refund: 'Refund paid out',
   topup_cancellation: 'Top-up cancelled',
 };
 
-function ownTitle(source: TitledMovement['source']): string | undefined {
+function ownTitle(source: JournalSource): string | undefined {
   if (source?.type === 'topup') {
     const from =
       source.depositorName === null ? '' : ` from ${source.depositorName}`;
@@ -38,7 +49,13 @@ function ownTitle(source: TitledMovement['source']): string | undefined {
   return source === null ? undefined : FIXED_TITLES[source.type];
 }
 
-export function movementTitle({ source, studentName }: TitledMovement): string {
+export function movementTitle(movement: TitledMovement): string {
+  if (movement.type === 'earmark') {
+    return movement.kind === 'set'
+      ? `Set aside for ${movement.studentName}`
+      : `Released from ${movement.studentName}`;
+  }
+  const { source, studentName } = movement;
   const own = ownTitle(source);
   if (own !== undefined) {
     return own;

@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { BanIcon } from 'lucide-react';
 import {
   WALLET_CANCEL_REASON_MESSAGE,
-  type WalletMovement,
+  type WalletJournalMovement,
 } from '@eduvault/api-contract';
 import {
   generateWalletReference,
@@ -22,7 +22,7 @@ function CancelForm({
   onClose,
 }: {
   walletId: string;
-  movement: WalletMovement;
+  movement: WalletJournalMovement;
   currency: string;
   onClose: () => void;
 }) {
@@ -84,7 +84,7 @@ export function CancelTopUpDialog({
   onClose,
 }: {
   walletId: string;
-  movement: WalletMovement | null;
+  movement: WalletJournalMovement | null;
   currency: string;
   onClose: () => void;
 }) {

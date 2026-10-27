@@ -1,6 +1,19 @@
 import { movementTitle, traceFacts } from './wallet-text';
 
 describe('movementTitle', () => {
+  it('names a set-aside and a release by the child', () => {
+    expect(
+      movementTitle({ type: 'earmark', kind: 'set', studentName: 'Ada Okeke' })
+    ).toBe('Set aside for Ada Okeke');
+    expect(
+      movementTitle({
+        type: 'earmark',
+        kind: 'release',
+        studentName: 'Ada Okeke',
+      })
+    ).toBe('Released from Ada Okeke');
+  });
+
   it('names a top-up by its depositor and way of paying', () => {
     expect(
       movementTitle({
