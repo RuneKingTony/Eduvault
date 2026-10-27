@@ -21,6 +21,7 @@ import {
   type PortalWalletMovementList,
   type WalletMovementList,
 } from '@eduvault/api-contract';
+import type { Pool } from 'pg';
 import { acting, expect } from './support/base-test';
 import { receivableBalance } from './support/factories/billing';
 import { journalItems } from './support/wallet-movements';
@@ -84,6 +85,19 @@ const familyBalance = (
 
 const guardianIdOf = (student: Parameters<typeof guardianOf>[0]) =>
   guardianOf(student)?.guardianId ?? '';
+
+const waitForRowLockWait = async (pool: Pool) => {
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const { rows } = await pool.query(
+      `SELECT 1 FROM pg_locks WHERE locktype IN ('transactionid', 'tuple') AND NOT granted`
+    );
+    if (rows.length > 0) {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  throw new Error('The spend never waited on the child’s row lock');
+};
 
 test.describe('a wallet for every paying guardian', () => {
   test('is created once by the database for each paying guardian, in every school', async ({
@@ -508,6 +522,32 @@ test.describe('the staff wallet screens', () => {
     ]);
   });
 
+  test('leave out each child’s oldest unpaid date, which only the guardian’s pay table needs', async ({
+    api,
+    app,
+    pool,
+    schools,
+  }) => {
+    const { owner } = schools;
+    const { ada, guardianLogin } = await family(app, schools);
+    const walletId = await walletIdOf(pool, guardianLogin?.guardianId ?? '');
+    await owes(app, owner, { studentId: ada.id, amountMinor: OWED });
+    const guardian = await signInAs(api, guardianLogin);
+
+    const staff = (
+      await api(owner).get(`/finance/wallets/${walletId}`).expect(200)
+    ).body as Wallet;
+    const own = (await api(guardian).get('/portal/wallet').expect(200))
+      .body as Wallet;
+
+    expect(
+      staff.children.find((child) => child.studentId === ada.id)
+    ).toMatchObject({ owedMinor: OWED, oldestUnpaidOn: null });
+    expect(
+      own.children.find((child) => child.studentId === ada.id)?.oldestUnpaidOn
+    ).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
   test('offer the accounts that can take a top-up and the ways of paying, to wallet:topUp only', async ({
     api,
     app,
@@ -794,6 +834,59 @@ test.describe('the guardian’s wallet', () => {
     expect(await receivableBalance(pool, orgA.id, ada.id)).toBe(
       OWED - 1_000_000
     );
+  });
+
+  test('waits for a posting in flight on a child before it reads what the child owes', async ({
+    api,
+    app,
+    pool,
+    schools,
+  }) => {
+    const { owner, orgA } = schools;
+    const account = await cashAccount(app, owner);
+    const { ada, guardianLogin } = await family(app, schools);
+    const guardianId = guardianLogin?.guardianId ?? '';
+    const walletId = await walletIdOf(pool, guardianId);
+    await owes(app, owner, { studentId: ada.id, amountMinor: OWED });
+    await topUpWallet(api, owner, { walletId, accountId: account.id });
+    const guardian = await signInAs(api, guardianLogin);
+    const holder = await pool.connect();
+    try {
+      await holder.query('BEGIN');
+      await holder.query(
+        'SELECT id FROM student WHERE organization_id = $1 AND id = $2 FOR UPDATE',
+        [orgA.id, ada.id]
+      );
+      let answered = false;
+      const pending = api(guardian)
+        .post('/portal/wallet/spend')
+        .send({
+          reference: nextReference('WSP'),
+          lines: [{ studentId: ada.id, amountMinor: 1_500_000 }],
+        })
+        .expect(201)
+        .then((res) => {
+          answered = true;
+          return res.body as SpentWallet;
+        });
+      await waitForRowLockWait(pool);
+      expect(answered).toBe(false);
+      expect(await receivableBalance(pool, orgA.id, ada.id)).toBe(OWED);
+
+      await holder.query('COMMIT');
+      const spent = await pending;
+
+      expect(spent.wallet.balanceMinor).toBe(TOP_UP - 1_500_000);
+      expect(await receivableBalance(pool, orgA.id, ada.id)).toBe(
+        OWED - 1_500_000
+      );
+      expect(await familyBalance(pool, orgA.id, guardianId)).toBe(
+        TOP_UP - 1_500_000
+      );
+    } finally {
+      await holder.query('ROLLBACK');
+      holder.release();
+    }
   });
 
   test('refuses a line over the free money or over what the child owes with 422 and the maximum, and another family’s child with 404', async ({

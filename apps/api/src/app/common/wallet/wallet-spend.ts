@@ -19,6 +19,7 @@ import {
 } from '../ledger';
 import { campusesOf } from '../payments';
 import { claimReference } from '../references/apply-once';
+import { lockStudents } from '../students';
 import { walletFreeMoney } from './wallet-held';
 import { spendPostingLines } from './wallet-posting';
 
@@ -170,6 +171,8 @@ export async function writeSpend(
   }
   const wallet = await lockWallet(trx, input);
   const studentIds = input.lines.map((line) => line.studentId);
+  // A posting for a child waits for this lock, so the balance read below is current.
+  await lockStudents(trx, { organizationId, studentIds });
   const [{ freeMinor, marked }, owed] = await Promise.all([
     walletFreeMoney(trx, {
       organizationId,

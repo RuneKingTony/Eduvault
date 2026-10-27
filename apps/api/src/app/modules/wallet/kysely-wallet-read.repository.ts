@@ -136,10 +136,27 @@ function toChild(
   };
 }
 
+async function oldestFor(
+  db: Kysely<DB>,
+  wallet: { organization_id: string },
+  from: { rows: readonly ChildRow[]; view: { withOldestUnpaid: boolean } }
+): Promise<ReadonlyMap<string, string>> {
+  if (!from.view.withOldestUnpaid) {
+    return new Map();
+  }
+  return oldestUnpaidByChild(db, {
+    organizationId: wallet.organization_id,
+    studentIds: from.rows
+      .filter((row) => Number(row.owed) > 0)
+      .map((row) => row.student_id),
+  });
+}
+
+/** Only the guardian's pay table orders children by their oldest unpaid charge, so staff reads skip that query. */
 async function viewOf(
   db: Kysely<DB>,
   wallet: WalletRow & { organization_id: string },
-  scope: OrgScope['campusScope']
+  view: { scope: OrgScope['campusScope']; withOldestUnpaid: boolean }
 ): Promise<WalletView> {
   const family = {
     organizationId: wallet.organization_id,
@@ -154,7 +171,7 @@ async function viewOf(
     connected,
     autoPay,
   ] = await Promise.all([
-    childRows(db, wallet, scope),
+    childRows(db, wallet, view.scope),
     walletBalance(db, family),
     earmarksByChild(db, {
       organizationId: wallet.organization_id,
@@ -168,12 +185,7 @@ async function viewOf(
     gatewayConnected(db, wallet.organization_id),
     latestAutoPay(db, family),
   ]);
-  const oldest = await oldestUnpaidByChild(db, {
-    organizationId: wallet.organization_id,
-    studentIds: rows
-      .filter((row) => Number(row.owed) > 0)
-      .map((row) => row.student_id),
-  });
+  const oldest = await oldestFor(db, wallet, { rows, view });
   const figures = walletFigures(balanceMinor, [...marked.values()], held);
   const context = { freeMinor: figures.freeMinor, oldest };
   return {
@@ -211,7 +223,9 @@ export async function findWallet(
       AND w.id = ${walletId}
       AND ${anyChildInScopeSql('w', scope.campusScope)}`.execute(db);
   const [row] = rows;
-  return row === undefined ? undefined : viewOf(db, row, scope.campusScope);
+  return row === undefined
+    ? undefined
+    : viewOf(db, row, { scope: scope.campusScope, withOldestUnpaid: false });
 }
 
 export async function findOwnWallet(
@@ -227,7 +241,9 @@ export async function findOwnWallet(
     db
   );
   const [row] = rows;
-  return row === undefined ? undefined : viewOf(db, row, 'all');
+  return row === undefined
+    ? undefined
+    : viewOf(db, row, { scope: 'all', withOldestUnpaid: true });
 }
 
 interface SummaryRow {
