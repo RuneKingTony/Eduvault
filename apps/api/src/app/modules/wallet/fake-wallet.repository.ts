@@ -186,8 +186,9 @@ export class FakeWalletRepository extends WalletRepository {
 
   private viewOf(
     wallet: FakeWallet,
-    scope: OrgScope['campusScope']
+    view: { scope: OrgScope['campusScope']; withOldestUnpaid: boolean }
   ): WalletView {
+    const { scope } = view;
     const figures = this.figures(wallet);
     const children = wallet.children.map((child): WalletChild => {
       const earmarkMinor = this.marked(wallet.id, child.studentId);
@@ -202,7 +203,9 @@ export class FakeWalletRepository extends WalletRepository {
           { owedMinor: child.owedMinor, earmarkMinor },
           figures.freeMinor
         ),
-        oldestUnpaidOn: child.oldestUnpaidOn ?? null,
+        oldestUnpaidOn: view.withOldestUnpaid
+          ? (child.oldestUnpaidOn ?? null)
+          : null,
       };
     });
     return {
@@ -300,7 +303,13 @@ export class FakeWalletRepository extends WalletRepository {
     walletId: string
   ): Promise<WalletView | undefined> {
     const wallet = this.visible(scope).find((row) => row.id === walletId);
-    return Promise.resolve(wallet && this.viewOf(wallet, scope.campusScope));
+    return Promise.resolve(
+      wallet &&
+        this.viewOf(wallet, {
+          scope: scope.campusScope,
+          withOldestUnpaid: false,
+        })
+    );
   }
 
   findOwnWallet(
@@ -310,7 +319,9 @@ export class FakeWalletRepository extends WalletRepository {
     const wallet = this.wallets.find(
       (row) => row.organizationId === organizationId && row.userId === userId
     );
-    return Promise.resolve(wallet && this.viewOf(wallet, 'all'));
+    return Promise.resolve(
+      wallet && this.viewOf(wallet, { scope: 'all', withOldestUnpaid: true })
+    );
   }
 
   movements(): Promise<MovementPage> {

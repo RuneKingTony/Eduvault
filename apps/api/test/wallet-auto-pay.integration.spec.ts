@@ -11,6 +11,7 @@ import { autoPayReference } from '../src/app/common/wallet';
 import { reservedAccountReference } from '../src/app/modules/gateway/reserved-account.service';
 import { expect, type Fixtures } from './support/base-test';
 import { importOpening } from './support/factories/finance';
+import { waitForLockWait } from './support/lock-wait';
 import { portalJournalItems } from './support/wallet-movements';
 import { receivableBalance } from './support/factories/billing';
 import { bankAccount, recordCash } from './support/factories/payments';
@@ -49,19 +50,6 @@ const autoPay = (
   api(guardian)
     .put('/portal/wallet/auto-pay')
     .send({ enabled: change.enabled ?? true, reference: change.reference });
-
-const waitForLockWait = async (pool: Pool) => {
-  for (let attempt = 0; attempt < 100; attempt += 1) {
-    const { rows } = await pool.query(
-      `SELECT 1 FROM pg_locks WHERE locktype = 'advisory' AND NOT granted`
-    );
-    if (rows.length > 0) {
-      return;
-    }
-    await new Promise((resolve) => setTimeout(resolve, 50));
-  }
-  throw new Error('The spend never waited on the reference lock');
-};
 
 const spendCount = async (pool: Pool) =>
   Number(
@@ -257,7 +245,7 @@ test.describe('auto-pay', () => {
         .send(body)
         .expect(201)
         .then((res) => res.body as ToppedUpWallet);
-      await waitForLockWait(pool);
+      await waitForLockWait(pool, holder);
 
       await recordCash(api, owner, {
         accountId: account.id,

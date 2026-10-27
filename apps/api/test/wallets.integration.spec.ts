@@ -21,9 +21,9 @@ import {
   type PortalWalletMovementList,
   type WalletMovementList,
 } from '@eduvault/api-contract';
-import type { Pool } from 'pg';
 import { acting, expect } from './support/base-test';
 import { receivableBalance } from './support/factories/billing';
+import { waitForLockWait } from './support/lock-wait';
 import { journalItems } from './support/wallet-movements';
 import { gatewayAccountId } from './support/factories/store';
 import { ledgerAccountId } from './support/factories/finance';
@@ -32,6 +32,7 @@ import {
   bankAccount,
   nextReference,
   owes,
+  recordCash,
 } from './support/factories/payments';
 import {
   cashAccount,
@@ -85,19 +86,6 @@ const familyBalance = (
 
 const guardianIdOf = (student: Parameters<typeof guardianOf>[0]) =>
   guardianOf(student)?.guardianId ?? '';
-
-const waitForRowLockWait = async (pool: Pool) => {
-  for (let attempt = 0; attempt < 100; attempt += 1) {
-    const { rows } = await pool.query(
-      `SELECT 1 FROM pg_locks WHERE locktype IN ('transactionid', 'tuple') AND NOT granted`
-    );
-    if (rows.length > 0) {
-      return;
-    }
-    await new Promise((resolve) => setTimeout(resolve, 50));
-  }
-  throw new Error('The spend never waited on the child’s row lock');
-};
 
 test.describe('a wallet for every paying guardian', () => {
   test('is created once by the database for each paying guardian, in every school', async ({
@@ -836,7 +824,49 @@ test.describe('the guardian’s wallet', () => {
     );
   });
 
-  test('waits for a posting in flight on a child before it reads what the child owes', async ({
+  test('still pays after waiting for a lock on the child that changes nothing', async ({
+    api,
+    app,
+    pool,
+    schools,
+  }) => {
+    const { owner, orgA } = schools;
+    const account = await cashAccount(app, owner);
+    const { ada, guardianLogin } = await family(app, schools);
+    const walletId = await walletIdOf(pool, guardianLogin?.guardianId ?? '');
+    await owes(app, owner, { studentId: ada.id, amountMinor: OWED });
+    await topUpWallet(api, owner, { walletId, accountId: account.id });
+    const guardian = await signInAs(api, guardianLogin);
+    const holder = await pool.connect();
+    try {
+      await holder.query('BEGIN');
+      await holder.query(
+        'SELECT id FROM student WHERE organization_id = $1 AND id = $2 FOR UPDATE',
+        [orgA.id, ada.id]
+      );
+      const pending = api(guardian)
+        .post('/portal/wallet/spend')
+        .send({
+          reference: nextReference('WSP'),
+          lines: [{ studentId: ada.id, amountMinor: 1_500_000 }],
+        })
+        .expect(201)
+        .then((res) => res.body as SpentWallet);
+      await waitForLockWait(pool, holder);
+      await holder.query('COMMIT');
+      const spent = await pending;
+
+      expect(spent.wallet.balanceMinor).toBe(TOP_UP - 1_500_000);
+      expect(await receivableBalance(pool, orgA.id, ada.id)).toBe(
+        OWED - 1_500_000
+      );
+    } finally {
+      await holder.query('ROLLBACK');
+      holder.release();
+    }
+  });
+
+  test('is checked against what the child owes after a posting in flight commits', async ({
     api,
     app,
     pool,
@@ -850,6 +880,10 @@ test.describe('the guardian’s wallet', () => {
     await owes(app, owner, { studentId: ada.id, amountMinor: OWED });
     await topUpWallet(api, owner, { walletId, accountId: account.id });
     const guardian = await signInAs(api, guardianLogin);
+    const [money, receivable] = await Promise.all([
+      ledgerAccountId(pool, orgA.id, 1200),
+      ledgerAccountId(pool, orgA.id, 1100),
+    ]);
     const holder = await pool.connect();
     try {
       await holder.query('BEGIN');
@@ -857,33 +891,87 @@ test.describe('the guardian’s wallet', () => {
         'SELECT id FROM student WHERE organization_id = $1 AND id = $2 FOR UPDATE',
         [orgA.id, ada.id]
       );
-      let answered = false;
+      const { rows } = await holder.query<{ id: string }>(
+        `INSERT INTO journal_entry (organization_id, reference, kind, effective_on)
+         VALUES ($1, $2, 'payment', '2026-09-01') RETURNING id`,
+        [orgA.id, nextReference('PAY')]
+      );
+      const entryId = rows[0]?.id ?? '';
+      await holder.query(
+        `INSERT INTO journal_line (organization_id, entry_id, ledger_account_id, student_id, debit_minor, credit_minor)
+         VALUES ($1, $2, $3, NULL, $5, 0), ($1, $2, $4, $6, 0, $5)`,
+        [orgA.id, entryId, money, receivable, OWED, ada.id]
+      );
       const pending = api(guardian)
         .post('/portal/wallet/spend')
         .send({
           reference: nextReference('WSP'),
           lines: [{ studentId: ada.id, amountMinor: 1_500_000 }],
         })
-        .expect(201)
-        .then((res) => {
-          answered = true;
-          return res.body as SpentWallet;
-        });
-      await waitForRowLockWait(pool);
-      expect(answered).toBe(false);
-      expect(await receivableBalance(pool, orgA.id, ada.id)).toBe(OWED);
-
+        .expect(422)
+        .then((res) => res.body as { message: string });
+      await waitForLockWait(pool, holder);
       await holder.query('COMMIT');
-      const spent = await pending;
+      const refused = await pending;
 
-      expect(spent.wallet.balanceMinor).toBe(TOP_UP - 1_500_000);
-      expect(await receivableBalance(pool, orgA.id, ada.id)).toBe(
-        OWED - 1_500_000
-      );
-      expect(await familyBalance(pool, orgA.id, guardianId)).toBe(
-        TOP_UP - 1_500_000
-      );
+      expect(refused.message).toBe(walletSpendOverMessage('Ada Okeke', 0));
+      expect(await receivableBalance(pool, orgA.id, ada.id)).toBe(0);
+      expect(await familyBalance(pool, orgA.id, guardianId)).toBe(TOP_UP);
     } finally {
+      await holder.query('ROLLBACK');
+      holder.release();
+    }
+  });
+
+  test('has a multi-child staff payment lock its children in id order before it posts', async ({
+    api,
+    app,
+    pool,
+    schools,
+  }) => {
+    const { owner, orgA } = schools;
+    const account = await cashAccount(app, owner);
+    const { ada, tobi } = await family(app, schools);
+    await owes(app, owner, { studentId: ada.id, amountMinor: OWED });
+    await owes(app, owner, { studentId: tobi.id, amountMinor: OWED });
+    const { rows: ordered } = await pool.query<{ id: string }>(
+      'SELECT id FROM student WHERE organization_id = $1 AND id = ANY($2) ORDER BY id',
+      [orgA.id, [ada.id, tobi.id]]
+    );
+    const [first, second] = ordered.map((row) => row.id);
+    const holder = await pool.connect();
+    const probe = await pool.connect();
+    try {
+      await holder.query('BEGIN');
+      await holder.query(
+        'SELECT id FROM student WHERE organization_id = $1 AND id = $2 FOR UPDATE',
+        [orgA.id, first]
+      );
+      const pending = recordCash(api, owner, {
+        accountId: account.id,
+        allocations: [
+          { studentId: second ?? '', amountMinor: OWED },
+          { studentId: first ?? '', amountMinor: OWED },
+        ],
+      });
+      await waitForLockWait(pool, holder);
+
+      await probe.query('BEGIN');
+      await expect(
+        probe.query(
+          'SELECT id FROM student WHERE organization_id = $1 AND id = $2 FOR UPDATE NOWAIT',
+          [orgA.id, second]
+        )
+      ).resolves.toBeDefined();
+      await probe.query('ROLLBACK');
+      await holder.query('COMMIT');
+      await pending;
+
+      expect(await receivableBalance(pool, orgA.id, ada.id)).toBe(0);
+      expect(await receivableBalance(pool, orgA.id, tobi.id)).toBe(0);
+    } finally {
+      await probe.query('ROLLBACK');
+      probe.release();
       await holder.query('ROLLBACK');
       holder.release();
     }

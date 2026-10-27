@@ -138,21 +138,21 @@ function toChild(
 
 async function oldestFor(
   db: Kysely<DB>,
-  wallet: { organization_id: string },
-  from: { rows: readonly ChildRow[]; view: { withOldestUnpaid: boolean } }
+  organizationId: string,
+  from: { rows: readonly ChildRow[]; withOldestUnpaid: boolean }
 ): Promise<ReadonlyMap<string, string>> {
-  if (!from.view.withOldestUnpaid) {
+  if (!from.withOldestUnpaid) {
     return new Map();
   }
   return oldestUnpaidByChild(db, {
-    organizationId: wallet.organization_id,
+    organizationId,
     studentIds: from.rows
       .filter((row) => Number(row.owed) > 0)
       .map((row) => row.student_id),
   });
 }
 
-/** Only the guardian's pay table orders children by their oldest unpaid charge, so staff reads skip that query. */
+// Only the guardian's pay table orders by oldest unpaid charge; staff reads skip the query.
 async function viewOf(
   db: Kysely<DB>,
   wallet: WalletRow & { organization_id: string },
@@ -185,7 +185,10 @@ async function viewOf(
     gatewayConnected(db, wallet.organization_id),
     latestAutoPay(db, family),
   ]);
-  const oldest = await oldestFor(db, wallet, { rows, view });
+  const oldest = await oldestFor(db, wallet.organization_id, {
+    rows,
+    withOldestUnpaid: view.withOldestUnpaid,
+  });
   const figures = walletFigures(balanceMinor, [...marked.values()], held);
   const context = { freeMinor: figures.freeMinor, oldest };
   return {
