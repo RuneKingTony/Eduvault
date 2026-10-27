@@ -263,13 +263,14 @@ export async function writeAutoPay(
     .executeTakeFirstOrThrow();
   const requestHash = `${wallet.guardian_id}|${input.enabled}`;
   const claim = await claimReference(trx, {
-    lockKey: `wallet-auto-pay:${organizationId}:${reference}`,
+    lockKey: `wallet-auto-pay:${organizationId}:${wallet.guardian_id}:${reference}`,
     requestHash,
     find: async () => {
       const row = await trx
         .selectFrom('wallet_auto_pay_setting')
         .select(['id', 'guardian_id', 'enabled'])
         .where('organization_id', '=', organizationId)
+        .where('guardian_id', '=', wallet.guardian_id)
         .where('reference', '=', reference)
         .executeTakeFirst();
       return (
