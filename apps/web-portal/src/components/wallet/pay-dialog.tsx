@@ -121,9 +121,7 @@ function PayActions({
 }
 
 function PayForm({ wallet, onClose }: { wallet: Wallet; onClose: () => void }) {
-  const [reference] = useState(() =>
-    generateWalletReference('spend', lagosDateOf(new Date()))
-  );
+  const [attempt, setAttempt] = useState<{ key: string; reference: string }>();
   const [texts, setTexts] = useState<PayTexts>({});
   const [confirming, setConfirming] = useState(false);
   const model = payModel(wallet, texts);
@@ -131,9 +129,18 @@ function PayForm({ wallet, onClose }: { wallet: Wallet; onClose: () => void }) {
 
   function review(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (payable) {
-      setConfirming(true);
+    if (!payable) {
+      return;
     }
+    // The same lines keep their reference, so a retry is a replay; other lines would clash with it.
+    const key = JSON.stringify(model.lines);
+    if (attempt?.key !== key) {
+      setAttempt({
+        key,
+        reference: generateWalletReference('spend', lagosDateOf(new Date())),
+      });
+    }
+    setConfirming(true);
   }
 
   return (
@@ -160,11 +167,11 @@ function PayForm({ wallet, onClose }: { wallet: Wallet; onClose: () => void }) {
           onClose={onClose}
         />
       </form>
-      {confirming ? (
+      {confirming && attempt !== undefined ? (
         <PayConfirm
           wallet={wallet}
           model={model}
-          reference={reference}
+          reference={attempt.reference}
           onCancel={() => {
             setConfirming(false);
           }}
