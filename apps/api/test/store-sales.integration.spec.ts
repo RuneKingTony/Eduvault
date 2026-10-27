@@ -50,6 +50,7 @@ import {
   uploadProof,
 } from './support/factories/payments';
 import { createStudent } from './support/factories/students';
+import { waitForLockWait } from './support/lock-wait';
 import {
   createItem,
   receive,
@@ -535,6 +536,43 @@ test.describe('refusals leave nothing behind', () => {
       [rare.id]
     );
     expect(sold.rows[0]?.n).toBe(1);
+  });
+
+  test('two sales of different items to one student at once are both recorded', async ({
+    api,
+    app,
+    pool,
+    schools,
+  }) => {
+    const { owner, orgA, studentLekki } = schools;
+    const { shirt, tie } = await counter(app, api, schools);
+    const holder = await pool.connect();
+    try {
+      await holder.query('BEGIN');
+      await holder.query(
+        'SELECT id FROM student WHERE organization_id = $1 AND id = $2 FOR KEY SHARE',
+        [orgA.id, studentLekki.id]
+      );
+      const send = (item: Item) =>
+        api(owner)
+          .post('/store/sales')
+          .send(
+            saleBody({
+              studentId: studentLekki.id,
+              lines: [{ itemId: item.id, ...SALE_ONE }],
+            })
+          );
+      const pending = Promise.all([send(shirt), send(tie)]);
+      await waitForLockWait(pool, holder, 2);
+      await holder.query('COMMIT');
+
+      const results = await pending;
+
+      expect(results.map((res) => res.status)).toEqual([201, 201]);
+    } finally {
+      await holder.query('ROLLBACK');
+      holder.release();
+    }
   });
 
   test('Inactive, Left and Graduated students cannot buy', async ({

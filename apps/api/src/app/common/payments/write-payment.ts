@@ -8,7 +8,7 @@ import type { DB } from '../../../db/db-types';
 import { claimReference } from '../references/apply-once';
 import { allocateDocumentNumber, formatDocumentNumber } from '../documents';
 import { systemAccountId, type LedgerPoster } from '../ledger';
-import { currentCampusSql } from '../students';
+import { currentCampusSql, lockStudents } from '../students';
 import { paymentPostingLines } from './payment-posting';
 
 export interface ExistingPayment {
@@ -200,5 +200,10 @@ export async function writePayment(
   if (journalClash !== undefined) {
     return { status: 'reference_used' };
   }
+  // Same id order as a wallet spend, so a multi-child payment cannot deadlock with one.
+  await lockStudents(trx, {
+    organizationId: input.organizationId,
+    studentIds: input.allocations.map((row) => row.studentId),
+  });
   return create(trx, poster, input);
 }
