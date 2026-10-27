@@ -211,6 +211,32 @@ describe('PayFromWalletDialog paying', () => {
     expect(second[0]?.body.reference).toBe(first[0]?.body.reference);
   });
 
+  it('uses a new reference when the amounts change after a failed attempt', async () => {
+    const spend = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('The school is away'))
+      .mockResolvedValueOnce(spent(800_000));
+    setup({ wallet: portalWallet({ children: [ada()] }), spend });
+    await user.type(amountFor('Ada Okeke'), '10000');
+    await user.click(screen.getByRole('button', { name: 'Review payment' }));
+    await user.click(await screen.findByRole('button', { name: 'Pay now' }));
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalled();
+    });
+    await user.clear(amountFor('Ada Okeke'));
+    await user.type(amountFor('Ada Okeke'), '8000');
+    await user.click(screen.getByRole('button', { name: 'Review payment' }));
+    await user.click(await screen.findByRole('button', { name: 'Pay now' }));
+    await waitFor(() => {
+      expect(spend).toHaveBeenCalledTimes(2);
+    });
+    const [first, second] = spend.mock.calls as [
+      { body: { reference: string } }[],
+      { body: { reference: string } }[],
+    ];
+    expect(second[0]?.body.reference).not.toBe(first[0]?.body.reference);
+  });
+
   it('shows the API’s limit when the payment is refused with 422', async () => {
     const message = walletSpendOverMessage('Ada Okeke', 400_000);
     const spend = vi
