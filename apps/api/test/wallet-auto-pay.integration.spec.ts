@@ -14,6 +14,7 @@ import { importOpening } from './support/factories/finance';
 import { portalJournalItems } from './support/wallet-movements';
 import { receivableBalance } from './support/factories/billing';
 import { bankAccount, recordCash } from './support/factories/payments';
+import { createStudent } from './support/factories/students';
 import {
   cashAccount,
   requestRefund,
@@ -449,6 +450,30 @@ test.describe('auto-pay', () => {
     expect(changed.body.message).toBe(WALLET_REFERENCE_TAKEN_MESSAGE);
     const rows = await pool.query('SELECT 1 FROM wallet_auto_pay_setting');
     expect(rows.rowCount).toBe(1);
+  });
+
+  test('lets two families in a school use the same reference without seeing each other', async ({
+    api,
+    app,
+    pool,
+    schools,
+  }) => {
+    const { guardianLogin } = await family(app, schools);
+    const ben = await createStudent(app, schools.owner, {
+      campusId: schools.lekki.id,
+      firstName: 'Ben',
+      lastName: 'Eze',
+    });
+    const first = await signInAs(api, guardianLogin);
+    const second = await signInAs(api, guardianOf(ben.logins));
+
+    await autoPay(api, first, { reference: 'APY-SHARED-1' }).expect(200);
+    await autoPay(api, second, { reference: 'APY-SHARED-1' }).expect(200);
+
+    const rows = await pool.query(
+      `SELECT guardian_id FROM wallet_auto_pay_setting WHERE reference = 'APY-SHARED-1'`
+    );
+    expect(rows.rowCount).toBe(2);
   });
 
   test('refuses someone without wallet:spend with 403, a staff member who is no guardian with 404, and no session with 401', async ({

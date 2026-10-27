@@ -3141,11 +3141,11 @@ ALTER TABLE ONLY public.verification
     ADD CONSTRAINT verification_pkey PRIMARY KEY (id);
 
 --
--- Name: wallet_auto_pay_setting wallet_auto_pay_setting_organization_id_reference_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: wallet_auto_pay_setting wallet_auto_pay_setting_guardian_reference_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.wallet_auto_pay_setting
-    ADD CONSTRAINT wallet_auto_pay_setting_organization_id_reference_key UNIQUE (organization_id, reference);
+    ADD CONSTRAINT wallet_auto_pay_setting_guardian_reference_key UNIQUE (organization_id, guardian_id, reference);
 
 --
 -- Name: wallet_auto_pay_setting wallet_auto_pay_setting_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -6043,4 +6043,5 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20261024120000'),
     ('20261025090000'),
     ('20261026090000'),
-    ('20261027090000');
+    ('20261027090000'),
+    ('20261028090000');
