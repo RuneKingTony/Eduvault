@@ -129,6 +129,90 @@ describe('loadEnv', () => {
     );
   });
 
+  describe('cookie domain', () => {
+    const urlNames = [
+      'BETTER_AUTH_URL',
+      'WEB_ADMIN_URL',
+      'WEB_PORTAL_URL',
+    ] as const;
+    const staging = {
+      BETTER_AUTH_URL: 'https://api.staging.example.com',
+      WEB_ADMIN_URL: 'https://admin.staging.example.com',
+      WEB_PORTAL_URL: 'https://portal.staging.example.com',
+    };
+
+    it('is optional and leaves local hosts alone', () => {
+      expect(loadEnv(valid).AUTH_COOKIE_DOMAIN).toBeUndefined();
+    });
+
+    it.each(['.staging.example.com', 'staging.example.com'])(
+      'accepts %j when every app URL is under it',
+      (domain) => {
+        expect(
+          loadEnv({ ...valid, ...staging, AUTH_COOKIE_DOMAIN: domain })
+            .AUTH_COOKIE_DOMAIN
+        ).toBe(domain);
+      }
+    );
+
+    it.each(urlNames)(
+      'names %s when its host is outside the domain',
+      (name) => {
+        const env = {
+          ...valid,
+          ...staging,
+          [name]: 'https://app.other.example.org',
+          AUTH_COOKIE_DOMAIN: '.staging.example.com',
+        };
+        expect(() => loadEnv(env)).toThrow(new RegExp(`${name}: Host must`));
+        for (const other of urlNames.filter(
+          (candidate) => candidate !== name
+        )) {
+          expect(() => loadEnv(env)).not.toThrow(
+            new RegExp(`${other}: Host must`)
+          );
+        }
+      }
+    );
+
+    it('does not match a host that only ends with the same letters', () => {
+      expect(() =>
+        loadEnv({
+          ...valid,
+          ...staging,
+          WEB_ADMIN_URL: 'https://admin.notstaging.example.com',
+          AUTH_COOKIE_DOMAIN: '.staging.example.com',
+        })
+      ).toThrow(/WEB_ADMIN_URL/);
+    });
+
+    it('reports a malformed URL as that variable, not a crash', () => {
+      expect(() =>
+        loadEnv({
+          ...valid,
+          WEB_ADMIN_URL: 'not a url',
+          AUTH_COOKIE_DOMAIN: '.staging.example.com',
+        })
+      ).toThrow(/Invalid environment[\s\S]*WEB_ADMIN_URL/);
+    });
+
+    it('refuses a value that is not a hostname', () => {
+      for (const bad of [
+        '',
+        'https://staging.example.com',
+        'a b',
+        '.',
+        'com',
+        '.com',
+        '127.0.0.1',
+      ]) {
+        expect(() => loadEnv({ ...valid, AUTH_COOKIE_DOMAIN: bad })).toThrow(
+          /AUTH_COOKIE_DOMAIN/
+        );
+      }
+    });
+  });
+
   describe('gateway encryption key', () => {
     const key = Buffer.alloc(32, 7).toString('base64');
 
