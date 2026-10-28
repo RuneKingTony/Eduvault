@@ -28,12 +28,13 @@ Confidence comes from, in order: formatting, ESLint (typescript-eslint strict pl
 
 ## Superseded in part
 
-Two parts of this decision were relaxed after it was written:
+Three parts of this decision were relaxed after it was written:
 
 - **CI is allowed.** `.github/workflows/validate-pr.yml` runs `pnpm validate` on pull requests. It adds no gate of its own; `pnpm validate` stays the single definition of "green".
 - **Opt-in browser e2e is allowed.** The `eduvault-e2e` skill drives the `run-local` stack with `playwright-cli` and `curl`, only when a diff touches `apps/web-admin`, `apps/web-portal` or UI-visible API. It has no project in the workspace, so it is kept out of `pnpm validate`, `validate:quick` and CI. The static-check-first order above is unchanged.
+- **Staging on Render is allowed.** `render.yaml` describes a staging environment ([ADR 0009](0009-deploy-staging-to-render.md)); deploys stay manual and out of `pnpm validate`.
 
-Still true: no deployment or infrastructure code.
+Still true: no other deployment or infrastructure code.
 
 ## Amended 2026-10-09: browser e2e is required
 

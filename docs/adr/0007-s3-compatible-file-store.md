@@ -42,7 +42,7 @@ Add `S3FileStore` beside `PostgresFileStore`, chosen by `FILE_STORE_DRIVER`. The
 - The object key is `<organizationId>/<storageKey>`, composed inside the driver from `StoredFileKey`. **Choice:** no schema change: `file_object.storage_key` stays the file id, so existing rows map without a rewrite and no drift run is needed.
 - A read with another school's `organizationId` composes a different key, finds nothing and returns `undefined`, which the service already turns into 404. The driver rejects an `organizationId` or `key` that contains `/`, `..` or is empty, so a caller cannot escape its prefix. The authority is still `file_object` plus `readable()`; the key layout is a second wall, not the first.
 - One private bucket for all schools. No public ACLs, no bucket policy that grants anonymous reads. Out-of-scope, unattached and missing files all answer 404, never 403 (D-114, ADR 0005).
-- **Choice:** the bucket is created with versioning on, outside the app. It costs little and means a wrong delete is recoverable. The app never relies on it.
+- **Choice:** the bucket is created with versioning on, outside the app, where the provider offers it. It costs little and means a wrong delete is recoverable. The app never relies on it. Staging on Cloudflare R2 goes without versioning, which R2 does not offer ([ADR 0009](0009-deploy-staging-to-render.md) holds that fact and its re-check).
 
 **Reads**
 
