@@ -1,0 +1,91 @@
+databases:
+  - name: eduvault-staging-db
+    plan: basic-256mb
+    postgresMajorVersion: '17'
+
+services:
+  - type: web
+    name: eduvault-api
+    runtime: node
+    plan: starter
+    autoDeploy: false
+    healthCheckPath: /health
+    # Render may build with NODE_ENV=production, and pnpm would then skip the dev dependencies the build needs.
+    buildCommand: corepack enable && pnpm install --frozen-lockfile --prod=false && pnpm nx run api:build
+    preDeployCommand: cd apps/api && ./node_modules/.bin/dbmate --migrations-dir db/migrations --no-dump-schema up
+    startCommand: node apps/api/dist/main.cjs
+    envVars:
+      - key: NODE_VERSION
+        value: '24'
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: eduvault-staging-db
+          property: connectionString
+      - key: BETTER_AUTH_SECRET
+        generateValue: true
+      - key: BETTER_AUTH_URL
+        sync: false
+      - key: WEB_ADMIN_URL
+        sync: false
+      - key: WEB_PORTAL_URL
+        sync: false
+      - key: AUTH_COOKIE_DOMAIN
+        sync: false
+      - key: FILE_STORE_DRIVER
+        value: s3
+      - key: S3_BUCKET
+        value: eduvault-staging
+      - key: S3_REGION
+        value: auto
+      - key: S3_FORCE_PATH_STYLE
+        value: 'true'
+      - key: S3_ENDPOINT
+        sync: false
+      - key: S3_ACCESS_KEY_ID
+        sync: false
+      - key: S3_SECRET_ACCESS_KEY
+        sync: false
+      - key: GATEWAY_ENCRYPTION_KEY
+        sync: false
+      - key: BOOTSTRAP_ADMIN_EMAIL
+        sync: false
+      - key: BOOTSTRAP_ADMIN_PASSWORD
+        sync: false
+
+  - type: web
+    name: eduvault-web-admin
+    runtime: static
+    autoDeploy: false
+    buildCommand: corepack enable && pnpm install --frozen-lockfile --prod=false && pnpm nx run web-admin:build
+    staticPublishPath: dist/apps/web-admin
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: NODE_VERSION
+        value: '24'
+      - key: VITE_API_URL
+        sync: false
+      - key: VITE_PORTAL_URL
+        sync: false
+
+  - type: web
+    name: eduvault-web-portal
+    runtime: static
+    autoDeploy: false
+    buildCommand: corepack enable && pnpm install --frozen-lockfile --prod=false && pnpm nx run web-portal:build
+    staticPublishPath: dist/apps/web-portal
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: NODE_VERSION
+        value: '24'
+      - key: VITE_API_URL
+        sync: false
+      - key: VITE_ADMIN_URL
+        sync: false

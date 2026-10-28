@@ -1,4 +1,4 @@
-import { betterAuth } from 'better-auth';
+import { betterAuth, type BetterAuthOptions } from 'better-auth';
 import type { Pool } from 'pg';
 import type { Env } from '../config/env';
 import {
@@ -45,6 +45,18 @@ const DISABLED_ORGANIZATION_PATHS = [
 export const isSignInLimited = (env: Env): boolean =>
   env.NODE_ENV === 'production' || env.AUTH_RATE_LIMIT;
 
+const crossSubDomainCookies = (
+  env: Pick<Env, 'AUTH_COOKIE_DOMAIN'>
+): Pick<NonNullable<BetterAuthOptions['advanced']>, 'crossSubDomainCookies'> =>
+  env.AUTH_COOKIE_DOMAIN === undefined
+    ? {}
+    : {
+        crossSubDomainCookies: {
+          enabled: true,
+          domain: env.AUTH_COOKIE_DOMAIN,
+        },
+      };
+
 export function createAuth(pool: Pool, env: Env) {
   return betterAuth({
     appName: 'Eduvault',
@@ -68,6 +80,7 @@ export function createAuth(pool: Pool, env: Env) {
         ...advancedBaseConfig.defaultCookieAttributes,
         secure: env.NODE_ENV === 'production',
       },
+      ...crossSubDomainCookies(env),
     },
     plugins: getPlugins(pool),
     disabledPaths: DISABLED_ORGANIZATION_PATHS,

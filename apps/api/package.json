@@ -31,6 +31,7 @@
     "kysely-codegen": "catalog:server",
     "supertest": "catalog:testing",
     "unplugin-swc": "catalog:swc",
+    "yaml": "catalog:",
     "@eduvault/testcontainers": "workspace:*"
   }
 }

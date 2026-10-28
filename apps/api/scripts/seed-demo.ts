@@ -2,8 +2,10 @@ import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../src/app/app.module';
 import { runDemoSeed } from './seed/demo/run-demo-seed';
+import { assertSeedAllowed } from './seed/production-guard';
 
 async function main() {
+  assertSeedAllowed(process.env);
   const app = await NestFactory.createApplicationContext(AppModule, {
     logger: ['error', 'warn'],
   });

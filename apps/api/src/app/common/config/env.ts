@@ -16,6 +16,13 @@ const gatewayKey = z
     'Must be 32 random bytes, base64 encoded (openssl rand -base64 32)'
   );
 
+const cookieDomain = z
+  .string()
+  .regex(
+    /^\.?[a-z\d-]+(\.[a-z\d-]+)*\.[a-z][a-z\d-]*$/i,
+    'Must be a hostname of at least two labels with an optional leading dot, like .staging.example.com'
+  );
+
 const envObject = z.object({
   NODE_ENV: z
     .enum(['development', 'test', 'production'])
@@ -42,6 +49,7 @@ const envObject = z.object({
   S3_ACCESS_KEY_ID: z.string().min(1).optional(),
   S3_SECRET_ACCESS_KEY: z.string().min(1).optional(),
   GATEWAY_ENCRYPTION_KEY: gatewayKey.optional(),
+  AUTH_COOKIE_DOMAIN: cookieDomain.optional(),
 });
 
 export type Env = z.infer<typeof envObject>;
@@ -75,11 +83,39 @@ export function s3Problems(
   return problems;
 }
 
-const envSchema = envObject.superRefine((env, ctx) => {
-  if (env.FILE_STORE_DRIVER !== 's3') {
-    return;
+const COOKIE_URL_NAMES = [
+  'BETTER_AUTH_URL',
+  'WEB_ADMIN_URL',
+  'WEB_PORTAL_URL',
+] as const;
+
+/** Every app URL must sit under the cookie domain, or the session cookie never reaches it. */
+function cookieDomainProblems(
+  env: Pick<Env, 'AUTH_COOKIE_DOMAIN' | (typeof COOKIE_URL_NAMES)[number]>
+): EnvProblem[] {
+  if (env.AUTH_COOKIE_DOMAIN === undefined) {
+    return [];
   }
-  for (const { name, message } of s3Problems(env)) {
+  const domain = env.AUTH_COOKIE_DOMAIN.replace(/^\./, '').toLowerCase();
+  return COOKIE_URL_NAMES.filter((name) => {
+    // A malformed URL is already reported by its own field.
+    if (!URL.canParse(env[name])) {
+      return false;
+    }
+    const host = new URL(env[name]).hostname;
+    return host !== domain && !host.endsWith(`.${domain}`);
+  }).map((name) => ({
+    name,
+    message: `Host must be ${domain} or end with .${domain} to share the AUTH_COOKIE_DOMAIN cookie`,
+  }));
+}
+
+const envSchema = envObject.superRefine((env, ctx) => {
+  const problems = [
+    ...(env.FILE_STORE_DRIVER === 's3' ? s3Problems(env) : []),
+    ...cookieDomainProblems(env),
+  ];
+  for (const { name, message } of problems) {
     ctx.addIssue({ code: 'custom', path: [name], message });
   }
 });

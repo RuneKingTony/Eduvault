@@ -41,6 +41,9 @@ catalogs:
     vite:
       specifier: ^7.3.0
       version: 7.3.7
+    yaml:
+      specifier: ^2.9.0
+      version: 2.9.1
     zod:
       specifier: ^4.0.0
       version: 4.6.5
@@ -498,6 +501,9 @@ importers:
       unplugin-swc:
         specifier: catalog:swc
         version: 1.6.0(@rspack/core@1.6.8)(@swc/core@1.15.47)(esbuild@0.28.2)(rollup@4.64.1)(vite@7.3.7(@types/node@24.19.1)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))(webpack@5.111.1(@swc/core@1.15.47)(esbuild@0.28.2)(lightningcss@1.32.0)(postcss@8.5.29))
+      yaml:
+        specifier: 'catalog:'
+        version: 2.9.1
 
   apps/web-admin:
     dependencies:

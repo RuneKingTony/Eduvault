@@ -6,6 +6,16 @@
   "tags": ["scope:api"],
   "targets": {
     "typecheck": {},
+    "test": {
+      "inputs": [
+        "default",
+        "^production",
+        { "externalDependencies": ["vitest"] },
+        "{workspaceRoot}/render.yaml",
+        "{workspaceRoot}/docs/development.md",
+        "{workspaceRoot}/.nvmrc"
+      ]
+    },
     "env-init": {
       "executor": "nx:run-commands",
       "options": {
