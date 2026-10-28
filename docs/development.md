@@ -94,6 +94,10 @@ ALLOW_PRODUCTION_SEED=true pnpm nx run api:db-seed   # optional demo school; ide
 
 Redeploy the previous successful build from the service's Deploys list. Migrations are not reversed: a bad migration is fixed forward with a new one. A rollback to code older than the schema works only while the new migrations stayed backward compatible, so keep them additive.
 
+## Free live demo
+
+A throwaway public demo on Neon and Render free tiers, with no custom domain and synthetic data only, is described in [`docs/demo.md`](demo.md). It shares no configuration with staging.
+
 ## Database
 
 | Task                    | Command                                                                                          |
