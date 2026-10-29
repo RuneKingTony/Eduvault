@@ -1,11 +1,10 @@
 import type { OrgContext } from '../../../src/app/common/auth';
-import { KYSELY_TOKEN, type Database } from '../../../src/app/common/db/tokens';
 import { FilesService } from '../../../src/app/common/files/files.service';
 import { WalletPortalService } from '../../../src/app/modules/wallet/wallet-portal.service';
 import { WalletService } from '../../../src/app/modules/wallet/wallet.service';
 import { orgContextFor } from '../actors';
 import {
-  found,
+  mustFind,
   moveClock,
   progressLogger,
   type DemoRun,
@@ -21,6 +20,7 @@ import {
   payerOf,
   type StudentNumber,
 } from './people-plan';
+import { databaseOf } from '../database';
 
 const PROGRESS_EVERY = 20;
 
@@ -40,7 +40,7 @@ async function topUp(
   const { run, money, walletIds, people } = context;
   const family = familyOf(run.plan.families, wallet.family);
   const bursar = bursarOf(money, family.campus);
-  const guardianId = found(people.payerIds.get(wallet.family), 'payer');
+  const guardianId = mustFind(people.payerIds.get(wallet.family), 'payer');
   const day = moveClock(run, top.daysAgo);
   const proof = await run.app
     .get(FilesService, { strict: false })
@@ -52,7 +52,7 @@ async function topUp(
     .get(WalletService, { strict: false })
     .topUp(
       bursar,
-      found(walletIds.get(guardianId), `wallet of family ${wallet.family}`),
+      mustFind(walletIds.get(guardianId), `wallet of family ${wallet.family}`),
       {
         reference: top.reference,
         moneyAccountId: accountFor(money, family.campus, wallet),
@@ -72,7 +72,7 @@ async function guardianActs(
 ): Promise<void> {
   const portal = context.run.app.get(WalletPortalService, { strict: false });
   const studentOf = (child: StudentNumber) =>
-    found(context.people.studentIds.get(child), `student ${child}`);
+    mustFind(context.people.studentIds.get(child), `student ${child}`);
   await portal.spend(guardian, {
     reference: `DEMO-SPEND-${wallet.number}`,
     lines: [
@@ -127,7 +127,7 @@ export async function runWallets(
   run: DemoRun,
   facts: { school: SchoolFacts; people: PeopleFacts; money: MoneyFacts }
 ): Promise<void> {
-  const db = run.app.get<Database>(KYSELY_TOKEN, { strict: false });
+  const db = databaseOf(run.app);
   const rows = await db
     .selectFrom('wallet')
     .select(['id', 'guardian_id'])

@@ -1,9 +1,8 @@
-import { KYSELY_TOKEN, type Database } from '../../../src/app/common/db/tokens';
 import { GraduationService } from '../../../src/app/modules/student/graduation.service';
 import { LifecycleService } from '../../../src/app/modules/student/lifecycle.service';
 import {
   dayAt,
-  found,
+  mustFind,
   moveClock,
   type AcademicFacts,
   type DemoRun,
@@ -11,6 +10,7 @@ import {
   type SchoolFacts,
 } from './demo-run';
 import type { ArmIndex, StudentNumber } from './people-plan';
+import { databaseOf } from '../database';
 
 const SEEN_AT = 'T10:00:00Z';
 
@@ -22,14 +22,14 @@ interface LifeRun {
 }
 
 const idOf = (context: LifeRun, student: StudentNumber): string =>
-  found(context.people.studentIds.get(student), `student ${student}`);
+  mustFind(context.people.studentIds.get(student), `student ${student}`);
 
 /** The services stamp wall-clock time on a student's row, so the seed day is written back afterwards. */
 async function restamp(
   context: LifeRun,
   rows: readonly { student: StudentNumber; day: string; archived: boolean }[]
 ): Promise<void> {
-  const db = context.run.app.get<Database>(KYSELY_TOKEN, { strict: false });
+  const db = databaseOf(context.run.app);
   for (const row of rows) {
     const at = new Date(`${row.day}${SEEN_AT}`);
     await db
@@ -57,7 +57,7 @@ async function graduateFinalYear(context: LifeRun): Promise<void> {
   for (const [arm, students] of byArm) {
     await graduation.graduate(
       school.owner,
-      found(academics.armIds[arm], `class ${arm}`),
+      mustFind(academics.armIds[arm], `class ${arm}`),
       { studentIds: students.map((student) => idOf(context, student)) }
     );
   }

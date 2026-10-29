@@ -3,7 +3,7 @@ import {
   FEES_RECEIVABLE_SYSTEM_KEY,
   STUDENT_WALLETS_SYSTEM_KEY,
 } from '@eduvault/api-contract';
-import { KYSELY_TOKEN, type Database } from '../../../src/app/common/db/tokens';
+import { SYSTEM_REFERENCE_PREFIXES } from '@eduvault/shared';
 import { StudentAccountService } from '../../../src/app/modules/student-account/student-account.service';
 import { WalletService } from '../../../src/app/modules/wallet/wallet.service';
 import {
@@ -21,6 +21,7 @@ import {
 import { matcher, type CheckInput } from './check-input';
 import { DEMO_ARM_COUNT, DEMO_CAMPUSES } from './config';
 import { DEMO_SCHOOL, EMAIL_DOMAIN, type StudentNumber } from './people-plan';
+import { databaseOf } from '../database';
 
 export const COUNTED_TABLES = [
   'organization',
@@ -52,7 +53,7 @@ export const COUNTED_TABLES = [
 ] as const;
 
 async function countsMatch({ app, plan, organizationId }: CheckInput) {
-  const db = app.get<Database>(KYSELY_TOKEN, { strict: false });
+  const db = databaseOf(app);
   const { rows } = await sql<Record<string, string>>`
     SELECT
       (SELECT count(*) FROM student WHERE organization_id = ${organizationId}) AS students,
@@ -125,15 +126,16 @@ interface StudentLedger {
   autoPaid: number;
 }
 
+const AUTOPAY_REFERENCE_PATTERN = `${SYSTEM_REFERENCE_PREFIXES.autopay}-%`;
 async function studentLedgers({
   app,
   organizationId,
 }: CheckInput): Promise<Map<string, StudentLedger>> {
-  const db = app.get<Database>(KYSELY_TOKEN, { strict: false });
+  const db = databaseOf(app);
   const { rows } = await sql<{ id: string; balance: string; auto: string }>`
     SELECT s.id,
            COALESCE(SUM(jl.debit_minor - jl.credit_minor), 0)::text AS balance,
-           COALESCE(SUM(jl.credit_minor) FILTER (WHERE e.reference LIKE 'AUTOPAY-%'), 0)::text AS auto
+           COALESCE(SUM(jl.credit_minor) FILTER (WHERE e.reference LIKE ${AUTOPAY_REFERENCE_PATTERN}), 0)::text AS auto
     FROM student s
     LEFT JOIN journal_line jl
       ON jl.student_id = s.id
@@ -154,7 +156,7 @@ async function studentLedgers({
 }
 
 async function receivableTotals({ app, organizationId }: CheckInput) {
-  const db = app.get<Database>(KYSELY_TOKEN, { strict: false });
+  const db = databaseOf(app);
   const { rows } = await sql<{ debits: string; credits: string }>`
     SELECT COALESCE(SUM(jl.debit_minor), 0)::text AS debits,
            COALESCE(SUM(jl.credit_minor), 0)::text AS credits
@@ -229,7 +231,7 @@ async function walletsMatch({
   owner,
   payerIds,
 }: CheckInput) {
-  const db = app.get<Database>(KYSELY_TOKEN, { strict: false });
+  const db = databaseOf(app);
   const { rows } = await sql<{
     wallet_id: string;
     guardian_id: string;
@@ -251,7 +253,7 @@ async function walletsMatch({
         JOIN journal_entry e ON e.id = jl.entry_id
         WHERE jl.organization_id = w.organization_id
           AND jl.family_id = w.guardian_id
-          AND e.reference LIKE 'AUTOPAY-%'
+          AND e.reference LIKE ${AUTOPAY_REFERENCE_PATTERN}
           AND jl.ledger_account_id = (
             SELECT la.id FROM ledger_account la
             WHERE la.organization_id = w.organization_id
@@ -297,7 +299,7 @@ async function walletsMatch({
 async function nothingLeaksAcross({ app, organizationId }: CheckInput) {
   const admissionLike = `${DEMO_SCHOOL.admissionPrefix}-%`;
   const emailLike = `%@${EMAIL_DOMAIN}`;
-  const db = app.get<Database>(KYSELY_TOKEN, { strict: false });
+  const db = databaseOf(app);
   const { rows } = await sql<Record<string, string>>`
     SELECT
       (SELECT count(*) FROM journal_line jl JOIN student s ON s.id = jl.student_id
@@ -321,7 +323,7 @@ async function nothingLeaksAcross({ app, organizationId }: CheckInput) {
 }
 
 async function rowCounts({ app }: CheckInput) {
-  const db = app.get<Database>(KYSELY_TOKEN, { strict: false });
+  const db = databaseOf(app);
   const counts = new Map<string, number>();
   for (const table of COUNTED_TABLES) {
     const { rows } = await sql<{

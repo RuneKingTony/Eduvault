@@ -10,7 +10,7 @@ import { castToBetterAuthRoles } from '../../src/app/common/auth/better-auth-rol
 import { Clock } from '../../src/app/common/clock';
 import { ENV_TOKEN, type Env } from '../../src/app/common/config/env';
 import { AuditRepository } from '../../src/app/common/audit';
-import { KYSELY_TOKEN, type Database } from '../../src/app/common/db/tokens';
+import type { Database } from '../../src/app/common/db/tokens';
 import { CampusService } from '../../src/app/modules/campus/campus.service';
 import { PlatformService } from '../../src/app/modules/platform/platform.service';
 import { seedAnnouncements } from './announcements';
@@ -42,6 +42,7 @@ import {
 } from './schools';
 import { runSeedCheck } from './seed-check';
 import { students } from './students';
+import { databaseOf } from './database';
 
 interface SeedOptions {
   log?: (line: string) => void;
@@ -191,7 +192,7 @@ export async function runSeed(
   { log = console.log, now }: SeedOptions = {}
 ): Promise<SeedResult> {
   const superAdmin = await ensureSuperAdmin(app, log);
-  const db = app.get<Database>(KYSELY_TOKEN, { strict: false });
+  const db = databaseOf(app);
   const marker = await db
     .selectFrom('organization')
     .select('id')
@@ -228,7 +229,7 @@ async function seedAndCheck(
   app: INestApplicationContext,
   { superAdmin, today, offsetDays, log }: SeedRun
 ): Promise<SeedResult> {
-  const db = app.get<Database>(KYSELY_TOKEN, { strict: false });
+  const db = databaseOf(app);
   const created = await createSchools(app, superAdmin);
   await backdateSchools(db, created.organizationIds, offsetDays);
   await addMembers(app, created);

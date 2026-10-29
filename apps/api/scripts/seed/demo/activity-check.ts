@@ -5,7 +5,7 @@ import {
 } from '@eduvault/api-contract';
 import { INACTIVE_AFTER_DAYS } from '@eduvault/shared';
 import { shiftDate } from '../date-shift';
-import { KYSELY_TOKEN, type Database } from '../../../src/app/common/db/tokens';
+import type { Database } from '../../../src/app/common/db/tokens';
 import {
   expectedStock,
   expectedStockValueMinor,
@@ -22,6 +22,7 @@ import { DEMO_CAMPUSES } from './config';
 import { campusIdOf, dayAt } from './demo-run';
 import type { ApprovalState } from './approvals-plan';
 import { STORE_ITEMS } from './store-plan';
+import { databaseOf } from '../database';
 
 export const isStoreEntry = (
   organizationId: string
@@ -31,8 +32,7 @@ export const isStoreEntry = (
     JOIN store_sale ss ON ss.payment_id = p.id
     WHERE ss.organization_id = ${organizationId}))`;
 
-const database = ({ app }: CheckInput): Database =>
-  app.get<Database>(KYSELY_TOKEN, { strict: false });
+const database = ({ app }: CheckInput): Database => databaseOf(app);
 
 async function groups(
   input: CheckInput,

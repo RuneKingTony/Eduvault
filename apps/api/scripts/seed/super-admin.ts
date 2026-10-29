@@ -6,8 +6,8 @@ import {
   type AppAuth,
   type AuthenticatedUser,
 } from '../../src/app/common/auth';
-import { KYSELY_TOKEN, type Database } from '../../src/app/common/db/tokens';
 import { SEED_PASSWORD, SUPER_ADMIN_EMAIL } from './members';
+import { databaseOf } from './database';
 
 export async function ensureSuperAdmin(
   app: INestApplicationContext,
@@ -25,7 +25,7 @@ export async function ensureSuperAdmin(
   if (outcome === 'created') {
     log(`Created the super admin ${credentials.email}.`);
   }
-  const db = app.get<Database>(KYSELY_TOKEN, { strict: false });
+  const db = databaseOf(app);
   return db
     .selectFrom('user')
     .select(['id', 'email', 'name'])

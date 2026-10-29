@@ -2,7 +2,6 @@ import type { INestApplicationContext } from '@nestjs/common';
 import type { AuthenticatedUser } from '../../../src/app/common/auth';
 import { Clock } from '../../../src/app/common/clock';
 import { ENV_TOKEN, type Env } from '../../../src/app/common/config/env';
-import { KYSELY_TOKEN, type Database } from '../../../src/app/common/db/tokens';
 import { PROTOTYPE_TODAY, seedOffsetDays, shiftDate } from '../date-shift';
 import { SEED_PASSWORD } from '../members';
 import { ensureSuperAdmin } from '../super-admin';
@@ -11,7 +10,7 @@ import { runAnnouncements } from './announcements';
 import { runApprovals } from './approvals';
 import { parseDemoSize, TERM_STARTED_DAYS_AGO, type DemoSize } from './config';
 import { runDemoCheck } from './demo-check';
-import { found, moveClock, type DemoRun } from './demo-run';
+import { mustFind, moveClock, type DemoRun } from './demo-run';
 import { runLeave } from './leave';
 import { billTerm, recordPayments, setUpMoney } from './money';
 import { DEMO_OWNER, DEMO_SCHOOL, familyOf, payerEmailOf } from './people-plan';
@@ -22,6 +21,7 @@ import { createAcademics, createSchool } from './structure';
 import { runStore } from './store';
 import { runStudentLife } from './student-life';
 import { runWallets } from './wallets';
+import { databaseOf } from '../database';
 
 interface DemoSeedOptions {
   log?: (line: string) => void;
@@ -48,12 +48,12 @@ function elapsed(startedAt: number): string {
 function signInLines(plan: DemoPlan): string[] {
   const staff = [...plan.leaders, ...plan.teachers];
   const staffEmail = (key: string) =>
-    found(
+    mustFind(
       staff.find((row) => row.key === key),
       key
     ).email;
   const payerEmail = (wallet: WalletPlan | undefined) =>
-    payerEmailOf(familyOf(plan.families, found(wallet, 'wallet').family));
+    payerEmailOf(familyOf(plan.families, mustFind(wallet, 'wallet').family));
   const plain = plan.wallets.find((wallet) => wallet.autoPay === null);
   const auto = plan.wallets.find((wallet) => wallet.autoPay !== null);
   const people: [string, string][] = [
@@ -166,7 +166,7 @@ export async function runDemoSeed(
   { log = console.log, now, size }: DemoSeedOptions = {}
 ): Promise<DemoSeedResult> {
   const superAdmin = await ensureSuperAdmin(app, log);
-  const db = app.get<Database>(KYSELY_TOKEN, { strict: false });
+  const db = databaseOf(app);
   const marker = await db
     .selectFrom('organization')
     .select('id')
