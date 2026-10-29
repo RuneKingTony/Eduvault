@@ -30,6 +30,7 @@
     "test:integration:changed": "nx run api:test-integration -- --changed origin/main --passWithNoTests",
     "validate:one": "nx run-many -t lint typecheck test --parallel=2 -p",
     "validate": "pnpm format:check && pnpm knip && nx run-many -t typecheck lint --nxBail && nx run-many -t test build --nxBail && pnpm drift && nx run api:test-integration",
+    "smoke:staging": "tsx --tsconfig scripts/tsconfig.json scripts/smoke-staging.ts",
     "drift:fix": "tsx --tsconfig scripts/tsconfig.json scripts/drift-check.ts --write",
     "db:migrate:up": "nx run api:db-migrate-up"
   },
