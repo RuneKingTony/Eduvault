@@ -6,7 +6,6 @@ import {
   type AuthenticatedUser,
 } from '../../../src/app/common/auth';
 import { castToBetterAuthRoles } from '../../../src/app/common/auth/better-auth-roles';
-import { KYSELY_TOKEN, type Database } from '../../../src/app/common/db/tokens';
 import { CalendarService } from '../../../src/app/modules/calendar/calendar.service';
 import { CampusService } from '../../../src/app/modules/campus/campus.service';
 import { ClassLevelService } from '../../../src/app/modules/class/class-level.service';
@@ -26,13 +25,14 @@ import {
 import {
   campusIdOf,
   dayAt,
-  found,
+  mustFind,
   type AcademicFacts,
   type DemoRun,
   type SchoolFacts,
 } from './demo-run';
 import { CAMPUS_ADDRESSES, DEMO_SUBJECTS, levelSubjects } from './lists';
 import { DEMO_OWNER, DEMO_SCHOOL, type DemoStaff } from './people-plan';
+import { databaseOf } from '../database';
 
 const DAYS_SINCE_SCHOOL_JOINED = 120;
 const SCHOOL_YEAR_DAYS = 319;
@@ -97,8 +97,7 @@ export async function createSchool(
       ownerEmail: DEMO_OWNER.email,
     });
   const organizationId = created.school.id;
-  await app
-    .get<Database>(KYSELY_TOKEN, { strict: false })
+  await databaseOf(app)
     .updateTable('organization')
     .set({
       createdAt: `${dayAt(plan, DAYS_SINCE_SCHOOL_JOINED)}T09:00:00Z`,
@@ -136,7 +135,7 @@ async function createCalendar(
     startsOn,
     endsOn: shiftDate(startsOn, SCHOOL_YEAR_DAYS),
   });
-  const first = found(
+  const first = mustFind(
     year.terms.find((term) => term.sequence === 1),
     'first term'
   );
@@ -164,7 +163,7 @@ async function createClasses(
   const armIds: string[] = [];
   for (const arm of plan.arms) {
     const row = await classes.create(school.owner, {
-      levelId: found(
+      levelId: mustFind(
         levels.find((level) => level.code === arm.level.code),
         `level ${arm.level.code}`
       ).id,
@@ -177,9 +176,9 @@ async function createClasses(
     if (teacher.leadsArm !== null) {
       await classes.assignTeacher(
         school.owner,
-        found(armIds[teacher.leadsArm], `class ${teacher.leadsArm}`),
+        mustFind(armIds[teacher.leadsArm], `class ${teacher.leadsArm}`),
         {
-          userId: found(school.userIds.get(teacher.key), teacher.key),
+          userId: mustFind(school.userIds.get(teacher.key), teacher.key),
           role: 'lead',
         }
       );
@@ -203,14 +202,17 @@ async function createSubjects(
   await addLevelLists(app, school, subjectIds);
   const teachers = app.get(SubjectTeacherService, { strict: false });
   for (const row of plan.subjectTeachers) {
-    const teacher = found(plan.teachers[row.teacher], `teacher ${row.teacher}`);
+    const teacher = mustFind(
+      plan.teachers[row.teacher],
+      `teacher ${row.teacher}`
+    );
     await teachers.assign(
       school.owner,
       {
-        classId: found(armIds[row.arm], `class ${row.arm}`),
-        subjectId: found(subjectIds.get(row.subject), row.subject),
+        classId: mustFind(armIds[row.arm], `class ${row.arm}`),
+        subjectId: mustFind(subjectIds.get(row.subject), row.subject),
       },
-      { userId: found(school.userIds.get(teacher.key), teacher.key) }
+      { userId: mustFind(school.userIds.get(teacher.key), teacher.key) }
     );
   }
 }
@@ -220,7 +222,7 @@ async function addLevelLists(
   school: SchoolFacts,
   subjectIds: ReadonlyMap<string, string>
 ): Promise<void> {
-  const db = app.get<Database>(KYSELY_TOKEN, { strict: false });
+  const db = databaseOf(app);
   const levels = await app
     .get(ClassLevelService, { strict: false })
     .list(school.owner);
@@ -231,7 +233,7 @@ async function addLevelLists(
         levelSubjects(level.code).map((entry, index) => ({
           organization_id: school.organizationId,
           class_level_id: level.id,
-          subject_id: found(subjectIds.get(entry.subject), entry.subject),
+          subject_id: mustFind(subjectIds.get(entry.subject), entry.subject),
           kind: entry.kind,
           sequence: index + 1,
         }))

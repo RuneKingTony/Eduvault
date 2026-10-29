@@ -1,7 +1,7 @@
 import type { OrgContext } from '../../../src/app/common/auth';
 import { LeaveService } from '../../../src/app/modules/leave/leave.service';
 import {
-  found,
+  mustFind,
   moveClock,
   staffContext,
   type DemoRun,
@@ -25,7 +25,8 @@ async function runRequest(
   const { run, leave } = context;
   const requester = await staffContext(
     run,
-    found(run.plan.teachers[request.teacher], `teacher ${request.teacher}`).key
+    mustFind(run.plan.teachers[request.teacher], `teacher ${request.teacher}`)
+      .key
   );
   moveClock(run, request.createdDaysAgo);
   const created = await leave.create(requester, {
@@ -41,7 +42,7 @@ async function runRequest(
   moveClock(run, request.decidedDaysAgo);
   const decider =
     request.decider === 'owner' ? context.owner : context.principal;
-  const reason = (): string => found(request.note, 'leave note');
+  const reason = (): string => mustFind(request.note, 'leave note');
   switch (request.outcome) {
     case 'withdrawn': {
       await leave.withdraw(requester, created.id);
@@ -53,7 +54,7 @@ async function runRequest(
     }
     case 'cancelled': {
       await leave.approve(decider, created.id);
-      moveClock(run, found(request.cancelledDaysAgo, 'cancel day'));
+      moveClock(run, mustFind(request.cancelledDaysAgo, 'cancel day'));
       await leave.cancel(decider, created.id, reason());
       break;
     }

@@ -1,7 +1,7 @@
 import type { INestApplicationContext } from '@nestjs/common';
 import type { GuardianDraft } from '@eduvault/api-contract';
 import { AccountService, type OrgContext } from '../../src/app/common/auth';
-import { KYSELY_TOKEN, type Database } from '../../src/app/common/db/tokens';
+import type { Database } from '../../src/app/common/db/tokens';
 import { stripMemberRole } from '../../src/app/common/auth/member-rows';
 import { ClassService } from '../../src/app/modules/class/class.service';
 import { AdmissionService } from '../../src/app/modules/student/admission.service';
@@ -9,6 +9,7 @@ import { LifecycleService } from '../../src/app/modules/student/lifecycle.servic
 import { shiftDate } from './date-shift';
 import { SEED_PASSWORD } from './members';
 import { SEED_GUARDIANS, students, type SeedStudent } from './students';
+import { databaseOf } from './database';
 
 const GREENFIELD_PREFIX = 'GF';
 const GREENFIELD_SLUG = 'greenfield';
@@ -377,7 +378,7 @@ export async function seedStudents(
   options: { owner: OrgContext; offsetDays: number }
 ): Promise<void> {
   const { owner, offsetDays } = options;
-  const db = app.get<Database>(KYSELY_TOKEN, { strict: false });
+  const db = databaseOf(app);
   const arms = await loadArms(app, owner);
   const setRequired = (requireGuardian: boolean) =>
     db

@@ -1,11 +1,11 @@
 import type { INestApplicationContext } from '@nestjs/common';
 import type { ClassTeacherRole } from '@eduvault/api-contract';
 import type { OrgContext } from '../../src/app/common/auth';
-import { KYSELY_TOKEN, type Database } from '../../src/app/common/db/tokens';
 import { ClassLevelService } from '../../src/app/modules/class/class-level.service';
 import { ClassRepository } from '../../src/app/modules/class/class.repository';
 import { ClassService } from '../../src/app/modules/class/class.service';
 import { shiftDate } from './date-shift';
+import { databaseOf } from './database';
 
 interface SeedClass {
   level: string;
@@ -97,7 +97,7 @@ export async function seedClasses(
       archived: true,
     }
   );
-  const db = app.get<Database>(KYSELY_TOKEN, { strict: false });
+  const db = databaseOf(app);
   await db
     .updateTable('class_arm')
     .set({ retired_at: `${shiftDate(ARCHIVED_ON, offsetDays)}T09:00:00Z` })

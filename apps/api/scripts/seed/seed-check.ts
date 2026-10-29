@@ -1,6 +1,6 @@
 import type { INestApplicationContext } from '@nestjs/common';
 import { sql } from 'kysely';
-import { KYSELY_TOKEN, type Database } from '../../src/app/common/db/tokens';
+import type { Database } from '../../src/app/common/db/tokens';
 import { AnnouncementService } from '../../src/app/modules/announcement/announcement.service';
 import { CalendarService } from '../../src/app/modules/calendar/calendar.service';
 import { CampusService } from '../../src/app/modules/campus/campus.service';
@@ -46,6 +46,7 @@ import {
   seedLife,
   students,
 } from './students';
+import { databaseOf } from './database';
 
 // Bola Johnson (JSS 3 Gold) has left and is only on the Left tab.
 export const visibleStudents: Record<string, number> = {
@@ -487,7 +488,7 @@ async function checkFinance(app: INestApplicationContext, check: Check) {
   const balanceOf = (code: number) =>
     chart.items.find((item) => item.code === code)?.balanceMinor;
   const charges = await checkCharges(app, funmi, check);
-  const db = app.get<Database>(KYSELY_TOKEN, { strict: false });
+  const db = databaseOf(app);
   const openingStock = await openingStockMinor(db, funmi.organizationId);
   check(
     'fees owed to the school',
@@ -739,7 +740,7 @@ async function studentIdOf(
   funmi: OwnerContext,
   admissionNumber: string
 ): Promise<string> {
-  const db = app.get<Database>(KYSELY_TOKEN, { strict: false });
+  const db = databaseOf(app);
   const row = await db
     .selectFrom('student')
     .select('id')
@@ -760,7 +761,7 @@ export async function runSeedCheck(
     }
   };
 
-  const db = app.get<Database>(KYSELY_TOKEN, { strict: false });
+  const db = databaseOf(app);
   await checkPlatform(db, check, offsetDays);
   const organizations = await db
     .selectFrom('organization')

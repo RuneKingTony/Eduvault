@@ -1,9 +1,8 @@
 import type { GuardianDraft } from '@eduvault/api-contract';
-import { KYSELY_TOKEN, type Database } from '../../../src/app/common/db/tokens';
 import { AdmissionService } from '../../../src/app/modules/student/admission.service';
 import { openPortalLogins } from '../student-seed';
 import {
-  found,
+  mustFind,
   progressLogger,
   type AcademicFacts,
   type DemoRun,
@@ -16,6 +15,7 @@ import type {
   FamilyNumber,
   StudentNumber,
 } from './people-plan';
+import { databaseOf } from '../database';
 
 const PROGRESS_EVERY = 100;
 
@@ -55,14 +55,14 @@ async function admitFamily(
       lastName: child.lastName,
       gender: child.gender,
       dateOfBirth: child.dateOfBirth,
-      classArmId: found(
+      classArmId: mustFind(
         context.academics.armIds[child.arm],
         `class ${child.arm}`
       ),
       guardians: family.guardians.map((guardian): GuardianDraft =>
         known.has(guardian.fullName)
           ? {
-              existingGuardianId: found(
+              existingGuardianId: mustFind(
                 known.get(guardian.fullName),
                 guardian.fullName
               ),
@@ -103,10 +103,6 @@ export async function admitStudents(
     await admitFamily(run, family, { school, academics, people });
     logProgress(family.children.length);
   }
-  await openPortalLogins(
-    run.app,
-    run.app.get<Database>(KYSELY_TOKEN, { strict: false }),
-    school.organizationId
-  );
+  await openPortalLogins(run.app, databaseOf(run.app), school.organizationId);
   return people;
 }

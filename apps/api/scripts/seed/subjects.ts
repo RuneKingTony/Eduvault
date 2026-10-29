@@ -1,12 +1,13 @@
 import type { INestApplicationContext } from '@nestjs/common';
 import type { LevelSubjectKind } from '@eduvault/api-contract';
 import type { OrgContext } from '../../src/app/common/auth';
-import { KYSELY_TOKEN, type Database } from '../../src/app/common/db/tokens';
+import type { Database } from '../../src/app/common/db/tokens';
 import { ClassLevelService } from '../../src/app/modules/class/class-level.service';
 import { ClassService } from '../../src/app/modules/class/class.service';
 import { SubjectTeacherService } from '../../src/app/modules/subject/subject-teacher.service';
 import { SubjectService } from '../../src/app/modules/subject/subject.service';
 import { shiftDate } from './date-shift';
+import { databaseOf } from './database';
 
 interface SeedSubject {
   code: string;
@@ -101,8 +102,7 @@ async function seedCatalogue(
   }
   const retired = found(ids.get(RETIRED_SUBJECT.code), 'retired subject');
   await subjects.update(owner, retired, { retired: true });
-  await app
-    .get<Database>(KYSELY_TOKEN, { strict: false })
+  await databaseOf(app)
     .updateTable('subject')
     .set({
       retired_at: `${shiftDate(RETIRED_SUBJECT.on, offsetDays)}T09:00:00Z`,
@@ -120,7 +120,7 @@ async function seedLevelLists(
   const levels = await app
     .get(ClassLevelService, { strict: false })
     .list(owner);
-  const db = app.get<Database>(KYSELY_TOKEN, { strict: false });
+  const db = databaseOf(app);
   for (const [levelName, list] of Object.entries(SEED_LEVEL_SUBJECTS)) {
     const level = found(
       levels.find((candidate) => candidate.name === levelName),
@@ -189,7 +189,7 @@ export async function seedSubjects(
   const subjectIds = await seedCatalogue(app, owner, offsetDays);
   await seedLevelLists(app, owner, subjectIds);
   await seedFrenchElectives(
-    app.get<Database>(KYSELY_TOKEN, { strict: false }),
+    databaseOf(app),
     owner,
     found(subjectIds.get('FRE'), 'French')
   );

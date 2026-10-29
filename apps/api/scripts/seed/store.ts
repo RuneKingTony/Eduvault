@@ -9,7 +9,7 @@ import {
 } from '@eduvault/api-contract';
 import type { OrgContext } from '../../src/app/common/auth';
 import { Clock } from '../../src/app/common/clock';
-import { KYSELY_TOKEN, type Database } from '../../src/app/common/db/tokens';
+import type { Database } from '../../src/app/common/db/tokens';
 import { FilesService } from '../../src/app/common/files/files.service';
 import { DeliveryService } from '../../src/app/modules/store/delivery.service';
 import { ItemService } from '../../src/app/modules/store/item.service';
@@ -18,6 +18,7 @@ import { StockCountService } from '../../src/app/modules/store/stock-count.servi
 import { orgContextFor } from './actors';
 import { shiftDate } from './date-shift';
 import { emailOf } from './members';
+import { databaseOf } from './database';
 
 type SeedCampus = 'Lekki' | 'Ikeja';
 
@@ -282,7 +283,7 @@ async function createItems(
   owner: OrgContext
 ): Promise<Stocked[]> {
   const items = app.get(ItemService, { strict: false });
-  const db = app.get<Database>(KYSELY_TOKEN, { strict: false });
+  const db = databaseOf(app);
   const levels = await levelIds(db, owner.organizationId);
   const stocked: Stocked[] = [];
   for (const uniform of SEED_UNIFORMS) {
@@ -378,7 +379,7 @@ async function seedSales(
   const clock = app.get(Clock, { strict: false });
   const sales = app.get(SaleService, { strict: false });
   const files = app.get(FilesService, { strict: false });
-  const db = app.get<Database>(KYSELY_TOKEN, { strict: false });
+  const db = databaseOf(app);
   const { owner } = seed;
   for (const [index, sale] of SEED_SALES.entries()) {
     const day = shiftDate(sale.on, seed.offsetDays);
@@ -440,7 +441,7 @@ async function seedCount(
   stocked: readonly Stocked[]
 ) {
   const counts = app.get(StockCountService, { strict: false });
-  const db = app.get<Database>(KYSELY_TOKEN, { strict: false });
+  const db = databaseOf(app);
   const bursar = await orgContextFor(app, emailOf('chika'));
   const lines = [];
   for (const shortage of SEED_COUNT_SHORTAGES) {
@@ -491,7 +492,7 @@ export async function seedStore(
         lines: openingLines(stocked, campus),
       });
     }
-    const db = app.get<Database>(KYSELY_TOKEN, { strict: false });
+    const db = databaseOf(app);
     await deliveries.record(owner, {
       reference: 'SEED-DELIVERY-0001',
       campusId: campusId('Lekki'),

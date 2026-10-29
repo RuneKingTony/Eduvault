@@ -11,7 +11,7 @@ import { StockCountService } from '../../../src/app/modules/store/stock-count.se
 import { DEMO_CAMPUSES } from './config';
 import {
   campusIdOf,
-  found,
+  mustFind,
   moveClock,
   staffContext,
   type DemoRun,
@@ -61,7 +61,7 @@ async function createItems(
       classLevelId:
         item.levelCode === null
           ? null
-          : found(
+          : mustFind(
               levels.find((level) => level.code === item.levelCode),
               `level ${item.levelCode}`
             ).id,
@@ -75,7 +75,7 @@ async function createItems(
 }
 
 const itemOf = (key: string) =>
-  found(
+  mustFind(
     STORE_ITEMS.find((item) => item.key === key),
     `item ${key}`
   );
@@ -93,7 +93,7 @@ async function stockCampuses(context: StoreRun): Promise<void> {
       isOpening: true,
       receivedOn: moveClock(run, OPENING_DAYS_AGO),
       lines: STORE_ITEMS.map((item, index) => ({
-        itemId: found(itemIds.get(item.key), item.key),
+        itemId: mustFind(itemIds.get(item.key), item.key),
         quantity: openingQuantity(index, campus),
         unitCostMinor: item.costMinor,
       })),
@@ -102,10 +102,13 @@ async function stockCampuses(context: StoreRun): Promise<void> {
       reference: `DEMO-DELIVERY-${campus.toUpperCase()}`,
       campusId,
       supplierName: DELIVERY_SUPPLIER,
-      moneyAccountId: found(money.bankAccounts.get(campus), `bank ${campus}`),
+      moneyAccountId: mustFind(
+        money.bankAccounts.get(campus),
+        `bank ${campus}`
+      ),
       receivedOn: moveClock(run, DELIVERY_DAYS_AGO),
       lines: deliveryLines(campus).map((line) => ({
-        itemId: found(itemIds.get(line.item), line.item),
+        itemId: mustFind(itemIds.get(line.item), line.item),
         quantity: line.quantity,
         unitCostMinor: itemOf(line.item).costMinor,
       })),
@@ -131,18 +134,18 @@ async function recordSale(context: StoreRun, sale: SalePlan): Promise<void> {
       day,
       `de30${sale.number.toString(16).padStart(4, '0')}`
     ),
-    studentId: found(
+    studentId: mustFind(
       people.studentIds.get(sale.student),
       `student ${sale.student}`
     ),
     method: sale.method,
-    moneyAccountId: found(
+    moneyAccountId: mustFind(
       accounts.get(sale.campus),
       `account for ${sale.campus}`
     ),
     proofFileId: proof?.id,
     lines: sale.lines.map((line) => ({
-      itemId: found(itemIds.get(line.item), line.item),
+      itemId: mustFind(itemIds.get(line.item), line.item),
       quantity: line.quantity,
     })),
   });
@@ -160,7 +163,7 @@ async function runCount(
     campusId: campusIdOf(school, count.campus),
     note: count.note,
     lines: count.lines.map((line) => ({
-      itemId: found(itemIds.get(line.item), line.item),
+      itemId: mustFind(itemIds.get(line.item), line.item),
       countedQuantity: line.held - line.missing,
     })),
   });
