@@ -43,6 +43,8 @@ export interface LockedAdjustment extends AdjustmentRecord {
 export interface NewAdjustment {
   id: string;
   number: string;
+  reference: string | null;
+  requestHash: string | null;
   kind: AdjustmentKind;
   studentId: string;
   invoiceId: string | null;
@@ -52,6 +54,10 @@ export interface NewAdjustment {
   reason: string;
   approvedEntryId: string | null;
 }
+
+export type AdjustmentClaim =
+  | { status: 'first' }
+  | { status: 'replayed' | 'clash'; id: string; number: string };
 
 export interface MoneyAccountPosting {
   ledgerAccountId: string;
@@ -74,6 +80,10 @@ export interface AdjustmentPage {
 
 export interface AdjustmentTx {
   lockStudent(studentId: string): Promise<StudentFacts | undefined>;
+  claimReference(
+    reference: string,
+    requestHash: string
+  ): Promise<AdjustmentClaim>;
   approvalOn(kind: AdjustmentKind): Promise<boolean>;
   sentCharge(studentId: string, invoiceId: string): Promise<SentChargeCheck>;
   creditAccount(ledgerAccountId: string | null): Promise<CreditAccountCheck>;

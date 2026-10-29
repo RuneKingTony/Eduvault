@@ -33,6 +33,9 @@ export interface AdjustmentPlan extends Decided {
   reason: string;
 }
 
+export const adjustmentReference = (index: number): string =>
+  `DEMO-ADJ-${index + 1}`;
+
 export interface VoidPlan extends Decided {
   family: FamilyNumber;
   reason: string;

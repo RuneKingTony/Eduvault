@@ -39,6 +39,17 @@ describe('createAdjustmentSchema', () => {
     ).toBe('Late enrolment');
   });
 
+  it('trims a client reference and refuses a system one', () => {
+    expect(
+      createAdjustmentSchema.parse({ ...adjustment, reference: ' DEMO-ADJ-1 ' })
+        .reference
+    ).toBe('DEMO-ADJ-1');
+    expect(
+      createAdjustmentSchema.safeParse({ ...adjustment, reference: 'ADJ-1' })
+        .success
+    ).toBe(false);
+  });
+
   it('accepts the optional accounts and charge', () => {
     expect(
       createAdjustmentSchema.safeParse({

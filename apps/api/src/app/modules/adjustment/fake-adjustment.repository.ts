@@ -21,6 +21,8 @@ import {
 import type { OrgScope } from '../../common/scope';
 
 interface StoredAdjustment extends AdjustmentRecord {
+  reference: string | null;
+  requestHash: string | null;
   approvedBy: string | null;
   rejectionReason: string | null;
   entryId: string | null;
@@ -77,6 +79,20 @@ export class FakeAdjustmentRepository extends AdjustmentRepository {
   > {
     return {
       currency: () => Promise.resolve('NGN'),
+      claimReference: (reference, requestHash) => {
+        const row = this.stored.find(
+          (candidate) => candidate.reference === reference
+        );
+        return Promise.resolve(
+          row === undefined
+            ? { status: 'first' }
+            : {
+                status: row.requestHash === requestHash ? 'replayed' : 'clash',
+                id: row.id,
+                number: row.number,
+              }
+        );
+      },
       lockStudent: (id) => Promise.resolve(this.students.get(id)),
       approvalOn: (kind) => Promise.resolve(!this.switchedOff.has(kind)),
       sentCharge: (_student, invoiceId) =>
@@ -161,6 +177,8 @@ export class FakeAdjustmentRepository extends AdjustmentRepository {
     this.stored.push({
       id: input.id,
       number: input.number,
+      reference: input.reference,
+      requestHash: input.requestHash,
       kind: input.kind,
       studentId: input.studentId,
       invoiceId: input.invoiceId,

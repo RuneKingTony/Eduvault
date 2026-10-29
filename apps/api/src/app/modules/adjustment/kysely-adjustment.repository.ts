@@ -29,6 +29,7 @@ import {
   schoolCurrency,
   systemAccountId,
 } from '../../common/ledger';
+import { claimReference } from '../../common/references/apply-once';
 import {
   usableMoneyAccount,
   type UsableMoneyAccount,
@@ -41,6 +42,7 @@ import {
 } from '../../common/students';
 import {
   AdjustmentRepository,
+  type AdjustmentClaim,
   type AdjustmentPage,
   type AdjustmentPost,
   type AdjustmentRecord,
@@ -107,6 +109,42 @@ class KyselyAdjustmentTx implements AdjustmentTx {
 
   private get organizationId(): string {
     return this.who.scope.organizationId;
+  }
+
+  async claimReference(
+    reference: string,
+    requestHash: string
+  ): Promise<AdjustmentClaim> {
+    const claim = await claimReference(this.trx, {
+      lockKey: `adjustment:${this.organizationId}:${reference}`,
+      requestHash,
+      find: async () => {
+        const { rows } = await sql<{
+          id: string;
+          number: string;
+          request_hash: string;
+        }>`
+          SELECT id, number, request_hash FROM adjustment
+          WHERE organization_id = ${this.organizationId} AND reference = ${reference}`.execute(
+          this.trx
+        );
+        const [row] = rows;
+        return (
+          row && {
+            id: row.id,
+            number: row.number,
+            requestHash: row.request_hash,
+          }
+        );
+      },
+    });
+    return claim.status === 'first'
+      ? claim
+      : {
+          status: claim.status,
+          id: claim.existing.id,
+          number: claim.existing.number,
+        };
   }
 
   async lockStudent(studentId: string): Promise<StudentFacts | undefined> {
@@ -264,6 +302,8 @@ class KyselyAdjustmentTx implements AdjustmentTx {
         id: input.id,
         organization_id: this.organizationId,
         number: input.number,
+        reference: input.reference,
+        request_hash: input.requestHash,
         kind: input.kind,
         student_id: input.studentId,
         invoice_id: input.invoiceId,

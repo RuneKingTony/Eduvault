@@ -15,7 +15,12 @@ import {
 } from './demo-run';
 import { bursarOf, type MoneyFacts } from './money';
 import { oldestFirst } from './ordering';
-import type { AdjustmentPlan, DiscountPlan, VoidPlan } from './approvals-plan';
+import {
+  adjustmentReference,
+  type AdjustmentPlan,
+  type DiscountPlan,
+  type VoidPlan,
+} from './approvals-plan';
 import type { StudentNumber } from './people-plan';
 
 interface ApprovalsRun {
@@ -105,6 +110,7 @@ async function runAdjustments(
       ),
       amountMinor: row.amountMinor,
       reason: row.reason,
+      reference: adjustmentReference(rows.indexOf(row)),
       moneyAccountId:
         row.kind === 'refund'
           ? found(money.cashBoxes.get(campus), `cash box for ${campus}`)
