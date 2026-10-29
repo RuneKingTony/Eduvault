@@ -17,7 +17,7 @@ Facts that shape it:
 
 ## Decision
 
-Staging runs on Render, described by `render.yaml` at the repo root, with files in an R2 bucket. The first deploy is triggered by hand; automating it is EDU-339.
+Staging runs on Render, described by `render.yaml` at the repo root, with files in an R2 bucket. The first deploy is triggered by hand; later deploys come from the `Deploy staging` workflow (D-431, EDU-339).
 
 - **Host:** one Postgres 17 database, the API as a Node web service, and `web-admin` and `web-portal` as static sites with a rewrite to `index.html` for client routes. Custom domains `api.`, `admin.` and `portal.staging.<domain>` are attached in the dashboard, with DNS-only CNAMEs in Cloudflare.
 - **Cookie scope:** `AUTH_COOKIE_DOMAIN` (for example `.staging.example.com`) turns on `crossSubDomainCookies`. At boot the API checks that its own URL and both web URLs sit under that domain. Unset, cookies stay host-scoped (D-423). `SameSite=lax` stays because the three hosts are same-site.

@@ -49,7 +49,7 @@ Cutover is copy, verify, switch the driver, then copy and verify once more. Roll
 
 ## Staging (Render)
 
-[`render.yaml`](../render.yaml) describes staging: a Postgres 17 database, the API as a web service, and `web-admin` and `web-portal` as static sites. Files go to a Cloudflare R2 bucket ([ADR 0009](adr/0009-deploy-staging-to-render.md)). Deploys are manual (`autoDeploy: false`) until CI deploys them. Staging holds synthetic data only.
+[`render.yaml`](../render.yaml) describes staging: a Postgres 17 database, the API as a web service, and `web-admin` and `web-portal` as static sites. Files go to a Cloudflare R2 bucket ([ADR 0009](adr/0009-deploy-staging-to-render.md)). `autoDeploy` is `false` on every service because the `Deploy staging` workflow triggers the deploys (see "Automatic deploys"). Staging holds synthetic data only.
 
 Every host, domain and secret is entered in the Render dashboard (`sync: false`), because the domain is the owner's and nothing secret belongs in git. This table is the one list of staging variables: `render.yaml`, `apps/api/.env.example` and ADR 0009 point here, and a spec fails when the blueprint and this section drift apart.
 
@@ -89,6 +89,21 @@ ALLOW_PRODUCTION_SEED=true pnpm nx run api:db-seed   # optional demo school; ide
 ```
 
 **`api:db-seed` creates every persona with the password `password123`.** With `NODE_ENV=production` it (and `api:db-seed-demo`) refuses to run unless `ALLOW_PRODUCTION_SEED=true` is set. On a public host anyone can guess that password, so change those passwords straight after, or seed nothing and create the schools through the super admin. Resetting and re-seeding is a later issue (EDU-340).
+
+### Automatic deploys
+
+`.github/workflows/deploy-staging.yml` runs on every push to `main`. It first checks that the pull request that produced the commit ended with a green `Validate PR` run, then triggers a Render deploy of the commit for the API and both sites, waits until each is `live`, and runs `pnpm smoke:staging`. The smoke check calls `GET /health`, loads both SPAs and signs in the bootstrap admin, stops at the first step that fails and names it. A failed deploy or smoke check fails the workflow. A manual run is available from the Actions tab (`workflow_dispatch`) and skips the green-PR check.
+
+Set once in the repository settings:
+
+| Kind     | Name                                                                           | Value                                        |
+| -------- | ------------------------------------------------------------------------------ | -------------------------------------------- |
+| Secret   | `RENDER_API_KEY`                                                               | a Render API key                             |
+| Secret   | `STAGING_SMOKE_EMAIL`, `STAGING_SMOKE_PASSWORD`                                | the `BOOTSTRAP_ADMIN_*` values               |
+| Variable | `RENDER_API_SERVICE_ID`, `RENDER_ADMIN_SERVICE_ID`, `RENDER_PORTAL_SERVICE_ID` | the `srv-...` ids of the three services      |
+| Variable | `STAGING_API_URL`, `STAGING_ADMIN_URL`, `STAGING_PORTAL_URL`                   | the three `https://...staging.<domain>` URLs |
+
+A migration that fails stops the API deploy (it runs as the pre-deploy command), the workflow reports it, and the old version keeps serving.
 
 ### Rollback
 

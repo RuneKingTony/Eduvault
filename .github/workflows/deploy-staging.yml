@@ -1,0 +1,85 @@
+name: Deploy staging
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  pull-requests: read
+  actions: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Require a green Validate PR
+        if: github.event_name == 'push'
+        run: |
+          head=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/pulls" --jq '.[0].head.sha // empty')
+          if [[ -z "$head" ]]; then
+            echo "::error::$GITHUB_SHA reached main without a pull request, so nothing vouches for it"
+            exit 1
+          fi
+          conclusion=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow validate-pr.yml --commit "$head" --limit 1 --json conclusion --jq '.[0].conclusion // empty')
+          if [[ "$conclusion" != "success" ]]; then
+            echo "::error::Validate PR for $head ended '${conclusion:-with no run}', so staging is not deployed"
+            exit 1
+          fi
+
+      - name: Deploy the three services
+        id: deploy
+        run: |
+          trigger() {
+            curl -fsS -X POST "https://api.render.com/v1/services/$1/deploys" \
+              -H "Authorization: Bearer $RENDER_API_KEY" \
+              -H 'Content-Type: application/json' \
+              -d "{\"commitId\":\"$GITHUB_SHA\"}" | jq -r '.id'
+          }
+          echo "api=$(trigger '${{ vars.RENDER_API_SERVICE_ID }}')" >> "$GITHUB_OUTPUT"
+          echo "admin=$(trigger '${{ vars.RENDER_ADMIN_SERVICE_ID }}')" >> "$GITHUB_OUTPUT"
+          echo "portal=$(trigger '${{ vars.RENDER_PORTAL_SERVICE_ID }}')" >> "$GITHUB_OUTPUT"
+
+      - name: Wait until all three are live
+        run: |
+          wait_live() {
+            local name=$1 service=$2 deploy=$3 status
+            for _ in $(seq 1 90); do
+              status=$(curl -fsS "https://api.render.com/v1/services/$service/deploys/$deploy" \
+                -H "Authorization: Bearer $RENDER_API_KEY" | jq -r '.status')
+              case "$status" in
+                live) echo "$name is live"; return 0 ;;
+                build_failed|update_failed|pre_deploy_failed|canceled|deactivated)
+                  echo "::error::$name deploy ended '$status'"; return 1 ;;
+              esac
+              sleep 20
+            done
+            echo "::error::$name deploy did not go live within 30 minutes"
+            return 1
+          }
+          wait_live api '${{ vars.RENDER_API_SERVICE_ID }}' '${{ steps.deploy.outputs.api }}'
+          wait_live web-admin '${{ vars.RENDER_ADMIN_SERVICE_ID }}' '${{ steps.deploy.outputs.admin }}'
+          wait_live web-portal '${{ vars.RENDER_PORTAL_SERVICE_ID }}' '${{ steps.deploy.outputs.portal }}'
+
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+        with:
+          nx: 'false'
+
+      - name: Smoke check
+        run: pnpm smoke:staging
+        env:
+          API_URL: ${{ vars.STAGING_API_URL }}
+          WEB_ADMIN_URL: ${{ vars.STAGING_ADMIN_URL }}
+          WEB_PORTAL_URL: ${{ vars.STAGING_PORTAL_URL }}
+          SMOKE_EMAIL: ${{ secrets.STAGING_SMOKE_EMAIL }}
+          SMOKE_PASSWORD: ${{ secrets.STAGING_SMOKE_PASSWORD }}
