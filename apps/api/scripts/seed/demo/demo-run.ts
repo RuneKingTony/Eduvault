@@ -30,7 +30,7 @@ export interface PeopleFacts {
   payerIds: ReadonlyMap<FamilyNumber, string>;
 }
 
-export const found = <T>(value: T | null | undefined, what: string): T => {
+export const mustFind = <T>(value: T | null | undefined, what: string): T => {
   if (value === undefined || value === null) {
     throw new Error(`The demo seed has no ${what}`);
   }
@@ -40,7 +40,7 @@ export const found = <T>(value: T | null | undefined, what: string): T => {
 export const campusIdOf = (
   school: Pick<SchoolFacts, 'campusIds'>,
   campus: DemoCampus
-): string => found(school.campusIds.get(campus), `campus ${campus}`);
+): string => mustFind(school.campusIds.get(campus), `campus ${campus}`);
 
 export const dayAt = (plan: DemoPlan, daysAgo: number): string =>
   shiftDate(plan.today, -daysAgo);
@@ -48,7 +48,7 @@ export const dayAt = (plan: DemoPlan, daysAgo: number): string =>
 export const staffContext = (run: DemoRun, key: string): Promise<OrgContext> =>
   orgContextFor(
     run.app,
-    found(
+    mustFind(
       [...run.plan.leaders, ...run.plan.teachers].find(
         (row) => row.key === key
       ),

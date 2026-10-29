@@ -1,9 +1,10 @@
 import type { INestApplicationContext } from '@nestjs/common';
 import type { OrgContext } from '../../src/app/common/auth';
-import { KYSELY_TOKEN, type Database } from '../../src/app/common/db/tokens';
+import type { Database } from '../../src/app/common/db/tokens';
 import { LedgerService } from '../../src/app/modules/ledger/ledger.service';
 import { MoneyAccountService } from '../../src/app/modules/money-account/money-account.service';
 import { shiftDate } from './date-shift';
+import { databaseOf } from './database';
 
 const GO_LIVE = '2026-09-07';
 
@@ -104,7 +105,7 @@ export async function seedFinance(
     });
   }
 
-  const db = app.get<Database>(KYSELY_TOKEN, { strict: false });
+  const db = databaseOf(app);
   const ids = await studentIds(db, owner.organizationId, 'GF');
   const effectiveOn = shiftDate(GO_LIVE, offsetDays);
   await app.get(LedgerService, { strict: false }).postOpening(owner, {

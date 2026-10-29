@@ -1,4 +1,3 @@
-import { KYSELY_TOKEN, type Database } from '../../../src/app/common/db/tokens';
 import type { OrgContext } from '../../../src/app/common/auth';
 import { FilesService } from '../../../src/app/common/files/files.service';
 import { BillingService } from '../../../src/app/modules/billing/billing.service';
@@ -11,7 +10,7 @@ import { DEMO_CAMPUSES, type DemoCampus } from './config';
 import {
   campusIdOf,
   dayAt,
-  found,
+  mustFind,
   moveClock,
   progressLogger,
   type AcademicFacts,
@@ -22,6 +21,7 @@ import {
 import { feeLinesFor, type FamilyPayment } from './money-plan';
 import { oldestFirst } from './ordering';
 import { DEMO_LEVELS, familyOf } from './people-plan';
+import { databaseOf } from '../database';
 
 const BILLING_DAYS_AGO = 33;
 const PROGRESS_EVERY = 100;
@@ -33,7 +33,7 @@ export interface MoneyFacts {
 }
 
 export const bursarOf = (money: MoneyFacts, campus: DemoCampus): OrgContext =>
-  found(money.bursars.get(campus), `bursar for ${campus}`);
+  mustFind(money.bursars.get(campus), `bursar for ${campus}`);
 
 const BANK_LAST4: Readonly<Record<DemoCampus, string>> = {
   Main: '2208',
@@ -69,7 +69,7 @@ export async function setUpMoney(
     });
     cashBoxes.set(campus, cash.id);
     bankAccounts.set(campus, bank.id);
-    const bursar = found(
+    const bursar = mustFind(
       run.plan.leaders.find(
         (leader) => leader.key === `bursar-${campus.toLowerCase()}`
       ),
@@ -85,7 +85,7 @@ async function createFeeLines(
   school: SchoolFacts,
   academics: AcademicFacts
 ): Promise<void> {
-  const db = run.app.get<Database>(KYSELY_TOKEN, { strict: false });
+  const db = databaseOf(run.app);
   const accounts = await db
     .selectFrom('ledger_account')
     .select(['id', 'code'])
@@ -97,7 +97,7 @@ async function createFeeLines(
     .list(school.owner);
   const lines = run.app.get(FeeLineService, { strict: false });
   for (const demoLevel of DEMO_LEVELS) {
-    const level = found(
+    const level = mustFind(
       levels.find((row) => row.code === demoLevel.code),
       demoLevel.code
     );
@@ -105,7 +105,7 @@ async function createFeeLines(
       await lines.create(school.owner, {
         termId: academics.termId,
         classLevelId: level.id,
-        feeTypeId: found(
+        feeTypeId: mustFind(
           feeTypes.get(line.typeCode),
           `fee type ${line.typeCode}`
         ),
@@ -165,7 +165,7 @@ export async function recordPayments(
         : undefined;
     await payments.record(bursar, {
       reference: `DEMO-PAY-${payment.family}`,
-      payerGuardianId: found(
+      payerGuardianId: mustFind(
         facts.people.payerIds.get(payment.family),
         `payer of family ${payment.family}`
       ),
@@ -177,7 +177,7 @@ export async function recordPayments(
       amountMinor: payment.amountMinor,
       paidOn: day,
       allocations: payment.allocations.map((row) => ({
-        studentId: found(
+        studentId: mustFind(
           facts.people.studentIds.get(row.child),
           `student ${row.child}`
         ),
@@ -195,5 +195,8 @@ export function accountFor(
 ): string {
   const accounts =
     payment.method === 'transfer' ? money.bankAccounts : money.cashBoxes;
-  return found(accounts.get(campus), `${payment.method} account for ${campus}`);
+  return mustFind(
+    accounts.get(campus),
+    `${payment.method} account for ${campus}`
+  );
 }

@@ -1,11 +1,12 @@
 import type { INestApplicationContext } from '@nestjs/common';
 import type { OrgContext } from '../../src/app/common/auth';
-import { KYSELY_TOKEN, type Database } from '../../src/app/common/db/tokens';
+import type { Database } from '../../src/app/common/db/tokens';
 import { AdjustmentService } from '../../src/app/modules/adjustment/adjustment.service';
 import { PaymentVoidService } from '../../src/app/modules/payment/payment-void.service';
 import { PaymentService } from '../../src/app/modules/payment/payment.service';
 import { orgContextFor } from './actors';
 import { emailOf } from './members';
+import { databaseOf } from './database';
 
 export const SEED_PAYMENT_MINOR = 2_000_000;
 
@@ -37,7 +38,7 @@ async function seedWaitingCancellation(
   seed: ApprovalsSeed,
   bursar: OrgContext
 ) {
-  const db = app.get<Database>(KYSELY_TOKEN, { strict: false });
+  const db = databaseOf(app);
   const { organizationId } = seed.owner;
   const [account, student] = await Promise.all([
     db
@@ -72,7 +73,7 @@ async function seedCorrections(
   seed: ApprovalsSeed,
   people: { bursar: OrgContext; principal: OrgContext }
 ) {
-  const db = app.get<Database>(KYSELY_TOKEN, { strict: false });
+  const db = databaseOf(app);
   const adjustments = app.get(AdjustmentService, { strict: false });
   const { organizationId } = seed.owner;
   const [ada, daniel, bola] = await Promise.all(

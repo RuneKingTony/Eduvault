@@ -1,9 +1,10 @@
 import type { INestApplicationContext } from '@nestjs/common';
 import type { OrgContext } from '../../src/app/common/auth';
-import { KYSELY_TOKEN, type Database } from '../../src/app/common/db/tokens';
+import type { Database } from '../../src/app/common/db/tokens';
 import { BillingService } from '../../src/app/modules/billing/billing.service';
 import { orgContextFor } from './actors';
 import { emailOf } from './members';
+import { databaseOf } from './database';
 
 const PRIMARY_TUITION = [
   8_000_000, 9_000_000, 10_000_000, 11_500_000, 12_500_000, 14_000_000,
@@ -104,7 +105,7 @@ async function seedFeeLines(
   seed: ChargesSeed,
   termIds: readonly string[]
 ) {
-  const db = app.get<Database>(KYSELY_TOKEN, { strict: false });
+  const db = databaseOf(app);
   const [levels, types] = await Promise.all([
     db
       .selectFrom('class_level')
@@ -141,7 +142,7 @@ async function seedDiscounts(
   seed: ChargesSeed,
   terms: { first: string; second: string; third: string }
 ) {
-  const db = app.get<Database>(KYSELY_TOKEN, { strict: false });
+  const db = databaseOf(app);
   const { organizationId } = seed.owner;
   const [bursar, principal, tuition, students] = await Promise.all([
     orgContextFor(app, emailOf('chika')),
@@ -201,7 +202,7 @@ export async function seedCharges(
   app: INestApplicationContext,
   seed: ChargesSeed
 ) {
-  const db = app.get<Database>(KYSELY_TOKEN, { strict: false });
+  const db = databaseOf(app);
   const terms = await termsOfCurrentYear(db, seed.owner.organizationId);
   const [first, second, third] = [1, 2, 3].map((sequence) => {
     const id = terms.get(sequence);

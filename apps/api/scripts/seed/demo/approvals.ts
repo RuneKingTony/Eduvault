@@ -1,11 +1,10 @@
 import type { OrgContext } from '../../../src/app/common/auth';
-import { KYSELY_TOKEN, type Database } from '../../../src/app/common/db/tokens';
 import { AdjustmentService } from '../../../src/app/modules/adjustment/adjustment.service';
 import { DiscountService } from '../../../src/app/modules/adjustment/discount.service';
 import { PaymentVoidService } from '../../../src/app/modules/payment/payment-void.service';
 import type { DemoCampus } from './config';
 import {
-  found,
+  mustFind,
   moveClock,
   staffContext,
   type AcademicFacts,
@@ -22,6 +21,7 @@ import {
   type VoidPlan,
 } from './approvals-plan';
 import type { StudentNumber } from './people-plan';
+import { databaseOf } from '../database';
 
 interface ApprovalsRun {
   run: DemoRun;
@@ -42,7 +42,7 @@ function campusOfStudent(run: DemoRun, student: StudentNumber): DemoCampus {
   const family = run.plan.families.find((row) =>
     row.children.some((child) => child.number === student)
   );
-  return found(family, `family of student ${student}`).campus;
+  return mustFind(family, `family of student ${student}`).campus;
 }
 
 interface Deciding {
@@ -58,14 +58,14 @@ async function decide(
   if (decision.state === 'pending') {
     return;
   }
-  moveClock(context.run, found(decision.decidedDaysAgo, 'decision day'));
+  moveClock(context.run, mustFind(decision.decidedDaysAgo, 'decision day'));
   const { service, id } = made;
   await (decision.state === 'approved'
     ? service.approve(context.principal, id)
     : service.decline(
         context.principal,
         id,
-        found(decision.declineReason, 'decline reason')
+        mustFind(decision.declineReason, 'decline reason')
       ));
 }
 
@@ -79,7 +79,7 @@ async function runDiscounts(
     const bursar = bursarOf(money, campusOfStudent(run, row.student));
     moveClock(run, row.daysAgo);
     const { discount } = await discounts.create(bursar, {
-      studentId: found(
+      studentId: mustFind(
         people.studentIds.get(row.student),
         `student ${row.student}`
       ),
@@ -104,7 +104,7 @@ async function runAdjustments(
     moveClock(run, row.daysAgo);
     const { adjustment } = await adjustments.create(bursarOf(money, campus), {
       kind: row.kind,
-      studentId: found(
+      studentId: mustFind(
         people.studentIds.get(row.student),
         `student ${row.student}`
       ),
@@ -113,7 +113,7 @@ async function runAdjustments(
       reference: adjustmentReference(rows.indexOf(row)),
       moneyAccountId:
         row.kind === 'refund'
-          ? found(money.cashBoxes.get(campus), `cash box for ${campus}`)
+          ? mustFind(money.cashBoxes.get(campus), `cash box for ${campus}`)
           : undefined,
     });
     await decide(context, row, { service: adjustments, id: adjustment.id });
@@ -125,10 +125,10 @@ async function runVoids(
   rows: readonly VoidPlan[]
 ): Promise<void> {
   const { run, school, money } = context;
-  const db = run.app.get<Database>(KYSELY_TOKEN, { strict: false });
+  const db = databaseOf(run.app);
   const voids = run.app.get(PaymentVoidService, { strict: false });
   for (const row of oldestFirst(rows, (item) => item.daysAgo)) {
-    const family = found(
+    const family = mustFind(
       run.plan.families.find((candidate) => candidate.number === row.family),
       `family ${row.family}`
     );
