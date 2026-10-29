@@ -3,7 +3,9 @@ import {
   ALREADY_DECIDED_MESSAGE,
   DECLINE_REASON_MESSAGE,
   PAYMENT_ACCOUNT_GATEWAY_MESSAGE,
+  PAYMENT_REFERENCE_TAKEN_MESSAGE,
   SELF_APPROVAL_MESSAGE,
+  adjustmentReferenceUsedMessage,
   adjustmentRefundCapMessage,
   adjustmentRefundNowCapMessage,
   adjustmentWriteOffCapMessage,
@@ -42,6 +44,124 @@ const adjustmentOf = async (
 ): Promise<Adjustment> =>
   (await api(actor).get(`/finance/adjustments/${id}`).expect(200))
     .body as Adjustment;
+
+const ask = (studentId: string, over: Record<string, unknown> = {}) => ({
+  kind: 'credit_note' as const,
+  studentId,
+  amountMinor: 100_000,
+  reason: 'Late enrolment',
+  reference: 'DEMO-ADJ-1',
+  ...over,
+});
+
+test.describe('asking with a reference', () => {
+  test('the same request again answers the first adjustment and adds no row', async ({
+    api,
+    pool,
+    schools: { owner, studentLekki },
+  }) => {
+    const first = await askAdjustment(api, owner, ask(studentLekki.id));
+    const again = await askAdjustment(api, owner, ask(studentLekki.id));
+
+    expect(again.adjustment.id).toBe(first.adjustment.id);
+    expect(
+      (
+        await pool.query(`SELECT 1 FROM adjustment WHERE reference = $1`, [
+          'DEMO-ADJ-1',
+        ])
+      ).rowCount
+    ).toBe(1);
+  });
+
+  test('requests sent together apply once', async ({
+    api,
+    pool,
+    schools: { owner, studentLekki },
+  }) => {
+    const made = await Promise.all(
+      [1, 2, 3].map(() => askAdjustment(api, owner, ask(studentLekki.id)))
+    );
+
+    expect(new Set(made.map((one) => one.adjustment.id)).size).toBe(1);
+    expect(
+      (
+        await pool.query(`SELECT 1 FROM adjustment WHERE reference = $1`, [
+          'DEMO-ADJ-1',
+        ])
+      ).rowCount
+    ).toBe(1);
+  });
+
+  test('another request on the reference answers 409 with the number', async ({
+    api,
+    schools: { owner, studentLekki },
+  }) => {
+    const first = await askAdjustment(api, owner, ask(studentLekki.id));
+
+    const res = await api(owner)
+      .post('/finance/adjustments')
+      .send(ask(studentLekki.id, { amountMinor: 200_000 }))
+      .expect(409);
+
+    expect(res.body).toMatchObject({
+      message: adjustmentReferenceUsedMessage(
+        'DEMO-ADJ-1',
+        first.adjustment.number
+      ),
+    });
+  });
+
+  test('a system prefix is refused with 400', async ({
+    api,
+    schools: { owner, studentLekki },
+  }) => {
+    await api(owner)
+      .post('/finance/adjustments')
+      .send(ask(studentLekki.id, { reference: 'ADJ-2026-0001' }))
+      .expect(400);
+  });
+
+  test('another school can use the same reference, and never sees A’s row', async ({
+    api,
+    pool,
+    schools: { owner, ownerB, orgA, orgB, studentLekki, studentB },
+  }) => {
+    const a = await askAdjustment(api, owner, ask(studentLekki.id));
+    const b = await askAdjustment(api, ownerB, ask(studentB.id));
+
+    expect(b.adjustment.id).not.toBe(a.adjustment.id);
+    const { rows } = await pool.query(
+      `SELECT organization_id FROM adjustment WHERE reference = $1 ORDER BY organization_id`,
+      ['DEMO-ADJ-1']
+    );
+    expect(
+      rows
+        .map((row) => row.organization_id)
+        .toSorted((left, right) => left.localeCompare(right))
+    ).toEqual(
+      [orgA.id, orgB.id].toSorted((left, right) => left.localeCompare(right))
+    );
+    await api(ownerB)
+      .get(`/finance/adjustments/${a.adjustment.id}`)
+      .expect(404);
+  });
+
+  test('a user outside the holder’s campus answers 409 without the number', async ({
+    api,
+    schools: { owner, lekkiOnly, studentIkeja, studentLekki },
+  }) => {
+    await askAdjustment(api, owner, ask(studentIkeja.id));
+
+    const res = await api(lekkiOnly)
+      .post('/finance/adjustments')
+      .send(ask(studentLekki.id))
+      .expect(409);
+
+    expect(res.body).toMatchObject({
+      message: PAYMENT_REFERENCE_TAKEN_MESSAGE,
+    });
+  });
+});
 
 test.describe('asking for a correction', () => {
   test('each kind posts nothing when asked and gets an ADJ number', async ({

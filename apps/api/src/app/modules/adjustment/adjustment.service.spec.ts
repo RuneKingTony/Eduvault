@@ -12,7 +12,9 @@ import {
   DECLINE_REASON_MESSAGE,
   PAYMENT_ACCOUNT_GATEWAY_MESSAGE,
   PAYMENT_ACCOUNT_RETIRED_MESSAGE,
+  PAYMENT_REFERENCE_TAKEN_MESSAGE,
   SELF_APPROVAL_MESSAGE,
+  adjustmentReferenceUsedMessage,
   adjustmentRefundCapMessage,
   adjustmentRefundNowCapMessage,
   adjustmentWriteOffCapMessage,
@@ -303,6 +305,69 @@ describe('AdjustmentService.create', () => {
     repo.switchedOff.add('refund');
     const result = await service.create(chika, creditNote());
     expect(result.autoApproved).toBe(false);
+  });
+});
+
+describe('AdjustmentService.create with a reference', () => {
+  it('answers the same request again with the first adjustment and creates nothing', async () => {
+    const { repo, service } = setup();
+
+    const first = await service.create(chika, creditNote({ reference: 'R-1' }));
+    const again = await service.create(chika, creditNote({ reference: 'R-1' }));
+
+    expect(again.adjustment.id).toBe(first.adjustment.id);
+    expect(repo.stored).toHaveLength(1);
+    expect(repo.numbers).toEqual(['ADJ-2026-0001']);
+  });
+
+  it('answers 409 with the number when the reference carries another request', async () => {
+    const { repo, service } = setup();
+    await service.create(chika, creditNote({ reference: 'R-1' }));
+
+    const error = await rejected(
+      service.create(chika, creditNote({ reference: 'R-1', amountMinor: 5 }))
+    );
+
+    expect(error).toBeInstanceOf(ConflictException);
+    expect(bodyOf(error)).toMatchObject({
+      message: adjustmentReferenceUsedMessage('R-1', 'ADJ-2026-0001'),
+    });
+    expect(repo.stored).toHaveLength(1);
+  });
+
+  it('answers 409 without the number when the holder is out of scope', async () => {
+    const { repo, service } = setup();
+    await service.create(chika, creditNote({ reference: 'R-1' }));
+    repo.students.clear();
+
+    const error = await rejected(
+      service.create(chika, creditNote({ reference: 'R-1' }))
+    );
+
+    expect(error).toBeInstanceOf(ConflictException);
+    expect(bodyOf(error)).toMatchObject({
+      message: PAYMENT_REFERENCE_TAKEN_MESSAGE,
+    });
+  });
+
+  it('keeps a request with no reference unlimited', async () => {
+    const { repo, service } = setup();
+
+    await service.create(chika, creditNote());
+    await service.create(chika, creditNote());
+
+    expect(repo.stored).toHaveLength(2);
+  });
+
+  it('reports an applied-at-once replay as auto-approved and posts once', async () => {
+    const { repo, service } = setup();
+    repo.switchedOff.add('credit_note');
+
+    await service.create(chika, creditNote({ reference: 'R-1' }));
+    const again = await service.create(chika, creditNote({ reference: 'R-1' }));
+
+    expect(again.autoApproved).toBe(true);
+    expect(repo.posted).toHaveLength(1);
   });
 });
 

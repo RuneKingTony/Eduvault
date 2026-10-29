@@ -16,6 +16,8 @@ import {
   ADJUSTMENT_STUDENT_NOT_FOUND_MESSAGE,
   PAYMENT_ACCOUNT_GATEWAY_MESSAGE,
   PAYMENT_ACCOUNT_RETIRED_MESSAGE,
+  PAYMENT_REFERENCE_TAKEN_MESSAGE,
+  adjustmentReferenceUsedMessage,
   type Adjustment,
   type AdjustmentList,
   type AdjustmentListQuery,
@@ -32,10 +34,13 @@ import { assertDeclineReason, decide } from '../../common/approvals';
 import type { OrgContext } from '../../common/auth';
 import { Clock } from '../../common/clock';
 import { documentYear } from '../../common/documents';
+import { replayOf } from '../../common/references/apply-once';
+import { hashCanonical } from '../../common/references/request-hash';
 import { adjustmentLines, adjustmentMemo } from './adjustment-posting';
 import { capProblem } from './adjustment-caps';
 import {
   AdjustmentRepository,
+  type AdjustmentClaim,
   type AdjustmentRecord,
   type AdjustmentTx,
   type StudentFacts,
@@ -59,6 +64,23 @@ interface ToPost {
   ledgerAccountId: string | null;
   moneyAccountId: string | null;
 }
+
+type Request = Omit<CreateAdjustment, 'reference'>;
+
+const requestHashOf = (request: Request): string =>
+  hashCanonical([
+    request.kind,
+    request.studentId,
+    request.amountMinor,
+    request.reason,
+    request.ledgerAccountId ?? null,
+    request.moneyAccountId ?? null,
+    request.invoiceId ?? null,
+  ]);
+
+type Made =
+  | { replay: Exclude<AdjustmentClaim, { status: 'first' }> }
+  | { id: string; autoApproved: boolean };
 
 function assertShape(input: CreateAdjustment): void {
   const creditOnly =
@@ -197,46 +219,90 @@ export class AdjustmentService {
     input: CreateAdjustment
   ): Promise<CreatedAdjustment> {
     const scope = orgScopeOf(ctx);
-    const year = documentYear(this.clock);
-    const made = await this.adjustments.withTx(
+    const { reference, ...request } = input;
+    const made: Made = await this.adjustments.withTx(
       scope,
       ctx.user.id,
       async (tx) => {
-        const student = await tx.lockStudent(input.studentId);
-        if (student === undefined) {
-          throw new NotFoundException(ADJUSTMENT_STUDENT_NOT_FOUND_MESSAGE);
-        }
-        const problem = capProblem({ ...input, student, moment: 'ask' });
-        if (problem !== undefined) {
-          throw new BadRequestException(problem);
-        }
-        const accounts = await resolveAccounts(tx, student, input);
-        const row = {
-          ...input,
-          ...accounts,
-          id: randomUUID(),
-          number: await tx.nextNumber(year),
-        };
-        const autoApproved = !(await tx.approvalOn(input.kind));
-        const approvedEntryId = autoApproved
-          ? await this.post(tx, row, student)
-          : null;
-        await tx.insert({ ...row, approvedEntryId });
-        if (autoApproved) {
-          await tx.activity.recordMany(
-            adjustmentApprovedActivity(
-              await financeActorIn(ctx, tx),
-              { ...row, ...studentFacts(student) },
-              { autoApproved: true }
-            )
-          );
-        }
-        return { id: row.id, autoApproved };
+        const claim =
+          reference === undefined
+            ? undefined
+            : await tx.claimReference(reference, requestHashOf(request));
+        return claim !== undefined && claim.status !== 'first'
+          ? { replay: claim }
+          : this.ask(ctx, tx, input);
       }
     );
+    if ('replay' in made) {
+      return this.replay(scope, reference ?? '', made.replay);
+    }
     return {
       adjustment: await this.item(scope, made.id),
       autoApproved: made.autoApproved,
+    };
+  }
+
+  private async ask(
+    ctx: OrgContext,
+    tx: AdjustmentTx,
+    input: CreateAdjustment
+  ): Promise<Made> {
+    const { reference, ...request } = input;
+    const student = await tx.lockStudent(request.studentId);
+    if (student === undefined) {
+      throw new NotFoundException(ADJUSTMENT_STUDENT_NOT_FOUND_MESSAGE);
+    }
+    const problem = capProblem({ ...request, student, moment: 'ask' });
+    if (problem !== undefined) {
+      throw new BadRequestException(problem);
+    }
+    const accounts = await resolveAccounts(tx, student, request);
+    const row = {
+      ...request,
+      ...accounts,
+      id: randomUUID(),
+      number: await tx.nextNumber(documentYear(this.clock)),
+    };
+    const autoApproved = !(await tx.approvalOn(request.kind));
+    const approvedEntryId = autoApproved
+      ? await this.post(tx, row, student)
+      : null;
+    await tx.insert({
+      ...row,
+      reference: reference ?? null,
+      requestHash: reference === undefined ? null : requestHashOf(request),
+      approvedEntryId,
+    });
+    if (autoApproved) {
+      await tx.activity.recordMany(
+        adjustmentApprovedActivity(
+          await financeActorIn(ctx, tx),
+          { ...row, ...studentFacts(student) },
+          { autoApproved: true }
+        )
+      );
+    }
+    return { id: row.id, autoApproved };
+  }
+
+  private async replay(
+    scope: OrgScope,
+    reference: string,
+    claim: Extract<Made, { replay: unknown }>['replay']
+  ): Promise<CreatedAdjustment> {
+    const adjustment = replayOf({
+      visible: await this.adjustments.findById(scope, claim.id),
+      sameRequest: () => claim.status === 'replayed',
+      taken: () => new ConflictException(PAYMENT_REFERENCE_TAKEN_MESSAGE),
+      used: () =>
+        new ConflictException(
+          adjustmentReferenceUsedMessage(reference, claim.number)
+        ),
+    });
+    return {
+      adjustment,
+      autoApproved:
+        adjustment.status === 'approved' && adjustment.approvedBy === null,
     };
   }
 

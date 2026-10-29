@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { adjustmentKindSchema } from './adjustment-kinds';
 import { approvalStatusSchema } from './approvals';
 import { FINANCE_PAGE_SIZE, FINANCE_PAGE_SIZE_MAX } from './finance';
+import { paymentReferenceSchema } from './payments';
 import { currencySchema, idSchema } from './schemas';
 
 export const ADJUSTMENT_REASON_MAX = 200;
@@ -24,6 +25,10 @@ export const ADJUSTMENT_ACCOUNT_NOT_ALLOWED_MESSAGE =
 export const ADJUSTMENT_CHARGE_MESSAGE =
   'Choose one of this student’s sent charges.';
 export const ADJUSTMENT_ACCOUNT_REQUIRED_MESSAGE = 'Choose an account.';
+export const adjustmentReferenceUsedMessage = (
+  reference: string,
+  number: string
+): string => `Reference ${reference} is already used by ${number}.`;
 export const ADJUSTMENT_SUBMITTED_MESSAGE =
   'Submitted. A boss must approve it.';
 export const ADJUSTMENT_APPLIED_MESSAGE =
@@ -95,6 +100,7 @@ export const createAdjustmentSchema = z.object({
   ledgerAccountId: idSchema.optional(),
   moneyAccountId: idSchema.optional(),
   invoiceId: idSchema.optional(),
+  reference: paymentReferenceSchema.optional(),
 });
 export type CreateAdjustmentInput = z.input<typeof createAdjustmentSchema>;
 export type CreateAdjustment = z.output<typeof createAdjustmentSchema>;

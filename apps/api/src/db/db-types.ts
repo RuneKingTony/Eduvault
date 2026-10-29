@@ -81,9 +81,11 @@ export interface Adjustment {
   number: string;
   organization_id: string;
   reason: string;
+  reference: string | null;
   rejected_at: Timestamp | null;
   rejected_by: string | null;
   rejection_reason: string | null;
+  request_hash: string | null;
   status: Generated<string>;
   student_id: string;
 }

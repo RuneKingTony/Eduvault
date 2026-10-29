@@ -706,6 +706,8 @@ CREATE TABLE public.adjustment (
     rejected_at timestamp with time zone,
     rejection_reason text,
     journal_entry_id uuid,
+    reference text,
+    request_hash text,
     CONSTRAINT adjustment_amount_minor_check CHECK ((amount_minor > 0)),
     CONSTRAINT adjustment_approved_columns CHECK (((status = 'approved'::text) = (approved_at IS NOT NULL))),
     CONSTRAINT adjustment_kind_check CHECK ((kind = ANY (ARRAY['credit_note'::text, 'write_off'::text, 'refund'::text]))),
@@ -717,6 +719,8 @@ CASE kind
 END),
     CONSTRAINT adjustment_number_check CHECK ((char_length(btrim(number)) > 0)),
     CONSTRAINT adjustment_reason_check CHECK (((char_length(btrim(reason)) >= 1) AND (char_length(btrim(reason)) <= 200))),
+    CONSTRAINT adjustment_reference_check CHECK (((char_length(btrim(reference)) >= 1) AND (char_length(btrim(reference)) <= 80))),
+    CONSTRAINT adjustment_reference_hash CHECK (((reference IS NULL) = (request_hash IS NULL))),
     CONSTRAINT adjustment_rejected_columns CHECK (((status = 'rejected'::text) = ((rejected_at IS NOT NULL) AND (rejected_by IS NOT NULL) AND (rejection_reason IS NOT NULL)))),
     CONSTRAINT adjustment_rejection_reason_check CHECK (((char_length(btrim(rejection_reason)) >= 1) AND (char_length(btrim(rejection_reason)) <= 500))),
     CONSTRAINT adjustment_status_check CHECK ((status = ANY (ARRAY['submitted'::text, 'approved'::text, 'rejected'::text])))
@@ -3392,6 +3396,12 @@ CREATE INDEX adjustment_listing_idx ON public.adjustment USING btree (organizati
 CREATE INDEX adjustment_money_account_idx ON public.adjustment USING btree (organization_id, money_account_id);
 
 --
+-- Name: adjustment_reference_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX adjustment_reference_key ON public.adjustment USING btree (organization_id, reference) WHERE (reference IS NOT NULL);
+
+--
 -- Name: adjustment_student_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -6044,4 +6054,5 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20261025090000'),
     ('20261026090000'),
     ('20261027090000'),
-    ('20261028090000');
+    ('20261028090000'),
+    ('20261029090000');

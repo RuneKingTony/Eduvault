@@ -20,7 +20,7 @@ import {
 } from './check-input';
 import { DEMO_CAMPUSES } from './config';
 import { campusIdOf, dayAt } from './demo-run';
-import type { ApprovalState } from './approvals-plan';
+import { adjustmentReference, type ApprovalState } from './approvals-plan';
 import { STORE_ITEMS } from './store-plan';
 import { databaseOf } from '../database';
 
@@ -219,6 +219,13 @@ export async function approvalsMatch(input: CheckInput): Promise<string[]> {
           FROM adjustment WHERE organization_id = ${organizationId} GROUP BY 1`,
       want: tally(
         approvals.adjustments.map((row) => `${row.kind}|${statusOf(row)}`)
+      ),
+    })),
+    ...(await groupsMatch(input, 'adjustment references', {
+      query: sql`SELECT reference AS key, count(*)::int AS n
+          FROM adjustment WHERE organization_id = ${organizationId} GROUP BY 1`,
+      want: tally(
+        approvals.adjustments.map((_, index) => adjustmentReference(index))
       ),
     })),
     ...(await groupsMatch(input, 'discounts', {
