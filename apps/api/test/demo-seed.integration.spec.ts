@@ -127,7 +127,7 @@ test.describe('demo seed', () => {
         await scalar(
           `SELECT count(*) AS n FROM journal_entry WHERE ${inRiverside} AND kind = 'wallet_topup'`
         )
-      ).toBe(plan.wallets.length + autoPay.length);
+      ).toBe(plan.wallets.length + autoPay.length + plan.walletRequests.length);
       expect(
         await scalar(
           `SELECT count(*) AS n FROM journal_entry WHERE ${inRiverside} AND reference LIKE 'DEMO-SPEND-%'`
@@ -165,6 +165,24 @@ test.describe('demo seed', () => {
       expect(await inRiversideCount('payment', ` AND status = 'voided'`)).toBe(
         approvals.voids.filter((row) => row.state === 'approved').length
       );
+      const asked = (kind: 'refund' | 'cancellation', state?: string) =>
+        plan.walletRequests.filter(
+          (row) =>
+            row.kind === kind && (state === undefined || row.state === state)
+        ).length;
+      expect(await inRiversideCount('wallet_refund')).toBe(asked('refund'));
+      expect(
+        await inRiversideCount('wallet_refund', ` AND status = 'approved'`)
+      ).toBe(asked('refund', 'approved'));
+      expect(await inRiversideCount('wallet_topup_cancellation')).toBe(
+        asked('cancellation')
+      );
+      expect(
+        await inRiversideCount(
+          'wallet_topup_cancellation',
+          ` AND status = 'approved'`
+        )
+      ).toBe(asked('cancellation', 'approved'));
       expect(await inRiversideCount('announcement')).toBe(
         plan.announcements.length
       );

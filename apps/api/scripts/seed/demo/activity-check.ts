@@ -228,6 +228,24 @@ export async function approvalsMatch(input: CheckInput): Promise<string[]> {
         approvals.adjustments.map((_, index) => adjustmentReference(index))
       ),
     })),
+    ...(await groupsMatch(input, 'wallet refunds', {
+      query: sql`SELECT status AS key, count(*)::int AS n
+          FROM wallet_refund WHERE organization_id = ${organizationId} GROUP BY 1`,
+      want: tally(
+        plan.walletRequests
+          .filter((row) => row.kind === 'refund')
+          .map((row) => statusOf(row))
+      ),
+    })),
+    ...(await groupsMatch(input, 'wallet top-up cancellations', {
+      query: sql`SELECT status AS key, count(*)::int AS n
+          FROM wallet_topup_cancellation WHERE organization_id = ${organizationId} GROUP BY 1`,
+      want: tally(
+        plan.walletRequests
+          .filter((row) => row.kind === 'cancellation')
+          .map((row) => statusOf(row))
+      ),
+    })),
     ...(await groupsMatch(input, 'discounts', {
       query: sql`SELECT status AS key, count(*)::int AS n
           FROM student_discount WHERE organization_id = ${organizationId} GROUP BY 1`,

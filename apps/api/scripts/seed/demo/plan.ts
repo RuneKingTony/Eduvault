@@ -1,3 +1,7 @@
+import {
+  planWalletRequests,
+  type WalletRequestPlan,
+} from './wallet-requests-plan';
 import type { DemoCampus, DemoSize } from './config';
 import {
   emptyApprovalsPlan,
@@ -57,6 +61,7 @@ export interface DemoPlan {
   families: DemoFamily[];
   payments: FamilyPayment[];
   wallets: WalletPlan[];
+  walletRequests: WalletRequestPlan[];
   store: StorePlan;
   approvals: ApprovalsPlan;
   announcements: AnnouncementPlan[];
@@ -66,6 +71,7 @@ export interface DemoPlan {
 
 export const withoutSchoolActivity = (plan: DemoPlan): DemoPlan => ({
   ...plan,
+  walletRequests: [],
   store: emptyStorePlan(),
   approvals: emptyApprovalsPlan(),
   announcements: [],
@@ -204,6 +210,7 @@ export function buildDemoPlan(size: DemoSize, today: string): DemoPlan {
     families: withSampleEmails(built, wallets),
     payments,
     wallets,
+    walletRequests: planWalletRequests(wallets),
     ...activity,
     announcements: [...DEMO_ANNOUNCEMENTS],
     leave: planLeave(teachers, today),

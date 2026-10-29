@@ -322,3 +322,44 @@ describe('splitByWeight', () => {
     expect(shares[0]).toBeGreaterThan(shares[1] ?? 0);
   });
 });
+
+describe('wallet requests', () => {
+  it.each([
+    ['full size', full],
+    ['small size', small],
+  ])(
+    'plans a refund and a cancellation in each state at %s',
+    (_label, plan) => {
+      expect(
+        plan.walletRequests.map((row) => `${row.kind}|${row.state}`)
+      ).toEqual([
+        'refund|approved',
+        'refund|pending',
+        'refund|declined',
+        'cancellation|approved',
+        'cancellation|pending',
+        'cancellation|declined',
+      ]);
+    }
+  );
+
+  it.each([
+    ['full size', full],
+    ['small size', small],
+  ])(
+    'puts every request on a wallet without auto-pay at %s',
+    (_label, plan) => {
+      const plain = new Set(
+        plan.wallets
+          .filter((row) => row.autoPay === null)
+          .map((row) => row.number)
+      );
+      for (const request of plan.walletRequests) {
+        expect(plain.has(request.wallet)).toBe(true);
+        expect(request.decidedDaysAgo === null).toBe(
+          request.state === 'pending'
+        );
+      }
+    }
+  );
+});
