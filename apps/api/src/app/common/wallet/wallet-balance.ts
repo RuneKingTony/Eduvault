@@ -25,6 +25,18 @@ export async function walletBalance(
   return Number(rows[0]?.balance ?? 0);
 }
 
+export async function earmarkTotal(
+  db: Kysely<DB>,
+  wallet: { organizationId: string; walletId: string }
+): Promise<number> {
+  const { rows } = await sql<{ total: string }>`
+    SELECT COALESCE(SUM(e.delta_minor), 0)::text AS total
+    FROM wallet_earmark e
+    WHERE e.organization_id = ${wallet.organizationId}
+      AND e.wallet_id = ${wallet.walletId}`.execute(db);
+  return Number(rows[0]?.total ?? 0);
+}
+
 export async function earmarksByChild(
   db: Kysely<DB>,
   wallet: { organizationId: string; walletId: string }
