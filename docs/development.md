@@ -92,7 +92,7 @@ ALLOW_PRODUCTION_SEED=true pnpm nx run api:db-seed   # optional demo school; ide
 
 ### Automatic deploys
 
-`.github/workflows/deploy-staging.yml` runs on every push to `main`. It first checks that the pull request that produced the commit ended with a green `Validate PR` run, then triggers a Render deploy of the commit for the API and both sites, waits until each is `live`, and runs `pnpm smoke:staging`. The smoke check calls `GET /health`, loads both SPAs and signs in the bootstrap admin, stops at the first step that fails and names it. A failed deploy or smoke check fails the workflow. A manual run is available from the Actions tab (`workflow_dispatch`) and skips the green-PR check.
+`.github/workflows/deploy-staging.yml` runs on every push to `main`. It first checks that the pull request that produced the commit ended with a green `Validate PR` run, then triggers a Render deploy of the commit for the API and both sites, waits until each is `live`, and runs `pnpm smoke:staging`. The smoke check calls `GET /health`, loads both SPAs and signs in the bootstrap admin, stops at the first step that fails and names it. A failed deploy or smoke check fails the workflow. Until `RENDER_API_SERVICE_ID` is set the workflow skips itself, so merges stay green before staging exists. A manual run is available from the Actions tab (`workflow_dispatch`) and skips the green-PR check.
 
 Set once in the repository settings:
 

@@ -16,6 +16,7 @@ permissions:
 
 jobs:
   deploy:
+    if: vars.RENDER_API_SERVICE_ID != ''
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
