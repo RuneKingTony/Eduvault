@@ -20,6 +20,7 @@ import { STORE_ITEMS } from './store-plan';
 import { createAcademics, createSchool } from './structure';
 import { runStore } from './store';
 import { runStudentLife } from './student-life';
+import { runWalletRequests } from './wallet-requests';
 import { runWallets } from './wallets';
 import { databaseOf } from '../database';
 
@@ -126,6 +127,8 @@ async function seedDemo(
   await recordPayments(run, { people, money });
   log('Topping up and spending from family wallets.');
   await runWallets(run, { school, people, money });
+  log('Asking for wallet refunds and top-up cancellations.');
+  await runWalletRequests(run, { school, people, money });
   log('Stocking the stores and recording store sales.');
   const store = await runStore(run, { school, people, money });
   log('Asking for and deciding discounts, adjustments and cancellations.');

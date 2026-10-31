@@ -12,6 +12,7 @@ import {
   expectedWalletBalance,
   owedAndCredit,
 } from './check-math';
+import { requestEffects } from './wallet-requests-plan';
 import {
   approvalsMatch,
   isStoreEntry,
@@ -36,6 +37,9 @@ export const COUNTED_TABLES = [
   'invoice',
   'payment',
   'wallet',
+  'wallet_topup',
+  'wallet_refund',
+  'wallet_topup_cancellation',
   'file_object',
   'journal_entry',
   'journal_line',
@@ -270,6 +274,7 @@ async function walletsMatch({
   for (const row of rows) {
     const wallet = await wallets.get(owner, row.wallet_id);
     const who = `wallet of ${wallet.guardian.name}`;
+    const sample = planned.get(row.guardian_id);
     const journal = Number(row.journal);
     const aside = Number(row.aside);
     same(
@@ -278,16 +283,23 @@ async function walletsMatch({
       journal
     );
     same(`${who}: money set aside`, wallet.setAsideMinor, aside);
-    same(`${who}: free money`, wallet.freeMinor, journal - aside);
+    const held =
+      sample === undefined
+        ? 0
+        : requestEffects(plan.walletRequests, sample.number).heldMinor;
+    same(`${who}: money held for requests`, wallet.heldMinor, held);
+    same(`${who}: free money`, wallet.freeMinor, journal - aside - held);
     if (wallet.freeMinor < 0) {
       failures.push(`${who} has negative free money`);
     }
-    const sample = planned.get(row.guardian_id);
     const autoPaid = Number(row.auto);
     same(
       `${who}: balance against its top-ups and spends`,
       journal,
-      sample === undefined ? 0 : expectedWalletBalance(sample, autoPaid)
+      sample === undefined
+        ? 0
+        : expectedWalletBalance(sample, autoPaid) +
+            requestEffects(plan.walletRequests, sample.number).balanceMinor
     );
     if ((sample?.autoPay ?? null) !== null && autoPaid <= 0) {
       failures.push(`${who} has auto-pay on but never auto-paid`);

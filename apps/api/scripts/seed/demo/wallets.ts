@@ -24,7 +24,7 @@ import { databaseOf } from '../database';
 
 const PROGRESS_EVERY = 20;
 
-interface WalletRun {
+export interface WalletRun {
   run: DemoRun;
   school: SchoolFacts;
   people: PeopleFacts;
@@ -32,11 +32,11 @@ interface WalletRun {
   walletIds: ReadonlyMap<string, string>;
 }
 
-async function topUp(
+export async function topUp(
   context: WalletRun,
   wallet: WalletPlan,
   top: { reference: string; amountMinor: number; daysAgo: number }
-): Promise<void> {
+): Promise<string> {
   const { run, money, walletIds, people } = context;
   const family = familyOf(run.plan.families, wallet.family);
   const bursar = bursarOf(money, family.campus);
@@ -48,7 +48,7 @@ async function topUp(
       kind: 'wallet_proof',
       file: proofOf(top.reference.toLowerCase()),
     });
-  await run.app
+  const topped = await run.app
     .get(WalletService, { strict: false })
     .topUp(
       bursar,
@@ -63,6 +63,7 @@ async function topUp(
         proofFileId: proof.id,
       }
     );
+  return topped.id;
 }
 
 async function guardianActs(
@@ -123,21 +124,28 @@ async function runWallet(
   }
 }
 
-export async function runWallets(
+export async function walletContext(
   run: DemoRun,
   facts: { school: SchoolFacts; people: PeopleFacts; money: MoneyFacts }
-): Promise<void> {
+): Promise<WalletRun> {
   const db = databaseOf(run.app);
   const rows = await db
     .selectFrom('wallet')
     .select(['id', 'guardian_id'])
     .where('organization_id', '=', facts.school.organizationId)
     .execute();
-  const context: WalletRun = {
+  return {
     run,
     ...facts,
     walletIds: new Map(rows.map((row) => [row.guardian_id, row.id])),
   };
+}
+
+export async function runWallets(
+  run: DemoRun,
+  facts: { school: SchoolFacts; people: PeopleFacts; money: MoneyFacts }
+): Promise<void> {
+  const context = await walletContext(run, facts);
   const ordered = oldestFirst(run.plan.wallets, (wallet) => wallet.daysAgo);
   const logProgress = progressLogger(run, ordered.length, {
     every: PROGRESS_EVERY,
