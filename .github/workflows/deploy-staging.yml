@@ -22,6 +22,27 @@ jobs:
       RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
       GH_TOKEN: ${{ github.token }}
     steps:
+      - name: Require staging config
+        env:
+          RENDER_API_SERVICE_ID: ${{ vars.RENDER_API_SERVICE_ID }}
+          RENDER_ADMIN_SERVICE_ID: ${{ vars.RENDER_ADMIN_SERVICE_ID }}
+          RENDER_PORTAL_SERVICE_ID: ${{ vars.RENDER_PORTAL_SERVICE_ID }}
+          STAGING_API_URL: ${{ vars.STAGING_API_URL }}
+          STAGING_ADMIN_URL: ${{ vars.STAGING_ADMIN_URL }}
+          STAGING_PORTAL_URL: ${{ vars.STAGING_PORTAL_URL }}
+          STAGING_SMOKE_EMAIL: ${{ secrets.STAGING_SMOKE_EMAIL }}
+          STAGING_SMOKE_PASSWORD: ${{ secrets.STAGING_SMOKE_PASSWORD }}
+        run: |
+          missing=()
+          for name in RENDER_API_KEY RENDER_API_SERVICE_ID RENDER_ADMIN_SERVICE_ID RENDER_PORTAL_SERVICE_ID \
+            STAGING_API_URL STAGING_ADMIN_URL STAGING_PORTAL_URL STAGING_SMOKE_EMAIL STAGING_SMOKE_PASSWORD; do
+            [[ -n "${!name:-}" ]] || missing+=("$name")
+          done
+          if (( ${#missing[@]} > 0 )); then
+            echo "::error::Staging is not configured, missing: ${missing[*]}"
+            exit 1
+          fi
+
       - name: Require a green Validate PR
         if: github.event_name == 'push'
         run: |
@@ -30,24 +51,37 @@ jobs:
             echo "::error::$GITHUB_SHA reached main without a pull request, so nothing vouches for it"
             exit 1
           fi
-          conclusion=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow validate-pr.yml --commit "$head" --limit 1 --json conclusion --jq '.[0].conclusion // empty')
-          if [[ "$conclusion" != "success" ]]; then
-            echo "::error::Validate PR for $head ended '${conclusion:-with no run}', so staging is not deployed"
+          runs=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow validate-pr.yml --commit "$head" --json status,conclusion --jq '[.[] | if .conclusion == "" then .status else .conclusion end] | join(",")')
+          if [[ ",$runs," != *,success,* ]]; then
+            echo "::error::Validate PR for $head has no successful run (runs: ${runs:-none}), so staging is not deployed"
             exit 1
           fi
 
       - name: Deploy the three services
         id: deploy
         run: |
+          set -o pipefail
           trigger() {
-            curl -fsS -X POST "https://api.render.com/v1/services/$1/deploys" \
+            local id
+            id=$(curl -fsS -X POST "https://api.render.com/v1/services/$1/deploys" \
               -H "Authorization: Bearer $RENDER_API_KEY" \
               -H 'Content-Type: application/json' \
-              -d "{\"commitId\":\"$GITHUB_SHA\"}" | jq -r '.id'
+              -d "{\"commitId\":\"$GITHUB_SHA\"}" | jq -r '.id // empty')
+            if [[ -z "$id" ]]; then
+              echo "::error::Render returned no deploy id for service $1" >&2
+              return 1
+            fi
+            echo "$id"
           }
-          echo "api=$(trigger '${{ vars.RENDER_API_SERVICE_ID }}')" >> "$GITHUB_OUTPUT"
-          echo "admin=$(trigger '${{ vars.RENDER_ADMIN_SERVICE_ID }}')" >> "$GITHUB_OUTPUT"
-          echo "portal=$(trigger '${{ vars.RENDER_PORTAL_SERVICE_ID }}')" >> "$GITHUB_OUTPUT"
+          # An assignment keeps trigger's exit status, which echo "$(...)" would hide.
+          api=$(trigger '${{ vars.RENDER_API_SERVICE_ID }}')
+          admin=$(trigger '${{ vars.RENDER_ADMIN_SERVICE_ID }}')
+          portal=$(trigger '${{ vars.RENDER_PORTAL_SERVICE_ID }}')
+          {
+            echo "api=$api"
+            echo "admin=$admin"
+            echo "portal=$portal"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Wait until all three are live
         run: |
