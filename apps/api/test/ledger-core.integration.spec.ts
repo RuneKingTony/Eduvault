@@ -80,6 +80,13 @@ const countOf = async (pool: Pool, sql: string, values: unknown[]) => {
   return Number(rows[0]?.count);
 };
 
+const gatewayCount = (pool: Pool, organizationId: string) =>
+  countOf(
+    pool,
+    `SELECT count(*) FROM money_account WHERE organization_id = $1 AND kind = 'gateway'`,
+    [organizationId]
+  );
+
 test.describe('the chart', () => {
   test('gives a new school the thirteen system accounts and eight fee types, and seeding twice changes nothing', async ({
     pool,
@@ -247,24 +254,53 @@ test.describe('the chart', () => {
     schools,
   }) => {
     const { orgA, orgB } = schools;
-    const gateways = (organizationId: string) =>
-      countOf(
-        pool,
-        `SELECT count(*) FROM money_account WHERE organization_id = $1 AND kind = 'gateway'`,
-        [organizationId]
-      );
     await pool.query(
       `DELETE FROM money_account WHERE organization_id = $1 AND kind = 'gateway'`,
       [orgA.id]
     );
-    expect(await gateways(orgA.id)).toBe(0);
+    expect(await gatewayCount(pool, orgA.id)).toBe(0);
 
     const boot = new EduvaultAuthModule(pool);
     await boot.onApplicationBootstrap();
     await boot.onApplicationBootstrap();
 
-    expect(await gateways(orgA.id)).toBe(1);
-    expect(await gateways(orgB.id)).toBe(1);
+    expect(await gatewayCount(pool, orgA.id)).toBe(1);
+    expect(await gatewayCount(pool, orgB.id)).toBe(1);
+  });
+
+  test('refuses deleting a gateway money account whose ledger account has history, and nothing else', async ({
+    pool,
+    schools,
+  }) => {
+    const { orgA, orgB } = schools;
+    await rawEntry(pool, {
+      organizationId: orgA.id,
+      reference: 'GATEWAY-HISTORY',
+      lines: [
+        {
+          accountId: await ledgerAccountId(pool, orgA.id, 1230),
+          debit: 500,
+        },
+        {
+          accountId: await ledgerAccountId(pool, orgA.id, 3000),
+          credit: 500,
+        },
+      ],
+    });
+    const deleteGateway = (organizationId: string) =>
+      pool.query(
+        `DELETE FROM money_account WHERE organization_id = $1 AND kind = 'gateway'`,
+        [organizationId]
+      );
+
+    await expect(deleteGateway(orgA.id)).rejects.toMatchObject({
+      code: '23514',
+      constraint: 'money_account_gateway_history_kept',
+    });
+    expect(await gatewayCount(pool, orgA.id)).toBe(1);
+
+    await deleteGateway(orgB.id);
+    expect(await gatewayCount(pool, orgB.id)).toBe(0);
   });
 
   test('shows 2200 Student wallets as a liability that needs a family', async ({
