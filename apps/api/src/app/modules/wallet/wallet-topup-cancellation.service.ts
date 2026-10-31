@@ -114,11 +114,11 @@ export class WalletTopUpCancellationService {
     target: { walletId: string; topUpId: string }
   ): Promise<void> {
     const scope = orgScopeOf(ctx);
-    const [wallet, topUp] = await Promise.all([
-      this.wallets.findWallet(scope, target.walletId),
+    const [inScope, topUp] = await Promise.all([
+      this.wallets.walletInScope(scope, target.walletId),
       this.wallets.findTopUpToCancel(scope, target.walletId, target.topUpId),
     ]);
-    if (wallet === undefined) {
+    if (!inScope) {
       throw new NotFoundException(WALLET_NOT_FOUND_MESSAGE);
     }
     if (topUp === undefined) {

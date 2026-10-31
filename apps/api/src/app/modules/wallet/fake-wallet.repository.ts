@@ -298,6 +298,12 @@ export class FakeWalletRepository extends WalletRepository {
     });
   }
 
+  walletInScope(scope: OrgScope, walletId: string): Promise<boolean> {
+    return Promise.resolve(
+      this.visible(scope).some((row) => row.id === walletId)
+    );
+  }
+
   findWallet(
     scope: OrgScope,
     walletId: string

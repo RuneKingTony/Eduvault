@@ -76,11 +76,11 @@ export class WalletRefundService {
     walletId: string,
     input: RequestWalletRefund
   ): Promise<RequestedWalletRefund> {
-    const [wallet, existing] = await Promise.all([
-      this.wallets.findWallet(orgScopeOf(ctx), walletId),
+    const [inScope, existing] = await Promise.all([
+      this.wallets.walletInScope(orgScopeOf(ctx), walletId),
       this.wallets.findRefundRequest(ctx.organizationId, input.reference),
     ]);
-    if (wallet === undefined) {
+    if (!inScope) {
       throw walletNotFound();
     }
     const requestHash = refundRequestHash(walletId, input);

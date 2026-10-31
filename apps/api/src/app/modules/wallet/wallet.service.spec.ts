@@ -260,6 +260,40 @@ describe('WalletService.topUp', () => {
     expect(repository.topUps).toHaveLength(0);
   });
 
+  it('reports the first problem in a fixed order when several things are wrong', async () => {
+    const { repository, service } = setup({ ...ojo, paying: false });
+    repository.methods = { cash: false, transfer: true, pos: true };
+    const bad = {
+      ...topUp,
+      moneyAccountId: 'nowhere',
+      proofFileId: 'stranger',
+      receivedOn: '2026-10-24',
+    };
+    await expect(service.topUp(everyone, ojo.id, bad)).rejects.toThrow(
+      WALLET_NOT_PAYING_MESSAGE
+    );
+    for (const wallet of repository.wallets) {
+      wallet.paying = true;
+    }
+    await expect(service.topUp(everyone, ojo.id, bad)).rejects.toThrow(
+      WALLET_METHOD_OFF_MESSAGE
+    );
+    repository.methods = { cash: true, transfer: true, pos: true };
+    await expect(service.topUp(everyone, ojo.id, bad)).rejects.toThrow(
+      WALLET_FUTURE_DATE_MESSAGE
+    );
+    await expect(
+      service.topUp(everyone, ojo.id, { ...bad, receivedOn: topUp.receivedOn })
+    ).rejects.toThrow(WALLET_ACCOUNT_NOT_FOUND_MESSAGE);
+    await expect(
+      service.topUp(everyone, ojo.id, {
+        ...bad,
+        receivedOn: topUp.receivedOn,
+        moneyAccountId: 'till',
+      })
+    ).rejects.toThrow(WALLET_PROOF_NOT_FOUND_MESSAGE);
+  });
+
   it('answers 404 for a receipt that is not the caller’s upload and 409 for one already attached', async () => {
     const { repository, service } = setup();
     await expect(
