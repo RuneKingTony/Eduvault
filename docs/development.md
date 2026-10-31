@@ -105,6 +105,25 @@ Set once in the repository settings:
 
 A migration that fails stops the API deploy (it runs as the pre-deploy command), the workflow reports it, and the old version keeps serving.
 
+### Reset and reseed
+
+The `Reset staging` workflow (Actions, manual dispatch) wipes the staging database and seeds it again: it drops the `public` schema, applies the migrations, runs `bootstrap-admin` and `db-seed`, then checks `/health`. Files in the R2 bucket are not removed; the seeded school gets new ids, so old objects are orphans until the bucket is emptied by hand.
+
+It reads a GitHub environment called `staging`. Secrets: `DATABASE_URL` (the database's **external** URL with `?sslmode=require`, and the Render Postgres must allow connections from GitHub runners), `BETTER_AUTH_SECRET`, `GATEWAY_ENCRYPTION_KEY`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `BOOTSTRAP_ADMIN_EMAIL`, `BOOTSTRAP_ADMIN_PASSWORD`. Variables: `BETTER_AUTH_URL`, `WEB_ADMIN_URL`, `WEB_PORTAL_URL`, `AUTH_COOKIE_DOMAIN`, `S3_ENDPOINT` and `STAGING_DB_HOST` (the database host the reset may touch). Use the same values as the Render dashboard.
+
+The workflow refuses to touch anything else: you must type `reset staging`, the host of `DATABASE_URL` must equal `STAGING_DB_HOST`, and `BETTER_AUTH_URL` must contain `.staging.`. The seed creates personas with the password `password123` (see "Seed once"); change them if the host is public.
+
+### e2e against staging
+
+`eduvault-e2e` reads its targets from the environment, so it runs against a deployed stack when you point it there. Run `preflight.sh` and `provision.sh` from a checkout of the commit that is deployed:
+
+```sh
+export E2E_API_URL=https://api.staging.<domain> E2E_ADMIN_URL=https://admin.staging.<domain> E2E_PORTAL_URL=https://portal.staging.<domain>
+export E2E_SUPERADMIN_EMAIL=<BOOTSTRAP_ADMIN_EMAIL> E2E_SUPERADMIN_PASSWORD=<BOOTSTRAP_ADMIN_PASSWORD>
+```
+
+The preflight line still prints `env=local`; read the URLs on it. Provisioning and cleanup go through the real API as on a local stack, so the run's schools and ledger rows stay on staging (money and students are never deleted); reset staging afterwards to clear them.
+
 ### Rollback
 
 Redeploy the previous successful build from the service's Deploys list. Migrations are not reversed: a bad migration is fixed forward with a new one. A rollback to code older than the schema works only while the new migrations stayed backward compatible, so keep them additive.
