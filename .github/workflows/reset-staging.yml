@@ -64,7 +64,7 @@ jobs:
       - name: Wipe the schema and apply the migrations
         run: |
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'
-          cd apps/api && ./node_modules/.bin/dbmate --migrations-dir db/migrations --no-dump-schema up
+          pnpm --filter @eduvault/api exec dbmate --migrations-dir db/migrations --no-dump-schema up
 
       - name: Seed the super admin and the demo schools
         run: |
