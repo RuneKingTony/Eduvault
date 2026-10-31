@@ -1,0 +1,76 @@
+name: Reset staging
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: Type "reset staging" to wipe the staging database and seed it again
+        required: true
+
+concurrency:
+  group: reset-staging
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  reset:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: staging
+    env:
+      NODE_ENV: production
+      ALLOW_PRODUCTION_SEED: 'true'
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
+      BETTER_AUTH_URL: ${{ vars.BETTER_AUTH_URL }}
+      WEB_ADMIN_URL: ${{ vars.WEB_ADMIN_URL }}
+      WEB_PORTAL_URL: ${{ vars.WEB_PORTAL_URL }}
+      AUTH_COOKIE_DOMAIN: ${{ vars.AUTH_COOKIE_DOMAIN }}
+      GATEWAY_ENCRYPTION_KEY: ${{ secrets.GATEWAY_ENCRYPTION_KEY }}
+      FILE_STORE_DRIVER: s3
+      S3_BUCKET: eduvault-staging
+      S3_REGION: auto
+      S3_FORCE_PATH_STYLE: 'true'
+      S3_ENDPOINT: ${{ vars.S3_ENDPOINT }}
+      S3_ACCESS_KEY_ID: ${{ secrets.S3_ACCESS_KEY_ID }}
+      S3_SECRET_ACCESS_KEY: ${{ secrets.S3_SECRET_ACCESS_KEY }}
+      BOOTSTRAP_ADMIN_EMAIL: ${{ secrets.BOOTSTRAP_ADMIN_EMAIL }}
+      BOOTSTRAP_ADMIN_PASSWORD: ${{ secrets.BOOTSTRAP_ADMIN_PASSWORD }}
+      STAGING_DB_HOST: ${{ vars.STAGING_DB_HOST }}
+    steps:
+      - name: Refuse anything that is not staging
+        run: |
+          if [[ '${{ inputs.confirm }}' != 'reset staging' ]]; then
+            echo "::error::Type exactly 'reset staging' to confirm"
+            exit 1
+          fi
+          host=$(node -e 'process.stdout.write(new URL(process.env.DATABASE_URL).hostname)')
+          if [[ -z "$STAGING_DB_HOST" || "$host" != "$STAGING_DB_HOST" ]]; then
+            echo "::error::DATABASE_URL points at '$host', not at the staging host in vars.STAGING_DB_HOST. Nothing was touched."
+            exit 1
+          fi
+          if [[ "$BETTER_AUTH_URL" != *".staging."* ]]; then
+            echo "::error::BETTER_AUTH_URL is not a staging address. Nothing was touched."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+        with:
+          nx: 'false'
+
+      - name: Wipe the schema and apply the migrations
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'
+          pnpm --filter @eduvault/api exec dbmate --migrations-dir db/migrations --no-dump-schema up
+
+      - name: Seed the super admin and the demo schools
+        run: |
+          pnpm nx run-many -t bootstrap-admin-build seed-build -p api
+          node apps/api/dist/bootstrap-admin.cjs
+          node apps/api/dist/seed.cjs
+
+      - name: Check the API answers
+        run: curl -fsS "$BETTER_AUTH_URL/health"
