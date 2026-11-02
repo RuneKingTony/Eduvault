@@ -6,11 +6,11 @@ import {
   Patch,
   Post,
   Query,
-  Res,
+  UseInterceptors,
 } from '@nestjs/common';
-import type { Response } from 'express';
 import { contract, type RouteOutput } from '@eduvault/api-contract';
 import { Org, OrganizationAuth, type OrgContext } from '../../common/auth';
+import { ReplayStatusInterceptor } from '../../common/http/replay-status.interceptor';
 import { zod } from '../../common/http/zod.pipe';
 import { DeliveryService } from './delivery.service';
 import { ItemService } from './item.service';
@@ -87,14 +87,12 @@ export class StoreController {
 
   @Post('deliveries')
   @OrganizationAuth('store', 'receive')
-  async recordDelivery(
+  @UseInterceptors(ReplayStatusInterceptor)
+  recordDelivery(
     @Org() org: OrgContext,
     @Body(zod(routes.recordDelivery.body))
-    body: Parameters<DeliveryService['record']>[1],
-    @Res({ passthrough: true }) response: Response
+    body: Parameters<DeliveryService['record']>[1]
   ): Promise<RouteOutput<typeof routes.recordDelivery>> {
-    const recorded = await this.deliveries.record(org, body);
-    response.status(recorded.replayed ? 200 : 201);
-    return recorded;
+    return this.deliveries.record(org, body);
   }
 }

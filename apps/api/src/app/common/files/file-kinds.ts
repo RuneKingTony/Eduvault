@@ -35,6 +35,19 @@ export interface FileKindRule {
 
 const MEGABYTE = 1_048_576;
 
+const proofKind = (
+  rule: Pick<
+    FileKindRule,
+    'maxBytes' | 'types' | 'write' | 'read' | 'locked' | 'denied'
+  >
+): FileKindRule => ({
+  ...rule,
+  campusScoped: true,
+  tooLarge: PAYMENT_PROOF_SIZE_MESSAGE,
+  wrongType: PAYMENT_PROOF_TYPE_MESSAGE,
+  unusable: PAYMENT_PROOF_INVALID_MESSAGE,
+});
+
 export const FILE_KIND_RULES: Record<FileKind, FileKindRule> = {
   school_logo: {
     maxBytes: MEGABYTE,
@@ -60,42 +73,30 @@ export const FILE_KIND_RULES: Record<FileKind, FileKindRule> = {
     wrongType: GUARDIAN_PHOTO_TYPE_MESSAGE,
     unusable: GUARDIAN_PHOTO_INVALID_MESSAGE,
   },
-  payment_proof: {
+  payment_proof: proofKind({
     maxBytes: PAYMENT_PROOF.maxBytes,
     types: PAYMENT_PROOF.types,
     write: ['payment:record', 'store:issue'],
     read: 'payment:read',
-    campusScoped: true,
     locked: PAYMENT_PROOF_LOCKED_MESSAGE,
     denied: PAYMENT_PROOF_DENIED_MESSAGE,
-    tooLarge: PAYMENT_PROOF_SIZE_MESSAGE,
-    wrongType: PAYMENT_PROOF_TYPE_MESSAGE,
-    unusable: PAYMENT_PROOF_INVALID_MESSAGE,
-  },
-  wallet_proof: {
+  }),
+  wallet_proof: proofKind({
     maxBytes: WALLET_PROOF.maxBytes,
     types: WALLET_PROOF.types,
     write: ['wallet:topUp'],
     read: 'wallet:read',
-    campusScoped: true,
     locked: WALLET_PROOF_LOCKED_MESSAGE,
     denied: WALLET_PROOF_DENIED_MESSAGE,
-    tooLarge: PAYMENT_PROOF_SIZE_MESSAGE,
-    wrongType: PAYMENT_PROOF_TYPE_MESSAGE,
-    unusable: PAYMENT_PROOF_INVALID_MESSAGE,
-  },
-  wallet_refund_request: {
+  }),
+  wallet_refund_request: proofKind({
     maxBytes: WALLET_PROOF.maxBytes,
     types: WALLET_PROOF.types,
     write: ['wallet:requestRefund'],
     read: 'wallet:read',
-    campusScoped: true,
     locked: WALLET_REFUND_PROOF_LOCKED_MESSAGE,
     denied: WALLET_REFUND_PROOF_DENIED_MESSAGE,
-    tooLarge: PAYMENT_PROOF_SIZE_MESSAGE,
-    wrongType: PAYMENT_PROOF_TYPE_MESSAGE,
-    unusable: PAYMENT_PROOF_INVALID_MESSAGE,
-  },
+  }),
 };
 
 /** One byte above the largest cap: bounds what any member can make the server buffer before the permission check. */

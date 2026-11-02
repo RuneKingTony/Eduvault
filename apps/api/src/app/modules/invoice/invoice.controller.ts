@@ -1,7 +1,15 @@
-import { Body, Controller, Get, Param, Post, Query, Res } from '@nestjs/common';
-import type { Response } from 'express';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+  UseInterceptors,
+} from '@nestjs/common';
 import { contract, type RouteOutput } from '@eduvault/api-contract';
 import { Org, OrganizationAuth, type OrgContext } from '../../common/auth';
+import { ReplayStatusInterceptor } from '../../common/http/replay-status.interceptor';
 import { zod } from '../../common/http/zod.pipe';
 import { InvoiceService } from './invoice.service';
 
@@ -32,14 +40,12 @@ export class InvoiceController {
 
   @Post()
   @OrganizationAuth('invoice', 'charge')
-  async create(
+  @UseInterceptors(ReplayStatusInterceptor)
+  create(
     @Org() org: OrgContext,
     @Body(zod(routes.create.body))
-    body: Parameters<InvoiceService['create']>[1],
-    @Res({ passthrough: true }) response: Response
+    body: Parameters<InvoiceService['create']>[1]
   ): Promise<RouteOutput<typeof routes.create>> {
-    const created = await this.invoices.create(org, body);
-    response.status(created.replayed ? 200 : 201);
-    return created;
+    return this.invoices.create(org, body);
   }
 }

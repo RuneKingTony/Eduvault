@@ -1,7 +1,15 @@
-import { Body, Controller, Get, Param, Post, Query, Res } from '@nestjs/common';
-import type { Response } from 'express';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+  UseInterceptors,
+} from '@nestjs/common';
 import { contract, type RouteOutput } from '@eduvault/api-contract';
 import { Org, OrganizationAuth, type OrgContext } from '../../common/auth';
+import { ReplayStatusInterceptor } from '../../common/http/replay-status.interceptor';
 import { zod } from '../../common/http/zod.pipe';
 import { PaymentVoidService } from './payment-void.service';
 import { PaymentService } from './payment.service';
@@ -44,15 +52,13 @@ export class PaymentController {
 
   @Post()
   @OrganizationAuth('payment', 'record')
-  async record(
+  @UseInterceptors(ReplayStatusInterceptor)
+  record(
     @Org() org: OrgContext,
     @Body(zod(routes.record.body))
-    body: Parameters<PaymentService['record']>[1],
-    @Res({ passthrough: true }) response: Response
+    body: Parameters<PaymentService['record']>[1]
   ): Promise<RouteOutput<typeof routes.record>> {
-    const recorded = await this.payments.record(org, body);
-    response.status(recorded.replayed ? 200 : 201);
-    return recorded;
+    return this.payments.record(org, body);
   }
 
   @Post(':id/void-requests')

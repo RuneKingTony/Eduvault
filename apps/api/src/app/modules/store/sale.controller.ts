@@ -1,11 +1,19 @@
-import { Body, Controller, Get, Param, Post, Query, Res } from '@nestjs/common';
-import type { Response } from 'express';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+  UseInterceptors,
+} from '@nestjs/common';
 import {
   contract,
   type RouteOutput,
   type SaleOptionsQuery,
 } from '@eduvault/api-contract';
 import { Org, OrganizationAuth, type OrgContext } from '../../common/auth';
+import { ReplayStatusInterceptor } from '../../common/http/replay-status.interceptor';
 import { zod } from '../../common/http/zod.pipe';
 import { SaleService } from './sale.service';
 import { StoreReadService } from './store-read.service';
@@ -49,14 +57,12 @@ export class SaleController {
 
   @Post('sales')
   @OrganizationAuth('store', 'issue')
-  async recordSale(
+  @UseInterceptors(ReplayStatusInterceptor)
+  recordSale(
     @Org() org: OrgContext,
     @Body(zod(routes.recordSale.body))
-    body: Parameters<SaleService['record']>[1],
-    @Res({ passthrough: true }) response: Response
+    body: Parameters<SaleService['record']>[1]
   ): Promise<RouteOutput<typeof routes.recordSale>> {
-    const recorded = await this.sales.record(org, body);
-    response.status(recorded.replayed ? 200 : 201);
-    return recorded;
+    return this.sales.record(org, body);
   }
 }
