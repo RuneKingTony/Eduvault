@@ -333,6 +333,25 @@ END;
 $$;
 
 --
+-- Name: money_account_gateway_history_kept(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.money_account_gateway_history_kept() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM journal_line
+    WHERE organization_id = OLD.organization_id AND ledger_account_id = OLD.ledger_account_id
+  ) THEN
+    RAISE EXCEPTION 'a gateway account with history is never deleted'
+      USING ERRCODE = 'check_violation', CONSTRAINT = 'money_account_gateway_history_kept';
+  END IF;
+  RETURN OLD;
+END;
+$$;
+
+--
 -- Name: payment_allocation_immutable(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -4146,6 +4165,12 @@ CREATE TRIGGER journal_line_requires_student BEFORE INSERT ON public.journal_lin
 CREATE TRIGGER ledger_account_system_fixed BEFORE UPDATE ON public.ledger_account FOR EACH ROW EXECUTE FUNCTION public.ledger_account_system_fixed();
 
 --
+-- Name: money_account money_account_gateway_history_kept; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER money_account_gateway_history_kept BEFORE DELETE ON public.money_account FOR EACH ROW WHEN ((old.kind = 'gateway'::text)) EXECUTE FUNCTION public.money_account_gateway_history_kept();
+
+--
 -- Name: payment_allocation payment_allocation_immutable; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -6055,4 +6080,5 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20261026090000'),
     ('20261027090000'),
     ('20261028090000'),
-    ('20261029090000');
+    ('20261029090000'),
+    ('20261030090000');
