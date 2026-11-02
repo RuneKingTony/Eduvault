@@ -204,6 +204,8 @@ export abstract class WalletRepository {
     walletId: string
   ): Promise<WalletView | undefined>;
 
+  abstract walletInScope(scope: OrgScope, walletId: string): Promise<boolean>;
+
   abstract findOwnWallet(
     organizationId: string,
     userId: string

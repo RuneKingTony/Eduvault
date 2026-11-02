@@ -35,7 +35,8 @@ import {
 } from '@eduvault/api-contract';
 import type { OrgContext } from '../../common/auth';
 import { Clock } from '../../common/clock';
-import { orgScopeOf, type OrgScope } from '../../common/scope';
+import { orgScopeOf } from '../../common/scope';
+import type { UsableMoneyAccount } from '../../common/money-accounts';
 import { MoneyAccountService } from '../money-account/money-account.service';
 import { topUpRequestHash } from './wallet-request-hash';
 import { WalletRepository } from './wallet.repository';
@@ -143,7 +144,7 @@ export class WalletService {
     query: WalletMovementQuery
   ): Promise<WalletMovementList> {
     const scope = orgScopeOf(ctx);
-    if ((await this.wallets.findWallet(scope, walletId)) === undefined) {
+    if (!(await this.wallets.walletInScope(scope, walletId))) {
       throw notFound();
     }
     const [currency, page] = await Promise.all([
@@ -159,7 +160,7 @@ export class WalletService {
     input: TopUpWallet
   ): Promise<ToppedUpWallet> {
     const scope = orgScopeOf(ctx);
-    if ((await this.wallets.findWallet(scope, walletId)) === undefined) {
+    if (!(await this.wallets.walletInScope(scope, walletId))) {
       throw notFound();
     }
     const requestHash = topUpRequestHash(walletId, input);
@@ -234,36 +235,35 @@ export class WalletService {
     input: TopUpWallet
   ): Promise<{ ledgerAccountId: string; campusId: string | null }> {
     const scope = orgScopeOf(ctx);
-    if (!(await this.wallets.guardianPays(ctx.organizationId, walletId))) {
+    const [pays, methods, account, proof] = await Promise.all([
+      this.wallets.guardianPays(ctx.organizationId, walletId),
+      this.wallets.paymentMethods(ctx.organizationId),
+      this.wallets.recordingAccount(scope, input.moneyAccountId),
+      this.wallets.proof(ctx.organizationId, ctx.user.id, input.proofFileId),
+    ]);
+    if (!pays) {
       throw new BadRequestException(WALLET_NOT_PAYING_MESSAGE);
     }
-    const methods = await this.wallets.paymentMethods(ctx.organizationId);
     if (!methods[input.method]) {
       throw new BadRequestException(WALLET_METHOD_OFF_MESSAGE);
     }
     if (input.receivedOn > this.clock.today()) {
       throw new BadRequestException(WALLET_FUTURE_DATE_MESSAGE);
     }
-    const account = await this.usableAccount(scope, input);
-    const proof = await this.wallets.proof(
-      ctx.organizationId,
-      ctx.user.id,
-      input.proofFileId
-    );
+    const usable = this.usableAccount(account, input);
     if (proof === 'missing') {
       throw new NotFoundException(WALLET_PROOF_NOT_FOUND_MESSAGE);
     }
     if (proof === 'taken') {
       throw new ConflictException(WALLET_PROOF_TAKEN_MESSAGE);
     }
-    return account;
+    return usable;
   }
 
-  private async usableAccount(scope: OrgScope, input: TopUpWallet) {
-    const account = await this.wallets.recordingAccount(
-      scope,
-      input.moneyAccountId
-    );
+  private usableAccount(
+    account: UsableMoneyAccount,
+    input: TopUpWallet
+  ): { ledgerAccountId: string; campusId: string | null } {
     if (account.status === 'missing') {
       throw new NotFoundException(WALLET_ACCOUNT_NOT_FOUND_MESSAGE);
     }

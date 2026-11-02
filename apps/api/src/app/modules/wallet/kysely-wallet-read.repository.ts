@@ -21,7 +21,7 @@ import { fileProofState, type ProofState } from '../../common/payments';
 import { receivableBalanceSql } from '../../common/ledger';
 import type { OrgScope } from '../../common/scope';
 import {
-  earmarksByChild,
+  earmarkTotal,
   heldMoney,
   heldMoneySql,
   latestAutoPay,
@@ -165,7 +165,7 @@ async function viewOf(
   const [
     rows,
     balanceMinor,
-    marked,
+    setAsideMinor,
     held,
     reservedAccount,
     connected,
@@ -173,7 +173,7 @@ async function viewOf(
   ] = await Promise.all([
     childRows(db, wallet, view.scope),
     walletBalance(db, family),
-    earmarksByChild(db, {
+    earmarkTotal(db, {
       organizationId: wallet.organization_id,
       walletId: wallet.id,
     }),
@@ -189,7 +189,7 @@ async function viewOf(
     rows,
     withOldestUnpaid: view.withOldestUnpaid,
   });
-  const figures = walletFigures(balanceMinor, [...marked.values()], held);
+  const figures = walletFigures(balanceMinor, [setAsideMinor], held);
   const context = { freeMinor: figures.freeMinor, oldest };
   return {
     id: wallet.id,
@@ -212,6 +212,19 @@ async function viewOf(
 }
 
 const WALLET_COLUMNS = sql`w.id, w.organization_id, w.guardian_id, g.full_name, g.phone`;
+
+export async function walletInScope(
+  db: Kysely<DB>,
+  scope: OrgScope,
+  walletId: string
+): Promise<boolean> {
+  const { rows } = await sql<{ id: string }>`
+    SELECT w.id FROM wallet w
+    WHERE w.organization_id = ${scope.organizationId}
+      AND w.id = ${walletId}
+      AND ${anyChildInScopeSql('w', scope.campusScope)}`.execute(db);
+  return rows.length > 0;
+}
 
 export async function findWallet(
   db: Kysely<DB>,
