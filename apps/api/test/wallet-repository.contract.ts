@@ -118,6 +118,28 @@ const migrationBody = (
 });
 
 export function describeWalletRepositoryContract(test: TestFn): void {
+  test('tells whether a wallet is in scope without building its view, and sums what is set aside', async (harness) => {
+    expect(
+      await harness.repository.walletInScope(harness.scope, harness.walletId)
+    ).toBe(true);
+    expect(
+      await harness.repository.walletInScope(
+        harness.scope,
+        '00000000-0000-4000-8000-000000000000'
+      )
+    ).toBe(false);
+
+    await fund(harness);
+    await harness.repository.earmark(
+      markBody(harness, { kind: 'set', index: 0, amountMinor: 100_000 })
+    );
+    await harness.repository.earmark(
+      markBody(harness, { kind: 'set', index: 1, amountMinor: 250_000 })
+    );
+
+    expect((await view(harness)).setAsideMinor).toBe(350_000);
+  });
+
   test('records a top-up once: the same request replays, a changed one clashes, a used receipt is refused', async (harness) => {
     const input = await harness.newTopUp({
       reference: nextReference('CSH'),

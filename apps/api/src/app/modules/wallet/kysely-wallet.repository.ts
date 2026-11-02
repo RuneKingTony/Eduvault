@@ -32,6 +32,7 @@ import {
   findTopUpToCancel,
   findWallet,
   listWallets,
+  walletInScope,
   ownMovements,
   refundProofState,
   walletMovements,
@@ -123,6 +124,10 @@ export class KyselyWalletRepository extends WalletRepository {
     walletId: string
   ): Promise<WalletView | undefined> {
     return findWallet(this.db, scope, walletId);
+  }
+
+  walletInScope(scope: OrgScope, walletId: string): Promise<boolean> {
+    return walletInScope(this.db, scope, walletId);
   }
 
   findOwnWallet(
