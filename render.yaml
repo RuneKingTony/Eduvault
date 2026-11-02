@@ -1,0 +1,62 @@
+services:
+  - type: web
+    name: eduvault-api
+    runtime: node
+    plan: free
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm exec nx run api:build && pnpm exec nx run api:bootstrap-admin-build
+    preDeployCommand: cd apps/api && pnpm exec dbmate --migrations-dir db/migrations --no-dump-schema up && node dist/bootstrap-admin.cjs
+    startCommand: node apps/api/dist/main.cjs
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: 24
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: BETTER_AUTH_SECRET
+        generateValue: true
+      - key: GATEWAY_ENCRYPTION_KEY
+        generateValue: true
+      - key: BETTER_AUTH_URL
+        value: https://eduvault-api.onrender.com
+      - key: WEB_ADMIN_URL
+        value: https://eduvault-admin.onrender.com
+      - key: WEB_PORTAL_URL
+        value: https://eduvault-portal.onrender.com
+      - key: BOOTSTRAP_ADMIN_EMAIL
+        sync: false
+      - key: BOOTSTRAP_ADMIN_PASSWORD
+        sync: false
+
+  - type: web
+    name: eduvault-admin
+    runtime: static
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm exec nx run web-admin:build
+    staticPublishPath: dist/apps/web-admin
+    envVars:
+      - key: NODE_VERSION
+        value: 24
+      - key: VITE_API_URL
+        value: https://eduvault-api.onrender.com
+      - key: VITE_PORTAL_URL
+        value: https://eduvault-portal.onrender.com
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
+  - type: web
+    name: eduvault-portal
+    runtime: static
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm exec nx run web-portal:build
+    staticPublishPath: dist/apps/web-portal
+    envVars:
+      - key: NODE_VERSION
+        value: 24
+      - key: VITE_API_URL
+        value: https://eduvault-api.onrender.com
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
