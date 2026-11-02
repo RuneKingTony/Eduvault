@@ -3,8 +3,7 @@ services:
     name: eduvault-api
     runtime: node
     plan: free
-    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm exec nx run api:build && pnpm exec nx run api:bootstrap-admin-build
-    preDeployCommand: cd apps/api && pnpm exec dbmate --migrations-dir db/migrations --no-dump-schema up && node dist/bootstrap-admin.cjs
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm exec nx run api:build && pnpm exec nx run api:bootstrap-admin-build && (cd apps/api && pnpm exec dbmate --migrations-dir db/migrations --no-dump-schema up && node dist/bootstrap-admin.cjs)
     startCommand: node apps/api/dist/main.cjs
     healthCheckPath: /
     envVars:
